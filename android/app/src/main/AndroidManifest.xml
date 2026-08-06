@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- release 빌드도 백엔드 API를 호출하므로 필요 (debug manifest의 INTERNET 권한은
+         Flutter 개발 도구 통신용이라 release에는 적용되지 않음) -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="bbbook"
         android:name="${applicationName}"

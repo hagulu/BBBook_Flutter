@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 기능 이관용 포팅 분석 문서(원본 프로젝트 캡처본, 버전관리 불필요)
+/docs/porting-reference/

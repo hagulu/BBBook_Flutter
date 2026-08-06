@@ -1,4 +1,4 @@
-package com.example.bbbook
+package com.hagulu.nook.bbbook
 
 import io.flutter.embedding.android.FlutterActivity
 
