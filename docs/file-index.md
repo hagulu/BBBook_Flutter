@@ -7,7 +7,7 @@
 - `lib/main.dart` — 앱 진입점
 - `lib/app/app.dart` — MaterialApp 루트 위젯
 - `lib/app/router.dart` — go_router 라우팅, 인증 상태 기반 redirect(AuthGuard 대응)
-- `lib/app/placeholder_home_screen.dart` — 로그인 후 진입 임시 화면(TODO: home-feed 기능 포팅 후 교체)
+- `lib/app/main_shell.dart` — 로그인 후 진입하는 하단 탭 셸(HOME/BOOKSHELF/PROFILE), 기본 탭은 BOOKSHELF, 포그라운드 전환 시 동기화 트리거
 
 ## core
 
@@ -26,6 +26,23 @@
 - `lib/features/auth/data/social_auth_service.dart` — Google/Apple 네이티브 로그인
 - `lib/features/auth/widgets/auth_loading_gate.dart` — 인증 확인 중 빈 배경 표시(AuthGuard 대응)
 
+## features/home
+
+- `lib/features/home/screens/home_tab_placeholder.dart` — 홈 탭 임시 화면(TODO: home-feed 기능 포팅 후 교체)
+
+## features/profile
+
+- `lib/features/profile/screens/profile_tab_placeholder.dart` — 프로필 탭 임시 화면(TODO: profile 기능 포팅 후 교체), 로그아웃 진입점
+
+## features/bookshelf
+
+- `lib/features/bookshelf/screens/bookshelf_screen.dart` — 책장 탭 콘텐츠(읽는 중/완독/읽고 싶음/중단 4탭)
+- `lib/features/bookshelf/data/bookshelf_api.dart` — 책장 API 호출(전체 동기화, 증분 동기화, 완독 공개 설정 조회/수정)
+- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(user_book/user_book_tag/sync_meta)
+- `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호)
+- `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화
+- `lib/features/bookshelf/providers/bookshelf_providers.dart` — 책장 관련 Riverpod provider(동기화 컨트롤러, 탭별 목록, 완독 필터, 공개 설정)
+
 ## shared/widgets
 
 - `lib/shared/widgets/app_alert.dart` — 공통 Alert 팝업(제목/내용/확인 버튼)
@@ -36,3 +53,5 @@
 
 - `docs/review/20260806-174318-initial-implementation-review.md` — 최초 구현의 구조·인증·공통 컴포넌트 심층 리뷰
 - `docs/review/20260807-141513-shared-dialog-loading-review.md` — 공통 Alert/Confirm/Loading 컴포넌트 리뷰
+- `docs/review/20260807-165007-finished-list-scroll-performance-review.md` — 완독 목록 스크롤 성능 병목과 튜닝 우선순위 리뷰
+- `docs/review/20260807-202727-bookshelf-implementation-review.md` — 책장 구현의 계정 데이터 격리·동기화 상태·접근성 리뷰

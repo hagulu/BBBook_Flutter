@@ -41,6 +41,8 @@ dependencies:
   sign_in_with_apple: ^8.1.0
   go_router: ^17.4.0
   uuid: ^4.6.0
+  sqflite: ^2.4.3
+  path: ^1.9.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

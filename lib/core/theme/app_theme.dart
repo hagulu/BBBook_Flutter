@@ -8,6 +8,7 @@ class AppColors {
   static const primary = Color(0xFF0061A3);
   static const primaryHover = Color(0xFF004F86);
   static const accent = Color(0xFF5DAEFF);
+  static const accentLight = Color(0xFFBEDAFE);
 
   static const titleText = Color(0xFF181C20);
   static const bodyText = Color(0xFF404751);
@@ -24,6 +25,10 @@ class AppColors {
   static const success = Color(0xFF16A34A);
   static const warning = Color(0xFFD97706);
   static const warningBackground = Color(0xFFFFFBEB);
+
+  static const starFilled = Color(0xFFFBBF24);
+  static const masterpieceGold = Color(0xFFF5C518);
+  static const masterpieceBackground = Color(0xFFFEF3C7);
 }
 
 ThemeData buildAppTheme() {

@@ -6,7 +6,7 @@ import '../features/auth/providers/auth_notifier.dart';
 import '../features/auth/providers/auth_state.dart';
 import '../features/auth/screens/onboarding_screen.dart';
 import '../features/auth/widgets/auth_loading_gate.dart';
-import 'placeholder_home_screen.dart';
+import 'main_shell.dart';
 
 /// Riverpod의 인증 상태 변화를 go_router의 `refresh`에 연결한다.
 class _GoRouterRefreshNotifier extends ChangeNotifier {
@@ -50,7 +50,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/feed',
-        builder: (context, state) => const AuthLoadingGate(child: PlaceholderHomeScreen()),
+        builder: (context, state) => const AuthLoadingGate(child: MainShell()),
       ),
     ],
   );

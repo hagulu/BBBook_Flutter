@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../data/auth_api.dart' show SocialProvider;
 import '../data/auth_repository.dart';
 import 'auth_providers.dart';
@@ -39,6 +40,10 @@ class AuthNotifier extends Notifier<AuthState> {
     try {
       final accessToken = await _refreshAccessToken();
       if (accessToken == null) {
+        // refresh token이 없거나(최초 설치) 무효화된 경우 모두 포함한다. 후자를
+        // 놓치면 이전 세션의 책장이 로컬 DB에 남은 채로 다음 로그인 사용자에게
+        // 노출될 수 있어(계정 데이터 격리), 로그아웃과 동일하게 비운다.
+        await _clearLocalBookshelf();
         state = const AuthState(status: AuthStatus.unauthenticated);
         return;
       }
@@ -110,6 +115,7 @@ class AuthNotifier extends Notifier<AuthState> {
       await _repository.logout();
       developer.log('[로그아웃] result=SUCCESS');
     } finally {
+      await _clearLocalBookshelf();
       state = const AuthState(status: AuthStatus.unauthenticated);
     }
   }
@@ -118,7 +124,27 @@ class AuthNotifier extends Notifier<AuthState> {
     try {
       await _repository.clearLocalSession();
     } finally {
+      await _clearLocalBookshelf();
       state = const AuthState(status: AuthStatus.unauthenticated);
+    }
+  }
+
+  /// 다음 로그인 사용자에게 이전 계정의 책장이 남아있지 않도록 로그아웃 시
+  /// 항상 비운다. SQLite뿐 아니라 이전 계정 데이터를 들고 있는 Riverpod
+  /// 캐시(탭별 목록, 마지막 동기화 시각, 공개 설정, 검색/필터 상태)도 함께
+  /// 무효화해야 한다 — 그렇지 않으면 재로그인 시 화면이 캐시된 이전 계정
+  /// 데이터를 그대로 보여주고, `syncIfStale()`도 남은 lastSyncedAt 때문에
+  /// 동기화를 건너뛴다.
+  Future<void> _clearLocalBookshelf() async {
+    try {
+      await ref.read(bookshelfRepositoryProvider).clearLocal();
+    } catch (e) {
+      developer.log('[책장 로컬 DB 초기화] result=FAIL reason=${e.runtimeType}');
+    } finally {
+      ref.invalidate(bookshelfSyncControllerProvider);
+      ref.invalidate(privacySettingControllerProvider);
+      ref.invalidate(finishedFilterProvider);
+      ref.read(bookshelfSyncVersionProvider.notifier).state++;
     }
   }
 
