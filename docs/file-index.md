@@ -26,6 +26,13 @@
 - `lib/features/auth/data/social_auth_service.dart` — Google/Apple 네이티브 로그인
 - `lib/features/auth/widgets/auth_loading_gate.dart` — 인증 확인 중 빈 배경 표시(AuthGuard 대응)
 
+## shared/widgets
+
+- `lib/shared/widgets/app_alert.dart` — 공통 Alert 팝업(제목/내용/확인 버튼)
+- `lib/shared/widgets/app_confirm.dart` — 공통 Confirm 팝업(확인/취소, Future<bool> 반환)
+- `lib/shared/widgets/app_loading.dart` — 공통 Loading(전체 화면 `AppLoading`, 영역 단위 `AppLoadingOverlay`)
+
 ## docs
 
 - `docs/review/20260806-174318-initial-implementation-review.md` — 최초 구현의 구조·인증·공통 컴포넌트 심층 리뷰
+- `docs/review/20260807-141513-shared-dialog-loading-review.md` — 공통 Alert/Confirm/Loading 컴포넌트 리뷰

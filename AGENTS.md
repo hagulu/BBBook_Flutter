@@ -28,6 +28,13 @@ Flutter 기반의 독서 기록 서비스 앱 프로젝트
 ## 아이콘
 - Material Icons를 기본으로 사용한다.
 
+## 전역 Alert/Confirm/Loading
+- 화면별 커스텀 팝업·로딩을 만들지 않고 `lib/shared/widgets/`의 공통 컴포넌트를 사용한다.
+  - Alert: `AppAlert.show()`
+  - Confirm: `AppConfirm.show()` — `Future<bool>` 반환
+  - Loading(전체 화면): `AppLoading.show()` / `AppLoading.hide()`
+  - Loading(영역 단위): `AppLoadingOverlay` 위젯
+
 ## 백엔드
 - API 문서만으로 해결 가능한 경우 백엔드 소스를 확인하지 않는다.
 - 백엔드 소스 확인이 필요하면 먼저 이유를 설명하고 사용자에게 확인받은 후 진행한다.
