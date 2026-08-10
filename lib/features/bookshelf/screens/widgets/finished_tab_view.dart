@@ -13,6 +13,7 @@ import 'book_cover.dart';
 import 'bookshelf_refresh_indicator.dart';
 import 'finished_filter_panel.dart';
 import 'finished_month_index_bar.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 완독 탭 상단 컨트롤(공개 토글/검색/필터 버튼) 영역 고정 높이.
 ///
@@ -475,7 +476,9 @@ class _FinishedControls extends ConsumerWidget {
                       ? '완독 책장 공개 중 (탭하면 비공개로 전환)'
                       : '완독 책장 비공개 중 (탭하면 공개로 전환)',
                   icon: Icon(
-                    isPublic ? Icons.public : Icons.lock_outline,
+                    isPublic
+                        ? PhosphorIconsRegular.globe
+                        : PhosphorIconsRegular.lock,
                     color: AppColors.primary,
                     size: 20,
                   ),
@@ -504,7 +507,7 @@ class _FinishedControls extends ConsumerWidget {
                   ),
                   padding: EdgeInsets.zero,
                   icon: const Icon(
-                    Icons.help_outline,
+                    PhosphorIconsRegular.question,
                     color: AppColors.mutedIcon,
                     size: 18,
                   ),
@@ -540,7 +543,7 @@ class _FinishedControls extends ConsumerWidget {
                     vertical: 12,
                   ),
                   prefixIcon: const Icon(
-                    Icons.search,
+                    PhosphorIconsRegular.magnifyingGlass,
                     size: 20,
                     color: AppColors.tertiaryText,
                   ),
@@ -550,7 +553,7 @@ class _FinishedControls extends ConsumerWidget {
                       if (value.text.isEmpty) return const SizedBox.shrink();
                       return IconButton(
                         icon: const Icon(
-                          Icons.close,
+                          PhosphorIconsRegular.x,
                           size: 18,
                           color: AppColors.tertiaryText,
                         ),
@@ -588,7 +591,7 @@ class _FinishedControls extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                     ),
                     onPressed: onToggleFilterPanel,
-                    icon: const Icon(Icons.filter_list, size: 16),
+                    icon: const Icon(PhosphorIconsRegular.funnel, size: 16),
                     label: Text(
                       filterActiveCount > 0 ? '필터 $filterActiveCount' : '필터',
                       style: const TextStyle(fontSize: 12),
@@ -656,13 +659,20 @@ class _FinishedBookCard extends StatelessWidget {
             children: [
               BookCover(imageUrl: book.coverImageUrl, title: book.title),
               if (book.isMasterpiece)
-                const Positioned(
+                Positioned(
                   top: 4,
                   left: 4,
-                  child: Icon(
-                    Icons.emoji_events,
-                    size: 16,
-                    color: AppColors.masterpieceGold,
+                  child: Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withValues(alpha: 0.35),
+                    ),
+                    child: const Icon(
+                      PhosphorIconsFill.crown,
+                      size: 20,
+                      color: AppColors.masterpieceGold,
+                    ),
                   ),
                 ),
             ],
@@ -697,7 +707,7 @@ class _StarRow extends StatelessWidget {
       children: List.generate(
         5,
         (i) => Icon(
-          i < filled ? Icons.star : Icons.star_border,
+          i < filled ? PhosphorIconsFill.star : PhosphorIconsRegular.star,
           size: 12,
           color: i < filled ? AppColors.starFilled : AppColors.border,
         ),

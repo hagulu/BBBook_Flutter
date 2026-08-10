@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_confirm.dart';
 import 'record_dialog_shell.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// [showRereadDialog] 결과. 재독 횟수를 바꿨으면 [RereadCountUpdated], 0에서
 /// '-'를 눌러 완독 취소를 확정했으면 [RereadFinishCancelled].
@@ -62,12 +63,15 @@ class _RereadDialogState extends State<_RereadDialog> {
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      icon: Icons.autorenew,
+      icon: PhosphorIconsRegular.arrowsClockwise,
       title: '재독 횟수',
       content: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _StepperButton(icon: Icons.remove, onPressed: _decrement),
+          _StepperButton(
+            icon: PhosphorIconsRegular.minus,
+            onPressed: _decrement,
+          ),
           SizedBox(
             width: 64,
             child: Text(
@@ -81,7 +85,7 @@ class _RereadDialogState extends State<_RereadDialog> {
             ),
           ),
           _StepperButton(
-            icon: Icons.add,
+            icon: PhosphorIconsRegular.plus,
             onPressed: () => setState(() => _count++),
           ),
         ],
@@ -93,7 +97,7 @@ class _RereadDialogState extends State<_RereadDialog> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         RecordDialogButton(
-          label: '저장',
+          label: '확인',
           onPressed: () =>
               Navigator.of(context).pop(RereadCountUpdated(_count)),
         ),

@@ -1,24 +1,25 @@
 import 'package:flutter/material.dart';
 
 import '../../bookshelf/models/book_status.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 책 기록 화면에서 쓰는 상태/출처/난이도 표시용 한글 라벨 + 아이콘.
-/// `book-record.md` 기준 문구(읽고 싶음/읽는 중/다 읽음/멈춤/중단, 실물책/전자책/오디오북).
+/// `book-record.md` 기준 문구(읽고 싶음/읽는 중/완독/멈춤/중단, 실물책/전자책/오디오북).
 extension BookStatusLabel on BookStatus {
   String get label => switch (this) {
     BookStatus.wantToRead => '읽고 싶음',
     BookStatus.reading => '읽는 중',
-    BookStatus.finished => '다 읽음',
+    BookStatus.finished => '완독',
     BookStatus.paused => '멈춤',
     BookStatus.stopped => '중단',
   };
 
   IconData get icon => switch (this) {
-    BookStatus.wantToRead => Icons.bookmark_border,
-    BookStatus.reading => Icons.menu_book_outlined,
-    BookStatus.finished => Icons.check_circle_outline,
-    BookStatus.paused => Icons.pause_circle_outline,
-    BookStatus.stopped => Icons.cancel_outlined,
+    BookStatus.wantToRead => PhosphorIconsRegular.bookmarkSimple,
+    BookStatus.reading => PhosphorIconsRegular.bookOpen,
+    BookStatus.finished => PhosphorIconsRegular.checkCircle,
+    BookStatus.paused => PhosphorIconsRegular.pauseCircle,
+    BookStatus.stopped => PhosphorIconsRegular.xCircle,
   };
 }
 
@@ -49,9 +50,9 @@ enum BookSourceType {
   };
 
   IconData get icon => switch (this) {
-    BookSourceType.paperBook => Icons.menu_book_outlined,
-    BookSourceType.ebook => Icons.tablet_mac_outlined,
-    BookSourceType.audioBook => Icons.headphones_outlined,
+    BookSourceType.paperBook => PhosphorIconsRegular.bookOpen,
+    BookSourceType.ebook => PhosphorIconsRegular.deviceTablet,
+    BookSourceType.audioBook => PhosphorIconsRegular.headphones,
   };
 
   /// `GET /api/books/options`의 `platforms` 맵 키.
@@ -92,8 +93,8 @@ enum DifficultyLevel {
   };
 
   IconData get icon => switch (this) {
-    DifficultyLevel.easy => Icons.signal_cellular_alt_1_bar,
-    DifficultyLevel.moderate => Icons.signal_cellular_alt_2_bar,
-    DifficultyLevel.hard => Icons.signal_cellular_alt,
+    DifficultyLevel.easy => PhosphorIconsRegular.cellSignalLow,
+    DifficultyLevel.moderate => PhosphorIconsRegular.cellSignalMedium,
+    DifficultyLevel.hard => PhosphorIconsRegular.cellSignalFull,
   };
 }

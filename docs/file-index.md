@@ -65,3 +65,5 @@
 - `docs/review/20260807-232503-book-record-and-bookshelf-review.md` — 책 기록 상세와 책장 후속 변경의 상태 최신성·동시성·포팅 누락 리뷰
 - `docs/review/20260808-001248-book-record-followup-review.md` — 책 기록 후속 수정의 계정 격리·포팅 범위·상태 정합성 재리뷰
 - `docs/review/20260808-172540-book-record-third-review.md` — 책 기록 추가 변경의 세션 경합·난이도 규격·접근성 재리뷰
+- `docs/review/20260810-153456-book-record-layout-review.md` — 책 기록 UI 재배치의 슬라이더 렌더링·접근성 리뷰
+- `docs/review/20260810-163411-book-record-status-and-icon-review.md` — 책 기록 상태 선택의 접근성·아이콘 정책 재리뷰

@@ -1,9 +1,110 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_theme.dart';
+import '../../../bookshelf/models/book_status.dart';
 import '../../models/record_labels.dart';
 import 'icon_option_selector.dart';
 import 'pill_option.dart';
 import 'record_dialog_shell.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
+
+/// 독서 상태 선택 팝업. 정사각형 카드를 고르면 바로 그 상태를 반환하며 닫힌다.
+Future<BookStatus?> showReadingStatusDialog(
+  BuildContext context, {
+  required BookStatus initialStatus,
+}) {
+  return showDialog<BookStatus>(
+    context: context,
+    builder: (context) => RecordDialogShell(
+      icon: PhosphorIconsRegular.listChecks,
+      title: '독서 상태',
+      content: GridView.count(
+        crossAxisCount: 3,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 1,
+        children: [
+          for (final status in BookStatus.values)
+            _StatusCard(
+              status: status,
+              selected: status == initialStatus,
+              onTap: () => Navigator.of(context).pop(status),
+            ),
+        ],
+      ),
+      buttons: [
+        RecordDialogButton(
+          label: '취소',
+          style: RecordDialogButtonStyle.neutral,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ],
+    ),
+  );
+}
+
+class _StatusCard extends StatelessWidget {
+  const _StatusCard({
+    required this.status,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final BookStatus status;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: status.label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.accentLight.withValues(alpha: 0.35)
+                : AppColors.cardBackground,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                status.icon,
+                size: 28,
+                color: selected ? AppColors.primary : AppColors.mutedIcon,
+              ),
+              const SizedBox(height: 8),
+              Flexible(
+                child: Text(
+                  status.label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: selected ? FontWeight.bold : FontWeight.w600,
+                    color: selected ? AppColors.primary : AppColors.bodyText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// [showSourcePlatformDialog] 결과. [platformName]이 null이면 요청에서
 /// 생략한다(실물책 선택 시 서버가 platformName을 자동으로 null 처리하므로
@@ -125,7 +226,7 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      icon: Icons.style_outlined,
+      icon: PhosphorIconsRegular.stack,
       title: '출처 / 플랫폼',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,7 +256,7 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
                     widget.initialPlatform!.isNotEmpty)
                   PillOption(
                     label: _kUnsetPlatformLabel,
-                    icon: Icons.remove_circle_outline,
+                    icon: PhosphorIconsRegular.minusCircle,
                     selected: _selectedPlatform == _kUnsetPlatformLabel,
                     onTap: () => setState(
                       () => _selectedPlatform = _kUnsetPlatformLabel,
@@ -178,7 +279,7 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
                   isDense: true,
                   hintText: '플랫폼명을 입력하세요',
                   counterText: '',
-                  prefixIcon: Icon(Icons.edit_outlined, size: 18),
+                  prefixIcon: Icon(PhosphorIconsRegular.pencil, size: 18),
                 ),
               ),
             ],
@@ -210,7 +311,7 @@ Future<String?> showDifficultyDialog(
   return showDialog<String>(
     context: context,
     builder: (context) => RecordDialogShell(
-      icon: Icons.speed_outlined,
+      icon: PhosphorIconsRegular.gauge,
       title: '난이도',
       content: IconOptionSelector<DifficultyLevel>(
         options: [
@@ -267,7 +368,7 @@ class _DiscoverySourceDialogState extends State<_DiscoverySourceDialog> {
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      icon: Icons.explore_outlined,
+      icon: PhosphorIconsRegular.compass,
       title: '알게 된 경로',
       content: TextField(
         controller: _controller,

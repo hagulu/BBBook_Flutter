@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
 
@@ -17,7 +18,7 @@ class StarRatingDisplay extends StatelessWidget {
       children: List.generate(
         5,
         (i) => Icon(
-          i < filled ? Icons.star : Icons.star_border,
+          i < filled ? PhosphorIconsFill.star : PhosphorIconsRegular.star,
           size: size,
           color: i < filled ? AppColors.starFilled : AppColors.border,
         ),
@@ -53,7 +54,7 @@ class StarRatingInput extends StatelessWidget {
             onPressed: () =>
                 onChanged(starIndex == filled ? 0 : starIndex.toDouble()),
             icon: Icon(
-              i < filled ? Icons.star : Icons.star_border,
+              i < filled ? PhosphorIconsFill.star : PhosphorIconsRegular.star,
               color: i < filled ? AppColors.starFilled : AppColors.border,
               size: 28,
             ),

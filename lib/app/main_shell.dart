@@ -6,6 +6,7 @@ import '../features/bookshelf/providers/bookshelf_providers.dart';
 import '../features/bookshelf/screens/bookshelf_screen.dart';
 import '../features/home/screens/home_tab_placeholder.dart';
 import '../features/profile/screens/profile_tab_placeholder.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 로그인 후 진입하는 하단 탭 셸(HOME/BOOKSHELF/PROFILE, `navigation.md` 대응).
 ///
@@ -75,23 +76,23 @@ class _MainShellState extends ConsumerState<MainShell>
             child: Row(
               children: [
                 _NavItem(
-                  icon: Icons.home_outlined,
-                  selectedIcon: Icons.home,
+                  icon: PhosphorIconsRegular.house,
+                  selectedIcon: PhosphorIconsFill.house,
                   label: '홈',
                   selected: _selectedIndex == 0,
                   onTap: () => setState(() => _selectedIndex = 0),
                 ),
                 _NavItem(
-                  icon: Icons.menu_book_outlined,
-                  selectedIcon: Icons.menu_book,
+                  icon: PhosphorIconsRegular.books,
+                  selectedIcon: PhosphorIconsFill.books,
                   label: '책장',
                   selected: _selectedIndex == 1,
                   onTap: () => setState(() => _selectedIndex = 1),
                 ),
                 const _AddNavItem(),
                 _NavItem(
-                  icon: Icons.person_outline,
-                  selectedIcon: Icons.person,
+                  icon: PhosphorIconsRegular.user,
+                  selectedIcon: PhosphorIconsFill.user,
                   label: '마이',
                   selected: _selectedIndex == 2,
                   onTap: () => setState(() => _selectedIndex = 2),
@@ -124,15 +125,21 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = selected ? AppColors.primary : AppColors.mutedIcon;
     return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(selected ? selectedIcon : icon, color: color),
-            const SizedBox(height: 2),
-            Text(label, style: TextStyle(color: color, fontSize: 12)),
-          ],
+      child: Semantics(
+        button: true,
+        selected: selected,
+        label: label,
+        excludeSemantics: true,
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(selected ? selectedIcon : icon, color: color),
+              const SizedBox(height: 2),
+              Text(label, style: TextStyle(color: color, fontSize: 12)),
+            ],
+          ),
         ),
       ),
     );
@@ -155,7 +162,11 @@ class _AddNavItem extends StatelessWidget {
               color: AppColors.accentLight,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.add, size: 20, color: AppColors.primary),
+            child: const Icon(
+              PhosphorIconsRegular.plus,
+              size: 20,
+              color: AppColors.primary,
+            ),
           ),
         ),
       ),

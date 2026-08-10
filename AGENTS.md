@@ -26,7 +26,8 @@ Flutter 기반의 독서 기록 서비스 앱 프로젝트
 - API 요청 시 401이면 refresh 토큰 재발급 후 1회 재시도하고, 실패하면 로그아웃 처리한다.
 
 ## 아이콘
-- Material Icons를 기본으로 사용한다.
+- 아이콘은 `phosphor_icons` 패키지의 `PhosphorIconsRegular`(기본)/`PhosphorIconsFill`(채워진 상태 표현)을 사용한다(`phosphor_flutter`는 최신 Flutter의 `IconData` final class 변경과 호환되지 않아 사용 금지).
+- 채워진 아이콘이 필요한 경우 커스텀 페인터로 직접 그리지 않고 `PhosphorIconsFill`을 우선 사용한다.
 
 ## 전역 Alert/Confirm/Loading
 - 화면별 커스텀 팝업·로딩을 만들지 않고 `lib/shared/widgets/`의 공통 컴포넌트를 사용한다.

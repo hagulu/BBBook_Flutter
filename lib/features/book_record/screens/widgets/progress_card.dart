@@ -129,22 +129,44 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
                   style: const TextStyle(
                     color: AppColors.primary,
                     fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                    fontSize: 17,
                   ),
                 ),
             ],
           ),
+          if (totalPages != null && totalPages > 0) const SizedBox(height: 12),
           if (totalPages != null && totalPages > 0)
-            Slider(
-              value: _sliderValue.clamp(0, totalPages.toDouble()),
-              min: 0,
-              max: totalPages.toDouble(),
-              activeColor: AppColors.primary,
-              onChanged: (v) => setState(() {
-                _sliderValue = v;
-                _pageController.text = '${v.round()}';
-              }),
-              onChangeEnd: (v) => _save(v.round()),
+            SizedBox(
+              // Slider의 기본 세로 여백이 overlay 크기 기준이라 overlay를
+              // 줄이면 터치 영역도 함께 줄어든다 — 높이를 고정해 최소
+              // 조작 영역(48)을 보장한다.
+              height: 48,
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 4,
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 8,
+                  ),
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 16,
+                  ),
+                ),
+                child: Slider(
+                  // 트랙 좌우 기본 여백(thumb/overlay 크기 기준)을 없애
+                  // 위 Row(쪽수/퍼센트)와 폭을 맞춘다 — 음수 Padding 대신
+                  // Slider가 공식 지원하는 padding으로 처리한다.
+                  padding: EdgeInsets.zero,
+                  value: _sliderValue.clamp(0, totalPages.toDouble()),
+                  min: 0,
+                  max: totalPages.toDouble(),
+                  activeColor: AppColors.primary,
+                  onChanged: (v) => setState(() {
+                    _sliderValue = v;
+                    _pageController.text = '${v.round()}';
+                  }),
+                  onChangeEnd: (v) => _save(v.round()),
+                ),
+              ),
             ),
         ],
       ),

@@ -10,6 +10,7 @@ import '../../../../shared/widgets/app_loading.dart';
 import '../../../bookshelf/models/book_item.dart';
 import '../../providers/book_record_providers.dart';
 import 'record_dialog_shell.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// "책 정보 수정" 모달(제목/저자/출판사/총쪽수/표지). ISBN 재연결(검색 팝업)은
 /// 책 검색 기능이 아직 이관되지 않아 이번 범위에서 제외한다.
@@ -156,7 +157,7 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      icon: Icons.auto_stories_outlined,
+      icon: PhosphorIconsRegular.bookOpen,
       title: '책 정보 수정',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -186,7 +187,7 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
                   right: -8,
                   bottom: -8,
                   child: _CircleIconButton(
-                    icon: Icons.photo_camera_outlined,
+                    icon: PhosphorIconsRegular.camera,
                     background: AppColors.primary,
                     onTap: _pickThumbnail,
                   ),
@@ -196,7 +197,7 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
                     left: -8,
                     top: -8,
                     child: _CircleIconButton(
-                      icon: Icons.close,
+                      icon: PhosphorIconsRegular.x,
                       background: AppColors.error,
                       size: 16,
                       onTap: _clearThumbnail,

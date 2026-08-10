@@ -25,7 +25,8 @@ Flutter 기반의 독서 기록 서비스 앱 프로젝트
 - API 요청 구현 전 `api-read` 스킬 기준으로 문서(`../../api-doc/*.md`)를 먼저 확인
 
 ## 아이콘
-- 아이콘은 Material Icons를 우선 사용하고, 필요 시 `cupertino_icons` 사용
+- 아이콘은 `phosphor_icons` 패키지의 `PhosphorIconsRegular`(기본)/`PhosphorIconsFill`(채워진 상태 표현)을 사용한다(`phosphor_flutter`는 최신 Flutter의 `IconData` final class 변경과 호환되지 않아 사용 금지)
+- 채워진 아이콘이 필요한 경우 커스텀 페인터로 직접 그리지 않고 `PhosphorIconsFill`을 우선 사용한다
 
 ## 전역 Alert/Confirm/Loading
 - 신규 기능 및 수정 작업에서 화면별 커스텀 팝업·로딩을 만들지 않고 아래 공통 컴포넌트(`lib/shared/widgets/`)를 사용한다

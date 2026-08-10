@@ -6,6 +6,7 @@ import '../../../bookshelf/models/book_item.dart';
 import '../../providers/book_record_providers.dart';
 import 'record_section_card.dart';
 import 'star_rating.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 내 평점(탭 즉시 저장) + 개인 리뷰(포커스 아웃 시 저장).
 ///
@@ -93,14 +94,14 @@ class _RatingReviewCardState extends ConsumerState<RatingReviewCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionLabel('내 평점', icon: Icons.star_border),
+          const SectionLabel('내 평점', icon: PhosphorIconsRegular.star),
           const SizedBox(height: 2),
           StarRatingInput(
             rating: widget.book.myRating ?? 0,
             onChanged: _saveRating,
           ),
           const SizedBox(height: 10),
-          const SectionLabel('개인 리뷰', icon: Icons.rate_review_outlined),
+          const SectionLabel('개인 리뷰', icon: PhosphorIconsRegular.notePencil),
           const SizedBox(height: 8),
           TextField(
             controller: _reviewController,

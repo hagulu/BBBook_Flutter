@@ -7,6 +7,7 @@ import '../../../bookshelf/models/book_tag.dart';
 import '../../providers/book_record_providers.dart';
 import 'pill_option.dart';
 import 'record_section_card.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 태그 추가/삭제 섹션(자동완성 제안 포함).
 class TagSection extends ConsumerStatefulWidget {
@@ -94,7 +95,7 @@ class _TagSectionState extends ConsumerState<TagSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionLabel('태그', icon: Icons.sell_outlined),
+        const SectionLabel('태그', icon: PhosphorIconsRegular.tag),
         const SizedBox(height: 8),
         if (widget.tags.isNotEmpty) ...[
           Wrap(
@@ -120,7 +121,7 @@ class _TagSectionState extends ConsumerState<TagSection> {
                   isDense: true,
                   hintText: '태그 추가',
                   counterText: '',
-                  prefixIcon: Icon(Icons.sell_outlined, size: 18),
+                  prefixIcon: Icon(PhosphorIconsRegular.tag, size: 18),
                 ),
               ),
             ),
@@ -163,7 +164,7 @@ class _TagSectionState extends ConsumerState<TagSection> {
                     for (final tag in filtered)
                       PillOption(
                         label: tag.name,
-                        icon: Icons.add,
+                        icon: PhosphorIconsRegular.plus,
                         selected: false,
                         onTap: () => _submit(tag.name),
                       ),
@@ -195,7 +196,7 @@ class _TagChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(
-            Icons.sell_outlined,
+            PhosphorIconsRegular.tag,
             size: 13,
             color: AppColors.tertiaryText,
           ),
@@ -219,7 +220,7 @@ class _TagChip extends StatelessWidget {
                 height: 36,
                 child: Center(
                   child: Icon(
-                    Icons.close,
+                    PhosphorIconsRegular.x,
                     size: 14,
                     color: AppColors.tertiaryText,
                   ),
@@ -248,7 +249,7 @@ class _AddTagButton extends StatelessWidget {
         customBorder: const CircleBorder(),
         child: const Padding(
           padding: EdgeInsets.all(10),
-          child: Icon(Icons.add, color: Colors.white, size: 18),
+          child: Icon(PhosphorIconsRegular.plus, color: Colors.white, size: 18),
         ),
       ),
     );

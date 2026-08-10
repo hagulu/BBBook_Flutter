@@ -16,10 +16,12 @@ import 'widgets/meta_dialogs.dart';
 import 'widgets/meta_summary_card.dart';
 import 'widgets/progress_card.dart';
 import 'widgets/rating_review_card.dart';
-import 'widgets/reading_status_selector.dart';
+import 'widgets/reading_status_tile.dart';
+import 'widgets/record_field_tile.dart';
 import 'widgets/record_section_card.dart';
 import 'widgets/reread_dialog.dart';
 import 'widgets/tag_section.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 책 기록 상세 화면(`/records/[userBookId]` 대응). 자체 AppBar만 갖고
 /// 공통 하단 탭은 쓰지 않는다(book-record.md — 별도 `Navigator.push`로 진입).
@@ -57,48 +59,9 @@ class BookRecordScreen extends ConsumerWidget {
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.titleText,
         elevation: 0,
-        actions: [
-          if (state.valueOrNull != null)
-            IconButton(
-              tooltip: '서재에서 삭제',
-              icon: const Icon(Icons.delete_outline),
-              // 진행 중인 저장(PATCH)이 있으면 비활성화한다 — 그러지 않으면
-              // 저장 응답이 늦게 도착했을 때 삭제된 로컬 행을 되살릴 수 있다.
-              onPressed: state.isLoading
-                  ? null
-                  : () => _confirmDelete(context, ref),
-            ),
-        ],
       ),
       body: body,
     );
-  }
-
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await AppConfirm.show(
-      context,
-      title: '책 삭제',
-      message: '이 책을 서재에서 삭제할까요? 삭제하면 되돌릴 수 없습니다.',
-      confirmText: '삭제',
-      destructive: true,
-    );
-    if (!confirmed || !context.mounted) return;
-
-    AppLoading.show(context);
-    try {
-      await ref
-          .read(bookRecordControllerProvider(userBookId).notifier)
-          .deleteBook();
-      if (context.mounted) Navigator.of(context).pop();
-    } on ApiException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    } finally {
-      AppLoading.hide();
-    }
   }
 }
 
@@ -158,7 +121,6 @@ class _BookRecordBody extends ConsumerWidget {
         children: [
           _Header(
             book: book,
-            onToggleMasterpiece: () => _toggleMasterpiece(context, controller),
             onEditBookInfo: () => showBookInfoEditDialog(
               context,
               userBookId: userBookId,
@@ -171,11 +133,53 @@ class _BookRecordBody extends ConsumerWidget {
             ProgressCard(userBookId: userBookId, book: book),
           ],
           const SizedBox(height: 20),
-          const SectionLabel('독서 상태', icon: Icons.checklist_outlined),
-          const SizedBox(height: 8),
-          ReadingStatusSelector(
-            selected: book.status,
-            onSelected: (status) => _onStatusTap(context, controller, status),
+          RecordSectionCard(
+            child: Row(
+              children: [
+                Expanded(
+                  child: ReadingStatusTile(
+                    status: book.status,
+                    summary: _statusSummary(book),
+                    onTap: () => _openReadingStatusDialog(context, controller),
+                  ),
+                ),
+                InkWell(
+                  onTap: () => _toggleMasterpiece(context, controller),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '명작',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: book.isMasterpiece
+                                ? AppColors.masterpieceGold
+                                : AppColors.mutedIcon,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Icon(
+                          book.isMasterpiece
+                              ? PhosphorIconsFill.crown
+                              : PhosphorIconsRegular.crown,
+                          size: 32,
+                          color: book.isMasterpiece
+                              ? AppColors.masterpieceGold
+                              : AppColors.mutedIcon,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           MetaSummaryCard(
@@ -194,24 +198,101 @@ class _BookRecordBody extends ConsumerWidget {
               isStartedAt: false,
             ),
             sourceValue: _sourceSummary(book),
+            sourceHasValue:
+                BookSourceType.fromApiValue(book.sourceType) != null,
             onTapSource: () => _openSourceDialog(context, ref, controller),
             difficultyValue:
                 DifficultyLevel.fromApiValue(book.difficulty)?.label ??
                 DifficultyLevel.values.map((d) => d.label).join(' · '),
+            difficultyHasValue:
+                DifficultyLevel.fromApiValue(book.difficulty) != null,
             onTapDifficulty: () => _openDifficultyDialog(context, controller),
-            discoverySourceValue: book.discoverySource ?? '미설정',
-            onTapDiscoverySource: () =>
-                _openDiscoverySourceDialog(context, controller),
           ),
           const SizedBox(height: 12),
           RatingReviewCard(userBookId: userBookId, book: book),
           const SizedBox(height: 12),
           RecordSectionCard(
+            child: RecordFieldTile(
+              icon: PhosphorIconsRegular.compass,
+              label: '알게 된 경로',
+              value: book.discoverySource ?? '미설정',
+              hasValue: book.discoverySource != null,
+              onTap: () => _openDiscoverySourceDialog(context, controller),
+            ),
+          ),
+          const SizedBox(height: 12),
+          RecordSectionCard(
             child: TagSection(userBookId: userBookId, tags: book.tags),
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: InkWell(
+              onTap: () => _confirmDelete(context, ref),
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 8,
+                  horizontal: 12,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(
+                      PhosphorIconsRegular.trash,
+                      size: 16,
+                      color: AppColors.error,
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      '서재에서 삭제',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await AppConfirm.show(
+      context,
+      title: '책 삭제',
+      message: '이 책을 서재에서 삭제할까요? 삭제하면 되돌릴 수 없습니다.',
+      confirmText: '삭제',
+      destructive: true,
+    );
+    if (!confirmed || !context.mounted) return;
+
+    AppLoading.show(context);
+    try {
+      await ref
+          .read(bookRecordControllerProvider(userBookId).notifier)
+          .deleteBook();
+      if (context.mounted) Navigator.of(context).pop();
+    } on ApiException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      AppLoading.hide();
+    }
+  }
+
+  String _statusSummary(BookItem book) {
+    if (book.status == BookStatus.finished && book.rereadCount >= 2) {
+      return '${book.status.label} · ${book.rereadCount}회';
+    }
+    return book.status.label;
   }
 
   String _sourceSummary(BookItem book) {
@@ -223,6 +304,18 @@ class _BookRecordBody extends ConsumerWidget {
       return source.label;
     }
     return '${source.label} · ${book.platformName}';
+  }
+
+  Future<void> _openReadingStatusDialog(
+    BuildContext context,
+    BookRecordController controller,
+  ) async {
+    final status = await showReadingStatusDialog(
+      context,
+      initialStatus: book.status,
+    );
+    if (status == null || !context.mounted) return;
+    await _onStatusTap(context, controller, status);
   }
 
   Future<void> _toggleMasterpiece(
@@ -246,29 +339,47 @@ class _BookRecordBody extends ConsumerWidget {
     BookStatus tapped,
   ) async {
     try {
-      if (tapped == book.status) {
-        if (tapped != BookStatus.finished) return;
-        final result = await showRereadDialog(
-          context,
-          initialCount: book.rereadCount,
-        );
-        if (result == null) return;
-        switch (result) {
-          case RereadCountUpdated(:final count):
-            await controller.updateRecord(rereadCount: count);
-          case RereadFinishCancelled():
-            // 실제 웹 클라이언트(BookRecordPage.tsx)도 완독 취소 시 재독
-            // 횟수를 0으로 되돌린다 — 다음에 다시 완독 처리하면 재독
-            // 횟수가 이전 값에서 이어지지 않고 새로 시작해야 자연스럽다.
-            await controller.updateRecord(
-              status: BookStatus.reading.apiValue,
-              rereadCount: 0,
-            );
-        }
-        return;
-      }
-
       if (tapped == BookStatus.finished) {
+        // finishedAt이 있으면 과거에 한 번 이상 완독한 책이다(현재 상태가
+        // 완독이 아니어도 마찬가지) — 바로 완독 처리하지 않고 완독 횟수
+        // 조정 팝업을 띄운다.
+        if (book.finishedAt != null) {
+          final result = await showRereadDialog(
+            context,
+            initialCount: book.rereadCount + 1,
+          );
+          if (result == null) return;
+          switch (result) {
+            case RereadCountUpdated(:final count):
+              await controller.updateRecord(
+                // 이미 완독 상태면 status를 다시 보내지 않는다 — status가
+                // FINISHED인데 finishedAt을 안 보내면 서버가 완독일을 오늘
+                // 날짜로 새로 설정해버려(api-doc), 횟수만 고치려던 사용자의
+                // 완독일이 의도치 않게 바뀐다. 완독이 아닌 상태(읽는 중 등)에서
+                // 재독을 완료하는 경우에만 상태를 FINISHED로 바꿔 완독일이
+                // 오늘로 새로 기록되게 한다.
+                status: book.status == BookStatus.finished
+                    ? null
+                    : tapped.apiValue,
+                rereadCount: count,
+                // totalPages를 아는 책은 마지막 쪽으로 진행률을 맞춘다(실제
+                // 웹 클라이언트와 동일 — 완독인데 진행률이 중간에 멈춰 있는
+                // 모순 방지). 재독 팝업은 완독 상태가 아닌 책에서도 열릴 수
+                // 있어 이 값이 항상 이미 반영돼 있지는 않다.
+                currentPage: book.totalPages,
+              );
+            case RereadFinishCancelled():
+              // 실제 웹 클라이언트(BookRecordPage.tsx)도 완독 취소 시 재독
+              // 횟수를 0으로 되돌린다 — 다음에 다시 완독 처리하면 재독
+              // 횟수가 이전 값에서 이어지지 않고 새로 시작해야 자연스럽다.
+              await controller.updateRecord(
+                status: BookStatus.reading.apiValue,
+                rereadCount: 0,
+              );
+          }
+          return;
+        }
+
         final result = await showFinishConfirmDialog(context);
         if (result == null) return;
         await controller.updateRecord(
@@ -282,6 +393,8 @@ class _BookRecordBody extends ConsumerWidget {
         );
         return;
       }
+
+      if (tapped == book.status) return;
 
       await controller.updateRecord(status: tapped.apiValue);
     } on ApiException catch (e) {
@@ -360,6 +473,7 @@ class _BookRecordBody extends ConsumerWidget {
       initialDate: current ?? now,
       firstDate: DateTime(1900),
       lastDate: now,
+      helpText: isStartedAt ? '시작일 선택' : '완독일 선택',
     );
     if (picked == null) return;
     final formatted = _formatApiDate(picked);
@@ -406,138 +520,91 @@ class _BookRecordBody extends ConsumerWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({
-    required this.book,
-    required this.onToggleMasterpiece,
-    required this.onEditBookInfo,
-  });
+  const _Header({required this.book, required this.onEditBookInfo});
 
   final BookItem book;
-  final VoidCallback onToggleMasterpiece;
   final VoidCallback onEditBookInfo;
 
   @override
   Widget build(BuildContext context) {
     return RecordSectionCard(
       padding: EdgeInsets.zero,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: InkWell(
-              onTap: onEditBookInfo,
-              borderRadius: BorderRadius.circular(16),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
+      child: InkWell(
+        onTap: onEditBookInfo,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 84,
+                child: BookCover(
+                  imageUrl: book.coverImageUrl,
+                  title: book.title,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SizedBox(
-                      width: 84,
-                      child: BookCover(
-                        imageUrl: book.coverImageUrl,
-                        title: book.title,
+                    if (book.category != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.inputBackground,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          book.category!,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.bodyText,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                    Text(
+                      book.title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                        color: AppColors.titleText,
                       ),
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (book.category != null) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.inputBackground,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                book.category!,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.bodyText,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                          ],
-                          Text(
-                            book.title,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 17,
-                              color: AppColors.titleText,
-                            ),
-                          ),
-                          if (book.author != null &&
-                              book.author!.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              book.author!,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.tertiaryText,
-                              ),
-                            ),
-                          ],
-                          if (book.publisher != null &&
-                              book.publisher!.isNotEmpty) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              book.publisher!,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.tertiaryText,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 6),
-                          const Row(
-                            children: [
-                              Icon(
-                                Icons.edit_outlined,
-                                size: 12,
-                                color: AppColors.mutedIcon,
-                              ),
-                              SizedBox(width: 3),
-                              Text(
-                                '탭하여 책 정보 수정',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.mutedIcon,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                    if (book.author != null && book.author!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        book.author!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.tertiaryText,
+                        ),
                       ),
-                    ),
+                    ],
+                    if (book.publisher != null &&
+                        book.publisher!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        book.publisher!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.tertiaryText,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-            ),
+            ],
           ),
-          Padding(
-            padding: const EdgeInsets.only(top: 16, right: 12),
-            child: IconButton(
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              onPressed: onToggleMasterpiece,
-              icon: Icon(
-                book.isMasterpiece
-                    ? Icons.emoji_events
-                    : Icons.emoji_events_outlined,
-                color: book.isMasterpiece
-                    ? AppColors.masterpieceGold
-                    : AppColors.mutedIcon,
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

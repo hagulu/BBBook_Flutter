@@ -7,6 +7,7 @@ import '../data/social_auth_service.dart';
 import '../providers/auth_notifier.dart';
 import '../providers/auth_providers.dart';
 import '../widgets/social_login_button.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 enum _LoadingProvider { none, google, apple }
 
@@ -105,7 +106,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(
-                        Icons.menu_book_rounded,
+                        PhosphorIconsRegular.bookOpen,
                         color: Colors.white,
                         size: 30,
                       ),
@@ -131,7 +132,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     const SocialLoginButton(
                       label: '카카오로 시작하기',
                       icon: Icon(
-                        Icons.chat_bubble,
+                        PhosphorIconsRegular.chatCircle,
                         color: Color(0xFF3C1E1E),
                         size: 20,
                       ),
@@ -174,7 +175,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     SocialLoginButton(
                       label: 'Apple로 시작하기',
                       icon: const Icon(
-                        Icons.apple,
+                        PhosphorIconsRegular.appleLogo,
                         color: Colors.white,
                         size: 22,
                       ),

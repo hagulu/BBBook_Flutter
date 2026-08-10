@@ -5,6 +5,7 @@ import '../../models/record_labels.dart';
 import 'icon_option_selector.dart';
 import 'record_dialog_shell.dart';
 import 'star_rating.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// "다 읽음" 전환 확인 팝업의 결과.
 class FinishConfirmResult {
@@ -47,7 +48,7 @@ class _FinishConfirmDialogState extends State<_FinishConfirmDialog> {
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      icon: Icons.celebration_outlined,
+      icon: PhosphorIconsRegular.confetti,
       iconColor: AppColors.masterpieceGold,
       iconBackgroundColor: AppColors.masterpieceBackground,
       title: '다 읽었어요!',

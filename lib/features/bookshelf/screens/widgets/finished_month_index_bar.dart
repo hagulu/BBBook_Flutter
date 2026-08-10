@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 완독 탭 우측 연/월 빠른 스크롤 인덱스(Google 포토 사진 스크러버 참고).
 ///
@@ -232,7 +233,7 @@ class _FinishedMonthIndexBarState extends State<FinishedMonthIndexBar> {
                       ),
                     ),
                     child: const Icon(
-                      Icons.drag_indicator,
+                      PhosphorIconsRegular.dotsSixVertical,
                       size: 16,
                       color: Colors.white,
                     ),
