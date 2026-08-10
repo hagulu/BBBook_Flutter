@@ -16,12 +16,10 @@ class AuthSession {
 /// 받아 상태 전이만 담당한다.
 class AuthRepository {
   AuthRepository({
-    required AuthApi authApi,
-    required TokenStorage tokenStorage,
-    required SocialAuthService socialAuthService,
-  }) : _authApi = authApi,
-       _tokenStorage = tokenStorage,
-       _socialAuthService = socialAuthService;
+    required this._authApi,
+    required this._tokenStorage,
+    required this._socialAuthService,
+  });
 
   final AuthApi _authApi;
   final TokenStorage _tokenStorage;
@@ -29,9 +27,15 @@ class AuthRepository {
 
   Future<AuthSession> loginWithProvider(SocialProvider provider) async {
     final idToken = await _idTokenFor(provider);
-    final result = await _authApi.postProviderLogin(provider: provider, idToken: idToken);
+    final result = await _authApi.postProviderLogin(
+      provider: provider,
+      idToken: idToken,
+    );
     await _tokenStorage.saveRefreshToken(result.tokens.refreshToken);
-    return AuthSession(user: result.user, accessToken: result.tokens.accessToken);
+    return AuthSession(
+      user: result.user,
+      accessToken: result.tokens.accessToken,
+    );
   }
 
   Future<String> _idTokenFor(SocialProvider provider) {

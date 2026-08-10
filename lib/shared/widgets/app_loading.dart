@@ -38,7 +38,10 @@ class _FullScreenLoadingBarrier extends StatelessWidget {
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        ModalBarrier(dismissible: false, color: Colors.black.withValues(alpha: 0.3)),
+        ModalBarrier(
+          dismissible: false,
+          color: Colors.black.withValues(alpha: 0.3),
+        ),
         Center(
           child: Semantics(
             liveRegion: true,
@@ -57,7 +60,11 @@ class _FullScreenLoadingBarrier extends StatelessWidget {
 ///
 /// [isLoading]이 true인 동안 [child] 위에 스피너 오버레이를 표시한다.
 class AppLoadingOverlay extends StatelessWidget {
-  const AppLoadingOverlay({super.key, required this.isLoading, required this.child});
+  const AppLoadingOverlay({
+    super.key,
+    required this.isLoading,
+    required this.child,
+  });
 
   final bool isLoading;
   final Widget child;
@@ -76,7 +83,9 @@ class AppLoadingOverlay extends StatelessWidget {
                   child: Semantics(
                     liveRegion: true,
                     label: '로딩 중',
-                    child: const CircularProgressIndicator(color: AppColors.primary),
+                    child: const CircularProgressIndicator(
+                      color: AppColors.primary,
+                    ),
                   ),
                 ),
               ),

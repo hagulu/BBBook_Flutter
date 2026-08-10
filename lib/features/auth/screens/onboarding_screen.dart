@@ -42,7 +42,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
-  Future<void> _handleLogin(_LoadingProvider provider, Future<void> Function() action) async {
+  Future<void> _handleLogin(
+    _LoadingProvider provider,
+    Future<void> Function() action,
+  ) async {
     setState(() => _loading = provider);
     try {
       await action();
@@ -59,12 +62,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
-    final isAppleSignInSupported = ref.watch(socialAuthServiceProvider).isAppleSignInSupported;
+    final isAppleSignInSupported = ref
+        .watch(socialAuthServiceProvider)
+        .isAppleSignInSupported;
 
     return Scaffold(
       backgroundColor: AppColors.onboardingBackground,
@@ -80,7 +87,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   color: AppColors.cardBackground,
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: const [
-                    BoxShadow(color: Color(0x14181C20), blurRadius: 24, offset: Offset(0, 8)),
+                    BoxShadow(
+                      color: Color(0x14181C20),
+                      blurRadius: 24,
+                      offset: Offset(0, 8),
+                    ),
                   ],
                 ),
                 child: Column(
@@ -93,7 +104,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         color: AppColors.primary,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Icon(Icons.menu_book_rounded, color: Colors.white, size: 30),
+                      child: const Icon(
+                        Icons.menu_book_rounded,
+                        color: Colors.white,
+                        size: 30,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     const Text(
@@ -107,12 +122,19 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     const SizedBox(height: 8),
                     const Text(
                       '로그인하고 기록을 시작하세요.',
-                      style: TextStyle(fontSize: 14, color: AppColors.tertiaryText),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.tertiaryText,
+                      ),
                     ),
                     const SizedBox(height: 28),
                     const SocialLoginButton(
                       label: '카카오로 시작하기',
-                      icon: Icon(Icons.chat_bubble, color: Color(0xFF3C1E1E), size: 20),
+                      icon: Icon(
+                        Icons.chat_bubble,
+                        color: Color(0xFF3C1E1E),
+                        size: 20,
+                      ),
                       backgroundColor: Color(0xFFFEE500),
                       foregroundColor: Color(0xFF3C1E1E),
                       onPressed: null,
@@ -122,7 +144,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       label: '네이버로 시작하기',
                       icon: Text(
                         'N',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       backgroundColor: Color(0xFF03C75A),
                       foregroundColor: Colors.white,
@@ -148,11 +173,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     const SizedBox(height: 12),
                     SocialLoginButton(
                       label: 'Apple로 시작하기',
-                      icon: const Icon(Icons.apple, color: Colors.white, size: 22),
+                      icon: const Icon(
+                        Icons.apple,
+                        color: Colors.white,
+                        size: 22,
+                      ),
                       backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
                       isLoading: _loading == _LoadingProvider.apple,
-                      onPressed: (_isBusy || !isAppleSignInSupported) ? null : _handleAppleLogin,
+                      onPressed: (_isBusy || !isAppleSignInSupported)
+                          ? null
+                          : _handleAppleLogin,
                     ),
                   ],
                 ),

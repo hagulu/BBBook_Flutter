@@ -13,5 +13,6 @@ class ApiException implements Exception {
   bool get isAuthFailure => statusCode == 401 || statusCode == 403;
 
   @override
-  String toString() => 'ApiException(statusCode: $statusCode, message: $message)';
+  String toString() =>
+      'ApiException(statusCode: $statusCode, message: $message)';
 }

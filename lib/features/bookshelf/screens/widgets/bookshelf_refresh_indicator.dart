@@ -16,9 +16,9 @@ class BookshelfRefreshIndicator extends ConsumerWidget {
         await ref.read(bookshelfSyncControllerProvider.notifier).syncNow();
         final result = ref.read(bookshelfSyncControllerProvider);
         if (result.hasError && context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('동기화에 실패했습니다. 잠시 후 다시 시도해 주세요.')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('동기화에 실패했습니다. 잠시 후 다시 시도해 주세요.')),
+          );
         }
       },
       child: child,

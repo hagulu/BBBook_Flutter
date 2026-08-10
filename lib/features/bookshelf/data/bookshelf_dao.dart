@@ -16,6 +16,18 @@ import 'bookshelf_database.dart';
 class BookshelfDao {
   const BookshelfDao();
 
+  Future<BookItem?> getById(int userBookId) async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'user_book',
+      where: 'user_book_id = ?',
+      whereArgs: [userBookId],
+    );
+    if (rows.isEmpty) return null;
+    final items = await _attachTags(db, rows);
+    return items.first;
+  }
+
   Future<List<BookItem>> getByStatuses(List<BookStatus> statuses) async {
     final db = await BookshelfDatabase.instance();
     final placeholders = List.filled(statuses.length, '?').join(', ');
@@ -100,12 +112,20 @@ class BookshelfDao {
       ''',
       [BookStatus.finished.apiValue],
     );
-    return rows.map((r) => BookTag(id: r['tag_id'] as int, name: r['tag_name'] as String)).toList();
+    return rows
+        .map(
+          (r) => BookTag(id: r['tag_id'] as int, name: r['tag_name'] as String),
+        )
+        .toList();
   }
 
   Future<DateTime?> getLastSyncedAt() async {
     final db = await BookshelfDatabase.instance();
-    final rows = await db.query('sync_meta', where: 'key = ?', whereArgs: ['last_synced_at']);
+    final rows = await db.query(
+      'sync_meta',
+      where: 'key = ?',
+      whereArgs: ['last_synced_at'],
+    );
     if (rows.isEmpty) return null;
     return DateTime.tryParse(rows.first['value'] as String);
   }
@@ -116,35 +136,16 @@ class BookshelfDao {
   /// [requestedAt]은 이 전체 동기화 요청을 보내기 *직전* 시각(UTC)이어야 한다.
   /// 응답을 받은 뒤의 시각을 쓰면 그 사이 서버에 반영된 변경이 다음 증분
   /// 동기화의 since보다 앞서게 되어 영구히 누락될 수 있다.
-  Future<void> reconcile(List<BookItem> serverItems, DateTime requestedAt) async {
+  Future<void> reconcile(
+    List<BookItem> serverItems,
+    DateTime requestedAt,
+  ) async {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
       final serverIds = serverItems.map((e) => e.userBookId).toList();
 
       for (final item in serverItems) {
-        final existing = await txn.query(
-          'user_book',
-          columns: ['is_dirty'],
-          where: 'user_book_id = ?',
-          whereArgs: [item.userBookId],
-        );
-        final isDirtyLocally = existing.isNotEmpty && existing.first['is_dirty'] == 1;
-        if (isDirtyLocally) continue;
-
-        await txn.insert(
-          'user_book',
-          _bookItemToRow(item),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-
-        await txn.delete('user_book_tag', where: 'user_book_id = ?', whereArgs: [item.userBookId]);
-        for (final tag in item.tags) {
-          await txn.insert('user_book_tag', {
-            'user_book_id': item.userBookId,
-            'tag_id': tag.id,
-            'tag_name': tag.name,
-          });
-        }
+        await _upsertItemTxn(txn, item);
       }
 
       if (serverIds.isEmpty) {
@@ -177,33 +178,14 @@ class BookshelfDao {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
       for (final item in upserted) {
-        final existing = await txn.query(
-          'user_book',
-          columns: ['is_dirty'],
-          where: 'user_book_id = ?',
-          whereArgs: [item.userBookId],
-        );
-        final isDirtyLocally = existing.isNotEmpty && existing.first['is_dirty'] == 1;
-        if (isDirtyLocally) continue;
-
-        await txn.insert(
-          'user_book',
-          _bookItemToRow(item),
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-
-        await txn.delete('user_book_tag', where: 'user_book_id = ?', whereArgs: [item.userBookId]);
-        for (final tag in item.tags) {
-          await txn.insert('user_book_tag', {
-            'user_book_id': item.userBookId,
-            'tag_id': tag.id,
-            'tag_name': tag.name,
-          });
-        }
+        await _upsertItemTxn(txn, item);
       }
 
       if (deletedUserBookIds.isNotEmpty) {
-        final placeholders = List.filled(deletedUserBookIds.length, '?').join(', ');
+        final placeholders = List.filled(
+          deletedUserBookIds.length,
+          '?',
+        ).join(', ');
         await txn.delete(
           'user_book',
           where: 'user_book_id IN ($placeholders) AND is_dirty = 0',
@@ -218,7 +200,60 @@ class BookshelfDao {
     });
   }
 
-  Future<List<BookItem>> _attachTags(Database db, List<Map<String, dynamic>> rows) async {
+  /// 책 기록 화면에서 서버 PATCH가 성공한 뒤 그 결과 한 건만 로컬에 반영할 때
+  /// 쓴다. [reconcile]/[applyChanges]와 동일하게 dirty 행은 덮어쓰지 않고,
+  /// `sync_meta.last_synced_at`은 건드리지 않는다(다음 증분 동기화가 이
+  /// 행을 다시 upsert하는 것은 무해하다).
+  Future<void> upsertOne(BookItem item) async {
+    final db = await BookshelfDatabase.instance();
+    await db.transaction((txn) => _upsertItemTxn(txn, item));
+  }
+
+  /// 서재에서 책을 삭제(DELETE API 성공)한 뒤 로컬 행을 제거한다.
+  Future<void> deleteOne(int userBookId) async {
+    final db = await BookshelfDatabase.instance();
+    await db.delete(
+      'user_book',
+      where: 'user_book_id = ?',
+      whereArgs: [userBookId],
+    );
+  }
+
+  Future<void> _upsertItemTxn(Transaction txn, BookItem item) async {
+    final existing = await txn.query(
+      'user_book',
+      columns: ['is_dirty'],
+      where: 'user_book_id = ?',
+      whereArgs: [item.userBookId],
+    );
+    final isDirtyLocally =
+        existing.isNotEmpty && existing.first['is_dirty'] == 1;
+    if (isDirtyLocally) return;
+
+    await txn.insert(
+      'user_book',
+      _bookItemToRow(item),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    await txn.delete(
+      'user_book_tag',
+      where: 'user_book_id = ?',
+      whereArgs: [item.userBookId],
+    );
+    for (final tag in item.tags) {
+      await txn.insert('user_book_tag', {
+        'user_book_id': item.userBookId,
+        'tag_id': tag.id,
+        'tag_name': tag.name,
+      });
+    }
+  }
+
+  Future<List<BookItem>> _attachTags(
+    Database db,
+    List<Map<String, dynamic>> rows,
+  ) async {
     if (rows.isEmpty) return const [];
     final ids = rows.map((r) => r['user_book_id'] as int).toList();
     final placeholders = List.filled(ids.length, '?').join(', ');
@@ -234,7 +269,12 @@ class BookshelfDao {
       );
     }
     return rows
-        .map((r) => _rowToBookItem(r, tagsByBook[r['user_book_id'] as int] ?? const []))
+        .map(
+          (r) => _rowToBookItem(
+            r,
+            tagsByBook[r['user_book_id'] as int] ?? const [],
+          ),
+        )
         .toList();
   }
 
@@ -302,7 +342,9 @@ class BookshelfDao {
     );
   }
 
-  String? _formatDate(DateTime? date) => date?.toIso8601String().substring(0, 10);
+  String? _formatDate(DateTime? date) =>
+      date?.toIso8601String().substring(0, 10);
 
-  DateTime? _parseDate(String? value) => value == null ? null : DateTime.parse(value);
+  DateTime? _parseDate(String? value) =>
+      value == null ? null : DateTime.parse(value);
 }

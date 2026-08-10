@@ -49,13 +49,18 @@ class SocialLoginButton extends StatelessWidget {
                 height: 18,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: isDisabled ? foregroundColor.withValues(alpha: 0.5) : foregroundColor,
+                  color: isDisabled
+                      ? foregroundColor.withValues(alpha: 0.5)
+                      : foregroundColor,
                 ),
               )
             else
               icon,
             const SizedBox(width: 10),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
           ],
         ),
       ),

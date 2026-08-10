@@ -19,8 +19,13 @@ class MainShell extends ConsumerStatefulWidget {
   ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends ConsumerState<MainShell> with WidgetsBindingObserver {
-  static const _tabs = [HomeTabPlaceholder(), BookshelfScreen(), ProfileTabPlaceholder()];
+class _MainShellState extends ConsumerState<MainShell>
+    with WidgetsBindingObserver {
+  static const _tabs = [
+    HomeTabPlaceholder(),
+    BookshelfScreen(),
+    ProfileTabPlaceholder(),
+  ];
 
   int _selectedIndex = 1;
 

@@ -46,7 +46,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => const AuthLoadingGate(child: OnboardingScreen()),
+        builder: (context, state) =>
+            const AuthLoadingGate(child: OnboardingScreen()),
       ),
       GoRoute(
         path: '/feed',

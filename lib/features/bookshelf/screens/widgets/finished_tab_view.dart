@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_alert.dart';
+import '../../../book_record/screens/book_record_screen.dart';
 import '../../models/book_item.dart';
 import '../../models/finished_filter.dart';
 import '../../providers/bookshelf_providers.dart';
@@ -101,11 +102,17 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
   ///
   /// 그리드 delegate 상수가 고정돼 있으므로 각 그룹의 높이를 직접 계산해
   /// 오프셋으로 바로 점프한다(상단 컨트롤·필터 패널 높이를 더한 절대 위치).
-  void _scrollToGroup(List<_MonthGroup> groups, double contentWidth, String groupKey) {
+  void _scrollToGroup(
+    List<_MonthGroup> groups,
+    double contentWidth,
+    String groupKey,
+  ) {
     if (!_scrollController.hasClients) return;
     final index = groups.indexWhere((g) => g.key == groupKey);
     if (index < 0) return;
-    final offset = _contentStartOffset() + _offsetForGroupIndex(groups, index, contentWidth);
+    final offset =
+        _contentStartOffset() +
+        _offsetForGroupIndex(groups, index, contentWidth);
     final maxScroll = _scrollController.position.maxScrollExtent;
     _scrollController.jumpTo(offset.clamp(0.0, maxScroll));
   }
@@ -119,20 +126,27 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
     return offset;
   }
 
-  double _offsetForGroupIndex(List<_MonthGroup> groups, int index, double contentWidth) {
+  double _offsetForGroupIndex(
+    List<_MonthGroup> groups,
+    int index,
+    double contentWidth,
+  ) {
     const crossAxisCount = 3;
     const crossAxisSpacing = 12.0;
     const mainAxisSpacing = 16.0;
     const horizontalPadding = 32.0; // SliverPadding 좌우 16 + 16
 
     final gridWidth = contentWidth - horizontalPadding;
-    final tileWidth = (gridWidth - crossAxisSpacing * (crossAxisCount - 1)) / crossAxisCount;
+    final tileWidth =
+        (gridWidth - crossAxisSpacing * (crossAxisCount - 1)) / crossAxisCount;
     final tileHeight = tileWidth / _kFinishedGridAspectRatio;
 
     double offset = 0;
     for (var i = 0; i < index; i++) {
       final rows = (groups[i].items.length / crossAxisCount).ceil();
-      final gridHeight = rows <= 0 ? 0.0 : rows * tileHeight + (rows - 1) * mainAxisSpacing;
+      final gridHeight = rows <= 0
+          ? 0.0
+          : rows * tileHeight + (rows - 1) * mainAxisSpacing;
       offset += _kFinishedGroupHeaderHeight + gridHeight;
     }
     return offset;
@@ -150,7 +164,10 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
         // 항상 가로 전체 폭을 그대로 사용한다(오른쪽에 별도 여백을 두지 않음).
         final contentWidth = constraints.maxWidth;
         final groups = isDefaultMode
-            ? books.maybeWhen(data: _groupByMonth, orElse: () => const <_MonthGroup>[])
+            ? books.maybeWhen(
+                data: _groupByMonth,
+                orElse: () => const <_MonthGroup>[],
+              )
             : const <_MonthGroup>[];
 
         return Stack(
@@ -174,15 +191,21 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
                       onSearchChanged: _onSearchChanged,
                       onClearSearch: _clearSearch,
                       filterActiveCount: filter.activeCount,
-                      onToggleFilterPanel: () => setState(() => _filterPanelOpen = !_filterPanelOpen),
+                      onToggleFilterPanel: () =>
+                          setState(() => _filterPanelOpen = !_filterPanelOpen),
                       onResetFilter: _resetFilter,
                     ),
                   ),
                   if (_filterPanelOpen)
                     SliverToBoxAdapter(
-                      child: KeyedSubtree(key: _filterPanelKey, child: const FinishedFilterPanel()),
+                      child: KeyedSubtree(
+                        key: _filterPanelKey,
+                        child: const FinishedFilterPanel(),
+                      ),
                     ),
-                  const SliverToBoxAdapter(child: SizedBox(height: _kFinishedContentSpacing)),
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: _kFinishedContentSpacing),
+                  ),
                   ..._contentSlivers(filter, books, groups),
                 ],
               ),
@@ -196,10 +219,12 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
                 child: FinishedMonthIndexBar(
                   groups: [
                     for (final g in groups)
-                      if (g.isDated) (year: g.year, month: g.month, groupKey: g.key),
+                      if (g.isDated)
+                        (year: g.year, month: g.month, groupKey: g.key),
                   ],
                   scrollController: _scrollController,
-                  onSelect: (groupKey) => _scrollToGroup(groups, contentWidth, groupKey),
+                  onSelect: (groupKey) =>
+                      _scrollToGroup(groups, contentWidth, groupKey),
                   onScrubChanged: (value) {
                     _scrubNotifier.value = value;
                     if (value != null && _filterPanelOpen) {
@@ -218,7 +243,10 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
                   valueListenable: _scrubNotifier,
                   builder: (context, scrub, _) {
                     if (scrub == null) return const SizedBox.shrink();
-                    final bubbleTop = (scrub.dy - 18).clamp(0.0, constraints.maxHeight - 16 - 36);
+                    final bubbleTop = (scrub.dy - 18).clamp(
+                      0.0,
+                      constraints.maxHeight - 16 - 36,
+                    );
                     return Stack(
                       children: [
                         Positioned(
@@ -226,7 +254,9 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
                           // 가려지지 않도록 썸 폭보다 한참 더 왼쪽에 띄운다.
                           right: FinishedMonthIndexBar.width + 40,
                           top: bubbleTop,
-                          child: IgnorePointer(child: _ScrubBubble(label: scrub.label)),
+                          child: IgnorePointer(
+                            child: _ScrubBubble(label: scrub.label),
+                          ),
                         ),
                       ],
                     );
@@ -250,7 +280,9 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
           return [
             SliverFillRemaining(
               hasScrollBody: false,
-              child: _buildMessage(filter.isEmpty ? '완독한 책이 없습니다.' : '검색 결과가 없습니다.'),
+              child: _buildMessage(
+                filter.isEmpty ? '완독한 책이 없습니다.' : '검색 결과가 없습니다.',
+              ),
             ),
           ];
         }
@@ -275,7 +307,12 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
         }
         return _groupedSlivers(groups);
       },
-      loading: () => [SliverFillRemaining(hasScrollBody: false, child: _buildMessage('불러오는 중'))],
+      loading: () => [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: _buildMessage('불러오는 중'),
+        ),
+      ],
       error: (error, stackTrace) => [
         SliverFillRemaining(
           hasScrollBody: false,
@@ -300,7 +337,11 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   group.label,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.titleText),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: AppColors.titleText,
+                  ),
                 ),
               ),
             ),
@@ -359,7 +400,13 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
           groups.last.month == finishedAt.month) {
         groups.last.items.add(item);
       } else {
-        groups.add(_MonthGroup(year: finishedAt.year, month: finishedAt.month, items: [item]));
+        groups.add(
+          _MonthGroup(
+            year: finishedAt.year,
+            month: finishedAt.month,
+            items: [item],
+          ),
+        );
       }
     }
     if (undated.isNotEmpty) {
@@ -370,7 +417,8 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
 }
 
 class _MonthGroup {
-  _MonthGroup({required this.year, required this.month, required this.items}) : isDated = true;
+  _MonthGroup({required this.year, required this.month, required this.items})
+    : isDated = true;
 
   _MonthGroup.undated(this.items) : year = 0, month = 0, isDated = false;
 
@@ -418,9 +466,14 @@ class _FinishedControls extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 IconButton(
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
                   padding: EdgeInsets.zero,
-                  tooltip: isPublic ? '완독 책장 공개 중 (탭하면 비공개로 전환)' : '완독 책장 비공개 중 (탭하면 공개로 전환)',
+                  tooltip: isPublic
+                      ? '완독 책장 공개 중 (탭하면 비공개로 전환)'
+                      : '완독 책장 비공개 중 (탭하면 공개로 전환)',
                   icon: Icon(
                     isPublic ? Icons.public : Icons.lock_outline,
                     color: AppColors.primary,
@@ -430,20 +483,31 @@ class _FinishedControls extends ConsumerWidget {
                       ? null
                       : () async {
                           try {
-                            await ref.read(privacySettingControllerProvider.notifier).toggle(!isPublic);
+                            await ref
+                                .read(privacySettingControllerProvider.notifier)
+                                .toggle(!isPublic);
                           } catch (_) {
                             if (context.mounted) {
-                              ScaffoldMessenger.of(
-                                context,
-                              ).showSnackBar(const SnackBar(content: Text('공개 설정 변경에 실패했습니다.')));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('공개 설정 변경에 실패했습니다.'),
+                                ),
+                              );
                             }
                           }
                         },
                 ),
                 IconButton(
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                   padding: EdgeInsets.zero,
-                  icon: const Icon(Icons.help_outline, color: AppColors.mutedIcon, size: 18),
+                  icon: const Icon(
+                    Icons.help_outline,
+                    color: AppColors.mutedIcon,
+                    size: 18,
+                  ),
                   onPressed: () => AppAlert.show(
                     context,
                     title: '완독 책장 공개',
@@ -467,15 +531,29 @@ class _FinishedControls extends ConsumerWidget {
                   hintText: '책 이름, 작가, 출판사 검색',
                   filled: true,
                   fillColor: AppColors.inputBackground,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.tertiaryText),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    size: 20,
+                    color: AppColors.tertiaryText,
+                  ),
                   suffixIcon: ValueListenableBuilder<TextEditingValue>(
                     valueListenable: searchController,
                     builder: (context, value, _) {
                       if (value.text.isEmpty) return const SizedBox.shrink();
                       return IconButton(
-                        icon: const Icon(Icons.close, size: 18, color: AppColors.tertiaryText),
+                        icon: const Icon(
+                          Icons.close,
+                          size: 18,
+                          color: AppColors.tertiaryText,
+                        ),
                         onPressed: onClearSearch,
                       );
                     },
@@ -499,7 +577,10 @@ class _FinishedControls extends ConsumerWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
                       onPressed: onResetFilter,
-                      child: const Text('필터 초기화', style: TextStyle(fontSize: 12)),
+                      child: const Text(
+                        '필터 초기화',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
                   TextButton.icon(
                     style: TextButton.styleFrom(
@@ -535,9 +616,22 @@ class _ScrubBubble extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 8, offset: Offset(0, 2))],
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
-      child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+        ),
+      ),
     );
   }
 }
@@ -549,29 +643,44 @@ class _FinishedBookCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Stack(
-          children: [
-            BookCover(imageUrl: book.coverImageUrl, title: book.title),
-            if (book.isMasterpiece)
-              const Positioned(
-                top: 4,
-                left: 4,
-                child: Icon(Icons.emoji_events, size: 16, color: AppColors.masterpieceGold),
-              ),
-          ],
+    return InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BookRecordScreen(userBookId: book.userBookId),
         ),
-        const SizedBox(height: 6),
-        Text(
-          book.title,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: AppColors.titleText),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        if (book.myRating != null) _StarRow(rating: book.myRating!),
-      ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
+            children: [
+              BookCover(imageUrl: book.coverImageUrl, title: book.title),
+              if (book.isMasterpiece)
+                const Positioned(
+                  top: 4,
+                  left: 4,
+                  child: Icon(
+                    Icons.emoji_events,
+                    size: 16,
+                    color: AppColors.masterpieceGold,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            book.title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              color: AppColors.titleText,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (book.myRating != null) _StarRow(rating: book.myRating!),
+        ],
+      ),
     );
   }
 }

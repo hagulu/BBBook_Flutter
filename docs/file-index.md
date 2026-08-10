@@ -43,6 +43,13 @@
 - `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화
 - `lib/features/bookshelf/providers/bookshelf_providers.dart` — 책장 관련 Riverpod provider(동기화 컨트롤러, 탭별 목록, 완독 필터, 공개 설정)
 
+## features/book_record
+
+- `lib/features/book_record/screens/book_record_screen.dart` — 책 기록 상세 화면(자체 AppBar, 책장에서 책 선택 시 진입), 정보/진행률/상태/출처/난이도/태그/삭제 조립
+- `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH, 책 정보 PATCH, 태그 POST/DELETE, 태그 목록/플랫폼 옵션 GET, 삭제 DELETE)
+- `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth(로컬 조회는 bookshelf 레포지토리 재사용, 수정은 서버 PATCH 성공 후 로컬 반영)
+- `lib/features/book_record/providers/book_record_providers.dart` — 책 기록 관련 Riverpod provider(단일 책 상태 컨트롤러, 태그 자동완성, 플랫폼 옵션)
+
 ## shared/widgets
 
 - `lib/shared/widgets/app_alert.dart` — 공통 Alert 팝업(제목/내용/확인 버튼)
@@ -55,3 +62,6 @@
 - `docs/review/20260807-141513-shared-dialog-loading-review.md` — 공통 Alert/Confirm/Loading 컴포넌트 리뷰
 - `docs/review/20260807-165007-finished-list-scroll-performance-review.md` — 완독 목록 스크롤 성능 병목과 튜닝 우선순위 리뷰
 - `docs/review/20260807-202727-bookshelf-implementation-review.md` — 책장 구현의 계정 데이터 격리·동기화 상태·접근성 리뷰
+- `docs/review/20260807-232503-book-record-and-bookshelf-review.md` — 책 기록 상세와 책장 후속 변경의 상태 최신성·동시성·포팅 누락 리뷰
+- `docs/review/20260808-001248-book-record-followup-review.md` — 책 기록 후속 수정의 계정 격리·포팅 범위·상태 정합성 재리뷰
+- `docs/review/20260808-172540-book-record-third-review.md` — 책 기록 추가 변경의 세션 경합·난이도 규격·접근성 재리뷰

@@ -68,7 +68,58 @@ class BookItem {
     return (currentPage / total).clamp(0.0, 1.0);
   }
 
+  /// [tags]와 [updatedAt]만 다른 사본을 만든다. 태그 추가/삭제 응답이
+  /// 태그 정보만 돌려주는 API(POST/DELETE tags)의 결과를 로컬 [BookItem]에
+  /// 반영할 때 사용한다.
+  BookItem copyWithTags(List<BookTag> tags, {required DateTime updatedAt}) {
+    return BookItem(
+      userBookId: userBookId,
+      bookId: bookId,
+      isbn13: isbn13,
+      title: title,
+      author: author,
+      publisher: publisher,
+      totalPages: totalPages,
+      coverImageUrl: coverImageUrl,
+      displayCategoryId: displayCategoryId,
+      category: category,
+      status: status,
+      currentPage: currentPage,
+      myRating: myRating,
+      shortReview: shortReview,
+      isMasterpiece: isMasterpiece,
+      sourceType: sourceType,
+      rereadCount: rereadCount,
+      difficulty: difficulty,
+      startedAt: startedAt,
+      finishedAt: finishedAt,
+      libraryId: libraryId,
+      libraryDueAt: libraryDueAt,
+      platformName: platformName,
+      discoverySource: discoverySource,
+      tags: tags,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
+
   factory BookItem.fromSyncJson(Map<String, dynamic> json) {
+    return BookItem.fromDetailJson(
+      json,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
+    );
+  }
+
+  /// `PATCH /api/me/books/:userBookId`류 응답(책 기록 상세 데이터)에는
+  /// `createdAt`/`updatedAt`이 내려오지 않는다. 로컬 DB의 `NOT NULL` 컬럼을
+  /// 채우기 위해 호출 측이 기존 로컬 행의 [createdAt]을 그대로 넘기고,
+  /// [updatedAt]은 응답을 반영하는 시점의 클라이언트 시각(UTC)을 넘긴다.
+  factory BookItem.fromDetailJson(
+    Map<String, dynamic> json, {
+    required DateTime createdAt,
+    required DateTime updatedAt,
+  }) {
     return BookItem(
       userBookId: json['userBookId'] as int,
       bookId: json['bookId'] as int?,
@@ -97,8 +148,8 @@ class BookItem {
       tags: (json['tags'] as List<dynamic>? ?? [])
           .map((e) => BookTag.fromJson(e as Map<String, dynamic>))
           .toList(),
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 

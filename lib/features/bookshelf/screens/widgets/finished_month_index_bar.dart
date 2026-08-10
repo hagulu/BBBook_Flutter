@@ -89,7 +89,10 @@ class _FinishedMonthIndexBarState extends State<FinishedMonthIndexBar> {
     final trackHeight = context.size?.height;
     if (trackHeight == null || trackHeight <= 0) return;
 
-    final fraction = (position.pixels / position.maxScrollExtent).clamp(0.0, 1.0);
+    final fraction = (position.pixels / position.maxScrollExtent).clamp(
+      0.0,
+      1.0,
+    );
     setState(() => _thumbDy = fraction * trackHeight);
   }
 
@@ -101,7 +104,9 @@ class _FinishedMonthIndexBarState extends State<FinishedMonthIndexBar> {
   }
 
   void _detachIsScrollingListener() {
-    _observedPosition?.isScrollingNotifier.removeListener(_handleIsScrollingChanged);
+    _observedPosition?.isScrollingNotifier.removeListener(
+      _handleIsScrollingChanged,
+    );
     _observedPosition = null;
   }
 
@@ -128,12 +133,23 @@ class _FinishedMonthIndexBarState extends State<FinishedMonthIndexBar> {
     if (widget.groups.isEmpty || trackHeight <= 0) return;
     final clampedDy = dy.clamp(0.0, trackHeight);
     final ratio = clampedDy / trackHeight;
-    final index = (ratio * widget.groups.length).floor().clamp(0, widget.groups.length - 1);
+    final index = (ratio * widget.groups.length).floor().clamp(
+      0,
+      widget.groups.length - 1,
+    );
     final group = widget.groups[index];
 
     setState(() => _thumbDy = clampedDy);
+    // onScrubChanged를 먼저 호출한다: 부모는 이 콜백 안에서 필터 패널이
+    // 열려 있으면 동기적으로 닫는다(setState로 상태 bool만 즉시 바뀜,
+    // 실제 리빌드는 다음 프레임). onSelect가 이후에 호출돼야 그 안의 오프셋
+    // 계산이 "패널이 이미 닫힌" 상태를 보고 패널 높이를 더하지 않는다 —
+    // 순서가 반대면 첫 스크럽 프레임에서 패널 높이만큼 점프 위치가 어긋난다.
+    widget.onScrubChanged((
+      label: '${group.year}년 ${group.month}월',
+      dy: clampedDy,
+    ));
     widget.onSelect(group.groupKey);
-    widget.onScrubChanged((label: '${group.year}년 ${group.month}월', dy: clampedDy));
   }
 
   void _startDrag(double dy, double trackHeight) {
@@ -161,10 +177,16 @@ class _FinishedMonthIndexBarState extends State<FinishedMonthIndexBar> {
         // 썸이 안 보일 때는 제스처 영역 자체를 만들지 않는다 — 밑에 있는
         // 그리드가 오른쪽 가장자리에서도 평소대로 스크롤/탭되도록.
         if (thumbDy == null) {
-          return SizedBox(width: FinishedMonthIndexBar.width, height: trackHeight);
+          return SizedBox(
+            width: FinishedMonthIndexBar.width,
+            height: trackHeight,
+          );
         }
 
-        final thumbTop = (thumbDy - _thumbHeight / 2).clamp(0.0, trackHeight - _thumbHeight);
+        final thumbTop = (thumbDy - _thumbHeight / 2).clamp(
+          0.0,
+          trackHeight - _thumbHeight,
+        );
 
         return SizedBox(
           width: FinishedMonthIndexBar.width,
@@ -176,13 +198,20 @@ class _FinishedMonthIndexBarState extends State<FinishedMonthIndexBar> {
                 right: 0,
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTapDown: (details) => _startDrag(thumbTop + details.localPosition.dy, trackHeight),
+                  onTapDown: (details) => _startDrag(
+                    thumbTop + details.localPosition.dy,
+                    trackHeight,
+                  ),
                   onTapUp: (_) => _endDrag(),
                   onTapCancel: _endDrag,
-                  onVerticalDragStart: (details) =>
-                      _startDrag(thumbTop + details.localPosition.dy, trackHeight),
-                  onVerticalDragUpdate: (details) =>
-                      _selectForDy((_thumbDy ?? thumbDy) + details.delta.dy, trackHeight),
+                  onVerticalDragStart: (details) => _startDrag(
+                    thumbTop + details.localPosition.dy,
+                    trackHeight,
+                  ),
+                  onVerticalDragUpdate: (details) => _selectForDy(
+                    (_thumbDy ?? thumbDy) + details.delta.dy,
+                    trackHeight,
+                  ),
                   onVerticalDragEnd: (_) => _endDrag(),
                   onVerticalDragCancel: _endDrag,
                   child: Container(
@@ -192,13 +221,21 @@ class _FinishedMonthIndexBarState extends State<FinishedMonthIndexBar> {
                     decoration: BoxDecoration(
                       // 반원(오른쪽은 화면 가장자리에 붙는 직선, 왼쪽만 완전히
                       // 둥글게)이 되도록 왼쪽 두 모서리 반지름을 폭(반지름)과 같게 둔다.
-                      color: AppColors.primary.withValues(alpha: _isDragging ? 0.75 : 0.55),
+                      color: AppColors.primary.withValues(
+                        alpha: _isDragging ? 0.75 : 0.55,
+                      ),
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(FinishedMonthIndexBar.width),
-                        bottomLeft: Radius.circular(FinishedMonthIndexBar.width),
+                        bottomLeft: Radius.circular(
+                          FinishedMonthIndexBar.width,
+                        ),
                       ),
                     ),
-                    child: const Icon(Icons.drag_indicator, size: 16, color: Colors.white),
+                    child: const Icon(
+                      Icons.drag_indicator,
+                      size: 16,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../book_record/screens/book_record_screen.dart';
 import '../../models/book_item.dart';
 import '../../models/book_status.dart';
 import '../../providers/bookshelf_providers.dart';
@@ -16,7 +17,11 @@ const _kGridAspectRatio = 0.46;
 
 /// 읽고 싶음 / 중단 탭: 단순 그리드(표지 + 제목).
 class SimpleGridTabView extends ConsumerWidget {
-  const SimpleGridTabView({super.key, required this.status, required this.emptyText});
+  const SimpleGridTabView({
+    super.key,
+    required this.status,
+    required this.emptyText,
+  });
 
   final BookStatus status;
   final String emptyText;
@@ -56,25 +61,39 @@ class _GridBookCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        BookCover(imageUrl: book.coverImageUrl, title: book.title),
-        const SizedBox(height: 6),
-        Text(
-          book.title,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: AppColors.titleText),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
+    return InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BookRecordScreen(userBookId: book.userBookId),
         ),
-        if (book.author != null)
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          BookCover(imageUrl: book.coverImageUrl, title: book.title),
+          const SizedBox(height: 6),
           Text(
-            book.author!,
-            style: const TextStyle(fontSize: 11, color: AppColors.tertiaryText),
-            maxLines: 1,
+            book.title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 12,
+              color: AppColors.titleText,
+            ),
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-      ],
+          if (book.author != null)
+            Text(
+              book.author!,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.tertiaryText,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+        ],
+      ),
     );
   }
 }

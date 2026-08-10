@@ -1,0 +1,120 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../../core/network/api_exception.dart';
+import '../../../bookshelf/models/book_item.dart';
+import '../../providers/book_record_providers.dart';
+import 'record_section_card.dart';
+import 'star_rating.dart';
+
+/// 내 평점(탭 즉시 저장) + 개인 리뷰(포커스 아웃 시 저장).
+///
+/// `book-record.md` 스크린샷 기준 독서 상태(읽는 중이든 완독이든)와 무관하게
+/// 항상 노출·편집 가능하다 — 완독 확인 팝업에서 입력한 값도 결국 이 필드에
+/// 반영되므로, 완독 이후에도 여기서 계속 고쳐 쓸 수 있어야 자연스럽다.
+class RatingReviewCard extends ConsumerStatefulWidget {
+  const RatingReviewCard({
+    super.key,
+    required this.userBookId,
+    required this.book,
+  });
+
+  final int userBookId;
+  final BookItem book;
+
+  @override
+  ConsumerState<RatingReviewCard> createState() => _RatingReviewCardState();
+}
+
+class _RatingReviewCardState extends ConsumerState<RatingReviewCard> {
+  late final _reviewController = TextEditingController(
+    text: widget.book.shortReview ?? '',
+  );
+  final _reviewFocus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _reviewFocus.addListener(() {
+      if (!_reviewFocus.hasFocus) _saveReview();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant RatingReviewCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.book.shortReview != oldWidget.book.shortReview &&
+        !_reviewFocus.hasFocus) {
+      _reviewController.text = widget.book.shortReview ?? '';
+    }
+  }
+
+  @override
+  void dispose() {
+    _reviewController.dispose();
+    _reviewFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _saveRating(double rating) async {
+    try {
+      await ref
+          .read(bookRecordControllerProvider(widget.userBookId).notifier)
+          .updateRecord(myRating: rating);
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
+  Future<void> _saveReview() async {
+    final trimmed = _reviewController.text.trim();
+    if (trimmed == (widget.book.shortReview ?? '')) return;
+    try {
+      await ref
+          .read(bookRecordControllerProvider(widget.userBookId).notifier)
+          .updateRecord(shortReview: trimmed);
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
+        setState(() => _reviewController.text = widget.book.shortReview ?? '');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RecordSectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionLabel('내 평점', icon: Icons.star_border),
+          const SizedBox(height: 2),
+          StarRatingInput(
+            rating: widget.book.myRating ?? 0,
+            onChanged: _saveRating,
+          ),
+          const SizedBox(height: 10),
+          const SectionLabel('개인 리뷰', icon: Icons.rate_review_outlined),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _reviewController,
+            focusNode: _reviewFocus,
+            maxLength: 2000,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              isDense: true,
+              hintText: '이 책에 대한 짧은 리뷰를 남겨보세요.',
+              counterText: '',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

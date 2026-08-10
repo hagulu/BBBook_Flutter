@@ -9,9 +9,7 @@ import 'bookshelf_database.dart';
 /// 책장 기능의 source of truth. 화면은 항상 이 레포지토리를 통해 로컬 DB만
 /// 읽고, [sync]를 호출했을 때만 서버와 통신한다.
 class BookshelfRepository {
-  BookshelfRepository({required BookshelfApi api, BookshelfDao dao = const BookshelfDao()})
-    : _api = api,
-      _dao = dao;
+  BookshelfRepository({required this._api, this._dao = const BookshelfDao()});
 
   final BookshelfApi _api;
   final BookshelfDao _dao;
@@ -78,13 +76,23 @@ class BookshelfRepository {
     return _dao.getByStatuses([BookStatus.reading, BookStatus.paused]);
   }
 
+  Future<BookItem?> getById(int userBookId) => _dao.getById(userBookId);
+
+  /// 책 기록 화면에서 서버 PATCH가 성공한 뒤 그 결과를 로컬에 반영한다.
+  Future<void> upsertLocal(BookItem item) => _dao.upsertOne(item);
+
+  /// 서재에서 책을 삭제(DELETE API 성공)한 뒤 로컬 행을 제거한다.
+  Future<void> deleteLocal(int userBookId) => _dao.deleteOne(userBookId);
+
   Future<List<BookItem>> getGridTab(BookStatus status) => _dao.getGrid(status);
 
-  Future<List<BookItem>> searchFinished(FinishedFilter filter) => _dao.searchFinished(filter);
+  Future<List<BookItem>> searchFinished(FinishedFilter filter) =>
+      _dao.searchFinished(filter);
 
   Future<List<String>> getDistinctCategories() => _dao.getDistinctCategories();
 
-  Future<List<String>> getDistinctDifficulties() => _dao.getDistinctDifficulties();
+  Future<List<String>> getDistinctDifficulties() =>
+      _dao.getDistinctDifficulties();
 
   Future<List<BookTag>> getDistinctTags() => _dao.getDistinctTags();
 
@@ -93,7 +101,9 @@ class BookshelfRepository {
   Future<bool> getPrivacySetting() => _api.getPrivacySetting();
 
   Future<bool> setPrivacySetting(bool isFinishedBooksPublic) {
-    return _api.patchPrivacySetting(isFinishedBooksPublic: isFinishedBooksPublic);
+    return _api.patchPrivacySetting(
+      isFinishedBooksPublic: isFinishedBooksPublic,
+    );
   }
 
   /// 로그아웃 시 다음 사용자에게 이전 계정의 책장이 보이지 않도록 로컬 DB를 비운다.

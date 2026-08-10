@@ -31,10 +31,8 @@ class BookshelfAsyncBody<T> extends StatelessWidget {
         return builder(context, items);
       },
       loading: () => const _ScrollableMessage(text: '불러오는 중'),
-      error: (error, stackTrace) => _ScrollableMessage(
-        text: '목록을 불러오지 못했습니다.',
-        onRetry: onRetry,
-      ),
+      error: (error, stackTrace) =>
+          _ScrollableMessage(text: '목록을 불러오지 못했습니다.', onRetry: onRetry),
     );
   }
 }
@@ -57,7 +55,10 @@ class _ScrollableMessage extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(text, style: const TextStyle(color: AppColors.tertiaryText)),
+                  Text(
+                    text,
+                    style: const TextStyle(color: AppColors.tertiaryText),
+                  ),
                   if (onRetry != null) ...[
                     const SizedBox(height: 8),
                     TextButton(onPressed: onRetry, child: const Text('다시 시도')),

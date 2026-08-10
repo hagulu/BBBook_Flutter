@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../book_record/providers/book_record_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../data/auth_api.dart' show SocialProvider;
 import '../data/auth_repository.dart';
@@ -59,7 +60,11 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> _loadCurrentUser(String accessToken) async {
     try {
       final user = await _repository.fetchCurrentUser();
-      state = AuthState(status: AuthStatus.authenticated, user: user, accessToken: accessToken);
+      state = AuthState(
+        status: AuthStatus.authenticated,
+        user: user,
+        accessToken: accessToken,
+      );
     } on ApiException catch (e) {
       if (e.isAuthFailure) {
         await _handleUnauthorized();
@@ -86,7 +91,9 @@ class AuthNotifier extends Notifier<AuthState> {
       );
       developer.log('[소셜 로그인] provider=${provider.apiValue} result=SUCCESS');
     } on ApiException catch (e) {
-      developer.log('[소셜 로그인] provider=${provider.apiValue} result=FAIL reason=${_reasonOf(e)}');
+      developer.log(
+        '[소셜 로그인] provider=${provider.apiValue} result=FAIL reason=${_reasonOf(e)}',
+      );
       rethrow;
     }
   }
@@ -98,12 +105,20 @@ class AuthNotifier extends Notifier<AuthState> {
     try {
       final accessToken = await _repository.refreshAccessToken();
       if (accessToken != null) {
-        state = AuthState(status: state.status, user: state.user, accessToken: accessToken);
+        state = AuthState(
+          status: state.status,
+          user: state.user,
+          accessToken: accessToken,
+        );
       }
-      developer.log('[토큰 갱신] result=${accessToken != null ? 'SUCCESS' : 'FAIL'}');
+      developer.log(
+        '[토큰 갱신] result=${accessToken != null ? 'SUCCESS' : 'FAIL'}',
+      );
       return accessToken;
     } on ApiException catch (e) {
-      developer.log('[토큰 갱신] result=FAIL reason=${_reasonOf(e)} (일시 오류, 세션 유지)');
+      developer.log(
+        '[토큰 갱신] result=FAIL reason=${_reasonOf(e)} (일시 오류, 세션 유지)',
+      );
       rethrow;
     }
   }
@@ -144,6 +159,9 @@ class AuthNotifier extends Notifier<AuthState> {
       ref.invalidate(bookshelfSyncControllerProvider);
       ref.invalidate(privacySettingControllerProvider);
       ref.invalidate(finishedFilterProvider);
+      // autoDispose family라 보통은 화면을 벗어나며 스스로 폐기되지만, 책
+      // 기록 화면이 열린 채로 로그아웃하는 경우까지 대비해 명시적으로도 비운다.
+      ref.invalidate(bookRecordControllerProvider);
       ref.read(bookshelfSyncVersionProvider.notifier).state++;
     }
   }
@@ -151,4 +169,6 @@ class AuthNotifier extends Notifier<AuthState> {
   String _reasonOf(ApiException e) => 'status_${e.statusCode ?? 'unknown'}';
 }
 
-final authNotifierProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
+final authNotifierProvider = NotifierProvider<AuthNotifier, AuthState>(
+  AuthNotifier.new,
+);

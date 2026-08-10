@@ -13,7 +13,9 @@ class AuthLoadingGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isAuthLoading = ref.watch(authNotifierProvider.select((s) => s.isAuthLoading));
+    final isAuthLoading = ref.watch(
+      authNotifierProvider.select((s) => s.isAuthLoading),
+    );
     if (isAuthLoading) {
       return const Scaffold(backgroundColor: Colors.white);
     }

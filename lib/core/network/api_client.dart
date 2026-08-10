@@ -16,7 +16,9 @@ typedef UnauthorizedHandler = Future<void> Function();
 class ApiClient {
   ApiClient({String baseUrl = ApiConfig.baseUrl})
     : dio = Dio(buildApiBaseOptions(baseUrl: baseUrl)) {
-    dio.interceptors.add(InterceptorsWrapper(onRequest: _onRequest, onError: _onError));
+    dio.interceptors.add(
+      InterceptorsWrapper(onRequest: _onRequest, onError: _onError),
+    );
   }
 
   final Dio dio;
@@ -47,7 +49,10 @@ class ApiClient {
     handler.next(options);
   }
 
-  Future<void> _onError(DioException error, ErrorInterceptorHandler handler) async {
+  Future<void> _onError(
+    DioException error,
+    ErrorInterceptorHandler handler,
+  ) async {
     final refresher = _refreshAccessToken;
     final isUnauthorized = error.response?.statusCode == 401;
     final alreadyRetried = error.requestOptions.extra['retried'] == true;
@@ -103,6 +108,8 @@ class ApiClient {
   Future<void> _notifyUnauthorizedOnce() {
     final handler = _onUnauthorized;
     if (handler == null) return Future<void>.value();
-    return _handlingUnauthorized ??= handler().whenComplete(() => _handlingUnauthorized = null);
+    return _handlingUnauthorized ??= handler().whenComplete(
+      () => _handlingUnauthorized = null,
+    );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../book_record/models/record_labels.dart';
 import '../../providers/bookshelf_providers.dart';
 
 /// 완독 탭 필터 패널(카테고리/태그/걸작/난이도). 옵션은 모두 로컬 DB의
@@ -14,14 +15,19 @@ class FinishedFilterPanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final filter = ref.watch(finishedFilterProvider);
     final notifier = ref.read(finishedFilterProvider.notifier);
-    final categories = ref.watch(finishedCategoryOptionsProvider).valueOrNull ?? const [];
+    final categories =
+        ref.watch(finishedCategoryOptionsProvider).valueOrNull ?? const [];
     final tags = ref.watch(finishedTagOptionsProvider).valueOrNull ?? const [];
-    final difficulties = ref.watch(finishedDifficultyOptionsProvider).valueOrNull ?? const [];
+    final difficulties =
+        ref.watch(finishedDifficultyOptionsProvider).valueOrNull ?? const [];
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: AppColors.cardBackground, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -41,7 +47,9 @@ class FinishedFilterPanel extends ConsumerWidget {
                   _FilterChip(
                     label: category,
                     selected: filter.category == category,
-                    onTap: () => notifier.setCategory(filter.category == category ? null : category),
+                    onTap: () => notifier.setCategory(
+                      filter.category == category ? null : category,
+                    ),
                   ),
               ],
             ),
@@ -71,13 +79,20 @@ class FinishedFilterPanel extends ConsumerWidget {
               _FilterChip(
                 label: '걸작만 보기',
                 selected: filter.masterpieceOnly,
-                onTap: () => notifier.setMasterpieceOnly(!filter.masterpieceOnly),
+                onTap: () =>
+                    notifier.setMasterpieceOnly(!filter.masterpieceOnly),
               ),
               for (final difficulty in difficulties)
                 _FilterChip(
-                  label: difficulty,
+                  // 필터 비교/전송에는 저장값(EASY 등)을 그대로 쓰고,
+                  // 라벨만 한글로 바꿔 보여준다(저장값에 한글이 섞이지 않도록).
+                  label:
+                      DifficultyLevel.fromApiValue(difficulty)?.label ??
+                      difficulty,
                   selected: filter.difficulty == difficulty,
-                  onTap: () => notifier.setDifficulty(filter.difficulty == difficulty ? null : difficulty),
+                  onTap: () => notifier.setDifficulty(
+                    filter.difficulty == difficulty ? null : difficulty,
+                  ),
                 ),
             ],
           ),
@@ -96,13 +111,21 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.tertiaryText),
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: AppColors.tertiaryText,
+      ),
     );
   }
 }
 
 class _FilterChip extends StatelessWidget {
-  const _FilterChip({required this.label, required this.selected, required this.onTap});
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
   final String label;
   final bool selected;

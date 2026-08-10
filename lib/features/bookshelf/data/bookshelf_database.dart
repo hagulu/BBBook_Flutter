@@ -60,8 +60,12 @@ class BookshelfDatabase {
             is_dirty INTEGER NOT NULL DEFAULT 0
           )
         ''');
-        await db.execute('CREATE INDEX idx_user_book_status ON user_book(status)');
-        await db.execute('CREATE INDEX idx_user_book_finished_at ON user_book(finished_at)');
+        await db.execute(
+          'CREATE INDEX idx_user_book_status ON user_book(status)',
+        );
+        await db.execute(
+          'CREATE INDEX idx_user_book_finished_at ON user_book(finished_at)',
+        );
         await db.execute('''
           CREATE TABLE user_book_tag (
             user_book_id INTEGER NOT NULL,

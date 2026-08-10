@@ -22,10 +22,11 @@ enum SocialProvider {
 /// [ApiClient]의 인증 인터셉터를 거치지 않는 별도 [authDio]를 사용하고,
 /// getMe만 [ApiClient]를 통해 요청한다.
 class AuthApi {
-  AuthApi({required Dio authDio, required ApiClient apiClient, required ClientIdStorage clientIdStorage})
-    : _authDio = authDio,
-      _apiClient = apiClient,
-      _clientIdStorage = clientIdStorage;
+  AuthApi({
+    required this._authDio,
+    required this._apiClient,
+    required this._clientIdStorage,
+  });
 
   final Dio _authDio;
   final ApiClient _apiClient;
@@ -89,7 +90,9 @@ class AuthApi {
   /// GET /api/users/me
   Future<AuthUser> getMe() async {
     try {
-      final response = await _apiClient.dio.get<Map<String, dynamic>>('/api/users/me');
+      final response = await _apiClient.dio.get<Map<String, dynamic>>(
+        '/api/users/me',
+      );
       return AuthUser.fromJson(_unwrap(response));
     } on DioException catch (e) {
       throw _mapError(e);

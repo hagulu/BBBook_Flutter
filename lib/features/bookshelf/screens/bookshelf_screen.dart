@@ -20,8 +20,12 @@ class BookshelfScreen extends ConsumerStatefulWidget {
   ConsumerState<BookshelfScreen> createState() => _BookshelfScreenState();
 }
 
-class _BookshelfScreenState extends ConsumerState<BookshelfScreen> with SingleTickerProviderStateMixin {
-  late final TabController _tabController = TabController(length: 4, vsync: this);
+class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController = TabController(
+    length: 4,
+    vsync: this,
+  );
 
   @override
   void dispose() {
@@ -44,10 +48,14 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> with SingleTi
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('책장을 불러오지 못했습니다.', style: TextStyle(color: AppColors.tertiaryText)),
+            const Text(
+              '책장을 불러오지 못했습니다.',
+              style: TextStyle(color: AppColors.tertiaryText),
+            ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () => ref.read(bookshelfSyncControllerProvider.notifier).syncNow(),
+              onPressed: () =>
+                  ref.read(bookshelfSyncControllerProvider.notifier).syncNow(),
               child: const Text('다시 시도'),
             ),
           ],
@@ -68,9 +76,18 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> with SingleTi
             tabAlignment: TabAlignment.start,
             labelColor: Colors.white,
             unselectedLabelColor: AppColors.tertiaryText,
-            labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-            indicator: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(999)),
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+            indicator: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(999),
+            ),
             indicatorSize: TabBarIndicatorSize.tab,
             dividerColor: Colors.transparent,
             padding: EdgeInsets.zero,
@@ -89,8 +106,14 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen> with SingleTi
             children: const [
               ReadingTabView(),
               FinishedTabView(),
-              SimpleGridTabView(status: BookStatus.wantToRead, emptyText: '읽고 싶은 책이 없습니다.'),
-              SimpleGridTabView(status: BookStatus.stopped, emptyText: '중단한 책이 없습니다.'),
+              SimpleGridTabView(
+                status: BookStatus.wantToRead,
+                emptyText: '읽고 싶은 책이 없습니다.',
+              ),
+              SimpleGridTabView(
+                status: BookStatus.stopped,
+                emptyText: '중단한 책이 없습니다.',
+              ),
             ],
           ),
         ),

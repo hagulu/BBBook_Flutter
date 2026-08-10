@@ -23,7 +23,9 @@ class SyncChangesResult {
       upserted: (json['upserted'] as List<dynamic>)
           .map((e) => BookItem.fromSyncJson(e as Map<String, dynamic>))
           .toList(),
-      deletedUserBookIds: (json['deletedUserBookIds'] as List<dynamic>).map((e) => e as int).toList(),
+      deletedUserBookIds: (json['deletedUserBookIds'] as List<dynamic>)
+          .map((e) => e as int)
+          .toList(),
       syncedAt: DateTime.parse(json['syncedAt'] as String),
       fullSyncRequired: json['fullSyncRequired'] as bool,
     );

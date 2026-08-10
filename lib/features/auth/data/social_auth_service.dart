@@ -15,8 +15,10 @@ class SocialAuthException implements Exception {
 /// Flutter 이관 시 주의사항).
 class SocialAuthService {
   // 백엔드가 id_token의 audience를 검증하므로 값이 백엔드 설정과 일치해야 한다.
-  static const _googleClientId = '585070787661-73kr7939i6slm4c1r53egdn2mi9c48si.apps.googleusercontent.com';
-  static const _googleServerClientId = '585070787661-nm9rlng3ab2pccff926ot80and5pgolt.apps.googleusercontent.com';
+  static const _googleClientId =
+      '585070787661-73kr7939i6slm4c1r53egdn2mi9c48si.apps.googleusercontent.com';
+  static const _googleServerClientId =
+      '585070787661-nm9rlng3ab2pccff926ot80and5pgolt.apps.googleusercontent.com';
 
   bool _googleInitialized = false;
 
@@ -57,7 +59,10 @@ class SocialAuthService {
     }
     try {
       final credential = await SignInWithApple.getAppleIDCredential(
-        scopes: const [AppleIDAuthorizationScopes.email, AppleIDAuthorizationScopes.fullName],
+        scopes: const [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
       );
       final idToken = credential.identityToken;
       if (idToken == null) {

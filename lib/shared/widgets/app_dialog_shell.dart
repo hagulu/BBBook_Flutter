@@ -5,7 +5,11 @@ import '../../core/theme/app_theme.dart';
 enum AppDialogActionStyle { primary, neutral, destructive }
 
 class AppDialogAction {
-  const AppDialogAction({required this.label, required this.style, required this.onPressed});
+  const AppDialogAction({
+    required this.label,
+    required this.style,
+    required this.onPressed,
+  });
 
   final String label;
   final AppDialogActionStyle style;
@@ -60,8 +64,14 @@ class AppDialogShell extends StatelessWidget {
                           children: [
                             CircleAvatar(
                               radius: 22,
-                              backgroundColor: iconBackgroundColor ?? AppColors.warningBackground,
-                              child: Icon(icon, color: iconColor ?? AppColors.warning, size: 22),
+                              backgroundColor:
+                                  iconBackgroundColor ??
+                                  AppColors.warningBackground,
+                              child: Icon(
+                                icon,
+                                color: iconColor ?? AppColors.warning,
+                                size: 22,
+                              ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(child: _Title(title)),
@@ -72,7 +82,11 @@ class AppDialogShell extends StatelessWidget {
                       const SizedBox(height: 16),
                       Text(
                         message,
-                        style: const TextStyle(fontSize: 15, color: AppColors.bodyText, height: 1.4),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: AppColors.bodyText,
+                          height: 1.4,
+                        ),
                       ),
                     ],
                   ),
@@ -80,7 +94,10 @@ class AppDialogShell extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               if (actions.length == 1)
-                SizedBox(width: double.infinity, child: _ActionButton(actions.single))
+                SizedBox(
+                  width: double.infinity,
+                  child: _ActionButton(actions.single),
+                )
               else
                 Row(
                   children: [
@@ -107,7 +124,11 @@ class _Title extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.titleText),
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: AppColors.titleText,
+      ),
     );
   }
 }

@@ -31,7 +31,9 @@ class AppConfirm {
           ),
           AppDialogAction(
             label: confirmText,
-            style: destructive ? AppDialogActionStyle.destructive : AppDialogActionStyle.primary,
+            style: destructive
+                ? AppDialogActionStyle.destructive
+                : AppDialogActionStyle.primary,
             onPressed: () => Navigator.of(dialogContext).pop(true),
           ),
         ],

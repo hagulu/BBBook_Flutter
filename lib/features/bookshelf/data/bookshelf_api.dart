@@ -14,16 +14,20 @@ import '../models/sync_changes_result.dart';
 /// 인증 필요 요청이므로 401 시 1회 재시도 후 실패하면 로그아웃 처리하는
 /// [ApiClient]를 통해서만 호출한다(CLAUDE.md 인증 API 호출 규칙).
 class BookshelfApi {
-  BookshelfApi({required ApiClient apiClient}) : _apiClient = apiClient;
+  BookshelfApi({required this._apiClient});
 
   final ApiClient _apiClient;
 
   /// GET /api/me/books/sync — 서재 전체 목록(페이지네이션 없음). 최초 동기화 전용.
   Future<List<BookItem>> getSync() async {
     try {
-      final response = await _apiClient.dio.get<Map<String, dynamic>>('/api/me/books/sync');
+      final response = await _apiClient.dio.get<Map<String, dynamic>>(
+        '/api/me/books/sync',
+      );
       final data = _unwrapList(response);
-      return data.map((e) => BookItem.fromSyncJson(e as Map<String, dynamic>)).toList();
+      return data
+          .map((e) => BookItem.fromSyncJson(e as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw _mapError(e);
     } on ApiException {
@@ -54,7 +58,9 @@ class BookshelfApi {
   /// GET /api/me/privacy-setting
   Future<bool> getPrivacySetting() async {
     try {
-      final response = await _apiClient.dio.get<Map<String, dynamic>>('/api/me/privacy-setting');
+      final response = await _apiClient.dio.get<Map<String, dynamic>>(
+        '/api/me/privacy-setting',
+      );
       final data = _unwrapMap(response);
       return data['isFinishedBooksPublic'] as bool;
     } on DioException catch (e) {
@@ -67,7 +73,9 @@ class BookshelfApi {
   }
 
   /// PATCH /api/me/privacy-setting
-  Future<bool> patchPrivacySetting({required bool isFinishedBooksPublic}) async {
+  Future<bool> patchPrivacySetting({
+    required bool isFinishedBooksPublic,
+  }) async {
     try {
       final response = await _apiClient.dio.patch<Map<String, dynamic>>(
         '/api/me/privacy-setting',

@@ -19,8 +19,18 @@ final bookshelfRepositoryProvider = Provider<BookshelfRepository>((ref) {
 });
 
 /// 동기화로 로컬 DB가 실제로 바뀌었을 때만 값을 올려 탭별 목록 Provider들을
-/// 무효화한다(변경 없는 증분 동기화는 재조회를 생략).
+/// 무효화한다(변경 없는 증분 동기화는 재조회를 생략). 책 기록 화면의 자체
+/// 저장도 이 값을 올려 책장 탭을 갱신한다(둘 다 "책장 목록이 바뀜"이라는
+/// 같은 의미이므로 공유해도 된다).
 final bookshelfSyncVersionProvider = StateProvider<int>((ref) => 0);
+
+/// [BookshelfSyncController]의 실제 동기화(당겨서 새로고침, 포그라운드 전환
+/// 등)가 로컬 DB를 바꿨을 때만 올라간다. `bookshelfSyncVersionProvider`와
+/// 달리 책 기록 화면 자신의 저장으로는 절대 올라가지 않는다 — 상세 화면이
+/// "다른 곳에서 이 책이 바뀌었는지"만 구분해서 구독하기 위한 신호다. 같이
+/// 묶으면 자기 저장 직후에도 상세 컨트롤러가 다시 빌드되며 로딩 오버레이가
+/// 불필요하게 깜빡인다.
+final externalSyncVersionProvider = StateProvider<int>((ref) => 0);
 
 /// 동기화 실행/상태 관리(최초엔 전체 동기화, 이후엔 증분 동기화). 값은
 /// 마지막 동기화 시각(없으면 null).
@@ -58,6 +68,7 @@ class BookshelfSyncController extends AsyncNotifier<DateTime?> {
       state = AsyncValue.data(syncedAt);
       if (changed) {
         ref.read(bookshelfSyncVersionProvider.notifier).state++;
+        ref.read(externalSyncVersionProvider.notifier).state++;
       }
     } catch (e, st) {
       if (_disposed) return;
@@ -66,24 +77,31 @@ class BookshelfSyncController extends AsyncNotifier<DateTime?> {
   }
 
   /// 마지막 동기화가 [throttle]보다 오래됐을 때만 동기화한다(앱 포그라운드 전환용).
-  Future<void> syncIfStale({Duration throttle = const Duration(minutes: 10)}) async {
+  Future<void> syncIfStale({
+    Duration throttle = const Duration(minutes: 10),
+  }) async {
     final lastSynced = state.valueOrNull ?? await _repository.getLastSyncedAt();
-    if (lastSynced == null || DateTime.now().difference(lastSynced) > throttle) {
+    if (lastSynced == null ||
+        DateTime.now().difference(lastSynced) > throttle) {
       await syncNow();
     }
   }
 }
 
-final bookshelfSyncControllerProvider = AsyncNotifierProvider<BookshelfSyncController, DateTime?>(
-  BookshelfSyncController.new,
-);
+final bookshelfSyncControllerProvider =
+    AsyncNotifierProvider<BookshelfSyncController, DateTime?>(
+      BookshelfSyncController.new,
+    );
 
 final readingTabProvider = FutureProvider<List<BookItem>>((ref) {
   ref.watch(bookshelfSyncVersionProvider);
   return ref.watch(bookshelfRepositoryProvider).getReadingTab();
 });
 
-final gridTabProvider = FutureProvider.family<List<BookItem>, BookStatus>((ref, status) {
+final gridTabProvider = FutureProvider.family<List<BookItem>, BookStatus>((
+  ref,
+  status,
+) {
   ref.watch(bookshelfSyncVersionProvider);
   return ref.watch(bookshelfRepositoryProvider).getGridTab(status);
 });
@@ -107,18 +125,23 @@ class FinishedFilterNotifier extends Notifier<FinishedFilter> {
     state = state.copyWith(tagIds: tags);
   }
 
-  void setMasterpieceOnly(bool value) => state = state.copyWith(masterpieceOnly: value);
+  void setMasterpieceOnly(bool value) =>
+      state = state.copyWith(masterpieceOnly: value);
 
   void setDifficulty(String? difficulty) {
-    state = state.copyWith(difficulty: difficulty, clearDifficulty: difficulty == null);
+    state = state.copyWith(
+      difficulty: difficulty,
+      clearDifficulty: difficulty == null,
+    );
   }
 
   void reset() => state = const FinishedFilter();
 }
 
-final finishedFilterProvider = NotifierProvider<FinishedFilterNotifier, FinishedFilter>(
-  FinishedFilterNotifier.new,
-);
+final finishedFilterProvider =
+    NotifierProvider<FinishedFilterNotifier, FinishedFilter>(
+      FinishedFilterNotifier.new,
+    );
 
 final finishedBooksProvider = FutureProvider<List<BookItem>>((ref) {
   ref.watch(bookshelfSyncVersionProvider);
@@ -164,6 +187,7 @@ class PrivacySettingController extends AsyncNotifier<bool> {
   }
 }
 
-final privacySettingControllerProvider = AsyncNotifierProvider<PrivacySettingController, bool>(
-  PrivacySettingController.new,
-);
+final privacySettingControllerProvider =
+    AsyncNotifierProvider<PrivacySettingController, bool>(
+      PrivacySettingController.new,
+    );

@@ -43,6 +43,11 @@ ThemeData buildAppTheme() {
     useMaterial3: true,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: AppColors.pageBackground,
+    // 기본 M3 bodyLarge(16px)는 TextField 입력 글씨로 쓰기엔 커 보여서(design-system.md
+    // 본문 14~15px 기준) 앱 전역 입력창 글씨 크기를 낮춘다.
+    textTheme: const TextTheme(
+      bodyLarge: TextStyle(fontSize: 14, color: AppColors.bodyText),
+    ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.primary,
@@ -51,6 +56,44 @@ ThemeData buildAppTheme() {
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.bodyText,
+        minimumSize: const Size.fromHeight(48),
+        side: const BorderSide(color: AppColors.border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+      ),
+    ),
+    // design-system.md: "텍스트 입력/검색창: 보더 없이 bg-[#f1f4f9] rounded-xl
+    // outline-none" — 밑줄(UnderlineInputBorder) 대신 보더 없는 필 배경으로 통일.
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: AppColors.inputBackground,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      hintStyle: const TextStyle(color: AppColors.tertiaryText),
+      labelStyle: const TextStyle(color: AppColors.tertiaryText, fontSize: 13),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.error, width: 1.2),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
       ),
     ),
   );

@@ -4,7 +4,12 @@ import '../../../../core/theme/app_theme.dart';
 
 /// 책 표지 썸네일. 이미지가 없거나 로드 실패 시 그라디언트 + 제목으로 대체한다.
 class BookCover extends StatelessWidget {
-  const BookCover({super.key, required this.imageUrl, required this.title, this.borderRadius = 10});
+  const BookCover({
+    super.key,
+    required this.imageUrl,
+    required this.title,
+    this.borderRadius = 10,
+  });
 
   final String? imageUrl;
   final String title;
@@ -34,7 +39,8 @@ class BookCover extends StatelessWidget {
                     url,
                     fit: BoxFit.cover,
                     cacheWidth: cacheWidth,
-                    errorBuilder: (context, error, stackTrace) => _CoverPlaceholder(title: title),
+                    errorBuilder: (context, error, stackTrace) =>
+                        _CoverPlaceholder(title: title),
                     loadingBuilder: (context, child, progress) {
                       if (progress == null) return child;
                       return const ColoredBox(color: AppColors.border);
@@ -69,7 +75,11 @@ class _CoverPlaceholder extends StatelessWidget {
         textAlign: TextAlign.center,
         maxLines: 4,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+          fontSize: 12,
+        ),
       ),
     );
   }

@@ -7,7 +7,11 @@ enum AuthStatus { authLoading, authenticated, unauthenticated }
 /// 원본(Next.js)의 `AuthProvider`(`isLoggedIn`, `isAuthLoading`, `user`,
 /// `accessToken`)에 대응한다.
 class AuthState {
-  const AuthState({this.status = AuthStatus.authLoading, this.user, this.accessToken});
+  const AuthState({
+    this.status = AuthStatus.authLoading,
+    this.user,
+    this.accessToken,
+  });
 
   final AuthStatus status;
   final AuthUser? user;
