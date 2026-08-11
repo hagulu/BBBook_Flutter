@@ -169,7 +169,7 @@ class _BookRecordBody extends ConsumerWidget {
                           book.isMasterpiece
                               ? PhosphorIconsFill.crown
                               : PhosphorIconsRegular.crown,
-                          size: 32,
+                          size: 28,
                           color: book.isMasterpiece
                               ? AppColors.masterpieceGold
                               : AppColors.mutedIcon,
@@ -201,19 +201,20 @@ class _BookRecordBody extends ConsumerWidget {
             sourceHasValue:
                 BookSourceType.fromApiValue(book.sourceType) != null,
             onTapSource: () => _openSourceDialog(context, ref, controller),
+            sourceIcon: BookSourceType.fromApiValue(book.sourceType)?.icon,
             difficultyValue:
                 DifficultyLevel.fromApiValue(book.difficulty)?.label ??
                 DifficultyLevel.values.map((d) => d.label).join(' · '),
             difficultyHasValue:
                 DifficultyLevel.fromApiValue(book.difficulty) != null,
             onTapDifficulty: () => _openDifficultyDialog(context, controller),
+            difficultyIcon: DifficultyLevel.fromApiValue(book.difficulty)?.icon,
           ),
           const SizedBox(height: 12),
           RatingReviewCard(userBookId: userBookId, book: book),
           const SizedBox(height: 12),
           RecordSectionCard(
             child: RecordFieldTile(
-              icon: PhosphorIconsRegular.compass,
               label: '알게 된 경로',
               value: book.discoverySource ?? '미설정',
               hasValue: book.discoverySource != null,
@@ -240,7 +241,7 @@ class _BookRecordBody extends ConsumerWidget {
                     Icon(
                       PhosphorIconsRegular.trash,
                       size: 16,
-                      color: AppColors.error,
+                      color: AppColors.tertiaryText,
                     ),
                     SizedBox(width: 6),
                     Text(
@@ -248,7 +249,7 @@ class _BookRecordBody extends ConsumerWidget {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.error,
+                        color: AppColors.tertiaryText,
                       ),
                     ),
                   ],

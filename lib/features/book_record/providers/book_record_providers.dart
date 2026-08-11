@@ -104,20 +104,49 @@ class BookRecordController
   Future<void> addTag(String name) =>
       _mutate(() => _repository.addTag(arg, name));
 
-  Future<void> removeTag(int tagId) =>
-      _mutate(() => _repository.removeTag(arg, tagId));
+  /// 태그 삭제는 다른 필드 수정과 달리 로딩 상태를 거치지 않고 칩을 화면에서
+  /// 즉시 지운 뒤(낙관적 삭제) 서버 응답을 기다린다 — 실패하면 [previous]로
+  /// 되돌린다. `state.isLoading`을 세우지 않으므로 [_mutate]/[deleteBook]과의
+  /// 동시성 가드는 [_isMutating] 플래그로 별도 관리한다.
+  Future<void> removeTag(int tagId) async {
+    if (state.isLoading || _isMutating) {
+      throw const ApiException('저장 중입니다. 잠시 후 다시 시도해주세요.');
+    }
+    final current = state.value;
+    if (current == null) {
+      throw const ApiException('존재하지 않거나 이미 삭제된 책입니다.');
+    }
+    final previous = state;
+    _isMutating = true;
+    state = AsyncValue.data(
+      current.copyWithTags(
+        current.tags.where((t) => t.id != tagId).toList(),
+        updatedAt: DateTime.now().toUtc(),
+      ),
+    );
+    try {
+      final updated = await _repository.removeTag(arg, tagId);
+      state = AsyncValue.data(updated);
+      ref.read(bookshelfSyncVersionProvider.notifier).state++;
+    } catch (e, st) {
+      state = previous;
+      Error.throwWithStackTrace(e, st);
+    } finally {
+      _isMutating = false;
+    }
+  }
 
   /// 성공하면 로컬 행도 함께 삭제되고 상태는 null이 된다. 화면은 성공 후
   /// 이전 화면으로 pop해야 한다(이 컨트롤러는 네비게이션을 하지 않는다).
   ///
-  /// 다른 수정이 아직 진행 중이면(`state.isLoading`) 예외를 던져 거부한다
-  /// — 그러지 않으면 PATCH가 서버에 반영되기 전에 DELETE가 로컬 행을
-  /// 지우고, 뒤늦게 도착한 PATCH 응답이 그 행을 다시 로컬에 살려낼 수
-  /// 있다. 호출부는 전부 [ApiException]을 잡아 스낵바/인라인 에러로
-  /// 보여주므로, 조용히 return하면 "저장된 것처럼 보이지만 실제로는
+  /// 다른 수정이 아직 진행 중이면(`state.isLoading` 또는 [_isMutating]) 예외를
+  /// 던져 거부한다 — 그러지 않으면 PATCH/낙관적 삭제가 서버에 반영되기 전에
+  /// DELETE가 로컬 행을 지우고, 뒤늦게 도착한 응답이 그 행을 다시 로컬에
+  /// 살려낼 수 있다. 호출부는 전부 [ApiException]을 잡아 스낵바/인라인
+  /// 에러로 보여주므로, 조용히 return하면 "저장된 것처럼 보이지만 실제로는
   /// 무시된" 상태가 된다 — 반드시 던져야 한다.
   Future<void> deleteBook() async {
-    if (state.isLoading) {
+    if (state.isLoading || _isMutating) {
       throw const ApiException('저장 중입니다. 잠시 후 다시 시도해주세요.');
     }
     final previous = state;
@@ -136,7 +165,7 @@ class BookRecordController
   /// — 진행 중인 PATCH와 또 다른 PATCH/DELETE가 응답 순서 역전으로 서로의
   /// 결과를 덮어쓰는 것을 방지). 조용히 무시하지 않고 던지는 이유도 동일하다.
   Future<void> _mutate(Future<BookItem> Function() action) async {
-    if (state.isLoading) {
+    if (state.isLoading || _isMutating) {
       throw const ApiException('저장 중입니다. 잠시 후 다시 시도해주세요.');
     }
     final previous = state;
@@ -150,6 +179,11 @@ class BookRecordController
       Error.throwWithStackTrace(e, st);
     }
   }
+
+  /// [removeTag]가 낙관적 갱신 중임을 표시하는 플래그. `state.isLoading`은
+  /// 낙관적 삭제 동안 그대로 false이므로(로딩 상태를 세우지 않음) 별도로
+  /// 관리해야 다른 변이(_mutate/deleteBook)와의 동시 실행을 막을 수 있다.
+  bool _isMutating = false;
 }
 
 final bookRecordControllerProvider = AsyncNotifierProvider.autoDispose

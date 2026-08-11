@@ -18,9 +18,11 @@ class MetaSummaryCard extends StatelessWidget {
     required this.sourceValue,
     required this.sourceHasValue,
     required this.onTapSource,
+    this.sourceIcon,
     required this.difficultyValue,
     required this.difficultyHasValue,
     required this.onTapDifficulty,
+    this.difficultyIcon,
   });
 
   final DateTime? startedAt;
@@ -30,9 +32,11 @@ class MetaSummaryCard extends StatelessWidget {
   final String sourceValue;
   final bool sourceHasValue;
   final VoidCallback onTapSource;
+  final IconData? sourceIcon;
   final String difficultyValue;
   final bool difficultyHasValue;
   final VoidCallback onTapDifficulty;
+  final IconData? difficultyIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -66,11 +70,11 @@ class MetaSummaryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: RecordFieldTile(
-                  icon: PhosphorIconsRegular.stack,
                   label: '출처',
                   value: sourceValue,
                   hasValue: sourceHasValue,
                   onTap: onTapSource,
+                  valueIcon: sourceIcon,
                 ),
               ),
               Container(
@@ -81,11 +85,11 @@ class MetaSummaryCard extends StatelessWidget {
               ),
               Expanded(
                 child: RecordFieldTile(
-                  icon: PhosphorIconsRegular.gauge,
                   label: '난이도',
                   value: difficultyValue,
                   hasValue: difficultyHasValue,
                   onTap: onTapDifficulty,
+                  valueIcon: difficultyIcon,
                 ),
               ),
             ],
