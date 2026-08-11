@@ -70,7 +70,12 @@ class _FinishConfirmDialogState extends State<_FinishConfirmDialog> {
           IconOptionSelector<DifficultyLevel>(
             options: [
               for (final level in DifficultyLevel.values)
-                IconOption(value: level, icon: level.icon, label: level.label),
+                IconOption(
+                  value: level,
+                  icon: level.icon,
+                  label: level.label,
+                  iconSize: 22,
+                ),
             ],
             selected: _difficulty,
             onSelected: (v) =>

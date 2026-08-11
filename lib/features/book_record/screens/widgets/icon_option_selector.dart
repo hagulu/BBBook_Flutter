@@ -8,11 +8,13 @@ class IconOption<T> {
     required this.value,
     required this.icon,
     required this.label,
+    this.iconSize = 20,
   });
 
   final T value;
   final IconData icon;
   final String label;
+  final double iconSize;
 }
 
 /// 단일 선택 아이콘 카드 그룹(독서 상태/난이도/출처처럼 소수의 고정 선택지를
@@ -88,7 +90,7 @@ class _OptionCell<T> extends StatelessWidget {
               children: [
                 Icon(
                   option.icon,
-                  size: 20,
+                  size: option.iconSize,
                   color: selected ? AppColors.primary : AppColors.mutedIcon,
                 ),
                 const SizedBox(height: 4),

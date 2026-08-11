@@ -316,7 +316,12 @@ Future<String?> showDifficultyDialog(
       content: IconOptionSelector<DifficultyLevel>(
         options: [
           for (final level in DifficultyLevel.values)
-            IconOption(value: level, icon: level.icon, label: level.label),
+            IconOption(
+              value: level,
+              icon: level.icon,
+              label: level.label,
+              iconSize: 22,
+            ),
         ],
         selected: DifficultyLevel.fromApiValue(initialDifficulty),
         onSelected: (level) => Navigator.of(context).pop(level.apiValue),
