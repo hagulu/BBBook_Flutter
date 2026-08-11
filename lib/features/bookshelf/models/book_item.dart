@@ -103,22 +103,93 @@ class BookItem {
     );
   }
 
+  /// 책 기록 화면의 필드 수정(`PATCH /api/me/books/:userBookId`에 대응하는
+  /// 필드만)을 로컬에 즉시 반영할 때 쓴다. 각 파라미터가 null이면 현재 값을
+  /// 유지한다 — 서버 PATCH의 "null이면 변경 없음" 의미론과 맞춰, 호출부가
+  /// 건드리지 않은 필드가 그대로 보존되게 한다.
+  ///
+  /// [status]가 `'FINISHED'`이고 [finishedAt]을 생략하면(문서 기준 서버가
+  /// `X-Timezone` 기준 오늘 날짜로 자동 설정하는 것과 동일한 조합) 로컬에도
+  /// 즉시 오늘 날짜(KST)를 채운다. 그러지 않으면 `status=FINISHED,
+  /// finishedAt=null`인 로컬 상태가 dirty로 남았을 때, 재시도 push가 그
+  /// 조합을 "서버가 오늘 날짜로 새로 잡아버릴 위험"으로 오인해 status
+  /// 자체를 생략하게 되고(`BookshelfRepository._pushDirtyItem`), 결국
+  /// 완독 전환이 서버에 끝내 반영되지 못한 채 재시도 응답으로 로컬 상태만
+  /// 원래대로 되돌아간다.
+  BookItem copyWithRecord({
+    String? status,
+    int? currentPage,
+    double? myRating,
+    String? shortReview,
+    bool? isMasterpiece,
+    String? sourceType,
+    int? rereadCount,
+    String? difficulty,
+    String? startedAt,
+    String? finishedAt,
+    String? platformName,
+    String? discoverySource,
+    required DateTime updatedAt,
+  }) {
+    final autoFillFinishedAt = status == 'FINISHED' && finishedAt == null;
+    return BookItem(
+      userBookId: userBookId,
+      bookId: bookId,
+      isbn13: isbn13,
+      title: title,
+      author: author,
+      publisher: publisher,
+      totalPages: totalPages,
+      coverImageUrl: coverImageUrl,
+      displayCategoryId: displayCategoryId,
+      category: category,
+      status: status != null ? BookStatus.fromApiValue(status) : this.status,
+      currentPage: currentPage ?? this.currentPage,
+      myRating: myRating ?? this.myRating,
+      shortReview: shortReview ?? this.shortReview,
+      isMasterpiece: isMasterpiece ?? this.isMasterpiece,
+      sourceType: sourceType ?? this.sourceType,
+      rereadCount: rereadCount ?? this.rereadCount,
+      difficulty: difficulty ?? this.difficulty,
+      startedAt: startedAt != null ? _parseDate(startedAt) : this.startedAt,
+      finishedAt: finishedAt != null
+          ? _parseDate(finishedAt)
+          : (autoFillFinishedAt ? _todayInKst() : this.finishedAt),
+      libraryId: libraryId,
+      libraryDueAt: libraryDueAt,
+      platformName: platformName ?? this.platformName,
+      discoverySource: discoverySource ?? this.discoverySource,
+      tags: tags,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
+
+  /// 이 앱은 한국어 전용 서비스라 서버에 항상 `X-Timezone: Asia/Seoul`을
+  /// 고정으로 보낸다(book_record_api.dart) — 기기의 실제 타임존 설정과
+  /// 무관하게 서버가 계산하는 "오늘"과 맞추기 위해 KST(UTC+9, DST 없음)
+  /// 기준으로 직접 계산한다.
+  static DateTime _todayInKst() {
+    final kstNow = DateTime.now().toUtc().add(const Duration(hours: 9));
+    return DateTime(kstNow.year, kstNow.month, kstNow.day);
+  }
+
   factory BookItem.fromSyncJson(Map<String, dynamic> json) {
     return BookItem.fromDetailJson(
       json,
       createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
   }
 
-  /// `PATCH /api/me/books/:userBookId`류 응답(책 기록 상세 데이터)에는
-  /// `createdAt`/`updatedAt`이 내려오지 않는다. 로컬 DB의 `NOT NULL` 컬럼을
-  /// 채우기 위해 호출 측이 기존 로컬 행의 [createdAt]을 그대로 넘기고,
-  /// [updatedAt]은 응답을 반영하는 시점의 클라이언트 시각(UTC)을 넘긴다.
+  /// `PATCH /api/me/books/:userBookId`(및 `.../book-info`) 응답(책 기록 상세
+  /// 데이터)에는 `createdAt`이 내려오지 않는다. 로컬 DB의 `NOT NULL` 컬럼을
+  /// 채우기 위해 호출 측이 기존 로컬 행의 [createdAt]을 그대로 넘긴다.
+  /// `updatedAt`은 두 응답 모두에 내려오므로(api-doc) json에서 직접 읽는다 —
+  /// 서버가 실제로 반영한 `user_book.updated_at`이라 다음 PATCH의 충돌 검사
+  /// 기준값으로 그대로 쓸 수 있다.
   factory BookItem.fromDetailJson(
     Map<String, dynamic> json, {
     required DateTime createdAt,
-    required DateTime updatedAt,
   }) {
     return BookItem(
       userBookId: json['userBookId'] as int,
@@ -149,7 +220,7 @@ class BookItem {
           .map((e) => BookTag.fromJson(e as Map<String, dynamic>))
           .toList(),
       createdAt: createdAt,
-      updatedAt: updatedAt,
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
   }
 

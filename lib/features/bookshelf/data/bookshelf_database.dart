@@ -3,9 +3,14 @@ import 'package:sqflite/sqflite.dart';
 
 /// 책장 로컬 DB(sqflite) 스키마.
 ///
-/// `user_book.is_dirty`는 이번 작업 범위(책 수정 화면 없음)에서는 항상 0이지만,
-/// 추후 책 수정 기능이 추가되면 "로컬 우선 반영 → dirty 표시 → 서버 push →
-/// 전체 동기화" 순서의 스키마 기반을 미리 마련해 둔다.
+/// `user_book.is_dirty`는 책 기록 화면의 필드 수정이 "로컬 우선 반영 → dirty
+/// 표시 → 서버로 조용히 push → 실패 시 dirty 유지, 다음 동기화 때 일괄 재시도"
+/// 순서로 동작하게 한다(`BookshelfDao.applyLocalEdit`/`confirmPush`,
+/// `BookshelfRepository.sync`). `synced_updated_at`은 "마지막으로 확인한 서버
+/// updated_at" 값으로, 로컬 편집을 서버로 push할 때 `updatedAt` 충돌 검사
+/// 파라미터로 사용한다. 서버 GET 응답(전체/증분 동기화)뿐 아니라 PATCH 응답
+/// (api-doc 기준 `updatedAt` 포함)에서도 갱신된다 — push가 성공하면 그
+/// 응답의 실제 서버 값으로 바로 다음 push의 기준값을 채운다.
 class BookshelfDatabase {
   BookshelfDatabase._();
 
@@ -26,11 +31,29 @@ class BookshelfDatabase {
     final path = join(dbPath, 'bookshelf.db');
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await _createBookCategoryTable(db);
+        }
+        if (oldVersion < 3) {
+          await db.execute(
+            'ALTER TABLE user_book ADD COLUMN synced_updated_at TEXT',
+          );
+          // 기존 행의 `updated_at` 컬럼은 서버 GET 응답으로 채워졌을 수도,
+          // (이번 업데이트 이전) 책 정보 PATCH·태그 추가/삭제 성공 응답을
+          // 클라이언트 시각으로 보강해 채운 것일 수도 있어 어느 쪽인지 구분할
+          // 수 없다 — 잘못 이관하면 실제로는 다르지 않은데 409가 나거나,
+          // 반대로 진짜 충돌을 놓칠 수 있다. `synced_updated_at`을 비워 둔
+          // 채(새 컬럼 기본값 NULL) `last_synced_at`도 지워, 다음
+          // `BookshelfRepository.sync()`가 무조건 전체 동기화로 모든 행의
+          // 충돌 검사 기준값을 서버 응답으로 새로 채우게 한다.
+          await db.delete(
+            'sync_meta',
+            where: 'key = ?',
+            whereArgs: ['last_synced_at'],
+          );
         }
       },
       onCreate: (db, version) async {
@@ -62,7 +85,8 @@ class BookshelfDatabase {
             discovery_source TEXT,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
-            is_dirty INTEGER NOT NULL DEFAULT 0
+            is_dirty INTEGER NOT NULL DEFAULT 0,
+            synced_updated_at TEXT
           )
         ''');
         await db.execute(

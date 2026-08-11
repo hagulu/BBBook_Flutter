@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import '../../../core/network/api_exception.dart';
@@ -8,9 +9,15 @@ import '../../bookshelf/models/book_tag.dart';
 import 'book_record_api.dart';
 
 /// 책 기록 상세 화면의 source of truth. 조회는 [BookshelfRepository]의 로컬
-/// DB만 사용하고, 수정은 [BookRecordApi]로 서버 PATCH가 성공한 뒤에만 그
-/// 결과를 로컬 DB에 반영한다(서버가 최종 진실 소스 — 서버 실패 시 로컬은
-/// 건드리지 않는다).
+/// DB만 사용한다.
+///
+/// [updateRecord](기본 기록 필드 — `PATCH /api/me/books/:userBookId`)는 로컬
+/// 우선이다: 즉시 로컬에 반영해 반환하고, 서버 반영은 뒤에서 조용히
+/// 시도한다 — 실패해도 예외를 던지지 않고 dirty로 남겨 다음 동기화
+/// (`BookshelfRepository.sync()`)가 일괄 재시도하게 한다. 그 외
+/// [updateBookInfo]/[addTag]/[removeTag]/[deleteBook]은 여전히 서버 PATCH가
+/// 성공한 뒤에만 로컬에 반영한다(서버가 최종 진실 소스 — 서버 실패 시
+/// 로컬은 건드리지 않고 예외를 던져 화면이 에러를 처리하게 한다).
 ///
 /// 각 쓰기 메서드는 API 호출 *전* [BookshelfDatabase.sessionGeneration]을
 /// 기억해 뒀다가, 응답을 받은 뒤 값이 바뀌었으면(그사이 로그아웃 등으로
@@ -30,7 +37,20 @@ class BookRecordRepository {
   Future<BookItem?> getLocal(int userBookId) =>
       _bookshelfRepository.getById(userBookId);
 
-  Future<BookItem> updateRecord(
+  /// 로컬에 즉시 반영하고 그 결과를 반환한다. 서버 반영은 기다리지 않고
+  /// [BookshelfRepository.pushDirtyRecord]로 뒤에서 조용히 시도한다 —
+  /// 실패해도 이 메서드는 예외를 던지지 않는다(호출부인
+  /// [BookRecordController]가 로딩/에러 UI 없이 즉시 반영된 것처럼
+  /// 보여줘야 하므로). push 자체의 스냅샷 구성·경합 처리·재시도 정책은
+  /// [BookshelfRepository.pushDirtyRecord]가 전담한다 — 책 기록 화면에서의
+  /// 즉시 push와 동기화 시점의 일괄 재시도가 같은 로직을 공유해야, 두
+  /// 경로가 동시에 실행돼도(연속 편집 도중 앱이 포그라운드로 전환되는 등)
+  /// 서로의 결과를 덮어쓰지 않는다.
+  ///
+  /// 로컬 행이 없으면(다른 기기에서 이미 삭제됨 등) 아무 것도 하지 않고
+  /// null을 반환한다 — 존재하지 않는 책을 오프라인 편집으로 되살릴 수는
+  /// 없다.
+  Future<BookItem?> updateRecord(
     int userBookId, {
     String? status,
     int? currentPage,
@@ -46,9 +66,10 @@ class BookRecordRepository {
     String? discoverySource,
   }) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
-    final current = await _requireLocal(userBookId);
-    final data = await _api.patchRecord(
-      userBookId: userBookId,
+    final current = await _bookshelfRepository.getById(userBookId);
+    if (current == null) return null;
+
+    final merged = current.copyWithRecord(
       status: status,
       currentPage: currentPage,
       myRating: myRating,
@@ -61,8 +82,17 @@ class BookRecordRepository {
       finishedAt: finishedAt,
       platformName: platformName,
       discoverySource: discoverySource,
+      updatedAt: DateTime.now().toUtc(),
     );
-    return _persist(current, data, expectedGeneration);
+
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+      return null;
+    }
+    await _bookshelfRepository.applyLocalEdit(merged);
+
+    unawaited(_bookshelfRepository.pushDirtyRecord(userBookId));
+
+    return merged;
   }
 
   Future<BookItem> updateBookInfo(
@@ -144,21 +174,25 @@ class BookRecordRepository {
     return item;
   }
 
-  /// PATCH류 응답(`createdAt`/`updatedAt` 없음)을 [current]의 createdAt과
-  /// 현재 클라이언트 시각(UTC)으로 보강해 로컬 DB에 반영한다. [expectedGeneration]이
-  /// 호출 시점과 달라졌으면(로그아웃 등) 로컬에 쓰지 않는다.
+  /// 책 정보 PATCH 응답(`createdAt` 없음, `updatedAt`은 있음 — api-doc)을
+  /// [current]의 createdAt으로 보강해 로컬 DB에 반영한다. 응답의 `updatedAt`은
+  /// 실제 서버 값이라 [BookshelfRepository.upsertLocal]에 충돌 검사
+  /// 기준값으로 함께 넘긴다 — 그러지 않으면 이 책 정보 수정으로 서버의
+  /// `user_book.updated_at`이 바뀐 뒤에도 로컬은 이전 기준값을 그대로 들고
+  /// 있어, 다음 기록 필드 PATCH가 실제로는 최신인데도 409로 거부될 수 있다.
+  /// [expectedGeneration]이 호출 시점과 달라졌으면(로그아웃 등) 로컬에
+  /// 쓰지 않는다.
   Future<BookItem> _persist(
     BookItem current,
     Map<String, dynamic> data,
     int expectedGeneration,
   ) async {
-    final updated = BookItem.fromDetailJson(
-      data,
-      createdAt: current.createdAt,
-      updatedAt: DateTime.now().toUtc(),
-    );
+    final updated = BookItem.fromDetailJson(data, createdAt: current.createdAt);
     if (BookshelfDatabase.sessionGeneration == expectedGeneration) {
-      await _bookshelfRepository.upsertLocal(updated);
+      await _bookshelfRepository.upsertLocal(
+        updated,
+        syncedUpdatedAt: updated.updatedAt,
+      );
     }
     return updated;
   }

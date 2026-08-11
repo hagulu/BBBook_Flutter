@@ -71,3 +71,4 @@
 - `docs/review/20260810-171825-book-record-tag-interaction-review.md` — 책 기록 태그 추천의 스크롤·렌더링·요청과 진행 쪽수 입력 접근성 리뷰
 - `docs/review/20260811-145525-book-category-edit-review.md` — 책 카테고리 수정·색상 표시의 비동기 상태·반응형·접근성·기능 의존 구조 리뷰
 - `docs/review/20260811-151308-book-category-cache-final-review.md` — 책 카테고리 로컬 캐시 추가 후 상태 정합성·다이얼로그 잔여 문제 최종 리뷰
+- `docs/review/20260811-155930-local-first-record-sync-review.md` — 책 기록 로컬 우선 저장의 연속 편집 경합·오프라인 재시도·마이그레이션 리뷰

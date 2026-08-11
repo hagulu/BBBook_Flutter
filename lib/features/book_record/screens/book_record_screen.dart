@@ -26,8 +26,9 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 책 기록 상세 화면(`/records/[userBookId]` 대응). 자체 AppBar만 갖고
 /// 공통 하단 탭은 쓰지 않는다(book-record.md — 별도 `Navigator.push`로 진입).
-/// 조회는 로컬 DB(bookRecordControllerProvider)만 사용하고, 수정은 서버 PATCH
-/// 성공 후 로컬에 반영된 결과를 그대로 반영한다.
+/// 조회는 로컬 DB(bookRecordControllerProvider)만 사용한다. 기본 기록 필드
+/// 수정(updateRecord)은 로컬 우선이라 로딩·에러 UI 없이 즉시 반영된 결과를
+/// 보여주고, 서재 삭제는 서버 응답을 기다려 로딩·에러를 그대로 노출한다.
 class BookRecordScreen extends ConsumerWidget {
   const BookRecordScreen({super.key, required this.userBookId});
 
@@ -323,16 +324,8 @@ class _BookRecordBody extends ConsumerWidget {
   Future<void> _toggleMasterpiece(
     BuildContext context,
     BookRecordController controller,
-  ) async {
-    try {
-      await controller.updateRecord(isMasterpiece: !book.isMasterpiece);
-    } on ApiException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    }
+  ) {
+    return controller.updateRecord(isMasterpiece: !book.isMasterpiece);
   }
 
   Future<void> _onStatusTap(
@@ -340,72 +333,64 @@ class _BookRecordBody extends ConsumerWidget {
     BookRecordController controller,
     BookStatus tapped,
   ) async {
-    try {
-      if (tapped == BookStatus.finished) {
-        // finishedAt이 있으면 과거에 한 번 이상 완독한 책이다(현재 상태가
-        // 완독이 아니어도 마찬가지) — 바로 완독 처리하지 않고 완독 횟수
-        // 조정 팝업을 띄운다.
-        if (book.finishedAt != null) {
-          final result = await showRereadDialog(
-            context,
-            initialCount: book.rereadCount + 1,
-          );
-          if (result == null) return;
-          switch (result) {
-            case RereadCountUpdated(:final count):
-              await controller.updateRecord(
-                // 이미 완독 상태면 status를 다시 보내지 않는다 — status가
-                // FINISHED인데 finishedAt을 안 보내면 서버가 완독일을 오늘
-                // 날짜로 새로 설정해버려(api-doc), 횟수만 고치려던 사용자의
-                // 완독일이 의도치 않게 바뀐다. 완독이 아닌 상태(읽는 중 등)에서
-                // 재독을 완료하는 경우에만 상태를 FINISHED로 바꿔 완독일이
-                // 오늘로 새로 기록되게 한다.
-                status: book.status == BookStatus.finished
-                    ? null
-                    : tapped.apiValue,
-                rereadCount: count,
-                // totalPages를 아는 책은 마지막 쪽으로 진행률을 맞춘다(실제
-                // 웹 클라이언트와 동일 — 완독인데 진행률이 중간에 멈춰 있는
-                // 모순 방지). 재독 팝업은 완독 상태가 아닌 책에서도 열릴 수
-                // 있어 이 값이 항상 이미 반영돼 있지는 않다.
-                currentPage: book.totalPages,
-              );
-            case RereadFinishCancelled():
-              // 실제 웹 클라이언트(BookRecordPage.tsx)도 완독 취소 시 재독
-              // 횟수를 0으로 되돌린다 — 다음에 다시 완독 처리하면 재독
-              // 횟수가 이전 값에서 이어지지 않고 새로 시작해야 자연스럽다.
-              await controller.updateRecord(
-                status: BookStatus.reading.apiValue,
-                rereadCount: 0,
-              );
-          }
-          return;
-        }
-
-        final result = await showFinishConfirmDialog(context);
-        if (result == null) return;
-        await controller.updateRecord(
-          status: tapped.apiValue,
-          // totalPages를 아는 책은 마지막 쪽으로 진행률을 맞춘다(실제 웹
-          // 클라이언트와 동일 — 완독인데 진행률이 중간에 멈춰 있는 모순 방지).
-          currentPage: book.totalPages,
-          difficulty: result.difficulty,
-          myRating: result.myRating,
-          shortReview: result.shortReview,
+    if (tapped == BookStatus.finished) {
+      // finishedAt이 있으면 과거에 한 번 이상 완독한 책이다(현재 상태가
+      // 완독이 아니어도 마찬가지) — 바로 완독 처리하지 않고 완독 횟수
+      // 조정 팝업을 띄운다.
+      if (book.finishedAt != null) {
+        final result = await showRereadDialog(
+          context,
+          initialCount: book.rereadCount + 1,
         );
+        if (result == null) return;
+        switch (result) {
+          case RereadCountUpdated(:final count):
+            await controller.updateRecord(
+              // 이미 완독 상태면 status를 다시 보내지 않는다 — status가
+              // FINISHED인데 finishedAt을 안 보내면 서버가 완독일을 오늘
+              // 날짜로 새로 설정해버려(api-doc), 횟수만 고치려던 사용자의
+              // 완독일이 의도치 않게 바뀐다. 완독이 아닌 상태(읽는 중 등)에서
+              // 재독을 완료하는 경우에만 상태를 FINISHED로 바꿔 완독일이
+              // 오늘로 새로 기록되게 한다.
+              status: book.status == BookStatus.finished
+                  ? null
+                  : tapped.apiValue,
+              rereadCount: count,
+              // totalPages를 아는 책은 마지막 쪽으로 진행률을 맞춘다(실제
+              // 웹 클라이언트와 동일 — 완독인데 진행률이 중간에 멈춰 있는
+              // 모순 방지). 재독 팝업은 완독 상태가 아닌 책에서도 열릴 수
+              // 있어 이 값이 항상 이미 반영돼 있지는 않다.
+              currentPage: book.totalPages,
+            );
+          case RereadFinishCancelled():
+            // 실제 웹 클라이언트(BookRecordPage.tsx)도 완독 취소 시 재독
+            // 횟수를 0으로 되돌린다 — 다음에 다시 완독 처리하면 재독
+            // 횟수가 이전 값에서 이어지지 않고 새로 시작해야 자연스럽다.
+            await controller.updateRecord(
+              status: BookStatus.reading.apiValue,
+              rereadCount: 0,
+            );
+        }
         return;
       }
 
-      if (tapped == book.status) return;
-
-      await controller.updateRecord(status: tapped.apiValue);
-    } on ApiException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
+      final result = await showFinishConfirmDialog(context);
+      if (result == null) return;
+      await controller.updateRecord(
+        status: tapped.apiValue,
+        // totalPages를 아는 책은 마지막 쪽으로 진행률을 맞춘다(실제 웹
+        // 클라이언트와 동일 — 완독인데 진행률이 중간에 멈춰 있는 모순 방지).
+        currentPage: book.totalPages,
+        difficulty: result.difficulty,
+        myRating: result.myRating,
+        shortReview: result.shortReview,
+      );
+      return;
     }
+
+    if (tapped == book.status) return;
+
+    await controller.updateRecord(status: tapped.apiValue);
   }
 
   Future<void> _openSourceDialog(
@@ -429,18 +414,10 @@ class _BookRecordBody extends ConsumerWidget {
     );
     if (result == null) return;
 
-    try {
-      await controller.updateRecord(
-        sourceType: result.sourceType.apiValue,
-        platformName: result.platformName,
-      );
-    } on ApiException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    }
+    await controller.updateRecord(
+      sourceType: result.sourceType.apiValue,
+      platformName: result.platformName,
+    );
   }
 
   Future<void> _openDifficultyDialog(
@@ -452,15 +429,7 @@ class _BookRecordBody extends ConsumerWidget {
       initialDifficulty: book.difficulty,
     );
     if (value == null) return;
-    try {
-      await controller.updateRecord(difficulty: value);
-    } on ApiException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    }
+    await controller.updateRecord(difficulty: value);
   }
 
   Future<void> _pickDate(
@@ -479,18 +448,10 @@ class _BookRecordBody extends ConsumerWidget {
     );
     if (picked == null) return;
     final formatted = _formatApiDate(picked);
-    try {
-      await controller.updateRecord(
-        startedAt: isStartedAt ? formatted : null,
-        finishedAt: isStartedAt ? null : formatted,
-      );
-    } on ApiException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    }
+    await controller.updateRecord(
+      startedAt: isStartedAt ? formatted : null,
+      finishedAt: isStartedAt ? null : formatted,
+    );
   }
 
   String _formatApiDate(DateTime date) {
@@ -509,15 +470,7 @@ class _BookRecordBody extends ConsumerWidget {
       initialValue: book.discoverySource,
     );
     if (value == null) return;
-    try {
-      await controller.updateRecord(discoverySource: value);
-    } on ApiException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    }
+    await controller.updateRecord(discoverySource: value);
   }
 }
 

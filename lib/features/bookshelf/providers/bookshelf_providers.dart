@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_providers.dart';
+import '../../book_record/data/book_record_api.dart';
 import '../data/bookshelf_api.dart';
 import '../data/bookshelf_repository.dart';
 import '../models/book_category.dart';
@@ -15,8 +16,16 @@ final bookshelfApiProvider = Provider<BookshelfApi>((ref) {
   return BookshelfApi(apiClient: ref.watch(apiClientProvider));
 });
 
+/// dirty 책 기록 push 전용으로 별도 생성한다(book_record 기능의
+/// `bookRecordApiProvider`를 재사용하려면 이 파일이 book_record_providers.dart를
+/// 가져와야 하는데, 그 파일이 이미 이 파일을 가져오므로 순환 참조가 된다.
+/// `BookRecordApi`는 상태 없이 [ApiClient]만 감싸는 얇은 클래스라 인스턴스가
+/// 둘로 나뉘어도 무해하다).
 final bookshelfRepositoryProvider = Provider<BookshelfRepository>((ref) {
-  return BookshelfRepository(api: ref.watch(bookshelfApiProvider));
+  return BookshelfRepository(
+    api: ref.watch(bookshelfApiProvider),
+    recordApi: BookRecordApi(apiClient: ref.watch(apiClientProvider)),
+  );
 });
 
 /// 카테고리 마스터 목록(계정과 무관한 정적 데이터, 로컬 DB에 캐시됨).

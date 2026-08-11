@@ -21,9 +21,10 @@ import '../../bookshelf/models/book_tag.dart';
 /// 인증 필요 요청이므로 401 시 1회 재시도 후 실패하면 로그아웃 처리하는
 /// [ApiClient]를 통해서만 호출한다(CLAUDE.md 인증 API 호출 규칙).
 ///
-/// 이 클래스의 PATCH류 응답에는 `createdAt`/`updatedAt`이 내려오지 않으므로
-/// `Map<String, dynamic>`(순수 data 파트)을 그대로 반환한다. `BookItem`으로
-/// 변환하는 것은 로컬 행의 createdAt을 알고 있는 리포지토리 쪽 책임이다.
+/// 이 클래스의 PATCH류 응답에는 `createdAt`이 내려오지 않으므로(`updatedAt`은
+/// 내려온다 — api-doc 기준) `Map<String, dynamic>`(순수 data 파트)을 그대로
+/// 반환한다. `BookItem`으로 변환하는 것은 로컬 행의 createdAt을 알고 있는
+/// 리포지토리 쪽 책임이다.
 class BookRecordApi {
   BookRecordApi({required this._apiClient});
 
@@ -39,6 +40,11 @@ class BookRecordApi {
   /// status를 FINISHED로 보낼 때 [finishedAt]을 생략하면, 서버가
   /// `X-Timezone` 헤더로 오늘 날짜를 계산해 자동 설정한다. 이 앱은 한국어
   /// 전용 서비스라 타임존 판별 플러그인 없이 'Asia/Seoul'을 고정으로 보낸다.
+  ///
+  /// [updatedAt]은 이 요청이 기준으로 삼는 서버의 마지막 `updated_at`이다
+  /// (문서 기준 낙관적 동시성 검사용). 값을 보내면 서버의 현재 updated_at과
+  /// 달라졌을 때 409로 거부되고([ApiException.statusCode] == 409), 생략하면
+  /// 충돌 검사 없이 무조건 수정된다.
   Future<Map<String, dynamic>> patchRecord({
     required int userBookId,
     String? status,
@@ -53,6 +59,7 @@ class BookRecordApi {
     String? finishedAt,
     String? platformName,
     String? discoverySource,
+    DateTime? updatedAt,
   }) async {
     final body = <String, dynamic>{
       'status': ?status,
@@ -67,6 +74,7 @@ class BookRecordApi {
       'finishedAt': ?finishedAt,
       'platformName': ?platformName,
       'discoverySource': ?discoverySource,
+      'updatedAt': ?updatedAt?.toUtc().toIso8601String(),
     };
 
     try {
@@ -77,7 +85,7 @@ class BookRecordApi {
       );
       return _unwrapMap(response);
     } on DioException catch (e) {
-      throw _mapError(e);
+      throw _mapError(e, overrides: const {409: '다른 곳에서 이미 수정된 기록입니다.'});
     } on ApiException {
       rethrow;
     } catch (e) {

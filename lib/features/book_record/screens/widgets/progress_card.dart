@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../bookshelf/models/book_item.dart';
 import '../../providers/book_record_providers.dart';
@@ -68,23 +67,11 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
     _save(clamped);
   }
 
-  Future<void> _save(int page) async {
-    if (page == widget.book.currentPage) return;
-    try {
-      await ref
-          .read(bookRecordControllerProvider(widget.userBookId).notifier)
-          .updateRecord(currentPage: page);
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-        setState(() {
-          _pageController.text = '${widget.book.currentPage}';
-          _sliderValue = widget.book.currentPage.toDouble();
-        });
-      }
-    }
+  Future<void> _save(int page) {
+    if (page == widget.book.currentPage) return Future.value();
+    return ref
+        .read(bookRecordControllerProvider(widget.userBookId).notifier)
+        .updateRecord(currentPage: page);
   }
 
   @override

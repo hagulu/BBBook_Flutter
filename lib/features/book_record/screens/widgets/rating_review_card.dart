@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/network/api_exception.dart';
 import '../../../bookshelf/models/book_item.dart';
 import '../../providers/book_record_providers.dart';
 import 'record_section_card.dart';
@@ -57,35 +56,18 @@ class _RatingReviewCardState extends ConsumerState<RatingReviewCard> {
     super.dispose();
   }
 
-  Future<void> _saveRating(double rating) async {
-    try {
-      await ref
-          .read(bookRecordControllerProvider(widget.userBookId).notifier)
-          .updateRecord(myRating: rating);
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    }
+  Future<void> _saveRating(double rating) {
+    return ref
+        .read(bookRecordControllerProvider(widget.userBookId).notifier)
+        .updateRecord(myRating: rating);
   }
 
-  Future<void> _saveReview() async {
+  Future<void> _saveReview() {
     final trimmed = _reviewController.text.trim();
-    if (trimmed == (widget.book.shortReview ?? '')) return;
-    try {
-      await ref
-          .read(bookRecordControllerProvider(widget.userBookId).notifier)
-          .updateRecord(shortReview: trimmed);
-    } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-        setState(() => _reviewController.text = widget.book.shortReview ?? '');
-      }
-    }
+    if (trimmed == (widget.book.shortReview ?? '')) return Future.value();
+    return ref
+        .read(bookRecordControllerProvider(widget.userBookId).notifier)
+        .updateRecord(shortReview: trimmed);
   }
 
   @override

@@ -1,3 +1,7 @@
+import 'dart:developer' as developer;
+
+import '../../../core/network/api_exception.dart';
+import '../../book_record/data/book_record_api.dart';
 import '../models/book_category.dart';
 import '../models/book_item.dart';
 import '../models/book_status.dart';
@@ -13,22 +17,27 @@ import 'bookshelf_database.dart';
 class BookshelfRepository {
   BookshelfRepository({
     required this._api,
+    required this._recordApi,
     this._dao = const BookshelfDao(),
     this._categoryDao = const BookCategoryDao(),
   });
 
   final BookshelfApi _api;
+  final BookRecordApi _recordApi;
   final BookshelfDao _dao;
   final BookCategoryDao _categoryDao;
 
-  /// 서버 동기화. 로컬에 동기화 기준값(마지막 since)이 없으면(최초 로그인
-  /// 또는 로그아웃 후 최초 구성) 전체 동기화를, 있으면 증분 동기화를
-  /// 수행한다. 증분 응답이 fullSyncRequired를 반환하면(삭제 이력 유실 가능)
-  /// 전체 동기화로 대체한다.
-  ///
-  /// dirty 로컬 행이 있다면 이 호출 전에 먼저 서버로 push해야 하지만, 이번
-  /// 작업 범위엔 책 수정 기능이 없어 dirty 행이 생기지 않으므로 push 단계는
-  /// 아직 구현하지 않는다(순서만 확보).
+  /// [pushDirtyRecord] 호출을 책별로 순서대로 실행시키는 체인. 겹치는 호출이
+  /// 동시에 같은 baseline으로 push를 보내면 서버가 뒤에 도착한 요청을 (실제
+  /// 충돌이 아닌데도) 409로 거부해 그 로컬 편집을 잃을 수 있다 — 자세한
+  /// 내용은 [pushDirtyRecord] 참고.
+  final Map<int, Future<void>> _dirtyPushChains = {};
+
+  /// 서버 동기화. dirty 로컬 행(책 기록 화면에서 로컬 우선 반영한 뒤 아직
+  /// 서버에 반영되지 못한 수정)이 있으면 먼저 일괄 push한 뒤, 로컬에 동기화
+  /// 기준값(마지막 since)이 없으면(최초 로그인 또는 로그아웃 후 최초 구성)
+  /// 전체 동기화를, 있으면 증분 동기화를 수행한다. 증분 응답이
+  /// fullSyncRequired를 반환하면(삭제 이력 유실 가능) 전체 동기화로 대체한다.
   ///
   /// 반환값은 실제로 로컬 DB가 바뀌었는지 여부. 변경이 없으면 호출 측이
   /// 탭 목록 provider들을 불필요하게 무효화하지 않도록 하기 위함이다.
@@ -39,6 +48,11 @@ class BookshelfRepository {
   /// 응답이 clear 이후 되살아나 다음 로그인 사용자에게 노출될 수 있다.
   Future<bool> sync() async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
+
+    await _pushDirtyRecords(expectedGeneration);
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+      return false;
+    }
 
     final since = await _dao.getLastSyncedAt();
     if (since == null) {
@@ -79,6 +93,148 @@ class BookshelfRepository {
     return true;
   }
 
+  /// dirty 표시된 책 기록 로컬 수정을 서버로 일괄 재전송한다(오프라인/실패로
+  /// 아직 반영되지 못한 것들 — 책 기록 화면에서 편집 직후 시도하는
+  /// [pushDirtyRecord]와 같은 책별 큐를 공유한다). 그러지 않고 이 행들을
+  /// 직접 push하면, 마침 그 책을 편집 중이던 화면의 즉시 push와 여기서의
+  /// push가 동시에 나가 서로의 결과를 덮어쓸 수 있다(연속 편집 유실과
+  /// 동일한 경합 — [pushDirtyRecord] 참고).
+  ///
+  /// 각 행은 독립적으로 처리한다 — 한 행이 실패해도(네트워크 오류 등) 다른
+  /// 행들의 push는 계속 시도하고, dirty가 남은 행은 다음 동기화 때 다시
+  /// 재시도된다.
+  Future<void> _pushDirtyRecords(int expectedGeneration) async {
+    final dirty = await _dao.getDirtyRecords();
+    for (final (item, _) in dirty) {
+      if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+      await pushDirtyRecord(item.userBookId);
+    }
+  }
+
+  /// 특정 책의 dirty 로컬 편집을 서버로 push한다. 책 기록 화면의 편집 직후
+  /// 즉시 호출([BookRecordRepository.updateRecord])되기도 하고, 동기화
+  /// 시점([_pushDirtyRecords])에도 호출된다 — 두 경로가 겹쳐도(연속 편집
+  /// 도중 앱이 포그라운드로 전환돼 동기화가 도는 등) 안전하도록 같은 책에
+  /// 대한 모든 호출을 [_dirtyPushChains]로 한 줄로 세운다. 그러지 않으면
+  /// 두 요청이 같은 `synced_updated_at` 기준값으로 동시에 나가고, 서버에
+  /// 먼저 도착한 요청만 성공하며 나중 요청은 (실제로는 우리 자신의 앞선
+  /// 요청 때문에 바뀐) 최신 updated_at과 비교돼 진짜 충돌이 아닌데도 409로
+  /// 거부된다 — 그 결과가 [BookshelfDao.resolveConflict]로 이어지면 방금
+  /// 성공한 편집까지 서버 상태로 되돌아갈 수 있다.
+  ///
+  /// 매 호출마다 실행 시점의 최신 dirty 행을 다시 읽는다(호출 시점의
+  /// 스냅샷을 들고 있지 않음) — 그래야 대기 중이던 호출이 실제로 실행될
+  /// 때 그 사이 쌓인 편집까지 포함해서 보낸다. dirty가 아니면(이미 push가
+  /// 끝났으면) 아무 것도 하지 않는다.
+  Future<void> pushDirtyRecord(int userBookId) {
+    final previous = _dirtyPushChains[userBookId] ?? Future<void>.value();
+    final chained = previous
+        .then((_) => _pushOneDirtyRecord(userBookId))
+        // 체인에 쌓인 Future가 에러로 완료되면 그 뒤에 이어붙는 호출들이
+        // 전부 건너뛰어지므로 여기서 삼켜 체인이 끊기지 않게 한다(실패는
+        // 이미 [_pushDirtyItem] 내부에서 로그로만 남기고 dirty를 유지한다).
+        .catchError((_, _) {});
+    _dirtyPushChains[userBookId] = chained;
+    return chained;
+  }
+
+  /// 실행 시점(대기열에서 순서가 왔을 때)의 최신 세션 generation과 dirty
+  /// 상태를 기준으로 한다 — 큐에 오래 대기했을 수 있어 호출 시점 값을
+  /// 넘겨받지 않고 여기서 새로 읽는다.
+  Future<void> _pushOneDirtyRecord(int userBookId) async {
+    final expectedGeneration = BookshelfDatabase.sessionGeneration;
+    final dirty = await _dao.getDirtyRecord(userBookId);
+    if (dirty == null) return;
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+    await _pushDirtyItem(dirty.$1, dirty.$2, expectedGeneration);
+  }
+
+  /// dirty 행 한 건을 서버로 push한다. 이 행이 현재 로컬에 들고 있는 필드
+  /// 전체를 스냅샷으로 보낸다(어떤 필드가 바뀌었는지 별도로 추적하지 않음)
+  /// — null이면 "변경 없음"인 API 의미상 안전하다(로컬 null은 원래 미설정
+  /// 상태이므로 그대로 보내면 "변경 없음"과 같은 뜻이 된다).
+  /// platformName/discoverySource도 로컬 null을 그대로 보낸다: 빈 문자열로
+  /// 바꿔 보내면 "미설정 상태를 유지"가 아니라 "명시적으로 지움"이 되어,
+  /// 애초에 값이 없던 행까지 서버 값을 지워버릴 수 있다(예: sourceType이
+  /// EBOOK인데 platformName을 아직 한 번도 설정하지 않은 행). status가
+  /// FINISHED인데 finishedAt을 모르면, status까지 같이 보낼 때 서버가
+  /// 완독일을 오늘 날짜로 새로 잡아버린다 — 그 조합일 때만 status를
+  /// 생략한다([BookItem.copyWithRecord]가 최초 완독 전환 시 로컬에도 곧바로
+  /// 오늘 날짜를 채워 두므로 정상 흐름에서는 이 조합 자체가 드물다).
+  ///
+  /// 성공하면 이 push를 보낸 뒤로 로컬 행이 더 바뀌지 않았을 때만(요청을
+  /// 만들 때 읽은 [item.updatedAt]과 현재 로컬 값이 같을 때만) 응답으로
+  /// 확정 반영하고 dirty를 해제한다. 그 사이 새 로컬 편집이 쌓였으면(이
+  /// 네트워크 요청이 오가는 동안 사용자가 같은 책을 또 편집하는 경우 — 같은
+  /// 책에 대한 push 자체는 [pushDirtyRecord]의 큐로 직렬화되지만, 로컬 편집
+  /// 자체는 그 큐를 기다리지 않고 즉시 반영되므로 이 창구는 여전히 남는다)
+  /// 그 편집을 덮어쓰면 안 되므로 필드는 그대로 두고 충돌 검사 기준값만
+  /// 이번 응답의 서버 updated_at으로 갱신한다 — dirty는 남아 다음 push가
+  /// 최신 상태를 다시 보낸다.
+  Future<void> _pushDirtyItem(
+    BookItem item,
+    DateTime? baseUpdatedAt,
+    int expectedGeneration,
+  ) async {
+    try {
+      final data = await _recordApi.patchRecord(
+        userBookId: item.userBookId,
+        status: (item.status == BookStatus.finished && item.finishedAt == null)
+            ? null
+            : item.status.apiValue,
+        currentPage: item.currentPage,
+        myRating: item.myRating,
+        shortReview: item.shortReview,
+        isMasterpiece: item.isMasterpiece,
+        sourceType: item.sourceType,
+        rereadCount: item.rereadCount,
+        difficulty: item.difficulty,
+        startedAt: _formatDate(item.startedAt),
+        finishedAt: _formatDate(item.finishedAt),
+        platformName: item.platformName,
+        discoverySource: item.discoverySource,
+        updatedAt: baseUpdatedAt,
+      );
+      if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+
+      final latest = await _dao.getById(item.userBookId);
+      if (latest == null) {
+        // push가 오가는 사이 이 책이 로컬에서 사라졌다(동시 삭제 등) —
+        // 확정 반영을 건너뛴다(이미 지워진 책을 되살리지 않도록).
+        return;
+      }
+
+      final serverItem = BookItem.fromDetailJson(data, createdAt: item.createdAt);
+      if (latest.updatedAt == item.updatedAt) {
+        await _dao.confirmPush(serverItem);
+      } else {
+        await _dao.refreshSyncedUpdatedAt(item.userBookId, serverItem.updatedAt);
+      }
+      developer.log(
+        '[책 기록 더티 push] userBookId=${item.userBookId} result=SUCCESS',
+      );
+    } on ApiException catch (e) {
+      if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+      if (e.statusCode == 409) {
+        await _dao.resolveConflict(item.userBookId);
+        developer.log(
+          '[책 기록 더티 push] userBookId=${item.userBookId} result=FAIL reason=conflict',
+        );
+      } else {
+        developer.log(
+          '[책 기록 더티 push] userBookId=${item.userBookId} result=FAIL reason=${e.statusCode ?? "network"}',
+        );
+      }
+    } catch (e) {
+      developer.log(
+        '[책 기록 더티 push] userBookId=${item.userBookId} result=FAIL reason=unknown',
+      );
+    }
+  }
+
+  String? _formatDate(DateTime? date) =>
+      date?.toIso8601String().substring(0, 10);
+
   Future<List<BookItem>> getReadingTab() {
     return _dao.getByStatuses([BookStatus.reading, BookStatus.paused]);
   }
@@ -86,10 +242,17 @@ class BookshelfRepository {
   Future<BookItem?> getById(int userBookId) => _dao.getById(userBookId);
 
   /// 책 기록 화면에서 서버 PATCH가 성공한 뒤 그 결과를 로컬에 반영한다.
-  Future<void> upsertLocal(BookItem item) => _dao.upsertOne(item);
+  /// [syncedUpdatedAt]은 응답에 실제 서버 updated_at이 함께 내려오는
+  /// 호출(책 정보 PATCH)만 넘긴다 — [BookshelfDao.upsertOne] 참고.
+  Future<void> upsertLocal(BookItem item, {DateTime? syncedUpdatedAt}) =>
+      _dao.upsertOne(item, syncedUpdatedAt: syncedUpdatedAt);
 
   /// 서재에서 책을 삭제(DELETE API 성공)한 뒤 로컬 행을 제거한다.
   Future<void> deleteLocal(int userBookId) => _dao.deleteOne(userBookId);
+
+  /// 책 기록 화면의 필드 수정을 로컬에 즉시 반영하고 dirty로 표시한다.
+  /// 서버 반영은 호출부가 이어서 [pushDirtyRecord]로 트리거한다.
+  Future<void> applyLocalEdit(BookItem item) => _dao.applyLocalEdit(item);
 
   Future<List<BookItem>> getGridTab(BookStatus status) => _dao.getGrid(status);
 

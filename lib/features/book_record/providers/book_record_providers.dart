@@ -22,8 +22,10 @@ final bookRecordRepositoryProvider = Provider<BookRecordRepository>((ref) {
   );
 });
 
-/// 책 기록 상세 화면의 단일 책 상태. 로컬 DB 조회로 시작하고, 각 수정
-/// 메서드는 서버 PATCH 성공 → 로컬 반영까지 끝난 뒤에만 상태를 갱신한다.
+/// 책 기록 상세 화면의 단일 책 상태. 로컬 DB 조회로 시작한다. [updateRecord]는
+/// 로컬 우선(즉시 반영, 서버 반영은 뒤에서 조용히 재시도)이라 로딩 상태나
+/// 에러를 노출하지 않고, 그 외 [updateBookInfo]/[addTag]/[removeTag]/
+/// [deleteBook]은 서버 PATCH 성공 → 로컬 반영까지 끝난 뒤에만 상태를 갱신하며
 /// 실패하면 이전 상태로 되돌리고 예외를 다시 던져 화면이 에러를 처리하게 한다.
 ///
 /// `autoDispose` family: 화면을 벗어나 아무도 watch하지 않으면 즉시 폐기된다.
@@ -33,6 +35,10 @@ final bookRecordRepositoryProvider = Provider<BookRecordRepository>((ref) {
 class BookRecordController
     extends AutoDisposeFamilyAsyncNotifier<BookItem?, int> {
   late BookRecordRepository _repository;
+
+  /// [updateRecord] 연속 호출을 순서대로 실행시키는 체인. 각 호출은 이전
+  /// 호출이 로컬 반영까지 끝난 뒤에만 시작된다.
+  Future<void> _editChain = Future.value();
 
   @override
   FutureOr<BookItem?> build(int userBookId) async {
@@ -47,6 +53,14 @@ class BookRecordController
     return _repository.getLocal(userBookId);
   }
 
+  /// 상태/진행률/평점 등 기본 기록 필드 수정(`PATCH /api/me/books/:userBookId`).
+  /// 로컬에 즉시 반영하고 서버 반영은 [BookRecordRepository]가 뒤에서 조용히
+  /// 시도한다 — 성공·실패와 무관하게 로딩 상태를 세우거나 예외를 던지지
+  /// 않는다(실패하면 dirty로 남아 다음 동기화 때 일괄 재시도됨).
+  ///
+  /// 같은 책에 대한 연속 호출은 [_editChain]으로 순서를 강제한다 — 그러지
+  /// 않으면 겹치는 호출의 로컬 read-modify-write(현재 값 조회 → 병합 →
+  /// 저장)가 서로의 수정을 덮어쓸 수 있다.
   Future<void> updateRecord({
     String? status,
     int? currentPage,
@@ -61,23 +75,64 @@ class BookRecordController
     String? platformName,
     String? discoverySource,
   }) {
-    return _mutate(
-      () => _repository.updateRecord(
-        arg,
-        status: status,
-        currentPage: currentPage,
-        myRating: myRating,
-        shortReview: shortReview,
-        isMasterpiece: isMasterpiece,
-        sourceType: sourceType,
-        rereadCount: rereadCount,
-        difficulty: difficulty,
-        startedAt: startedAt,
-        finishedAt: finishedAt,
-        platformName: platformName,
-        discoverySource: discoverySource,
-      ),
+    final chained = _editChain
+        .then(
+          (_) => _applyRecordEdit(
+            status: status,
+            currentPage: currentPage,
+            myRating: myRating,
+            shortReview: shortReview,
+            isMasterpiece: isMasterpiece,
+            sourceType: sourceType,
+            rereadCount: rereadCount,
+            difficulty: difficulty,
+            startedAt: startedAt,
+            finishedAt: finishedAt,
+            platformName: platformName,
+            discoverySource: discoverySource,
+          ),
+        )
+        // 체인에 쌓인 Future가 에러로 완료되면 그 뒤에 이어붙는 .then들이
+        // 전부 건너뛰어지며 에러가 그대로 전파된다 — 여기서 삼켜 체인이
+        // 끊기지 않게 한다(어차피 이 메서드는 에러를 밖으로 보고하지 않음).
+        .catchError((_, _) {});
+    _editChain = chained;
+    return chained;
+  }
+
+  Future<void> _applyRecordEdit({
+    String? status,
+    int? currentPage,
+    double? myRating,
+    String? shortReview,
+    bool? isMasterpiece,
+    String? sourceType,
+    int? rereadCount,
+    String? difficulty,
+    String? startedAt,
+    String? finishedAt,
+    String? platformName,
+    String? discoverySource,
+  }) async {
+    final updated = await _repository.updateRecord(
+      arg,
+      status: status,
+      currentPage: currentPage,
+      myRating: myRating,
+      shortReview: shortReview,
+      isMasterpiece: isMasterpiece,
+      sourceType: sourceType,
+      rereadCount: rereadCount,
+      difficulty: difficulty,
+      startedAt: startedAt,
+      finishedAt: finishedAt,
+      platformName: platformName,
+      discoverySource: discoverySource,
     );
+    if (updated != null) {
+      state = AsyncValue.data(updated);
+      ref.read(bookshelfSyncVersionProvider.notifier).state++;
+    }
   }
 
   Future<void> updateBookInfo({
