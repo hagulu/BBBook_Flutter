@@ -237,10 +237,16 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
             ),
           ),
           const SizedBox(height: 10),
-          TextField(
-            controller: _totalPagesController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(isDense: true, labelText: '총 쪽수'),
+          SizedBox(
+            width: 120,
+            child: TextField(
+              controller: _totalPagesController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                isDense: true,
+                labelText: '총 쪽수',
+              ),
+            ),
           ),
           if (_errorText != null) ...[
             const SizedBox(height: 8),

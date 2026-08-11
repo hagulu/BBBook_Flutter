@@ -115,10 +115,7 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
                   onSubmitted: (_) => _pageFocus.unfocus(),
                   decoration: const InputDecoration(
                     isDense: true,
-                    // 접근성 최소 터치 영역(48dp)을 확보한다 — 이전에
-                    // top:0/bottom:4로 과하게 줄였더니 손가락으로 정확히
-                    // 탭하기 어려워졌다는 피드백으로 되돌림.
-                    contentPadding: EdgeInsets.symmetric(vertical: 14),
+                    contentPadding: EdgeInsets.symmetric(vertical: 8),
                   ),
                 ),
               ),
@@ -139,7 +136,7 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
                 ),
             ],
           ),
-          if (totalPages != null && totalPages > 0) const SizedBox(height: 8),
+          if (totalPages != null && totalPages > 0) const SizedBox(height: 2),
           if (totalPages != null && totalPages > 0)
             SizedBox(
               // Slider의 기본 세로 여백이 overlay 크기 기준이라 overlay를
