@@ -26,8 +26,13 @@ class BookshelfDatabase {
     final path = join(dbPath, 'bookshelf.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await _createBookCategoryTable(db);
+        }
+      },
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE user_book (
@@ -81,11 +86,28 @@ class BookshelfDatabase {
             value TEXT
           )
         ''');
+        await _createBookCategoryTable(db);
       },
     );
   }
 
+  /// `sort_order`는 서버 응답 배열의 위치를 그대로 저장한다(API가 `sort_order`
+  /// 값 자체는 내려주지 않고 이미 정렬된 배열만 반환하므로).
+  static Future<void> _createBookCategoryTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS book_category (
+        id INTEGER PRIMARY KEY,
+        code TEXT NOT NULL,
+        name TEXT NOT NULL,
+        color_hex TEXT NOT NULL,
+        sort_order INTEGER NOT NULL
+      )
+    ''');
+  }
+
   /// 로그아웃 시 이전 계정 데이터가 다음 로그인 사용자에게 노출되지 않도록 전부 비운다.
+  /// `book_category`는 계정과 무관한 전역 마스터 데이터(인증 불필요 API 응답)라
+  /// 로그아웃해도 지우지 않는다.
   static Future<void> clearAll() async {
     sessionGeneration++;
     final db = await instance();

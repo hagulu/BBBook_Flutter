@@ -1,7 +1,9 @@
+import '../models/book_category.dart';
 import '../models/book_item.dart';
 import '../models/book_status.dart';
 import '../models/book_tag.dart';
 import '../models/finished_filter.dart';
+import 'book_category_dao.dart';
 import 'bookshelf_api.dart';
 import 'bookshelf_dao.dart';
 import 'bookshelf_database.dart';
@@ -9,10 +11,15 @@ import 'bookshelf_database.dart';
 /// 책장 기능의 source of truth. 화면은 항상 이 레포지토리를 통해 로컬 DB만
 /// 읽고, [sync]를 호출했을 때만 서버와 통신한다.
 class BookshelfRepository {
-  BookshelfRepository({required this._api, this._dao = const BookshelfDao()});
+  BookshelfRepository({
+    required this._api,
+    this._dao = const BookshelfDao(),
+    this._categoryDao = const BookCategoryDao(),
+  });
 
   final BookshelfApi _api;
   final BookshelfDao _dao;
+  final BookCategoryDao _categoryDao;
 
   /// 서버 동기화. 로컬에 동기화 기준값(마지막 since)이 없으면(최초 로그인
   /// 또는 로그아웃 후 최초 구성) 전체 동기화를, 있으면 증분 동기화를
@@ -108,4 +115,23 @@ class BookshelfRepository {
 
   /// 로그아웃 시 다음 사용자에게 이전 계정의 책장이 보이지 않도록 로컬 DB를 비운다.
   Future<void> clearLocal() => BookshelfDatabase.clearAll();
+
+  /// 카테고리 마스터 목록. 로컬 캐시가 있으면(계정 무관 데이터라 로그아웃해도
+  /// 유지됨) 그대로 반환하고, 없으면 서버에서 받아와 캐시를 채운 뒤 반환한다.
+  Future<List<BookCategory>> getCategories() async {
+    final cached = await _categoryDao.getAll();
+    if (cached.isNotEmpty) return cached;
+    return refreshCategories();
+  }
+
+  /// 로그인 시 호출: 캐시 유무와 상관없이 서버에서 다시 받아와 로컬 캐시를
+  /// 통째로 교체한다. 카테고리는 세션 내내 캐시만 쓰므로(주기적 재조회 없음)
+  /// staleness를 "로그인 시점"으로만 한정하기 위함이다.
+  Future<List<BookCategory>> refreshCategories() async {
+    final categories = await _api.getCategories();
+    if (categories.isNotEmpty) {
+      await _categoryDao.replaceAll(categories);
+    }
+    return categories;
+  }
 }

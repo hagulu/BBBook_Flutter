@@ -71,6 +71,7 @@ class BookRecordRepository {
     String? author,
     String? publisher,
     int? totalPages,
+    int? categoryId,
     File? thumbnailFile,
     bool removeThumbnail = false,
   }) async {
@@ -82,6 +83,7 @@ class BookRecordRepository {
       author: author,
       publisher: publisher,
       totalPages: totalPages,
+      categoryId: categoryId,
       thumbnailFile: thumbnailFile,
       removeThumbnail: removeThumbnail,
     );

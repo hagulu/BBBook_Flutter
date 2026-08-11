@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -65,6 +66,7 @@ class AuthNotifier extends Notifier<AuthState> {
         user: user,
         accessToken: accessToken,
       );
+      unawaited(_prefetchCategories());
     } on ApiException catch (e) {
       if (e.isAuthFailure) {
         await _handleUnauthorized();
@@ -90,6 +92,7 @@ class AuthNotifier extends Notifier<AuthState> {
         accessToken: session.accessToken,
       );
       developer.log('[소셜 로그인] provider=${provider.apiValue} result=SUCCESS');
+      unawaited(_prefetchCategories());
     } on ApiException catch (e) {
       developer.log(
         '[소셜 로그인] provider=${provider.apiValue} result=FAIL reason=${_reasonOf(e)}',
@@ -163,6 +166,21 @@ class AuthNotifier extends Notifier<AuthState> {
       // 기록 화면이 열린 채로 로그아웃하는 경우까지 대비해 명시적으로도 비운다.
       ref.invalidate(bookRecordControllerProvider);
       ref.read(bookshelfSyncVersionProvider.notifier).state++;
+    }
+  }
+
+  /// 카테고리 마스터 데이터는 계정과 무관하지만(인증 불필요 API), 앱 전반에서
+  /// 반복 조회되므로 로그인(또는 세션 복원) 시마다 서버에서 다시 받아와 로컬
+  /// DB 캐시를 최신으로 맞춰둔다([BookshelfRepository.refreshCategories] —
+  /// 세션 중에는 이 캐시만 쓰고 재조회하지 않으므로, staleness를 "로그인
+  /// 시점"으로만 한정하기 위해 캐시 유무와 상관없이 강제로 새로 받는다).
+  /// 실패해도(오프라인 등) 이미 있던 캐시는 그대로 남고, 로그인 흐름도
+  /// 막지 않도록 예외를 삼키고 로그만 남긴다.
+  Future<void> _prefetchCategories() async {
+    try {
+      await ref.read(bookshelfRepositoryProvider).refreshCategories();
+    } catch (e) {
+      developer.log('[카테고리 캐시] result=FAIL reason=${e.runtimeType}');
     }
   }
 

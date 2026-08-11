@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../data/bookshelf_api.dart';
 import '../data/bookshelf_repository.dart';
+import '../models/book_category.dart';
 import '../models/book_item.dart';
 import '../models/book_status.dart';
 import '../models/book_tag.dart';
@@ -16,6 +17,20 @@ final bookshelfApiProvider = Provider<BookshelfApi>((ref) {
 
 final bookshelfRepositoryProvider = Provider<BookshelfRepository>((ref) {
   return BookshelfRepository(api: ref.watch(bookshelfApiProvider));
+});
+
+/// 카테고리 마스터 목록(계정과 무관한 정적 데이터, 로컬 DB에 캐시됨).
+/// `autoDispose`로 두되 성공했을 때만 `ref.keepAlive()`로 폐기를 막는다 —
+/// 성공 시에는 화면을 오가도 재조회하지 않고, 실패(오프라인 등) 시에는
+/// 마지막 구독자가 사라지며 폐기되어 다음에 화면을 다시 열 때 재시도된다.
+final bookCategoriesProvider = FutureProvider.autoDispose<List<BookCategory>>((
+  ref,
+) async {
+  final categories = await ref
+      .watch(bookshelfRepositoryProvider)
+      .getCategories();
+  ref.keepAlive();
+  return categories;
 });
 
 /// 동기화로 로컬 DB가 실제로 바뀌었을 때만 값을 올려 탭별 목록 Provider들을

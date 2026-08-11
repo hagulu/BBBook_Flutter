@@ -23,7 +23,7 @@ class RecordDialogButton {
 class RecordDialogShell extends StatelessWidget {
   const RecordDialogShell({
     super.key,
-    required this.icon,
+    this.icon,
     this.iconColor = AppColors.primary,
     this.iconBackgroundColor = AppColors.accentLight,
     required this.title,
@@ -31,7 +31,7 @@ class RecordDialogShell extends StatelessWidget {
     this.buttons = const [],
   });
 
-  final IconData icon;
+  final IconData? icon;
   final Color iconColor;
   final Color iconBackgroundColor;
   final String title;
@@ -53,12 +53,14 @@ class RecordDialogShell extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: iconBackgroundColor,
-                    child: Icon(icon, color: iconColor, size: 20),
-                  ),
-                  const SizedBox(width: 12),
+                  if (icon != null) ...[
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundColor: iconBackgroundColor,
+                      child: Icon(icon, color: iconColor, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                  ],
                   Expanded(
                     child: Text(
                       title,

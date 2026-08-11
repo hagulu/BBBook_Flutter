@@ -7,6 +7,7 @@ import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/models/book_status.dart';
+import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../bookshelf/screens/widgets/book_cover.dart';
 import '../models/record_labels.dart';
 import '../providers/book_record_providers.dart';
@@ -520,14 +521,29 @@ class _BookRecordBody extends ConsumerWidget {
   }
 }
 
-class _Header extends StatelessWidget {
+class _Header extends ConsumerWidget {
   const _Header({required this.book, required this.onEditBookInfo});
 
   final BookItem book;
   final VoidCallback onEditBookInfo;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 색을 맞출 카테고리가 애초에 없는 책이면 카테고리 목록 provider를
+    // 구독하지 않는다(불필요한 리빌드/조회 방지).
+    Color? categoryColor;
+    if (book.displayCategoryId != null) {
+      final categories = ref.watch(bookCategoriesProvider).valueOrNull;
+      if (categories != null) {
+        for (final category in categories) {
+          if (category.id == book.displayCategoryId) {
+            categoryColor = category.color;
+            break;
+          }
+        }
+      }
+    }
+
     return RecordSectionCard(
       padding: EdgeInsets.zero,
       child: InkWell(
@@ -557,7 +573,9 @@ class _Header extends StatelessWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.inputBackground,
+                          color:
+                              (categoryColor ?? AppColors.mutedIcon)
+                                  .withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
@@ -584,7 +602,8 @@ class _Header extends StatelessWidget {
                       Text(
                         book.author!,
                         style: const TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                           color: AppColors.tertiaryText,
                         ),
                       ),

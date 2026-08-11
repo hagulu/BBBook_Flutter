@@ -15,6 +15,9 @@ import '../../bookshelf/models/book_tag.dart';
 /// api-me-books-userBookId-tags-tagId-delete.md, api-me-tags-get.md,
 /// api-me-books-userBookId-delete.md
 ///
+/// 카테고리 목록(`GET /api/books/categories`)은 계정과 무관한 전역 마스터
+/// 데이터라 `BookshelfApi.getCategories`가 대신 다룬다.
+///
 /// 인증 필요 요청이므로 401 시 1회 재시도 후 실패하면 로그아웃 처리하는
 /// [ApiClient]를 통해서만 호출한다(CLAUDE.md 인증 API 호출 규칙).
 ///
@@ -86,14 +89,15 @@ class BookRecordApi {
   ///
   /// [thumbnailFile]이 있으면 새 표지를 업로드하고, [removeThumbnail]이
   /// true이면 표지를 제거한다(둘 다 아니면 표지는 현재값 유지). [author],
-  /// [publisher], [totalPages]는 null을 명시적으로 보내면 서버가 null로
-  /// 저장한다(문서 기준, 메인 PATCH와 다른 의미론).
+  /// [publisher], [totalPages], [categoryId]는 null을 명시적으로 보내면
+  /// 서버가 null로 저장한다(문서 기준, 메인 PATCH와 다른 의미론).
   Future<Map<String, dynamic>> patchBookInfo({
     required int userBookId,
     required String title,
     String? author,
     String? publisher,
     int? totalPages,
+    int? categoryId,
     File? thumbnailFile,
     bool removeThumbnail = false,
   }) async {
@@ -102,6 +106,7 @@ class BookRecordApi {
       'author': author,
       'publisher': publisher,
       'totalPages': totalPages,
+      'categoryId': categoryId,
     };
 
     try {

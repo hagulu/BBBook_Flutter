@@ -39,13 +39,28 @@ class ReadingTabView extends ConsumerWidget {
   }
 }
 
-class _ReadingBookCard extends StatelessWidget {
+class _ReadingBookCard extends ConsumerWidget {
   const _ReadingBookCard({required this.book});
 
   final BookItem book;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // 색을 맞출 카테고리가 애초에 없는 책이면 카테고리 목록 provider를
+    // 구독하지 않는다(불필요한 리빌드/조회 방지).
+    Color? categoryColor;
+    if (book.displayCategoryId != null) {
+      final categories = ref.watch(bookCategoriesProvider).valueOrNull;
+      if (categories != null) {
+        for (final category in categories) {
+          if (category.id == book.displayCategoryId) {
+            categoryColor = category.color;
+            break;
+          }
+        }
+      }
+    }
+
     final card = Material(
       color: AppColors.cardBackground,
       borderRadius: BorderRadius.circular(16),
@@ -85,7 +100,7 @@ class _ReadingBookCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (book.category != null) ...[
-                      _CategoryBadge(text: book.category!),
+                      _CategoryBadge(text: book.category!, color: categoryColor),
                       const SizedBox(height: 6),
                     ],
                     Text(
@@ -137,16 +152,17 @@ class _ReadingBookCard extends StatelessWidget {
 }
 
 class _CategoryBadge extends StatelessWidget {
-  const _CategoryBadge({required this.text});
+  const _CategoryBadge({required this.text, this.color});
 
   final String text;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: AppColors.inputBackground,
+        color: (color ?? AppColors.mutedIcon).withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(

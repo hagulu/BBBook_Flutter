@@ -37,16 +37,17 @@
 ## features/bookshelf
 
 - `lib/features/bookshelf/screens/bookshelf_screen.dart` — 책장 탭 콘텐츠(읽는 중/완독/읽고 싶음/중단 4탭)
-- `lib/features/bookshelf/data/bookshelf_api.dart` — 책장 API 호출(전체 동기화, 증분 동기화, 완독 공개 설정 조회/수정)
-- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(user_book/user_book_tag/sync_meta)
+- `lib/features/bookshelf/data/bookshelf_api.dart` — 책장 API 호출(전체 동기화, 증분 동기화, 완독 공개 설정 조회/수정, 카테고리 목록 GET)
+- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(user_book/user_book_tag/sync_meta/book_category, v2)
 - `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호)
-- `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화
-- `lib/features/bookshelf/providers/bookshelf_providers.dart` — 책장 관련 Riverpod provider(동기화 컨트롤러, 탭별 목록, 완독 필터, 공개 설정)
+- `lib/features/bookshelf/data/book_category_dao.dart` — 카테고리 마스터 목록 로컬 캐시 DAO(계정 무관, 로그아웃 시에도 유지)
+- `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화, 카테고리는 로컬 캐시 우선 조회
+- `lib/features/bookshelf/providers/bookshelf_providers.dart` — 책장 관련 Riverpod provider(동기화 컨트롤러, 탭별 목록, 완독 필터, 공개 설정, 카테고리 목록)
 
 ## features/book_record
 
 - `lib/features/book_record/screens/book_record_screen.dart` — 책 기록 상세 화면(자체 AppBar, 책장에서 책 선택 시 진입), 정보/진행률/상태/출처/난이도/태그/삭제 조립
-- `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH, 책 정보 PATCH, 태그 POST/DELETE, 태그 목록/플랫폼 옵션 GET, 삭제 DELETE)
+- `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH, 책 정보 PATCH(카테고리 포함), 태그 POST/DELETE, 태그 목록/플랫폼 옵션 GET, 삭제 DELETE)
 - `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth(로컬 조회는 bookshelf 레포지토리 재사용, 수정은 서버 PATCH 성공 후 로컬 반영)
 - `lib/features/book_record/providers/book_record_providers.dart` — 책 기록 관련 Riverpod provider(단일 책 상태 컨트롤러, 태그 자동완성, 플랫폼 옵션)
 
@@ -68,3 +69,5 @@
 - `docs/review/20260810-153456-book-record-layout-review.md` — 책 기록 UI 재배치의 슬라이더 렌더링·접근성 리뷰
 - `docs/review/20260810-163411-book-record-status-and-icon-review.md` — 책 기록 상태 선택의 접근성·아이콘 정책 재리뷰
 - `docs/review/20260810-171825-book-record-tag-interaction-review.md` — 책 기록 태그 추천의 스크롤·렌더링·요청과 진행 쪽수 입력 접근성 리뷰
+- `docs/review/20260811-145525-book-category-edit-review.md` — 책 카테고리 수정·색상 표시의 비동기 상태·반응형·접근성·기능 의존 구조 리뷰
+- `docs/review/20260811-151308-book-category-cache-final-review.md` — 책 카테고리 로컬 캐시 추가 후 상태 정합성·다이얼로그 잔여 문제 최종 리뷰
