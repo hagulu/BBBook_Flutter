@@ -67,7 +67,7 @@ enum BookSourceType {
 /// `DIFFICULTY_OPTIONS`)는 `EASY`/`MODERATE`/`HARD`를 API 저장값으로 쓰고
 /// 한글은 표시할 때만 매핑한다 — `api-doc`에는 "자유 텍스트"로만 적혀 있지만,
 /// 실제 저장값 규격은 이 3개 상수와 맞춰야 다른 클라이언트(웹)와 데이터가
-/// 호환된다. 신호 세기 아이콘(SignalLow/Medium/High)도 실제 클라이언트 기준.
+/// 호환된다.
 enum DifficultyLevel {
   easy,
   moderate,
@@ -93,8 +93,8 @@ enum DifficultyLevel {
   };
 
   IconData get icon => switch (this) {
-    DifficultyLevel.easy => PhosphorIconsRegular.cellSignalLow,
-    DifficultyLevel.moderate => PhosphorIconsRegular.cellSignalMedium,
-    DifficultyLevel.hard => PhosphorIconsRegular.cellSignalFull,
+    DifficultyLevel.easy => PhosphorIconsRegular.smiley,
+    DifficultyLevel.moderate => PhosphorIconsRegular.smileyMeh,
+    DifficultyLevel.hard => PhosphorIconsRegular.smileyMelting,
   };
 }

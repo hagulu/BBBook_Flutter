@@ -42,6 +42,7 @@
 - `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호)
 - `lib/features/bookshelf/data/book_category_dao.dart` — 카테고리 마스터 목록 로컬 캐시 DAO(계정 무관, 로그아웃 시에도 유지)
 - `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화, 카테고리는 로컬 캐시 우선 조회
+- `lib/features/bookshelf/data/finished_cover_cache_manager.dart` — 완독 목록 표지 전용 디스크 캐시(원본 바이트 저장, 디코딩 크기 제한은 `BookCover`의 `ResizeImage`가 담당)
 - `lib/features/bookshelf/providers/bookshelf_providers.dart` — 책장 관련 Riverpod provider(동기화 컨트롤러, 탭별 목록, 완독 필터, 공개 설정, 카테고리 목록)
 
 ## features/book_record
@@ -73,3 +74,4 @@
 - `docs/review/20260811-151308-book-category-cache-final-review.md` — 책 카테고리 로컬 캐시 추가 후 상태 정합성·다이얼로그 잔여 문제 최종 리뷰
 - `docs/review/20260811-155930-local-first-record-sync-review.md` — 책 기록 로컬 우선 저장의 연속 편집 경합·오프라인 재시도·마이그레이션 리뷰
 - `docs/review/20260811-173548-bookshelf-filter-and-chrome-review.md` — 완독 필터·탭 바 자동 숨김 변경의 상태 복원·캐시·접근성 리뷰
+- `docs/review/20260811-182433-finished-cover-disk-cache-review.md` — 완독 표지 디스크 캐시의 콜드 성능·포커스 생명주기·포맷별 리사이즈 리뷰

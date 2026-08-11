@@ -67,7 +67,8 @@ class FinishedTabView extends ConsumerStatefulWidget {
   ConsumerState<FinishedTabView> createState() => _FinishedTabViewState();
 }
 
-class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
+class _FinishedTabViewState extends ConsumerState<FinishedTabView>
+    with AutomaticKeepAliveClientMixin<FinishedTabView> {
   final _searchController = TextEditingController();
   final _searchFocusNode = FocusNode();
   final _scrollController = ScrollController();
@@ -76,6 +77,20 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
   Timer? _searchDebounce;
   bool _searchOpen = false;
   bool _filterPanelOpen = false;
+
+  // 월별 그룹 결과 캐시. `_groupByMonth`는 완독 전체 목록을 순회하는데,
+  // 검색/필터 패널 토글처럼 books와 무관한 setState에도 build()가 다시
+  // 실행되므로 캐시 없이는 매번 재계산된다. `books` 리스트가 실제로 바뀐
+  // 경우(Riverpod가 새 List 인스턴스를 내려줄 때)만 다시 계산한다.
+  List<BookItem>? _lastGroupedItems;
+  List<_MonthGroup> _lastGroups = const [];
+
+  // PageView(TabBarView 내부)는 기본적으로 화면 밖으로 벗어난 탭의 State를
+  // 그대로 폐기한다. 이 탭은 검색어/필터/스크롤 위치 등 내부 상태가 많고
+  // 월별 그룹핑 비용도 있어, 다른 탭으로 갔다 돌아올 때마다 이를 처음부터
+  // 다시 만들지 않도록 유지한다.
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void dispose() {
@@ -208,6 +223,7 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAliveClientMixin 요구사항
     final filter = ref.watch(finishedFilterProvider);
     final books = ref.watch(finishedBooksProvider);
     final isDefaultMode = filter.isDefaultMode;
@@ -219,7 +235,7 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
         final contentWidth = constraints.maxWidth;
         final groups = isDefaultMode
             ? books.maybeWhen(
-                data: _groupByMonth,
+                data: _groupedFor,
                 orElse: () => const <_MonthGroup>[],
               )
             : const <_MonthGroup>[];
@@ -435,6 +451,14 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
         ],
       ),
     );
+  }
+
+  /// [_lastGroupedItems]과 동일한 리스트 인스턴스면(=데이터가 실제로는
+  /// 바뀌지 않았으면) 재계산하지 않고 캐시를 그대로 반환한다.
+  List<_MonthGroup> _groupedFor(List<BookItem> items) {
+    if (identical(_lastGroupedItems, items)) return _lastGroups;
+    _lastGroupedItems = items;
+    return _lastGroups = _groupByMonth(items);
   }
 
   /// `finishedAt`이 없는(예: CSV 가져오기 등으로 날짜 없이 완독 처리된) 책은
@@ -749,7 +773,11 @@ class _FinishedBookCard extends StatelessWidget {
         children: [
           Stack(
             children: [
-              BookCover(imageUrl: book.coverImageUrl, title: book.title),
+              BookCover(
+                imageUrl: book.coverImageUrl,
+                title: book.title,
+                useDiskCache: true,
+              ),
               if (book.isMasterpiece)
                 Positioned(
                   top: 4,

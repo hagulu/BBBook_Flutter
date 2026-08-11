@@ -60,6 +60,11 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
     if (_tabController.index == _lastTabIndex) return;
     _lastTabIndex = _tabController.index;
     _setChromeVisible(true);
+    // 완독 탭은 keep-alive라 검색 TextField의 FocusNode도 탭을 떠나도
+    // 폐기되지 않는다 — 포커스를 둔 채 다른 탭으로 넘어가면 보이지 않는
+    // 검색창이 계속 포커스를 들고 있어 키보드가 남는다. 검색어/필터/스크롤
+    // 상태는 그대로 두고 키보드 포커스만 해제한다.
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
   void _setChromeVisible(bool visible) {
@@ -139,6 +144,11 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
                   borderRadius: BorderRadius.circular(999),
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,
+                // 기본 상태 레이어(hover/press/선택)가 알약 모양 indicator와
+                // 무관하게 탭의 사각 영역 전체에 반투명 사각형으로 겹쳐 보여서
+                // 모두 끈다 — 선택 표시는 위 pill indicator 하나로 충분하다.
+                splashFactory: NoSplash.splashFactory,
+                overlayColor: WidgetStateProperty.all(Colors.transparent),
                 dividerColor: Colors.transparent,
                 padding: EdgeInsets.zero,
                 labelPadding: const EdgeInsets.symmetric(horizontal: 4),
