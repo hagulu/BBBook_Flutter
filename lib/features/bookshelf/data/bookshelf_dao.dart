@@ -52,9 +52,13 @@ class BookshelfDao {
       final kw = '%${filter.keyword}%';
       args.addAll([kw, kw, kw]);
     }
-    if (filter.category != null) {
-      where.add('category = ?');
-      args.add(filter.category);
+    if (filter.categories.isNotEmpty) {
+      final placeholders = List.filled(
+        filter.categories.length,
+        '?',
+      ).join(', ');
+      where.add('category IN ($placeholders)');
+      args.addAll(filter.categories);
     }
     if (filter.masterpieceOnly) {
       where.add('is_masterpiece = 1');
@@ -88,16 +92,6 @@ class BookshelfDao {
       [BookStatus.finished.apiValue],
     );
     return rows.map((r) => r['category'] as String).toList();
-  }
-
-  Future<List<String>> getDistinctDifficulties() async {
-    final db = await BookshelfDatabase.instance();
-    final rows = await db.rawQuery(
-      'SELECT DISTINCT difficulty FROM user_book WHERE status = ? AND difficulty IS NOT NULL '
-      'ORDER BY difficulty',
-      [BookStatus.finished.apiValue],
-    );
-    return rows.map((r) => r['difficulty'] as String).toList();
   }
 
   Future<List<BookTag>> getDistinctTags() async {
@@ -238,15 +232,11 @@ class BookshelfDao {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
       final syncedUpdatedAt = await _readSyncedUpdatedAt(txn, item.userBookId);
-      await txn.insert(
-        'user_book',
-        {
-          ..._bookItemToRow(item),
-          'is_dirty': 1,
-          'synced_updated_at': syncedUpdatedAt,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('user_book', {
+        ..._bookItemToRow(item),
+        'is_dirty': 1,
+        'synced_updated_at': syncedUpdatedAt,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
       await _writeTagsTxn(txn, item);
     });
   }
@@ -260,15 +250,11 @@ class BookshelfDao {
   Future<void> confirmPush(BookItem item) async {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
-      await txn.insert(
-        'user_book',
-        {
-          ..._bookItemToRow(item),
-          'is_dirty': 0,
-          'synced_updated_at': item.updatedAt.toUtc().toIso8601String(),
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+      await txn.insert('user_book', {
+        ..._bookItemToRow(item),
+        'is_dirty': 0,
+        'synced_updated_at': item.updatedAt.toUtc().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
       await _writeTagsTxn(txn, item);
     });
   }
@@ -289,9 +275,11 @@ class BookshelfDao {
         where: 'user_book_id = ?',
         whereArgs: [userBookId],
       );
-      await txn.delete('sync_meta', where: 'key = ?', whereArgs: [
-        'last_synced_at',
-      ]);
+      await txn.delete(
+        'sync_meta',
+        where: 'key = ?',
+        whereArgs: ['last_synced_at'],
+      );
     });
   }
 
@@ -309,10 +297,8 @@ class BookshelfDao {
     };
     return items
         .map(
-          (item) => (
-            item,
-            DateTime.tryParse(baselineById[item.userBookId] ?? ''),
-          ),
+          (item) =>
+              (item, DateTime.tryParse(baselineById[item.userBookId] ?? '')),
         )
         .toList();
   }
@@ -339,7 +325,10 @@ class BookshelfDao {
   /// 때, 충돌 검사 기준값만 이번 push로 서버가 확인해 준 최신 updated_at으로
   /// 갱신한다. `is_dirty`와 다른 컬럼은 그대로 둔다 — 새 편집은 여전히 push가
   /// 필요하므로.
-  Future<void> refreshSyncedUpdatedAt(int userBookId, DateTime updatedAt) async {
+  Future<void> refreshSyncedUpdatedAt(
+    int userBookId,
+    DateTime updatedAt,
+  ) async {
     final db = await BookshelfDatabase.instance();
     await db.update(
       'user_book',
@@ -384,13 +373,14 @@ class BookshelfDao {
     // 시각을 기준으로 비교돼 잘못된 409를 유발할 수 있다.
     final resolvedSyncedUpdatedAt =
         syncedUpdatedAt?.toUtc().toIso8601String() ??
-        (existing.isEmpty ? null : existing.first['synced_updated_at'] as String?);
+        (existing.isEmpty
+            ? null
+            : existing.first['synced_updated_at'] as String?);
 
-    await txn.insert(
-      'user_book',
-      {..._bookItemToRow(item), 'synced_updated_at': resolvedSyncedUpdatedAt},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await txn.insert('user_book', {
+      ..._bookItemToRow(item),
+      'synced_updated_at': resolvedSyncedUpdatedAt,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
 
     await _writeTagsTxn(txn, item);
   }

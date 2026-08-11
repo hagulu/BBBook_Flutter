@@ -137,9 +137,15 @@ class FinishedFilterNotifier extends Notifier<FinishedFilter> {
 
   void setKeyword(String keyword) => state = state.copyWith(keyword: keyword);
 
-  void setCategory(String? category) {
-    state = state.copyWith(category: category, clearCategory: category == null);
+  void toggleCategory(String category) {
+    final categories = Set<String>.from(state.categories);
+    if (!categories.remove(category)) {
+      categories.add(category);
+    }
+    state = state.copyWith(categories: categories);
   }
+
+  void clearCategories() => state = state.copyWith(categories: const {});
 
   void toggleTag(int tagId) {
     final tags = Set<int>.from(state.tagIds);
@@ -181,11 +187,6 @@ final finishedCategoryOptionsProvider = FutureProvider<List<String>>((ref) {
 final finishedTagOptionsProvider = FutureProvider<List<BookTag>>((ref) {
   ref.watch(bookshelfSyncVersionProvider);
   return ref.watch(bookshelfRepositoryProvider).getDistinctTags();
-});
-
-final finishedDifficultyOptionsProvider = FutureProvider<List<String>>((ref) {
-  ref.watch(bookshelfSyncVersionProvider);
-  return ref.watch(bookshelfRepositoryProvider).getDistinctDifficulties();
 });
 
 /// 완독 책장 공개 여부(지구본/자물쇠 토글). 완독 탭 진입 시 조회한다.

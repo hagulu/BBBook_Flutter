@@ -15,12 +15,21 @@ import 'finished_filter_panel.dart';
 import 'finished_month_index_bar.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
-/// 완독 탭 상단 컨트롤(공개 토글/검색/필터 버튼) 영역 고정 높이.
+/// 완독 탭 상단 아이콘 바(공개 토글/도움말/검색 아이콘) 높이.
 ///
-/// `SliverAppBar.toolbarHeight`와 `_FinishedControls`의 내부 Column이 항상
-/// 같은 값을 참조해야 한다 — 실제 콘텐츠 합계(128)보다 여유를 둔 값이라
-/// RenderFlex 오버플로우 없이 안전하다.
-const _kFinishedControlsHeight = 144.0;
+/// 고정(pinned)되지 않은 일반 콘텐츠 sliver라 목록과 함께 자연스럽게
+/// 스크롤되어 사라진다. `_FinishedIconBar`의 내부 Row가 항상 같은 값을
+/// 참조해야 한다. 44×44 터치 영역(아래 `_FinishedIconBar`)을 여백 없이
+/// 꽉 채우지 않도록 44보다 조금 여유를 둔 값이다.
+const _kFinishedIconBarHeight = 48.0;
+
+/// 완독 탭 검색/필터 바(검색창 + 필터 버튼 행) 높이.
+///
+/// 아이콘 바의 검색 버튼을 누르면 접혔다 펼쳐지는 방식이라(스크롤 연동 아님)
+/// [_FinishedTabViewState._searchOpen]이 false면 아예 트리에서 빠진다.
+/// `_FinishedSearchBar`의 내부 Column이 항상 같은 값을 참조해야 한다 —
+/// 실제 콘텐츠 합계(88)보다 여유를 둔 값이라 RenderFlex 오버플로우 없이 안전하다.
+const _kFinishedSearchBarHeight = 96.0;
 
 /// 완독 탭 월 그룹 헤더 고정 높이. `_groupedSlivers`의 헤더 위젯과
 /// `_FinishedTabViewState._offsetForGroupIndex`의 스크롤 오프셋 계산이
@@ -30,7 +39,7 @@ const _kFinishedGroupHeaderHeight = 44.0;
 /// 완독 탭 상단 컨트롤과 콘텐츠 사이 여백(스크롤 오프셋 계산에도 사용).
 const _kFinishedContentSpacing = 4.0;
 
-/// 그리드 셀(표지 2:3 + 제목 2줄 + 별점) 콘텐츠가 셀 높이를 넘지 않도록
+/// 그리드 셀(표지 2:3 + 제목 1줄 + 별점) 콘텐츠가 셀 높이를 넘지 않도록
 /// 여유를 둔 비율. 0.56이면 좁은 화면에서 텍스트가 넘쳐 RenderFlex 오버플로우
 /// (디버그 모드의 노란/검정 빗금)가 발생해 0.46으로 낮췄다.
 const _kFinishedGridAspectRatio = 0.46;
@@ -40,11 +49,17 @@ const _kFinishedGridAspectRatio = 0.46;
 /// 손가락 옆에 날짜 버블이 뜬다), 검색/필터가 걸리면 일반 그리드로 전환한다
 /// (`bookshelf.md`).
 ///
-/// 상단 컨트롤(공개 토글/검색/필터 버튼)은 `SliverAppBar`(`floating: false`,
-/// `pinned: false`)로 만들어 아래로 스크롤하면 사라진다. 다시 접근하려면
-/// 목록 맨 위까지 스크롤해야 한다 — floating+snap(위로 스크롤 시 즉시
-/// 재노출)은 아직 구현돼 있지 않다(TODO). 검색은 입력할 때마다 짧은
-/// 디바운스 후 로컬 DB를 바로 재조회한다(버튼 없음).
+/// 상단 컨트롤은 두 부분으로 나뉜다.
+/// - 아이콘 바(공개 토글/도움말/검색 아이콘): 고정되지 않은 일반 sliver라
+///   목록과 함께 자연스럽게 스크롤되어 사라진다(따로 고정해 둘 이유가
+///   없다). 다만 [BookshelfScreen]이 이 CustomScrollView의 세로 스크롤
+///   방향을 감지해 상단 탭 바(읽는 중/완독/읽고 싶음/중단)는 같은 타이밍에
+///   접었다 펼친다.
+/// - 검색/필터 바(`_FinishedSearchBar`): 검색창 + 필터 버튼. 스크롤과는
+///   무관하게, 아이콘 바의 검색 버튼을 누를 때만 접혔다 펼쳐진다(토글). 펼칠
+///   때는 목록을 맨 위로 스크롤해 바로 보이게 하고 검색창에 포커스를 준다.
+///   닫으면(X) 검색을 "종료"하는 것으로 보고 검색어/필터도 함께 초기화한다.
+///   검색은 입력할 때마다 짧은 디바운스 후 로컬 DB를 바로 재조회한다(버튼 없음).
 class FinishedTabView extends ConsumerStatefulWidget {
   const FinishedTabView({super.key});
 
@@ -54,19 +69,54 @@ class FinishedTabView extends ConsumerStatefulWidget {
 
 class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
   final _searchController = TextEditingController();
+  final _searchFocusNode = FocusNode();
   final _scrollController = ScrollController();
   final _scrubNotifier = ValueNotifier<({String label, double dy})?>(null);
   final _filterPanelKey = GlobalKey();
   Timer? _searchDebounce;
+  bool _searchOpen = false;
   bool _filterPanelOpen = false;
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     _scrollController.dispose();
     _scrubNotifier.dispose();
     super.dispose();
+  }
+
+  /// 아이콘 바의 검색 버튼: 검색/필터 바를 접었다 펼친다(스크롤과 무관한
+  /// 단순 토글).
+  void _toggleSearch() {
+    if (_searchOpen) {
+      _closeSearch();
+    } else {
+      _openSearch();
+    }
+  }
+
+  /// 맨 위로 스크롤해 검색/필터 바를 바로 보이게 한다. 필터만 쓰려는
+  /// 경우도 있어 키보드가 바로 뜨지 않도록 포커스는 주지 않는다(검색창을
+  /// 직접 탭해야 포커스가 잡힌다).
+  void _openSearch() {
+    setState(() => _searchOpen = true);
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0);
+    }
+  }
+
+  /// 검색 바를 닫는 것은 검색을 "종료"하는 의미이므로 검색어/필터도 함께
+  /// 초기화한다(닫아도 검색어만 남아 있으면 그리드가 계속 필터된 상태로
+  /// 남아 사용자가 혼란스러울 수 있다). 필터 패널을 여는 버튼도 검색 바
+  /// 안에 있어 검색 바가 사라지면 접근할 수 없으므로 함께 닫는다.
+  void _closeSearch() {
+    _resetFilter();
+    setState(() {
+      _searchOpen = false;
+      _filterPanelOpen = false;
+    });
   }
 
   void _onSearchChanged(String value) {
@@ -119,9 +169,12 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
   }
 
   double _contentStartOffset() {
-    var offset = _kFinishedControlsHeight;
-    if (_filterPanelOpen) {
-      offset += _filterPanelKey.currentContext?.size?.height ?? 0;
+    var offset = _kFinishedIconBarHeight;
+    if (_searchOpen) {
+      offset += _kFinishedSearchBarHeight;
+      if (_filterPanelOpen) {
+        offset += _filterPanelKey.currentContext?.size?.height ?? 0;
+      }
     }
     offset += _kFinishedContentSpacing;
     return offset;
@@ -178,25 +231,26 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView> {
                 controller: _scrollController,
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  SliverAppBar(
-                    backgroundColor: AppColors.pageBackground,
-                    elevation: 0,
-                    floating: false,
-                    pinned: false,
-                    automaticallyImplyLeading: false,
-                    centerTitle: false,
-                    titleSpacing: 0,
-                    toolbarHeight: _kFinishedControlsHeight,
-                    title: _FinishedControls(
-                      searchController: _searchController,
-                      onSearchChanged: _onSearchChanged,
-                      onClearSearch: _clearSearch,
-                      filterActiveCount: filter.activeCount,
-                      onToggleFilterPanel: () =>
-                          setState(() => _filterPanelOpen = !_filterPanelOpen),
-                      onResetFilter: _resetFilter,
+                  SliverToBoxAdapter(
+                    child: _FinishedIconBar(
+                      searchOpen: _searchOpen,
+                      onSearchTap: _toggleSearch,
                     ),
                   ),
+                  if (_searchOpen)
+                    SliverToBoxAdapter(
+                      child: _FinishedSearchBar(
+                        searchController: _searchController,
+                        searchFocusNode: _searchFocusNode,
+                        onSearchChanged: _onSearchChanged,
+                        onClearSearch: _clearSearch,
+                        filterActiveCount: filter.activeCount,
+                        onToggleFilterPanel: () => setState(
+                          () => _filterPanelOpen = !_filterPanelOpen,
+                        ),
+                        onResetFilter: _resetFilter,
+                      ),
+                    ),
                   if (_filterPanelOpen)
                     SliverToBoxAdapter(
                       child: KeyedSubtree(
@@ -432,24 +486,15 @@ class _MonthGroup {
   String get label => isDated ? '$year년 $month월' : '날짜 미지정';
 }
 
-/// 완독 탭 상단 컨트롤 3줄(공개 토글 / 검색 / 필터 버튼). 높이는 항상
-/// [_kFinishedControlsHeight]에 맞춰 `SliverAppBar`와 어긋나지 않게 한다.
-class _FinishedControls extends ConsumerWidget {
-  const _FinishedControls({
-    required this.searchController,
-    required this.onSearchChanged,
-    required this.onClearSearch,
-    required this.filterActiveCount,
-    required this.onToggleFilterPanel,
-    required this.onResetFilter,
-  });
+/// 완독 탭 상단 아이콘 바(검색 / 공개 토글 / 도움말). 고정되지 않은 일반
+/// sliver 콘텐츠라 목록과 함께 스크롤되어 사라진다. 높이는 항상
+/// [_kFinishedIconBarHeight]에 맞춰 `_contentStartOffset`의 계산과
+/// 어긋나지 않게 한다.
+class _FinishedIconBar extends ConsumerWidget {
+  const _FinishedIconBar({required this.searchOpen, required this.onSearchTap});
 
-  final TextEditingController searchController;
-  final ValueChanged<String> onSearchChanged;
-  final VoidCallback onClearSearch;
-  final int filterActiveCount;
-  final VoidCallback onToggleFilterPanel;
-  final VoidCallback onResetFilter;
+  final bool searchOpen;
+  final VoidCallback onSearchTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -457,19 +502,31 @@ class _FinishedControls extends ConsumerWidget {
     final isPublic = privacyState.valueOrNull ?? false;
 
     return SizedBox(
-      height: _kFinishedControlsHeight,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: 36,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+      height: _kFinishedIconBarHeight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconButton(
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+              padding: EdgeInsets.zero,
+              tooltip: searchOpen ? '검색 닫기' : '완독한 책 검색',
+              icon: Icon(
+                searchOpen
+                    ? PhosphorIconsRegular.x
+                    : PhosphorIconsRegular.magnifyingGlass,
+                color: AppColors.primary,
+                size: 20,
+              ),
+              onPressed: onSearchTap,
+            ),
+            Row(
               children: [
                 IconButton(
                   constraints: const BoxConstraints(
-                    minWidth: 36,
-                    minHeight: 36,
+                    minWidth: 44,
+                    minHeight: 44,
                   ),
                   padding: EdgeInsets.zero,
                   tooltip: isPublic
@@ -502,10 +559,11 @@ class _FinishedControls extends ConsumerWidget {
                 ),
                 IconButton(
                   constraints: const BoxConstraints(
-                    minWidth: 32,
-                    minHeight: 32,
+                    minWidth: 40,
+                    minHeight: 40,
                   ),
                   padding: EdgeInsets.zero,
+                  tooltip: '완독 책장 공개 안내',
                   icon: const Icon(
                     PhosphorIconsRegular.question,
                     color: AppColors.mutedIcon,
@@ -517,17 +575,51 @@ class _FinishedControls extends ConsumerWidget {
                     message: '공개로 설정하면 다른 사용자가 내 완독 책장을 볼 수 있습니다.',
                   ),
                 ),
-                const SizedBox(width: 8),
               ],
             ),
-          ),
-          const SizedBox(height: 4),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 완독 탭 검색창 + 필터 버튼 행. 높이는 항상 [_kFinishedSearchBarHeight]에
+/// 맞춰야 한다. 아이콘 바의 검색 버튼을 누를 때만 트리에 들어왔다 빠지는
+/// 방식(스크롤과 무관한 단순 토글)이라 `SliverToBoxAdapter`로 감싸 쓴다.
+class _FinishedSearchBar extends StatelessWidget {
+  const _FinishedSearchBar({
+    required this.searchController,
+    required this.searchFocusNode,
+    required this.onSearchChanged,
+    required this.onClearSearch,
+    required this.filterActiveCount,
+    required this.onToggleFilterPanel,
+    required this.onResetFilter,
+  });
+
+  final TextEditingController searchController;
+  final FocusNode searchFocusNode;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onClearSearch;
+  final int filterActiveCount;
+  final VoidCallback onToggleFilterPanel;
+  final VoidCallback onResetFilter;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: _kFinishedSearchBarHeight,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           SizedBox(
             height: 44,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextField(
                 controller: searchController,
+                focusNode: searchFocusNode,
                 onChanged: onSearchChanged,
                 decoration: InputDecoration(
                   isDense: true,
@@ -685,7 +777,7 @@ class _FinishedBookCard extends StatelessWidget {
               fontSize: 12,
               color: AppColors.titleText,
             ),
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
           if (book.myRating != null) _StarRow(rating: book.myRating!),

@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../book_record/models/record_labels.dart';
 import '../../providers/bookshelf_providers.dart';
 
-/// 완독 탭 필터 패널(카테고리/태그/걸작/난이도). 옵션은 모두 로컬 DB의
-/// 완독 책에서 실제 사용 중인 값만 distinct로 추출한다(서버 카테고리/태그
-/// API는 사용하지 않음).
+/// 완독 탭 필터 패널(명작/카테고리/태그/난이도). 명작은 항상 맨 위, 난이도는
+/// [DifficultyLevel] 3종 고정 노출이고, 카테고리/태그는 로컬 DB의 완독 책에서
+/// 실제 사용 중인 값만 distinct로 추출한다(서버 카테고리/태그 API는 사용 안 함).
 class FinishedFilterPanel extends ConsumerWidget {
   const FinishedFilterPanel({super.key});
 
@@ -18,8 +19,11 @@ class FinishedFilterPanel extends ConsumerWidget {
     final categories =
         ref.watch(finishedCategoryOptionsProvider).valueOrNull ?? const [];
     final tags = ref.watch(finishedTagOptionsProvider).valueOrNull ?? const [];
-    final difficulties =
-        ref.watch(finishedDifficultyOptionsProvider).valueOrNull ?? const [];
+    final categoryColors = {
+      for (final category
+          in ref.watch(bookCategoriesProvider).valueOrNull ?? const [])
+        category.name: category.color,
+    };
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -31,6 +35,30 @@ class FinishedFilterPanel extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _FilterChip(
+                label: '명작',
+                selected: filter.masterpieceOnly,
+                selectedColor: AppColors.masterpieceGold,
+                selectedTextColor: AppColors.titleText,
+                leading: Icon(
+                  filter.masterpieceOnly
+                      ? PhosphorIconsFill.crown
+                      : PhosphorIconsRegular.crown,
+                  size: 14,
+                  color: filter.masterpieceOnly
+                      ? AppColors.titleText
+                      : AppColors.tertiaryText,
+                ),
+                onTap: () =>
+                    notifier.setMasterpieceOnly(!filter.masterpieceOnly),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           if (categories.isNotEmpty) ...[
             const _SectionLabel('카테고리'),
             const SizedBox(height: 8),
@@ -40,16 +68,17 @@ class FinishedFilterPanel extends ConsumerWidget {
               children: [
                 _FilterChip(
                   label: '전체',
-                  selected: filter.category == null,
-                  onTap: () => notifier.setCategory(null),
+                  selected: filter.categories.isEmpty,
+                  onTap: notifier.clearCategories,
                 ),
                 for (final category in categories)
                   _FilterChip(
                     label: category,
-                    selected: filter.category == category,
-                    onTap: () => notifier.setCategory(
-                      filter.category == category ? null : category,
+                    selected: filter.categories.contains(category),
+                    leading: _CategoryColorDot(
+                      color: categoryColors[category] ?? AppColors.mutedIcon,
                     ),
+                    onTap: () => notifier.toggleCategory(category),
                   ),
               ],
             ),
@@ -72,27 +101,22 @@ class FinishedFilterPanel extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
           ],
+          const _SectionLabel('난이도'),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
               _FilterChip(
-                label: '걸작만 보기',
-                selected: filter.masterpieceOnly,
-                onTap: () =>
-                    notifier.setMasterpieceOnly(!filter.masterpieceOnly),
+                label: '전체',
+                selected: filter.difficulty == null,
+                onTap: () => notifier.setDifficulty(null),
               ),
-              for (final difficulty in difficulties)
+              for (final level in DifficultyLevel.values)
                 _FilterChip(
-                  // 필터 비교/전송에는 저장값(EASY 등)을 그대로 쓰고,
-                  // 라벨만 한글로 바꿔 보여준다(저장값에 한글이 섞이지 않도록).
-                  label:
-                      DifficultyLevel.fromApiValue(difficulty)?.label ??
-                      difficulty,
-                  selected: filter.difficulty == difficulty,
-                  onTap: () => notifier.setDifficulty(
-                    filter.difficulty == difficulty ? null : difficulty,
-                  ),
+                  label: level.label,
+                  selected: filter.difficulty == level.apiValue,
+                  onTap: () => notifier.setDifficulty(level.apiValue),
                 ),
             ],
           ),
@@ -120,16 +144,37 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
+class _CategoryColorDot extends StatelessWidget {
+  const _CategoryColorDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    );
+  }
+}
+
 class _FilterChip extends StatelessWidget {
   const _FilterChip({
     required this.label,
     required this.selected,
     required this.onTap,
+    this.leading,
+    this.selectedColor = AppColors.primary,
+    this.selectedTextColor = Colors.white,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final Widget? leading;
+  final Color selectedColor;
+  final Color selectedTextColor;
 
   @override
   Widget build(BuildContext context) {
@@ -142,16 +187,22 @@ class _FilterChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
-            color: selected ? AppColors.primary : AppColors.inputBackground,
+            color: selected ? selectedColor : AppColors.inputBackground,
             borderRadius: BorderRadius.circular(999),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: selected ? Colors.white : AppColors.tertiaryText,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (leading != null) ...[leading!, const SizedBox(width: 6)],
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? selectedTextColor : AppColors.tertiaryText,
+                ),
+              ),
+            ],
           ),
         ),
       ),

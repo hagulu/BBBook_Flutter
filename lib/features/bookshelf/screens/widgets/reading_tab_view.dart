@@ -100,7 +100,10 @@ class _ReadingBookCard extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (book.category != null) ...[
-                      _CategoryBadge(text: book.category!, color: categoryColor),
+                      _CategoryBadge(
+                        text: book.category!,
+                        color: categoryColor,
+                      ),
                       const SizedBox(height: 6),
                     ],
                     Text(
@@ -143,11 +146,8 @@ class _ReadingBookCard extends ConsumerWidget {
   }
 
   static String? _subtitle(BookItem book) {
-    final parts = [
-      book.author,
-      book.publisher,
-    ].whereType<String>().where((s) => s.isNotEmpty);
-    return parts.isEmpty ? null : parts.join(' · ');
+    final author = book.author;
+    return author != null && author.isNotEmpty ? author : null;
   }
 }
 

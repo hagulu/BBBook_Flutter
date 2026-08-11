@@ -204,11 +204,17 @@ class BookshelfRepository {
         return;
       }
 
-      final serverItem = BookItem.fromDetailJson(data, createdAt: item.createdAt);
+      final serverItem = BookItem.fromDetailJson(
+        data,
+        createdAt: item.createdAt,
+      );
       if (latest.updatedAt == item.updatedAt) {
         await _dao.confirmPush(serverItem);
       } else {
-        await _dao.refreshSyncedUpdatedAt(item.userBookId, serverItem.updatedAt);
+        await _dao.refreshSyncedUpdatedAt(
+          item.userBookId,
+          serverItem.updatedAt,
+        );
       }
       developer.log(
         '[책 기록 더티 push] userBookId=${item.userBookId} result=SUCCESS',
@@ -260,9 +266,6 @@ class BookshelfRepository {
       _dao.searchFinished(filter);
 
   Future<List<String>> getDistinctCategories() => _dao.getDistinctCategories();
-
-  Future<List<String>> getDistinctDifficulties() =>
-      _dao.getDistinctDifficulties();
 
   Future<List<BookTag>> getDistinctTags() => _dao.getDistinctTags();
 

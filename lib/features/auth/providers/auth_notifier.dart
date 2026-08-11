@@ -176,9 +176,16 @@ class AuthNotifier extends Notifier<AuthState> {
   /// 시점"으로만 한정하기 위해 캐시 유무와 상관없이 강제로 새로 받는다).
   /// 실패해도(오프라인 등) 이미 있던 캐시는 그대로 남고, 로그인 흐름도
   /// 막지 않도록 예외를 삼키고 로그만 남긴다.
+  ///
+  /// 이 메서드는 `unawaited`로 호출돼 로그인 직후 화면 전환과 경쟁한다 —
+  /// 화면이 [bookCategoriesProvider]를 이 갱신보다 먼저 구독해 옛 DB 캐시로
+  /// `keepAlive`되면, 여기서 DB를 새로 채워도 그 provider는 세션 내내 갱신된
+  /// 값을 반영하지 못한다. 성공 시 provider를 invalidate해 다음 구독이 방금
+  /// 갱신된 DB 값을 다시 읽게 한다.
   Future<void> _prefetchCategories() async {
     try {
       await ref.read(bookshelfRepositoryProvider).refreshCategories();
+      ref.invalidate(bookCategoriesProvider);
     } catch (e) {
       developer.log('[카테고리 캐시] result=FAIL reason=${e.runtimeType}');
     }

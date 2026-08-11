@@ -2,21 +2,24 @@
 class FinishedFilter {
   const FinishedFilter({
     this.keyword = '',
-    this.category,
+    this.categories = const {},
     this.tagIds = const {},
     this.masterpieceOnly = false,
     this.difficulty,
   });
 
   final String keyword;
-  final String? category;
+
+  /// 책 하나당 카테고리는 하나뿐이지만, 필터에서는 여러 카테고리를 선택해
+  /// "그 중 하나라도 해당"(OR)으로 걸러낼 수 있다.
+  final Set<String> categories;
   final Set<int> tagIds;
   final bool masterpieceOnly;
   final String? difficulty;
 
   bool get isEmpty =>
       keyword.isEmpty &&
-      category == null &&
+      categories.isEmpty &&
       tagIds.isEmpty &&
       !masterpieceOnly &&
       difficulty == null;
@@ -27,15 +30,14 @@ class FinishedFilter {
 
   int get activeCount =>
       (keyword.isNotEmpty ? 1 : 0) +
-      (category != null ? 1 : 0) +
+      (categories.isNotEmpty ? 1 : 0) +
       (tagIds.isNotEmpty ? 1 : 0) +
       (masterpieceOnly ? 1 : 0) +
       (difficulty != null ? 1 : 0);
 
   FinishedFilter copyWith({
     String? keyword,
-    String? category,
-    bool clearCategory = false,
+    Set<String>? categories,
     Set<int>? tagIds,
     bool? masterpieceOnly,
     String? difficulty,
@@ -43,7 +45,7 @@ class FinishedFilter {
   }) {
     return FinishedFilter(
       keyword: keyword ?? this.keyword,
-      category: clearCategory ? null : (category ?? this.category),
+      categories: categories ?? this.categories,
       tagIds: tagIds ?? this.tagIds,
       masterpieceOnly: masterpieceOnly ?? this.masterpieceOnly,
       difficulty: clearDifficulty ? null : (difficulty ?? this.difficulty),
