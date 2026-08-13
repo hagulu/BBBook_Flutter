@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/author_display.dart';
 import '../../../book_record/screens/book_record_screen.dart';
 import '../../models/book_item.dart';
 import '../../models/book_status.dart';
@@ -84,7 +85,7 @@ class _GridBookCard extends StatelessWidget {
           ),
           if (book.author != null)
             Text(
-              book.author!,
+              displayAuthor(book.author!),
               style: const TextStyle(
                 fontSize: 11,
                 color: AppColors.tertiaryText,

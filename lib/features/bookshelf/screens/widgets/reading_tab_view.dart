@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/author_display.dart';
 import '../../../book_record/screens/book_record_screen.dart';
 import '../../models/book_item.dart';
 import '../../models/book_status.dart';
@@ -147,7 +148,7 @@ class _ReadingBookCard extends ConsumerWidget {
 
   static String? _subtitle(BookItem book) {
     final author = book.author;
-    return author != null && author.isNotEmpty ? author : null;
+    return author != null && author.isNotEmpty ? displayAuthor(author) : null;
   }
 }
 

@@ -21,10 +21,11 @@ Future<CategorySelection?> showBookCategoryPickerDialog(
   required List<BookCategory> categories,
   required int? initialCategoryId,
 }) {
-  return showDialog<CategorySelection>(
+  return showModalBottomSheet<CategorySelection>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) => RecordDialogShell(
-      icon: PhosphorIconsRegular.tag,
       title: '카테고리',
       content: Wrap(
         spacing: 8,
@@ -48,13 +49,6 @@ Future<CategorySelection?> showBookCategoryPickerDialog(
             ),
         ],
       ),
-      buttons: [
-        RecordDialogButton(
-          label: '취소',
-          style: RecordDialogButtonStyle.neutral,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ],
     ),
   );
 }

@@ -17,61 +17,66 @@ class RecordDialogButton {
 }
 
 /// 책 기록 화면의 커스텀 폼형 팝업(완독 확인/재독/출처·플랫폼/난이도/책 정보
-/// 수정)이 공유하는 다이얼로그 뼈대. `AppAlert`/`AppConfirm`이 쓰는
-/// `AppDialogShell`과 같은 시각 언어(라운드 24, 아이콘 원형 배지, 필 버튼)를
-/// 커스텀 콘텐츠가 필요한 폼에도 그대로 적용해 팝업들이 한 가족처럼 보이게 한다.
+/// 수정)이 공유하는 바텀시트 뼈대. 커스텀 콘텐츠가 필요한 폼에도 필 버튼
+/// 시각 언어를 그대로 적용해 팝업들이 한 가족처럼 보이게 한다.
+/// `showModalBottomSheet`의 `builder`에서 반환해 사용한다(선택/수정 항목은
+/// 바텀시트로, 단순 알림/확인은 `AppAlert`/`AppConfirm`을 그대로 쓴다).
 class RecordDialogShell extends StatelessWidget {
   const RecordDialogShell({
     super.key,
-    this.icon,
-    this.iconColor = AppColors.primary,
-    this.iconBackgroundColor = AppColors.accentLight,
     required this.title,
     required this.content,
     this.buttons = const [],
   });
 
-  final IconData? icon;
-  final Color iconColor;
-  final Color iconBackgroundColor;
   final String title;
   final Widget content;
   final List<RecordDialogButton> buttons;
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: AppColors.cardBackground,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
+    // 흰 배경 컨테이너가 화면 맨 아래까지 이어지도록 SafeArea로 감싸 크기를
+    // 줄이는 대신, 하단 세이프 에어리어(홈 인디케이터 등)만큼을 컨테이너
+    // 내부 패딩에 더한다 — 그렇지 않으면 그 틈으로 투명한 모달 배리어가
+    // 노출된다.
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.cardBackground,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+          24,
+          12,
+          24,
+          24 +
+              MediaQuery.viewInsetsOf(context).bottom +
+              MediaQuery.viewPaddingOf(context).bottom,
+        ),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  if (icon != null) ...[
-                    CircleAvatar(
-                      radius: 20,
-                      backgroundColor: iconBackgroundColor,
-                      child: Icon(icon, color: iconColor, size: 20),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.titleText,
-                      ),
-                    ),
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.titleText,
+                ),
               ),
               const SizedBox(height: 18),
               content,

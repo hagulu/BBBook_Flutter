@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/author_display.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../book_record/screens/widgets/star_rating.dart';
 import '../../bookshelf/models/book_status.dart';
@@ -279,7 +280,7 @@ class _HeroSection extends StatelessWidget {
         if (detail.author != null && detail.author!.isNotEmpty) ...[
           const SizedBox(height: 6),
           Text(
-            detail.author!,
+            displayAuthor(detail.author!),
             textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 13,

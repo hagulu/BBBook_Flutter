@@ -16,7 +16,6 @@ import '../../../book_record/screens/widgets/record_field_tile.dart';
 import '../../../bookshelf/models/book_status.dart';
 import '../../../bookshelf/providers/bookshelf_providers.dart';
 import '../../providers/book_search_providers.dart';
-import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// "직접 등록" 모달(book-search.md, `CustomBookModal` add 모드 대응). 항목은
 /// 책 기록 상세의 "책 정보 수정" 팝업(표지/제목/저자/출판사/카테고리/총쪽수)과
@@ -30,8 +29,10 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 Future<({int userBookId, bool synced})?> showCustomBookDialog(
   BuildContext context,
 ) {
-  return showDialog<({int userBookId, bool synced})>(
+  return showModalBottomSheet<({int userBookId, bool synced})>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) => const _CustomBookDialog(),
   );
 }
@@ -198,7 +199,6 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(bookCategoriesProvider);
     return RecordDialogShell(
-      icon: PhosphorIconsRegular.notePencil,
       title: '직접 등록',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -261,11 +261,6 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
         ],
       ),
       buttons: [
-        RecordDialogButton(
-          label: '취소',
-          style: RecordDialogButtonStyle.neutral,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
         RecordDialogButton(label: '등록', onPressed: _save),
       ],
     );

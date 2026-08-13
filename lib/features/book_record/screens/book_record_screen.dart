@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/author_display.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../bookshelf/models/book_item.dart';
@@ -553,7 +554,7 @@ class _Header extends ConsumerWidget {
                     if (book.author != null && book.author!.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        book.author!,
+                        displayAuthor(book.author!),
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,

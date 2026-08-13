@@ -20,8 +20,10 @@ Future<void> showBookInfoEditDialog(
   required int userBookId,
   required BookItem book,
 }) {
-  return showDialog<void>(
+  return showModalBottomSheet<void>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) =>
         BookInfoEditDialog(userBookId: userBookId, book: book),
   );
@@ -219,11 +221,6 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
         ],
       ),
       buttons: [
-        RecordDialogButton(
-          label: '취소',
-          style: RecordDialogButtonStyle.neutral,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
         RecordDialogButton(label: '저장', onPressed: _save),
       ],
     );

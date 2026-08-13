@@ -24,8 +24,10 @@ Future<ReviewEditResult?> showReviewEditDialog(
   BuildContext context, {
   required BookReview review,
 }) {
-  return showDialog<ReviewEditResult>(
+  return showModalBottomSheet<ReviewEditResult>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) => _ReviewEditDialog(review: review),
   );
 }
@@ -112,11 +114,6 @@ class _ReviewEditDialogState extends State<_ReviewEditDialog> {
         ],
       ),
       buttons: [
-        RecordDialogButton(
-          label: '취소',
-          style: RecordDialogButtonStyle.neutral,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
         RecordDialogButton(label: '저장', onPressed: _save),
       ],
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/author_display.dart';
 import '../../../book_record/screens/widgets/star_rating.dart';
 import '../../../bookshelf/screens/widgets/book_cover.dart';
 import '../../models/book_search_item.dart';
@@ -51,7 +52,7 @@ class SearchResultCard extends StatelessWidget {
                     if (item.author != null && item.author!.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        item.author!,
+                        displayAuthor(item.author!),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(

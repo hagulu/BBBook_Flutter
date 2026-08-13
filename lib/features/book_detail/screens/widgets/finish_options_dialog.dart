@@ -32,8 +32,10 @@ class FinishOptionsResult {
 }
 
 Future<FinishOptionsResult?> showFinishOptionsDialog(BuildContext context) {
-  return showDialog<FinishOptionsResult>(
+  return showModalBottomSheet<FinishOptionsResult>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) => const _FinishOptionsDialog(),
   );
 }
@@ -80,9 +82,6 @@ class _FinishOptionsDialogState extends State<_FinishOptionsDialog> {
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      icon: PhosphorIconsRegular.confetti,
-      iconColor: AppColors.masterpieceGold,
-      iconBackgroundColor: AppColors.masterpieceBackground,
       title: '완독 정보',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -173,11 +172,6 @@ class _FinishOptionsDialogState extends State<_FinishOptionsDialog> {
         ],
       ),
       buttons: [
-        RecordDialogButton(
-          label: '취소',
-          style: RecordDialogButtonStyle.neutral,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
         RecordDialogButton(
           label: '완독 등록',
           onPressed: () => Navigator.of(context).pop(

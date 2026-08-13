@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_theme.dart';
 import '../../../book_record/screens/widgets/record_dialog_shell.dart';
-import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 신고 사유 4종(common-interactions.md `ReportModal` 대응).
 enum ReportReason {
@@ -35,8 +33,10 @@ class ReportSubmission {
 
 /// 리뷰 신고 모달. 사유 라디오 4종, ETC 선택 시에만 상세 내용 입력창 노출.
 Future<ReportSubmission?> showReportDialog(BuildContext context) {
-  return showDialog<ReportSubmission>(
+  return showModalBottomSheet<ReportSubmission>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) => const _ReportDialog(),
   );
 }
@@ -61,8 +61,6 @@ class _ReportDialogState extends State<_ReportDialog> {
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      icon: PhosphorIconsRegular.flag,
-      iconColor: AppColors.error,
       title: '신고하기',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -98,11 +96,6 @@ class _ReportDialogState extends State<_ReportDialog> {
         ],
       ),
       buttons: [
-        RecordDialogButton(
-          label: '취소',
-          style: RecordDialogButtonStyle.neutral,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
         RecordDialogButton(
           label: '신고',
           style: RecordDialogButtonStyle.destructive,

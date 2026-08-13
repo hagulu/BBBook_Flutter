@@ -13,10 +13,11 @@ Future<BookStatus?> showReadingStatusDialog(
   BuildContext context, {
   required BookStatus initialStatus,
 }) {
-  return showDialog<BookStatus>(
+  return showModalBottomSheet<BookStatus>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) => RecordDialogShell(
-      icon: PhosphorIconsRegular.listChecks,
       title: '독서 상태',
       content: GridView.count(
         crossAxisCount: 3,
@@ -34,13 +35,6 @@ Future<BookStatus?> showReadingStatusDialog(
             ),
         ],
       ),
-      buttons: [
-        RecordDialogButton(
-          label: '취소',
-          style: RecordDialogButtonStyle.neutral,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ],
     ),
   );
 }
@@ -123,8 +117,10 @@ Future<SourcePlatformResult?> showSourcePlatformDialog(
   required String? initialPlatform,
   required Map<String, List<String>> platformOptions,
 }) {
-  return showDialog<SourcePlatformResult>(
+  return showModalBottomSheet<SourcePlatformResult>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) => _SourcePlatformDialog(
       initialSource: initialSource,
       initialPlatform: initialPlatform,
@@ -223,11 +219,26 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
     ).pop(SourcePlatformResult(sourceType: source, platformName: platformName));
   }
 
+  /// 출처 선택. 플랫폼이 필요 없는 출처(실물책)는 바로 저장하고 닫는다.
+  void _selectSource(BookSourceType source) {
+    setState(() {
+      _source = source;
+      _selectedPlatform = null;
+    });
+    if (source.platformOptionsKey == null) _save();
+  }
+
+  /// 플랫폼 선택. '직접 입력'을 고르면 입력창을 펼치기만 하고, 그 외에는
+  /// 바로 저장하고 닫는다.
+  void _selectPlatform(String platform) {
+    setState(() => _selectedPlatform = platform);
+    if (platform != _kCustomPlatformLabel) _save();
+  }
+
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      icon: PhosphorIconsRegular.stack,
-      title: '출처 / 플랫폼',
+      title: '출처',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -241,32 +252,33 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
                 ),
             ],
             selected: _source,
-            onSelected: (source) => setState(() {
-              _source = source;
-              _selectedPlatform = null;
-            }),
+            onSelected: _selectSource,
           ),
           if (_source?.platformOptionsKey != null) ...[
             const SizedBox(height: 16),
+            const Text(
+              '플랫폼',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.tertiaryText,
+              ),
+            ),
+            const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (widget.initialPlatform != null &&
-                    widget.initialPlatform!.isNotEmpty)
-                  PillOption(
-                    label: _kUnsetPlatformLabel,
-                    icon: PhosphorIconsRegular.minusCircle,
-                    selected: _selectedPlatform == _kUnsetPlatformLabel,
-                    onTap: () => setState(
-                      () => _selectedPlatform = _kUnsetPlatformLabel,
-                    ),
-                  ),
+                PillOption(
+                  label: _kUnsetPlatformLabel,
+                  selected: _selectedPlatform == _kUnsetPlatformLabel,
+                  onTap: () => _selectPlatform(_kUnsetPlatformLabel),
+                ),
                 for (final platform in _platforms)
                   PillOption(
                     label: platform,
                     selected: _selectedPlatform == platform,
-                    onTap: () => setState(() => _selectedPlatform = platform),
+                    onTap: () => _selectPlatform(platform),
                   ),
               ],
             ),
@@ -286,17 +298,9 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
           ],
         ],
       ),
-      buttons: [
-        RecordDialogButton(
-          label: '취소',
-          style: RecordDialogButtonStyle.neutral,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        RecordDialogButton(
-          label: '저장',
-          onPressed: _source == null ? null : _save,
-        ),
-      ],
+      buttons: _isCustomSelected
+          ? [RecordDialogButton(label: '저장', onPressed: _save)]
+          : const [],
     );
   }
 }
@@ -308,10 +312,11 @@ Future<String?> showDifficultyDialog(
   BuildContext context, {
   required String? initialDifficulty,
 }) {
-  return showDialog<String>(
+  return showModalBottomSheet<String>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) => RecordDialogShell(
-      icon: PhosphorIconsRegular.gauge,
       title: '난이도',
       content: IconOptionSelector<DifficultyLevel>(
         options: [
@@ -326,13 +331,6 @@ Future<String?> showDifficultyDialog(
         selected: DifficultyLevel.fromApiValue(initialDifficulty),
         onSelected: (level) => Navigator.of(context).pop(level.apiValue),
       ),
-      buttons: [
-        RecordDialogButton(
-          label: '취소',
-          style: RecordDialogButtonStyle.neutral,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ],
     ),
   );
 }
@@ -344,8 +342,10 @@ Future<String?> showDiscoverySourceDialog(
   BuildContext context, {
   required String? initialValue,
 }) {
-  return showDialog<String>(
+  return showModalBottomSheet<String>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) => _DiscoverySourceDialog(initialValue: initialValue),
   );
 }
@@ -373,7 +373,6 @@ class _DiscoverySourceDialogState extends State<_DiscoverySourceDialog> {
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      icon: PhosphorIconsRegular.compass,
       title: '알게 된 경로',
       content: TextField(
         controller: _controller,
@@ -386,11 +385,6 @@ class _DiscoverySourceDialogState extends State<_DiscoverySourceDialog> {
         ),
       ),
       buttons: [
-        RecordDialogButton(
-          label: '취소',
-          style: RecordDialogButtonStyle.neutral,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
         RecordDialogButton(
           label: '저장',
           onPressed: () => Navigator.of(context).pop(_controller.text.trim()),

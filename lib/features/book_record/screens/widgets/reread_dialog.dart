@@ -26,8 +26,10 @@ Future<RereadDialogResult?> showRereadDialog(
   BuildContext context, {
   required int initialCount,
 }) {
-  return showDialog<RereadDialogResult>(
+  return showModalBottomSheet<RereadDialogResult>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) => _RereadDialog(initialCount: initialCount),
   );
 }
@@ -63,7 +65,6 @@ class _RereadDialogState extends State<_RereadDialog> {
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      icon: PhosphorIconsRegular.arrowsClockwise,
       title: '재독 횟수',
       content: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -91,11 +92,6 @@ class _RereadDialogState extends State<_RereadDialog> {
         ],
       ),
       buttons: [
-        RecordDialogButton(
-          label: '취소',
-          style: RecordDialogButtonStyle.neutral,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
         RecordDialogButton(
           label: '확인',
           onPressed: () =>

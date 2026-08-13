@@ -5,7 +5,6 @@ import '../../models/record_labels.dart';
 import 'icon_option_selector.dart';
 import 'record_dialog_shell.dart';
 import 'star_rating.dart';
-import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// "다 읽음" 전환 확인 팝업의 결과.
 class FinishConfirmResult {
@@ -21,8 +20,10 @@ class FinishConfirmResult {
 /// 완독 확인 팝업(난이도/별점/한줄평 입력). 확인을 누르면 [FinishConfirmResult]를
 /// 반환하고, 배경 클릭/취소로 닫으면 null을 반환한다.
 Future<FinishConfirmResult?> showFinishConfirmDialog(BuildContext context) {
-  return showDialog<FinishConfirmResult>(
+  return showModalBottomSheet<FinishConfirmResult>(
     context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
     builder: (context) => const _FinishConfirmDialog(),
   );
 }
@@ -48,9 +49,6 @@ class _FinishConfirmDialogState extends State<_FinishConfirmDialog> {
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      icon: PhosphorIconsRegular.confetti,
-      iconColor: AppColors.masterpieceGold,
-      iconBackgroundColor: AppColors.masterpieceBackground,
       title: '다 읽었어요!',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,11 +93,6 @@ class _FinishConfirmDialogState extends State<_FinishConfirmDialog> {
         ],
       ),
       buttons: [
-        RecordDialogButton(
-          label: '취소',
-          style: RecordDialogButtonStyle.neutral,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
         RecordDialogButton(
           label: '완독 처리',
           onPressed: () => Navigator.of(context).pop(
