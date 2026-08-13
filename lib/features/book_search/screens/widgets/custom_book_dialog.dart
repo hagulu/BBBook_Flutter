@@ -6,56 +6,53 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_loading.dart';
-import '../../../bookshelf/models/book_item.dart';
+import '../../../book_detail/screens/widgets/add_status_dialog.dart';
+import '../../../book_detail/screens/widgets/finish_options_dialog.dart';
+import '../../../book_record/models/record_labels.dart';
+import '../../../book_record/screens/widgets/book_category_field.dart';
+import '../../../book_record/screens/widgets/book_thumbnail_field.dart';
+import '../../../book_record/screens/widgets/record_dialog_shell.dart';
+import '../../../book_record/screens/widgets/record_field_tile.dart';
+import '../../../bookshelf/models/book_status.dart';
 import '../../../bookshelf/providers/bookshelf_providers.dart';
-import '../../providers/book_record_providers.dart';
-import 'book_category_field.dart';
-import 'book_thumbnail_field.dart';
-import 'record_dialog_shell.dart';
+import '../../providers/book_search_providers.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
-/// "책 정보 수정" 모달(제목/저자/출판사/총쪽수/표지/카테고리). ISBN 재연결
-/// (검색 팝업)은 책 검색 기능이 아직 이관되지 않아 이번 범위에서 제외한다.
-Future<void> showBookInfoEditDialog(
-  BuildContext context, {
-  required int userBookId,
-  required BookItem book,
-}) {
-  return showDialog<void>(
+/// "직접 등록" 모달(book-search.md, `CustomBookModal` add 모드 대응). 항목은
+/// 책 기록 상세의 "책 정보 수정" 팝업(표지/제목/저자/출판사/카테고리/총쪽수)과
+/// 동일하게 구성하고, 새로 서재에 추가하는 화면이라 독서 상태 선택을 더한다.
+///
+/// 성공하면 새로 만들어진 userBookId와 로컬 DB 동기화 확인 여부([synced])를
+/// 반환하고, 취소/바깥 탭이면 null을 반환한다. 서버 등록은 됐지만 동기화가
+/// 아직 반영되지 않았을 수 있어([BookshelfSyncController.ensureSynced]),
+/// 호출부는 [synced]가 false면 로컬 DB를 바로 읽는 책 기록 상세로 이동하지
+/// 않아야 한다(존재하지 않는 행이라 "책을 찾을 수 없습니다"로 막힌다).
+Future<({int userBookId, bool synced})?> showCustomBookDialog(
+  BuildContext context,
+) {
+  return showDialog<({int userBookId, bool synced})>(
     context: context,
-    builder: (context) =>
-        BookInfoEditDialog(userBookId: userBookId, book: book),
+    builder: (context) => const _CustomBookDialog(),
   );
 }
 
-class BookInfoEditDialog extends ConsumerStatefulWidget {
-  const BookInfoEditDialog({
-    super.key,
-    required this.userBookId,
-    required this.book,
-  });
-
-  final int userBookId;
-  final BookItem book;
+class _CustomBookDialog extends ConsumerStatefulWidget {
+  const _CustomBookDialog();
 
   @override
-  ConsumerState<BookInfoEditDialog> createState() => _BookInfoEditDialogState();
+  ConsumerState<_CustomBookDialog> createState() => _CustomBookDialogState();
 }
 
-class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
-  late final _titleController = TextEditingController(text: widget.book.title);
-  late final _authorController = TextEditingController(
-    text: widget.book.author ?? '',
-  );
-  late final _publisherController = TextEditingController(
-    text: widget.book.publisher ?? '',
-  );
-  late final _totalPagesController = TextEditingController(
-    text: widget.book.totalPages?.toString() ?? '',
-  );
+class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
+  final _titleController = TextEditingController();
+  final _authorController = TextEditingController();
+  final _publisherController = TextEditingController();
+  final _totalPagesController = TextEditingController();
 
   File? _pickedThumbnail;
-  bool _removeThumbnail = false;
-  late int? _selectedCategoryId = widget.book.displayCategoryId;
+  int? _selectedCategoryId;
+  BookStatus _status = BookStatus.reading;
+  FinishOptionsResult? _finishOptions;
   String? _errorText;
 
   static const _labelStyle = TextStyle(
@@ -82,21 +79,42 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
     }
     setState(() {
       _pickedThumbnail = result.file;
-      _removeThumbnail = false;
       _errorText = null;
     });
   }
 
   void _clearThumbnail() {
-    setState(() {
-      _pickedThumbnail = null;
-      _removeThumbnail = true;
-    });
+    setState(() => _pickedThumbnail = null);
   }
 
-  bool get _hasThumbnail =>
-      _pickedThumbnail != null ||
-      (!_removeThumbnail && (widget.book.coverImageUrl?.isNotEmpty ?? false));
+  Future<void> _pickStatus() async {
+    final status = await showAddStatusDialog(context);
+    if (status == null || !mounted) return;
+
+    if (status == BookStatus.finished) {
+      final options = await showFinishOptionsDialog(context);
+      if (options == null || !mounted) return;
+      setState(() {
+        _status = status;
+        _finishOptions = options;
+      });
+    } else {
+      setState(() {
+        _status = status;
+        _finishOptions = null;
+      });
+    }
+  }
+
+  String get _statusSummary =>
+      _status == BookStatus.finished ? '완독(정보 입력됨)' : _status.label;
+
+  String _formatDate(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
 
   Future<void> _save() async {
     final title = _titleController.text.trim();
@@ -116,9 +134,10 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
     setState(() => _errorText = null);
     AppLoading.show(context);
     try {
-      await ref
-          .read(bookRecordControllerProvider(widget.userBookId).notifier)
-          .updateBookInfo(
+      final options = _finishOptions;
+      final userBookId = await ref
+          .read(bookSearchApiProvider)
+          .postCustomBook(
             title: title,
             author: _authorController.text.trim().isEmpty
                 ? null
@@ -129,9 +148,23 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
             totalPages: totalPages,
             categoryId: _selectedCategoryId,
             thumbnailFile: _pickedThumbnail,
-            removeThumbnail: _removeThumbnail,
+            status: _status.apiValue,
+            sourceType: options?.sourceType?.apiValue,
+            myRating: options?.myRating,
+            shortReview: options?.shortReview,
+            difficulty: options?.difficulty?.apiValue,
+            finishedAt: options?.finishedAt == null
+                ? null
+                : _formatDate(options!.finishedAt!),
           );
-      if (mounted) Navigator.of(context).pop();
+      final synced = await ref
+          .read(bookshelfSyncControllerProvider.notifier)
+          .ensureSynced(userBookId);
+      if (mounted) {
+        Navigator.of(
+          context,
+        ).pop((userBookId: userBookId, synced: synced));
+      }
     } on ApiException catch (e) {
       if (mounted) setState(() => _errorText = e.message);
     } finally {
@@ -165,15 +198,16 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(bookCategoriesProvider);
     return RecordDialogShell(
-      title: '책 정보 수정',
+      icon: PhosphorIconsRegular.notePencil,
+      title: '직접 등록',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           BookThumbnailField(
-            title: widget.book.title,
-            currentCoverUrl: widget.book.coverImageUrl,
+            title: _titleController.text.isEmpty ? '책 표지' : _titleController.text,
+            currentCoverUrl: null,
             pickedFile: _pickedThumbnail,
-            hasThumbnail: _hasThumbnail,
+            hasThumbnail: _pickedThumbnail != null,
             onPick: _pickThumbnail,
             onRemove: _clearThumbnail,
           ),
@@ -209,6 +243,14 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
               ),
             ],
           ),
+          const SizedBox(height: 12),
+          RecordFieldTile(
+            label: '독서 상태',
+            value: _statusSummary,
+            hasValue: true,
+            valueIcon: _status.icon,
+            onTap: _pickStatus,
+          ),
           if (_errorText != null) ...[
             const SizedBox(height: 8),
             Text(
@@ -224,7 +266,7 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
           style: RecordDialogButtonStyle.neutral,
           onPressed: () => Navigator.of(context).pop(),
         ),
-        RecordDialogButton(label: '저장', onPressed: _save),
+        RecordDialogButton(label: '등록', onPressed: _save),
       ],
     );
   }

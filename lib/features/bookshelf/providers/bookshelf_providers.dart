@@ -76,6 +76,18 @@ class BookshelfSyncController extends AsyncNotifier<DateTime?> {
     return _inFlight ??= _runSync().whenComplete(() => _inFlight = null);
   }
 
+  /// 책 검색/상세에서 방금 서버에 추가한 [userBookId]가 로컬 DB에 반영될
+  /// 때까지 동기화한다. [syncNow]가 이미 진행 중인 다른 동기화(포그라운드
+  /// 전환의 `syncIfStale` 등)와 합류(coalescing)하면, 그 동기화의 서버 요청이
+  /// 이번 추가보다 먼저 나간 것일 수 있어 새 책이 반영되지 않을 수 있다 — 그
+  /// 경우 한 번 더(이번엔 새로 시작하는) 동기화를 시도한다.
+  Future<bool> ensureSynced(int userBookId) async {
+    await syncNow();
+    if (await _repository.getById(userBookId) != null) return true;
+    await syncNow();
+    return await _repository.getById(userBookId) != null;
+  }
+
   Future<void> _runSync() async {
     // 이전 값(마지막 동기화 시각)을 유지한 채 loading으로 전환한다. 화면이
     // valueOrNull로 "최초 동기화 여부"를 판단하므로(BookshelfScreen), 여기서

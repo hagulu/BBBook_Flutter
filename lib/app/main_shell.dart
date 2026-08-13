@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
+import '../features/book_search/screens/book_search_screen.dart';
 import '../features/bookshelf/providers/bookshelf_providers.dart';
 import '../features/bookshelf/screens/bookshelf_screen.dart';
 import '../features/home/screens/home_tab_placeholder.dart';
@@ -153,7 +154,9 @@ class _AddNavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: InkWell(
-        onTap: () {},
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const BookSearchScreen()),
+        ),
         child: Center(
           child: Container(
             width: 34,

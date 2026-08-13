@@ -51,6 +51,21 @@
 - `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH, 책 정보 PATCH(카테고리 포함), 태그 POST/DELETE, 태그 목록/플랫폼 옵션 GET, 삭제 DELETE)
 - `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth(로컬 조회는 bookshelf 레포지토리 재사용, 수정은 서버 PATCH 성공 후 로컬 반영)
 - `lib/features/book_record/providers/book_record_providers.dart` — 책 기록 관련 Riverpod provider(단일 책 상태 컨트롤러, 태그 자동완성, 플랫폼 옵션)
+- `lib/features/book_record/screens/widgets/book_thumbnail_field.dart` — 책 표지 이미지 선택/미리보기 공용 위젯(책 정보 수정·직접 등록에서 공유)
+- `lib/features/book_record/screens/widgets/book_category_field.dart` — 카테고리 선택 필드 + 선택 팝업 공용 위젯(책 정보 수정·직접 등록에서 공유)
+
+## features/book_search
+
+- `lib/features/book_search/screens/book_search_screen.dart` — 책 검색 화면(하단 탭 셸 "+" 버튼으로 진입), 검색창/결과 목록/페이지네이션/직접 등록·바코드 등록 진입점 조립
+- `lib/features/book_search/screens/barcode_scan_screen.dart` — 카메라로 책 바코드(ISBN-13) 스캔 화면. 기본은 ISBN을 반환해 상세로 이동, "빠른 등록" 체크 시 선택한 상태로 즉시 서재에 담고 연속 스캔
+- `lib/features/book_search/data/book_search_api.dart` — 책 검색 API 호출(키워드 검색, 직접 등록 POST(표지/카테고리 포함 multipart 지원))
+- `lib/features/book_search/providers/book_search_providers.dart` — 검색 화면 상태(검색어/페이지/결과) 관리 Riverpod provider
+
+## features/book_detail
+
+- `lib/features/book_detail/screens/book_detail_screen.dart` — 검색 결과 경유 책 상세 화면, 정보/서재 담기/구매/커뮤니티 리뷰 조립(토론·공개 독후감 탭은 미이관 기능이라 제외)
+- `lib/features/book_detail/data/book_detail_api.dart` — 책 상세 API 호출(상세 조회, 서재 존재 확인, 서재 담기, 리뷰 CRUD, 좋아요, 신고)
+- `lib/features/book_detail/providers/book_detail_providers.dart` — 책 상세/커뮤니티 리뷰 관련 Riverpod provider(상세+서재 포함 여부 컨트롤러, 리뷰 커서 무한 스크롤 컨트롤러)
 
 ## shared/widgets
 
@@ -75,3 +90,4 @@
 - `docs/review/20260811-155930-local-first-record-sync-review.md` — 책 기록 로컬 우선 저장의 연속 편집 경합·오프라인 재시도·마이그레이션 리뷰
 - `docs/review/20260811-173548-bookshelf-filter-and-chrome-review.md` — 완독 필터·탭 바 자동 숨김 변경의 상태 복원·캐시·접근성 리뷰
 - `docs/review/20260811-182433-finished-cover-disk-cache-review.md` — 완독 표지 디스크 캐시의 콜드 성능·포커스 생명주기·포맷별 리사이즈 리뷰
+- `docs/review/20260813-154240-book-search-detail-barcode-review.md` — 책 검색·상세·바코드 등록의 후속 동기화·화면 상태·리뷰 상호작용 검토

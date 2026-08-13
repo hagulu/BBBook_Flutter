@@ -2,6 +2,10 @@
     <!-- release 빌드도 백엔드 API를 호출하므로 필요 (debug manifest의 INTERNET 권한은
          Flutter 개발 도구 통신용이라 release에는 적용되지 않음) -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- 책 검색 화면의 바코드 스캔(mobile_scanner)에 필요 -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
     <application
         android:label="bbbook"
         android:name="${applicationName}"
@@ -43,6 +47,13 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- 책 상세 "구매" 버튼이 외부 브라우저로 상품 링크를 여는 데 필요
+             (url_launcher, Android 11+ 패키지 가시성). -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <category android:name="android.intent.category.BROWSABLE"/>
+            <data android:scheme="https"/>
         </intent>
     </queries>
 </manifest>
