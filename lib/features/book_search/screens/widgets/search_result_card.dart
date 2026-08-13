@@ -80,7 +80,21 @@ class SearchResultCard extends StatelessWidget {
                     ],
                     if (item.displayRating != null) ...[
                       const SizedBox(height: 6),
-                      StarRatingDisplay(rating: item.displayRating!, size: 13),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          StarRatingDisplay(rating: item.displayRating!, size: 13),
+                          const SizedBox(width: 4),
+                          Text(
+                            item.rating!.toStringAsFixed(1),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.titleText,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ],
                 ),

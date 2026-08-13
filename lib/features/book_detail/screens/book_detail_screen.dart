@@ -9,7 +9,6 @@ import '../../book_record/screens/widgets/star_rating.dart';
 import '../../bookshelf/models/book_status.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../bookshelf/screens/widgets/book_cover.dart';
-import '../models/book_detail.dart';
 import '../providers/book_detail_providers.dart';
 import 'widgets/add_status_dialog.dart';
 import 'widgets/community_reviews_section.dart';
@@ -32,18 +31,6 @@ class BookDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
-  bool _handleScrollNotification(ScrollNotification notification, String isbn13) {
-    final metrics = notification.metrics;
-    if (metrics.axis == Axis.vertical &&
-        metrics.pixels >= metrics.maxScrollExtent - 300) {
-      final reviewsState = ref.read(reviewsControllerProvider(isbn13)).valueOrNull;
-      if (reviewsState != null && reviewsState.hasNext && !reviewsState.isLoadingMore) {
-        ref.read(reviewsControllerProvider(isbn13).notifier).loadMore();
-      }
-    }
-    return false;
-  }
-
   Future<void> _addToShelf(BookDetailData data) async {
     final status = await showAddStatusDialog(context);
     if (status == null || !mounted) return;
@@ -122,30 +109,29 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
     // 등으로 잠깐 loading으로 전환되는 동안에도(이전 값이 있으면) 전체 화면을
     // "불러오는 중"으로 덮어쓰지 않고 오버레이만 얹는다.
     Widget body;
+    Widget? bottomBar;
     if (state.hasValue) {
       final value = state.value!;
       body = AppLoadingOverlay(
         isLoading: state.isLoading,
-        child: NotificationListener<ScrollNotification>(
-          onNotification: (n) => _handleScrollNotification(n, value.detail.isbn),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _HeroSection(
-                  data: value,
-                  onAddToShelf: () => _addToShelf(value),
-                  onBuy: value.detail.productUrl == null || value.detail.productUrl!.isEmpty
-                      ? null
-                      : () => _openProductUrl(value.detail.productUrl!),
-                ),
-                const SizedBox(height: 24),
-                CommunityReviewsSection(isbn13: value.detail.isbn),
-              ],
-            ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _HeroSection(data: value),
+              const SizedBox(height: 24),
+              CommunityReviewsSection(isbn13: value.detail.isbn),
+            ],
           ),
         ),
+      );
+      bottomBar = _BottomActionBar(
+        data: value,
+        onAddToShelf: () => _addToShelf(value),
+        onBuy: value.detail.productUrl == null || value.detail.productUrl!.isEmpty
+            ? null
+            : () => _openProductUrl(value.detail.productUrl!),
       );
     } else if (state.hasError) {
       body = _ErrorBody(
@@ -163,6 +149,57 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
         elevation: 0,
       ),
       body: body,
+      bottomNavigationBar: bottomBar,
+    );
+  }
+}
+
+/// 서재 담기/구매 버튼을 화면 하단에 고정하는 CTA 바.
+class _BottomActionBar extends StatelessWidget {
+  const _BottomActionBar({
+    required this.data,
+    required this.onAddToShelf,
+    required this.onBuy,
+  });
+
+  final BookDetailData data;
+  final VoidCallback onAddToShelf;
+  final VoidCallback? onBuy;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        decoration: const BoxDecoration(
+          color: AppColors.pageBackground,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: data.existsInShelf ? null : onAddToShelf,
+                icon: Icon(
+                  data.existsInShelf
+                      ? PhosphorIconsFill.checkCircle
+                      : PhosphorIconsRegular.bookmarkSimple,
+                  size: 18,
+                ),
+                label: Text(data.existsInShelf ? '이미 서재에 있음' : '서재 담기'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: onBuy,
+                icon: const Icon(PhosphorIconsRegular.shoppingCartSimple, size: 18),
+                label: const Text('구매'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -191,166 +228,105 @@ class _ErrorBody extends StatelessWidget {
 }
 
 class _HeroSection extends StatelessWidget {
-  const _HeroSection({
-    required this.data,
-    required this.onAddToShelf,
-    required this.onBuy,
-  });
+  const _HeroSection({required this.data});
 
   final BookDetailData data;
-  final VoidCallback onAddToShelf;
-  final VoidCallback? onBuy;
 
   @override
   Widget build(BuildContext context) {
     final detail = data.detail;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 110,
-              child: BookCover(imageUrl: detail.coverUrl, title: detail.title),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (detail.category != null) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.accentLight.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        detail.category!,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.bodyText,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  Text(
-                    detail.title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                      color: AppColors.titleText,
-                    ),
-                  ),
-                  if (detail.author != null && detail.author!.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      detail.author!,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.tertiaryText,
-                      ),
-                    ),
-                  ],
-                  if (detail.displayRating != null) ...[
-                    const SizedBox(height: 8),
-                    StarRatingDisplay(rating: detail.displayRating!, size: 15),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: ElevatedButton.icon(
-                onPressed: data.existsInShelf ? null : onAddToShelf,
-                icon: Icon(
-                  data.existsInShelf
-                      ? PhosphorIconsFill.checkCircle
-                      : PhosphorIconsRegular.bookmarkSimple,
-                  size: 18,
-                ),
-                label: Text(data.existsInShelf ? '이미 서재에 있음' : '서재 담기'),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onBuy,
-                icon: const Icon(PhosphorIconsRegular.shoppingCartSimple, size: 18),
-                label: const Text('구매'),
-              ),
-            ),
-          ],
-        ),
-        if (detail.description != null && detail.description!.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          Text(
-            detail.description!,
-            style: const TextStyle(fontSize: 14, color: AppColors.bodyText, height: 1.5),
-          ),
-        ],
-        const SizedBox(height: 16),
-        _MetaGrid(detail: detail),
-      ],
-    );
-  }
-}
-
-class _MetaGrid extends StatelessWidget {
-  const _MetaGrid({required this.detail});
-
-  final BookDetail detail;
-
-  @override
-  Widget build(BuildContext context) {
-    final rows = <(String, String)>[
-      if (detail.publisher != null && detail.publisher!.isNotEmpty)
-        ('출판사', detail.publisher!),
-      if (detail.pageCount > 0) ('쪽수', '${detail.pageCount}쪽'),
-      if (detail.pubDate != null && detail.pubDate!.isNotEmpty)
-        ('출간일', detail.pubDate!),
-      ('ISBN', detail.isbn),
+    final metaParts = <String>[
+      if (detail.publisher != null && detail.publisher!.isNotEmpty) detail.publisher!,
+      if (detail.pageCount > 0) '${detail.pageCount}쪽',
+      if (detail.pubDate != null && detail.pubDate!.isNotEmpty) detail.pubDate!,
     ];
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.cardBackground,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          for (var i = 0; i < rows.length; i++) ...[
-            Row(
-              children: [
-                SizedBox(
-                  width: 64,
-                  child: Text(
-                    rows[i].$1,
-                    style: const TextStyle(fontSize: 12, color: AppColors.tertiaryText),
-                  ),
-                ),
-                Expanded(
-                  child: Text(
-                    rows[i].$2,
-                    style: const TextStyle(fontSize: 13, color: AppColors.bodyText),
-                  ),
-                ),
-              ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        SizedBox(
+          width: 160,
+          child: BookCover(imageUrl: detail.coverUrl, title: detail.title),
+        ),
+        const SizedBox(height: 16),
+        if (detail.category != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.accentLight.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(999),
             ),
-            if (i != rows.length - 1) const SizedBox(height: 8),
-          ],
+            child: Text(
+              detail.category!,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.bodyText,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
         ],
-      ),
+        Text(
+          detail.title,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            color: AppColors.titleText,
+          ),
+        ),
+        if (detail.author != null && detail.author!.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            detail.author!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.tertiaryText,
+            ),
+          ),
+        ],
+        if (metaParts.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Text(
+            metaParts.join(' · '),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 11, color: AppColors.tertiaryText),
+          ),
+        ],
+        if (detail.displayRating != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              StarRatingDisplay(rating: detail.displayRating!, size: 15),
+              const SizedBox(width: 6),
+              Text(
+                detail.rating!.toStringAsFixed(1),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.titleText,
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (detail.description != null && detail.description!.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: Text(
+              detail.description!,
+              style: const TextStyle(fontSize: 14, color: AppColors.bodyText, height: 1.5),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

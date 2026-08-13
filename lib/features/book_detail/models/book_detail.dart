@@ -44,11 +44,33 @@ class BookDetail {
       isbn: json['isbn'] as String,
       coverUrl: json['coverUrl'] as String?,
       productUrl: json['productUrl'] as String?,
-      description: json['description'] as String?,
+      description: _decodeHtmlEntities(json['description'] as String?),
       categoryId: json['categoryId'] as int?,
       category: json['category'] as String?,
       rating: (json['rating'] as num?)?.toDouble(),
       pageCount: json['pageCount'] as int? ?? 0,
     );
   }
+}
+
+final _numericEntity = RegExp(r'&#(\d+);');
+final _hexEntity = RegExp(r'&#x([0-9a-fA-F]+);');
+
+/// 서버가 책 소개를 HTML 엔티티(`&lt;`, `&gt;` 등)로 이스케이프해 내려줘
+/// 화면에 그대로 표시하면 `&gt;` 같은 문자열이 보인다. 실제 문자로 되돌린다.
+String? _decodeHtmlEntities(String? input) {
+  if (input == null) return null;
+  return input
+      .replaceAllMapped(_numericEntity, (m) => String.fromCharCode(int.parse(m.group(1)!)))
+      .replaceAllMapped(
+        _hexEntity,
+        (m) => String.fromCharCode(int.parse(m.group(1)!, radix: 16)),
+      )
+      .replaceAll('&lt;', '<')
+      .replaceAll('&gt;', '>')
+      .replaceAll('&quot;', '"')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&apos;', "'")
+      .replaceAll('&nbsp;', ' ')
+      .replaceAll('&amp;', '&');
 }

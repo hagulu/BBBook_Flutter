@@ -91,3 +91,4 @@
 - `docs/review/20260811-173548-bookshelf-filter-and-chrome-review.md` — 완독 필터·탭 바 자동 숨김 변경의 상태 복원·캐시·접근성 리뷰
 - `docs/review/20260811-182433-finished-cover-disk-cache-review.md` — 완독 표지 디스크 캐시의 콜드 성능·포커스 생명주기·포맷별 리사이즈 리뷰
 - `docs/review/20260813-154240-book-search-detail-barcode-review.md` — 책 검색·상세·바코드 등록의 후속 동기화·화면 상태·리뷰 상호작용 검토
+- `docs/review/20260813-162239-book-detail-preview-layout-review.md` — 책 상세 미리보기 레이아웃의 평점 스케일·리뷰 접근성·표시 데이터 정합성 리뷰

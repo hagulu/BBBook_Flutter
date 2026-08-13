@@ -87,43 +87,25 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _queryController,
-                    textInputAction: TextInputAction.search,
-                    onSubmitted: (_) => _submit(),
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText: '책, 저자, ISBN으로 검색',
-                      prefixIcon: const Icon(
-                        PhosphorIconsRegular.magnifyingGlass,
-                        size: 18,
+            child: TextField(
+              controller: _queryController,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => _submit(),
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                isDense: true,
+                hintText: '책, 저자, ISBN으로 검색',
+                prefixIcon: const Icon(
+                  PhosphorIconsRegular.magnifyingGlass,
+                  size: 18,
+                ),
+                suffixIcon: _queryController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: const Icon(PhosphorIconsRegular.x, size: 18),
+                        onPressed: _clear,
                       ),
-                      suffixIcon: _queryController.text.isEmpty
-                          ? null
-                          : IconButton(
-                              icon: const Icon(
-                                PhosphorIconsRegular.x,
-                                size: 18,
-                              ),
-                              onPressed: _clear,
-                            ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _submit,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(0, 48),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                  ),
-                  child: const Text('검색'),
-                ),
-              ],
+              ),
             ),
           ),
           if (state.hasQuery)
