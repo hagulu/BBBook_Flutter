@@ -7,6 +7,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_alert.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../book_detail/providers/book_detail_providers.dart';
 import '../../book_record/models/record_labels.dart';
 import '../../bookshelf/models/book_status.dart';
@@ -129,14 +130,12 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
           .read(bookshelfSyncControllerProvider.notifier)
           .ensureSynced(result.userBookId);
       if (mounted) {
-        ScaffoldMessenger.of(context)
-          ..clearSnackBars()
-          ..showSnackBar(
-            SnackBar(
-              content: Text('\'${result.title}\' 책 등록완료 (${status.label})'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
+        AppSnackBar.success(
+          context,
+          '\'${result.title}\' 책 등록완료 (${status.label})',
+          duration: const Duration(seconds: 2),
+          replaceCurrent: true,
+        );
       }
     } on ApiException catch (e) {
       // 409(이미 서재에 있음)는 같은 책을 계속 비추고 있는 한 재시도해도
@@ -144,11 +143,12 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
       // 실패(네트워크 오류 등)는 풀어줘서 같은 책을 바로 재시도할 수 있게 한다.
       if (e.statusCode != 409) _lastProcessedIsbn = null;
       if (mounted) {
-        ScaffoldMessenger.of(context)
-          ..clearSnackBars()
-          ..showSnackBar(
-            SnackBar(content: Text(e.message), duration: const Duration(seconds: 2)),
-          );
+        AppSnackBar.error(
+          context,
+          e.message,
+          duration: const Duration(seconds: 2),
+          replaceCurrent: true,
+        );
       }
     } finally {
       if (mounted) setState(() => _processing = false);

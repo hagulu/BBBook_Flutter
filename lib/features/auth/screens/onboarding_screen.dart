@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../data/social_auth_service.dart';
 import '../providers/auth_notifier.dart';
 import '../providers/auth_providers.dart';
@@ -63,9 +64,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    AppSnackBar.error(context, message);
   }
 
   @override

@@ -28,14 +28,15 @@ Flutter 기반의 독서 기록 서비스 앱 프로젝트
 - 아이콘은 `phosphor_icons` 패키지의 `PhosphorIconsRegular`(기본)/`PhosphorIconsFill`(채워진 상태 표현)을 사용한다(`phosphor_flutter`는 최신 Flutter의 `IconData` final class 변경과 호환되지 않아 사용 금지)
 - 채워진 아이콘이 필요한 경우 커스텀 페인터로 직접 그리지 않고 `PhosphorIconsFill`을 우선 사용한다
 
-## 전역 Alert/Confirm/Loading
-- 신규 기능 및 수정 작업에서 화면별 커스텀 팝업·로딩을 만들지 않고 아래 공통 컴포넌트(`lib/shared/widgets/`)를 사용한다
+## 전역 Alert/Confirm/Loading/SnackBar
+- 신규 기능 및 수정 작업에서 화면별 커스텀 팝업·로딩·스낵바를 만들지 않고 아래 공통 컴포넌트(`lib/shared/widgets/`)를 사용한다
   - Alert: `AppAlert.show()` — 제목/내용/확인 버튼
   - Confirm: `AppConfirm.show()` — 제목/내용/확인·취소 버튼, `Future<bool>` 반환
   - Loading(전체 화면): `AppLoading.show()` / `AppLoading.hide()` — 중첩 호출 안전(참조 카운트), `hide()`는 반드시 `finally`에서 호출
   - Loading(영역 단위): `AppLoadingOverlay` 위젯 — `isLoading`으로 제어
-- 사용자 안내/성공/실패/경고는 `ScaffoldMessenger`(SnackBar), 확인 요청은 `AppConfirm`을 사용한다
-- 기존 코드에서 화면별 중복 확인 다이얼로그·로딩 위젯이 발견되면 위 공통 컴포넌트로 교체한다
+  - SnackBar: `AppSnackBar.success()` / `.info()` / `.error()` — pill 형태, 성공·정보는 아이덴티티 컬러, 에러는 에러 컬러 반투명 배경 + 상태 아이콘
+- 사용자 안내/성공/실패/경고는 `AppSnackBar`, 확인 요청은 `AppConfirm`을 사용한다
+- 기존 코드에서 화면별 중복 확인 다이얼로그·로딩·SnackBar가 발견되면 위 공통 컴포넌트로 교체한다
 
 ## 백엔드
 - 백엔드 관련 문제가 생기면 소스를 직접 열지 말고 사용자에게 먼저 확인한다

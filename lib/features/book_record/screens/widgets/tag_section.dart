@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../bookshelf/models/book_tag.dart';
 import '../../providers/book_record_providers.dart';
 import 'pill_option.dart';
@@ -103,11 +104,7 @@ class _TagSectionState extends ConsumerState<TagSection> {
           .read(bookRecordControllerProvider(widget.userBookId).notifier)
           .removeTag(tag.id);
     } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
-      }
+      if (mounted) AppSnackBar.error(context, e.message);
     }
   }
 

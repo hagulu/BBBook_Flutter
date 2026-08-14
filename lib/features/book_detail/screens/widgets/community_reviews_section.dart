@@ -5,6 +5,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_confirm.dart';
+import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../book_record/screens/widgets/record_section_card.dart';
 import '../../../book_record/screens/widgets/star_rating.dart';
 import '../../models/book_review.dart';
@@ -112,9 +113,7 @@ class CommunityReviewsSection extends ConsumerWidget {
     try {
       await controller.toggleLike(review);
     } on ApiException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      }
+      if (context.mounted) AppSnackBar.error(context, e.message);
     }
   }
 
@@ -134,9 +133,7 @@ class CommunityReviewsSection extends ConsumerWidget {
         isSpoiler: result.isSpoiler,
       );
     } on ApiException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      }
+      if (context.mounted) AppSnackBar.error(context, e.message);
     }
   }
 
@@ -156,9 +153,7 @@ class CommunityReviewsSection extends ConsumerWidget {
     try {
       await controller.deleteReview(review.id);
     } on ApiException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      }
+      if (context.mounted) AppSnackBar.error(context, e.message);
     }
   }
 
@@ -175,15 +170,9 @@ class CommunityReviewsSection extends ConsumerWidget {
         reason: submission.reason.apiValue,
         content: submission.content,
       );
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('신고가 접수되었습니다.')));
-      }
+      if (context.mounted) AppSnackBar.success(context, '신고가 접수되었습니다.');
     } on ApiException catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      }
+      if (context.mounted) AppSnackBar.error(context, e.message);
     }
   }
 
@@ -191,9 +180,7 @@ class CommunityReviewsSection extends ConsumerWidget {
 
   // TODO: 독후감/토론/전체 리뷰 목록 화면 구현 후 각각 해당 화면으로 이동.
   void _handleShowPlaceholder(BuildContext context, String label) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('$label 화면은 준비 중입니다.')));
+    AppSnackBar.info(context, '$label 화면은 준비 중입니다.');
   }
 }
 

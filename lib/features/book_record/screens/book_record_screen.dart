@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/author_display.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/models/book_status.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
@@ -283,9 +284,7 @@ class _BookRecordBody extends ConsumerWidget {
       if (context.mounted) Navigator.of(context).pop();
     } on ApiException catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(e.message)));
+        AppSnackBar.error(context, e.message);
       }
     } finally {
       AppLoading.hide();

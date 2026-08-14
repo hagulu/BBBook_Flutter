@@ -72,6 +72,7 @@
 - `lib/shared/widgets/app_alert.dart` — 공통 Alert 팝업(제목/내용/확인 버튼)
 - `lib/shared/widgets/app_confirm.dart` — 공통 Confirm 팝업(확인/취소, Future<bool> 반환)
 - `lib/shared/widgets/app_loading.dart` — 공통 Loading(전체 화면 `AppLoading`, 영역 단위 `AppLoadingOverlay`)
+- `lib/shared/widgets/app_snackbar.dart` — 공통 SnackBar(pill 형태, 성공/정보는 아이덴티티 컬러·에러는 에러 컬러 반투명 배경 + 상태 아이콘)
 
 ## docs
 
@@ -93,3 +94,5 @@
 - `docs/review/20260813-154240-book-search-detail-barcode-review.md` — 책 검색·상세·바코드 등록의 후속 동기화·화면 상태·리뷰 상호작용 검토
 - `docs/review/20260813-162239-book-detail-preview-layout-review.md` — 책 상세 미리보기 레이아웃의 평점 스케일·리뷰 접근성·표시 데이터 정합성 리뷰
 - `docs/review/20260813-180341-author-and-bottom-sheet-review.md` — 저자 표시 가공과 공통 바텀시트 전환의 안전 영역 처리 리뷰
+- `docs/review/20260813-183444-app-snackbar-review.md` — 공통 스낵바의 오류 색상 대비와 메시지 큐 초기화 동작 리뷰
+- `docs/review/20260814-121328-app-snackbar-rereview.md` — 공통 스낵바의 미해결 색상 대비·메시지 큐 문제 재리뷰

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_alert.dart';
+import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../book_record/screens/book_record_screen.dart';
 import '../../models/book_item.dart';
 import '../../models/finished_filter.dart';
@@ -572,11 +573,7 @@ class _FinishedIconBar extends ConsumerWidget {
                                 .toggle(!isPublic);
                           } catch (_) {
                             if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('공개 설정 변경에 실패했습니다.'),
-                                ),
-                              );
+                              AppSnackBar.error(context, '공개 설정 변경에 실패했습니다.');
                             }
                           }
                         },

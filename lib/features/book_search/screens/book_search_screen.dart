@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../book_detail/screens/book_detail_screen.dart';
 import '../../book_record/screens/book_record_screen.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../providers/book_search_providers.dart';
 import 'barcode_scan_screen.dart';
 import 'widgets/custom_book_dialog.dart';
@@ -50,11 +51,7 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
         ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('등록되었습니다. 목록 반영에 시간이 걸릴 수 있어요. 잠시 후 책장에서 확인해주세요.'),
-        ),
-      );
+      AppSnackBar.success(context, '등록되었습니다. 목록 반영에 시간이 걸릴 수 있어요. 잠시 후 책장에서 확인해주세요.');
     }
   }
 

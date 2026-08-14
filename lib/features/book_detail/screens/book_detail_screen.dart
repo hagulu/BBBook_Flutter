@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/author_display.dart';
 import '../../../shared/widgets/app_loading.dart';
+import '../../../shared/widgets/app_snackbar.dart';
 import '../../book_record/screens/widgets/star_rating.dart';
 import '../../bookshelf/models/book_status.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
@@ -64,16 +65,12 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
       ref
           .read(bookDetailControllerProvider(widget.isbn).notifier)
           .markAddedToShelf(result.userBookId);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('서재에 추가되었습니다.')));
+      AppSnackBar.success(context, '서재에 추가되었습니다.');
     } on ApiException catch (e) {
       if (e.statusCode == 409) {
         ref.invalidate(bookDetailControllerProvider(widget.isbn));
       }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      }
+      if (mounted) AppSnackBar.error(context, e.message);
     } finally {
       AppLoading.hide();
     }
@@ -89,9 +86,7 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
       launched = false;
     }
     if (!launched && mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('구매 페이지를 열 수 없습니다.')));
+      AppSnackBar.error(context, '구매 페이지를 열 수 없습니다.');
     }
   }
 
