@@ -135,6 +135,16 @@ class BookRecordController
     }
   }
 
+  /// 시작일/완독일 "선택 해제". [updateRecord]와 달리 서버 PATCH 성공을
+  /// 기다린 뒤에만 상태를 갱신한다([BookRecordRepository.clearReadingDate]
+  /// 참고 — 로컬 우선 경로로는 "명시적으로 지움"이라는 의도가 유지되지
+  /// 않는다).
+  Future<void> clearReadingDate({required bool isStartedAt}) {
+    return _mutate(
+      () => _repository.clearReadingDate(arg, isStartedAt: isStartedAt),
+    );
+  }
+
   Future<void> updateBookInfo({
     required String title,
     String? author,

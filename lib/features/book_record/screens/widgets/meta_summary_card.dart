@@ -47,20 +47,29 @@ class MetaSummaryCard extends StatelessWidget {
           const SectionLabel('독서 기간', icon: PhosphorIconsRegular.calendar),
           const SizedBox(height: 8),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _DateValue(label: '시작일', date: startedAt, onTap: onTapStartedAt),
+              Expanded(
+                child: _DateValue(
+                  label: '시작일',
+                  date: startedAt,
+                  onTap: onTapStartedAt,
+                ),
+              ),
               const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
+                padding: EdgeInsets.symmetric(horizontal: 16),
                 child: Icon(
                   PhosphorIconsRegular.arrowRight,
-                  size: 14,
+                  size: 16,
                   color: AppColors.mutedIcon,
                 ),
               ),
-              _DateValue(
-                label: '완독일',
-                date: finishedAt,
-                onTap: onTapFinishedAt,
+              Expanded(
+                child: _DateValue(
+                  label: '완독일',
+                  date: finishedAt,
+                  onTap: onTapFinishedAt,
+                ),
               ),
             ],
           ),
@@ -130,7 +139,7 @@ class _DateValue extends StatelessWidget {
           child: Text(
             currentDate == null ? label : _formatDate(currentDate),
             style: TextStyle(
-              fontSize: 15,
+              fontSize: currentDate == null ? 13 : 15,
               fontWeight: FontWeight.w600,
               color: currentDate == null
                   ? AppColors.tertiaryText

@@ -96,3 +96,4 @@
 - `docs/review/20260813-180341-author-and-bottom-sheet-review.md` — 저자 표시 가공과 공통 바텀시트 전환의 안전 영역 처리 리뷰
 - `docs/review/20260813-183444-app-snackbar-review.md` — 공통 스낵바의 오류 색상 대비와 메시지 큐 초기화 동작 리뷰
 - `docs/review/20260814-121328-app-snackbar-rereview.md` — 공통 스낵바의 미해결 색상 대비·메시지 큐 문제 재리뷰
+- `docs/review/20260814-124800-reading-date-bottom-sheet-review.md` — 독서 날짜 바텀시트의 삭제 동기화·오늘 선택·접근성 리뷰

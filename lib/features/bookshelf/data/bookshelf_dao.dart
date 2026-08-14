@@ -194,6 +194,27 @@ class BookshelfDao {
     });
   }
 
+  /// [BookRecordRepository.clearReadingDate](시작일/완독일 "선택 해제")
+  /// 전용 좁은 갱신. 서버가 이미 그 필드를 지운 뒤 호출되므로, 다른 필드가
+  /// 아직 dirty로 남아 있어도([_upsertItemTxn]의 "dirty 행 보호"를 적용하면
+  /// 이 컬럼까지 함께 건너뛰어져 서버에서는 지워졌는데 로컬만 옛 날짜를
+  /// 계속 들고 있게 된다) 이 컬럼만은 반영돼야 한다. 그래서 `is_dirty`나
+  /// 다른 컬럼은 전혀 건드리지 않고 `started_at`/`finished_at` 딱 하나만
+  /// 직접 갱신한다 — 동시에 진행 중일 수 있는 다른 필드의 로컬 우선 편집을
+  /// 덮어쓰지 않기 위함이다.
+  Future<void> clearReadingDateColumn(
+    int userBookId, {
+    required bool isStartedAt,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    await db.update(
+      'user_book',
+      {isStartedAt ? 'started_at' : 'finished_at': null},
+      where: 'user_book_id = ?',
+      whereArgs: [userBookId],
+    );
+  }
+
   /// 책 기록 화면에서 서버 PATCH가 성공한 뒤 그 결과 한 건만 로컬에 반영할 때
   /// 쓴다. [reconcile]/[applyChanges]와 동일하게 dirty 행은 덮어쓰지 않고,
   /// `sync_meta.last_synced_at`은 건드리지 않는다(다음 증분 동기화가 이

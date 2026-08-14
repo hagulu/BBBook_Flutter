@@ -253,6 +253,13 @@ class BookshelfRepository {
   Future<void> upsertLocal(BookItem item, {DateTime? syncedUpdatedAt}) =>
       _dao.upsertOne(item, syncedUpdatedAt: syncedUpdatedAt);
 
+  /// [BookRecordRepository.clearReadingDate] 전용 — [BookshelfDao.
+  /// clearReadingDateColumn] 참고.
+  Future<void> clearReadingDateLocal(
+    int userBookId, {
+    required bool isStartedAt,
+  }) => _dao.clearReadingDateColumn(userBookId, isStartedAt: isStartedAt);
+
   /// 서재에서 책을 삭제(DELETE API 성공)한 뒤 로컬 행을 제거한다.
   Future<void> deleteLocal(int userBookId) => _dao.deleteOne(userBookId);
 

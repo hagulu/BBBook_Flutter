@@ -439,15 +439,27 @@ class _BookRecordBody extends ConsumerWidget {
     required bool isStartedAt,
   }) async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: current ?? now,
-      firstDate: DateTime(1900),
+    final result = await showReadingDateDialog(
+      context,
+      initialDate: current,
       lastDate: now,
-      helpText: isStartedAt ? '시작일 선택' : '완독일 선택',
+      isStartedAt: isStartedAt,
     );
-    if (picked == null) return;
-    final formatted = _formatApiDate(picked);
+    if (result == null) return;
+    if (result.cleared) {
+      // "선택 해제"는 로컬 우선 updateRecord로 보내면 안 된다 — 빈
+      // 문자열이 로컬 반영 시점에 바로 null로 바뀌어 버려, 뒤에서 조용히
+      // 나가는 dirty push가 "명시적으로 지움"과 "원래 미설정"을 구분하지
+      // 못하고 서버 값을 그대로 남긴다(book_record_repository.dart의
+      // clearReadingDate 문서 참고). 그래서 이 경로만 서버 응답을 기다린다.
+      try {
+        await controller.clearReadingDate(isStartedAt: isStartedAt);
+      } on ApiException catch (e) {
+        if (context.mounted) AppSnackBar.error(context, e.message);
+      }
+      return;
+    }
+    final formatted = _formatApiDate(result.date!);
     await controller.updateRecord(
       startedAt: isStartedAt ? formatted : null,
       finishedAt: isStartedAt ? null : formatted,

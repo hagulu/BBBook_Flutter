@@ -1,3 +1,4 @@
+import 'package:calendar_date_picker2/calendar_date_picker2.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
@@ -348,6 +349,141 @@ Future<String?> showDiscoverySourceDialog(
     backgroundColor: Colors.transparent,
     builder: (context) => _DiscoverySourceDialog(initialValue: initialValue),
   );
+}
+
+/// [showReadingDateDialog]의 결과. 날짜를 골랐으면 [date]가 채워지고
+/// [cleared]는 false, "선택 해제"를 눌렀으면 [date]는 null이고 [cleared]가
+/// true다 — 반환값 자체가 null(바텀시트를 그냥 닫음)인 "변경 없음"과
+/// 구분하기 위해 필요하다.
+class ReadingDateResult {
+  const ReadingDateResult.picked(this.date) : cleared = false;
+
+  const ReadingDateResult.cleared() : date = null, cleared = true;
+
+  final DateTime? date;
+  final bool cleared;
+}
+
+/// 시작일/완독일 선택 팝업. `calendar_date_picker2`로 달력을 바텀시트 안에
+/// 그려서, 플랫폼 기본 `showDatePicker`의 별도 다이얼로그 대신 다른 선택
+/// 팝업들과 같은 바텀시트 톤을 유지한다.
+Future<ReadingDateResult?> showReadingDateDialog(
+  BuildContext context, {
+  required DateTime? initialDate,
+  required DateTime lastDate,
+  required bool isStartedAt,
+}) {
+  return showModalBottomSheet<ReadingDateResult>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => _ReadingDateDialog(
+      title: isStartedAt ? '시작일 선택' : '완독일 선택',
+      initialDate: initialDate,
+      lastDate: lastDate,
+    ),
+  );
+}
+
+/// 날짜를 탭하는 즉시 그 날짜로 팝업을 닫는다(별도 저장 버튼 없음 — 월/년
+/// 모드 토글은 표시 월만 바꿀 뿐 [CalendarDatePicker2]가 `onValueChanged`를
+/// 호출하지 않아 실수로 닫히지 않는다). 이미 설정된 날짜가 있으면 제목 아래에
+/// 작은 "선택 해제" 버튼을 둬서, 실수로 고른 날짜를 되돌릴 수 있게 한다.
+class _ReadingDateDialog extends StatelessWidget {
+  const _ReadingDateDialog({
+    required this.title,
+    required this.initialDate,
+    required this.lastDate,
+  });
+
+  final String title;
+  final DateTime? initialDate;
+  final DateTime lastDate;
+
+  @override
+  Widget build(BuildContext context) {
+    return RecordDialogShell(
+      title: title,
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (initialDate != null) ...[
+            Align(
+              alignment: Alignment.centerRight,
+              child: PillOption(
+                label: '선택 해제',
+                selected: false,
+                onTap: () => Navigator.of(
+                  context,
+                ).pop(const ReadingDateResult.cleared()),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          _buildCalendar(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalendar(BuildContext context) {
+    return CalendarDatePicker2(
+      config: CalendarDatePicker2Config(
+        calendarType: CalendarDatePicker2Type.single,
+        firstDate: DateTime(1900),
+        lastDate: lastDate,
+        dynamicCalendarRows: true,
+        centerAlignModePicker: true,
+        // 화면에 보이는 요일/월·년 표기는 직접 한글로 고정한다 — 이제 앱이
+        // 한국어 MaterialLocalizations를 제공하므로(app.dart) 패키지 기본
+        // 로케일 포맷도 한글로 나오긴 하지만, 그 경로는 intl 로케일
+        // 데이터가 초기화돼 있어야 한다는 전제가 있어 직접 확인하지 못했다
+        // — 화면 표시만큼은 이 값으로 확실하게 고정한다(스크린 리더 안내는
+        // flutter_localizations가 formatFullDate 등으로 별도 제공).
+        weekdayLabels: const ['일', '월', '화', '수', '목', '금', '토'],
+        modePickerTextHandler: ({required monthDate, isMonthPicker}) =>
+            isMonthPicker == true
+                ? '${monthDate.month}월'
+                : '${monthDate.year}년',
+        // 날짜를 다시 탭해도(이미 선택된 날짜 재확인) 닫히도록 허용한다 —
+        // 이 시트엔 별도 저장 버튼이 없어 탭 자체가 곧 확정이라, 같은 값을
+        // 다시 탭했을 때만 콜백이 안 오면 그 상태로 멈춘 것처럼 보인다.
+        allowSameValueSelection: true,
+        selectedDayHighlightColor: AppColors.primary,
+        dayBorderRadius: BorderRadius.circular(10),
+        yearBorderRadius: BorderRadius.circular(10),
+        selectedDayTextStyle: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+        todayTextStyle: const TextStyle(
+          color: AppColors.primary,
+          fontWeight: FontWeight.bold,
+        ),
+        dayTextStyle: const TextStyle(color: AppColors.bodyText),
+        disabledDayTextStyle: const TextStyle(color: AppColors.mutedIcon),
+        weekdayLabelTextStyle: const TextStyle(
+          color: AppColors.tertiaryText,
+          fontWeight: FontWeight.w600,
+          fontSize: 12,
+        ),
+        controlsTextStyle: const TextStyle(
+          color: AppColors.titleText,
+          fontWeight: FontWeight.bold,
+          fontSize: 15,
+        ),
+      ),
+      // 미설정이면 빈 목록을 넘긴다 — [lastDate](오늘)를 미리 선택값으로
+      // 채우면, 오늘을 처음 탭했을 때 "이미 선택된 값과 같음"으로 처리돼
+      // onValueChanged가 호출되지 않는다(표시 월은 그래도 오늘이 속한
+      // 달로 맞춰진다 — displayedMonthDate 생략 시 기본값).
+      value: initialDate != null ? [initialDate] : const [],
+      onValueChanged: (dates) {
+        if (dates.isEmpty) return;
+        Navigator.of(context).pop(ReadingDateResult.picked(dates.first));
+      },
+    );
+  }
 }
 
 class _DiscoverySourceDialog extends StatefulWidget {
