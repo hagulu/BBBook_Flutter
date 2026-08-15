@@ -11,7 +11,8 @@ import '../../bookshelf/models/book_tag.dart';
 /// 책 기록 상세 화면의 API 호출.
 ///
 /// 문서: ../../../../../../api-doc/api-me-books-userBookId-patch.md,
-/// api-me-books-userBookId-book-info-patch.md, api-me-books-userBookId-tags-post.md,
+/// api-me-books-userBookId-book-info-patch.md, api-me-books-userBookId-link-patch.md,
+/// api-me-books-userBookId-tags-post.md,
 /// api-me-books-userBookId-tags-tagId-delete.md, api-me-tags-get.md,
 /// api-me-books-userBookId-delete.md
 ///
@@ -99,6 +100,12 @@ class BookRecordApi {
   /// true이면 표지를 제거한다(둘 다 아니면 표지는 현재값 유지). [author],
   /// [publisher], [totalPages], [categoryId]는 null을 명시적으로 보내면
   /// 서버가 null로 저장한다(문서 기준, 메인 PATCH와 다른 의미론).
+  ///
+  /// [coverImageUrl]은 [thumbnailFile]/[removeThumbnail]과 달리 값이 있을
+  /// 때만 요청에 포함한다(생략 시 표지 현재값 유지 — 문서 기준 처리 우선순위
+  /// 1.thumbnail 파트 2.removeThumbnail 3.coverImageUrl 4.유지). ISBN
+  /// 불러오기/변경으로 채운 공개 책 표지 URL을 그대로 저장할 때 쓴다 —
+  /// 파일 업로드/삭제와 동시에 쓸 일이 없어 그 두 값이 있으면 무시해도 된다.
   Future<Map<String, dynamic>> patchBookInfo({
     required int userBookId,
     required String title,
@@ -106,6 +113,7 @@ class BookRecordApi {
     String? publisher,
     int? totalPages,
     int? categoryId,
+    String? coverImageUrl,
     File? thumbnailFile,
     bool removeThumbnail = false,
   }) async {
@@ -115,6 +123,7 @@ class BookRecordApi {
       'publisher': publisher,
       'totalPages': totalPages,
       'categoryId': categoryId,
+      'coverImageUrl': ?coverImageUrl,
     };
 
     try {
@@ -142,6 +151,38 @@ class BookRecordApi {
       return _unwrapMap(response);
     } on DioException catch (e) {
       throw _mapError(e);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('서버 응답 형식이 올바르지 않습니다.', cause: e);
+    }
+  }
+
+  /// PATCH /api/me/books/:userBookId/link — 공용 book과 연결/재연결/연결 해제.
+  ///
+  /// [isbn13]이 null이면 연결 해제(커스텀 책 전환)다. 서버가 "필드 자체가
+  /// 없으면 400"으로 구분하므로(문서 기준) null이어도 항상 키 자체는
+  /// 요청 본문에 포함해야 한다 — 다른 메서드의 `'x': ?x`(null이면 키 생략)
+  /// 패턴을 여기서 그대로 쓰면 연결 해제가 400으로 실패한다.
+  Future<Map<String, dynamic>> patchLink({
+    required int userBookId,
+    required String? isbn13,
+  }) async {
+    try {
+      final response = await _apiClient.dio.patch<Map<String, dynamic>>(
+        '/api/me/books/$userBookId/link',
+        data: {'isbn13': isbn13},
+      );
+      return _unwrapMap(response);
+    } on DioException catch (e) {
+      throw _mapError(
+        e,
+        overrides: const {
+          400: '연결할 책 정보를 확인해주세요(이미 읽은 쪽수가 총 쪽수보다 많을 수 있어요).',
+          404: '연결할 책을 찾을 수 없습니다.',
+          409: '이미 다른 책에 연결된 ISBN입니다.',
+        },
+      );
     } on ApiException {
       rethrow;
     } catch (e) {

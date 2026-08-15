@@ -15,7 +15,7 @@ import 'book_record_api.dart';
 /// 우선이다: 즉시 로컬에 반영해 반환하고, 서버 반영은 뒤에서 조용히
 /// 시도한다 — 실패해도 예외를 던지지 않고 dirty로 남겨 다음 동기화
 /// (`BookshelfRepository.sync()`)가 일괄 재시도하게 한다. 그 외
-/// [updateBookInfo]/[addTag]/[removeTag]/[deleteBook]은 여전히 서버 PATCH가
+/// [updateBookInfo]/[linkBook]/[addTag]/[removeTag]/[deleteBook]은 여전히 서버 PATCH가
 /// 성공한 뒤에만 로컬에 반영한다(서버가 최종 진실 소스 — 서버 실패 시
 /// 로컬은 건드리지 않고 예외를 던져 화면이 에러를 처리하게 한다).
 ///
@@ -156,6 +156,7 @@ class BookRecordRepository {
     String? publisher,
     int? totalPages,
     int? categoryId,
+    String? coverImageUrl,
     File? thumbnailFile,
     bool removeThumbnail = false,
   }) async {
@@ -168,9 +169,22 @@ class BookRecordRepository {
       publisher: publisher,
       totalPages: totalPages,
       categoryId: categoryId,
+      coverImageUrl: coverImageUrl,
       thumbnailFile: thumbnailFile,
       removeThumbnail: removeThumbnail,
     );
+    return _persist(current, data, expectedGeneration);
+  }
+
+  /// ISBN 연결/재연결/연결 해제(`PATCH /api/me/books/:userBookId/link`).
+  /// 연결·재연결이면 응답의 display 필드(제목/저자/출판사/총쪽수/표지/
+  /// 카테고리)가 새로 연결한 책 기준으로 갱신돼 돌아오고, 해제([isbn13]이
+  /// null)면 그 필드들은 기존값을 유지한 채 isbn13/bookId만 null이 된다
+  /// (api-doc 기준) — 어느 쪽이든 응답을 그대로 로컬에 반영하면 된다.
+  Future<BookItem> linkBook(int userBookId, {required String? isbn13}) async {
+    final expectedGeneration = BookshelfDatabase.sessionGeneration;
+    final current = await _requireLocal(userBookId);
+    final data = await _api.patchLink(userBookId: userBookId, isbn13: isbn13);
     return _persist(current, data, expectedGeneration);
   }
 

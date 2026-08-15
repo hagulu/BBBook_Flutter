@@ -86,6 +86,16 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
   List<BookItem>? _lastGroupedItems;
   List<_MonthGroup> _lastGroups = const [];
 
+  // 마지막으로 "확정"(AsyncData)된 결과와, 그 결과를 만든 필터. 책 기록
+  // 상세 등에서의 수정이 `bookshelfSyncVersionProvider`를 올려
+  // [finishedBooksProvider]가 백그라운드에서 다시 조회되는 동안에도 화면이
+  // 계속 이전 목록을 보여주게 하기 위한 캐시다(그러지 않으면 목록이
+  // 통째로 사라졌다 다시 채워지면서 스크롤 위치가 맨 위로 리셋된 것처럼
+  // 보인다). 단, 필터가 바뀐 뒤의 로딩 중에는 재사용하면 안 된다 — 필터가
+  // 같을 때만([_lastSettledFilter] == 현재 필터) 재사용한다.
+  FinishedFilter? _lastSettledFilter;
+  List<BookItem>? _lastSettledItems;
+
   // PageView(TabBarView 내부)는 기본적으로 화면 밖으로 벗어난 탭의 State를
   // 그대로 폐기한다. 이 탭은 검색어/필터/스크롤 위치 등 내부 상태가 많고
   // 월별 그룹핑 비용도 있어, 다른 탭으로 갔다 돌아올 때마다 이를 처음부터
@@ -229,16 +239,33 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     final books = ref.watch(finishedBooksProvider);
     final isDefaultMode = filter.isDefaultMode;
 
+    // 실제로 그릴 목록을 여기서 한 번만 정한다.
+    // - AsyncData(확정된 성공 응답)면 그 값을 쓰고, 이 필터의 결과로 캐시해 둔다.
+    // - AsyncLoading이고 캐시된 필터가 지금 필터와 같으면(=검색/필터가 아니라
+    //   `bookshelfSyncVersionProvider` 변화로 인한 백그라운드 재조회) 캐시를
+    //   그대로 재사용한다 — 그러지 않으면 목록이 통째로 사라졌다 다시
+    //   채워지면서 스크롤 위치가 맨 위로 리셋된 것처럼 보인다.
+    // - 그 외(필터가 바뀐 직후의 로딩, 또는 오류)는 재사용하지 않는다 —
+    //   그러지 않으면 새 필터의 로딩/오류 중에 이전 필터의 결과가 그대로
+    //   남아 사용자가 고른 조건과 다른 목록이 보일 수 있다.
+    final List<BookItem>? items;
+    if (books case AsyncData(:final value)) {
+      items = value;
+      _lastSettledFilter = filter;
+      _lastSettledItems = value;
+    } else if (books.isLoading && identical(_lastSettledFilter, filter)) {
+      items = _lastSettledItems;
+    } else {
+      items = null;
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         // 썸/버블은 반투명 오버레이라 책 표지 위에 겹쳐도 되므로, 목록은
         // 항상 가로 전체 폭을 그대로 사용한다(오른쪽에 별도 여백을 두지 않음).
         final contentWidth = constraints.maxWidth;
-        final groups = isDefaultMode
-            ? books.maybeWhen(
-                data: _groupedFor,
-                orElse: () => const <_MonthGroup>[],
-              )
+        final groups = isDefaultMode && items != null
+            ? _groupedFor(items)
             : const <_MonthGroup>[];
 
         return Stack(
@@ -278,7 +305,7 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
                   const SliverToBoxAdapter(
                     child: SizedBox(height: _kFinishedContentSpacing),
                   ),
-                  ..._contentSlivers(filter, books, groups),
+                  ..._contentSlivers(filter, items, books.hasError, groups),
                 ],
               ),
             ),
@@ -341,60 +368,64 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     );
   }
 
+  /// [items]는 build()에서 이미 "지금 필터에 안전하게 보여줘도 되는
+  /// 데이터인지"까지 판단해 넘겨준 값이다(캐시 재사용 조건은 build() 문서
+  /// 참고) — 여기서는 그 결과를 그대로 렌더링하기만 한다.
   List<Widget> _contentSlivers(
     FinishedFilter filter,
-    AsyncValue<List<BookItem>> books,
+    List<BookItem>? items,
+    bool hasError,
     List<_MonthGroup> groups,
   ) {
-    return books.when(
-      data: (items) {
-        if (items.isEmpty) {
-          return [
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: _buildMessage(
-                filter.isEmpty ? '완독한 책이 없습니다.' : '검색 결과가 없습니다.',
-              ),
+    if (items == null) {
+      if (hasError) {
+        return [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: _buildMessage(
+              '목록을 불러오지 못했습니다.',
+              onRetry: () => ref.invalidate(finishedBooksProvider),
             ),
-          ];
-        }
-        if (!filter.isDefaultMode) {
-          return [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: _kFinishedGridAspectRatio,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => _FinishedBookCard(book: items[index]),
-                  childCount: items.length,
-                ),
-              ),
-            ),
-          ];
-        }
-        return _groupedSlivers(groups);
-      },
-      loading: () => [
+          ),
+        ];
+      }
+      return [
         SliverFillRemaining(
           hasScrollBody: false,
           child: _buildMessage('불러오는 중'),
         ),
-      ],
-      error: (error, stackTrace) => [
+      ];
+    }
+    if (items.isEmpty) {
+      return [
         SliverFillRemaining(
           hasScrollBody: false,
           child: _buildMessage(
-            '목록을 불러오지 못했습니다.',
-            onRetry: () => ref.invalidate(finishedBooksProvider),
+            filter.isEmpty ? '완독한 책이 없습니다.' : '검색 결과가 없습니다.',
           ),
         ),
-      ],
-    );
+      ];
+    }
+    if (!filter.isDefaultMode) {
+      return [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 16,
+              childAspectRatio: _kFinishedGridAspectRatio,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => _FinishedBookCard(book: items[index]),
+              childCount: items.length,
+            ),
+          ),
+        ),
+      ];
+    }
+    return _groupedSlivers(groups);
   }
 
   List<Widget> _groupedSlivers(List<_MonthGroup> groups) {

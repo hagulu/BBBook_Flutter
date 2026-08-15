@@ -48,7 +48,7 @@
 ## features/book_record
 
 - `lib/features/book_record/screens/book_record_screen.dart` — 책 기록 상세 화면(자체 AppBar, 책장에서 책 선택 시 진입), 정보/진행률/상태/출처/난이도/태그/삭제 조립
-- `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH, 책 정보 PATCH(카테고리 포함), 태그 POST/DELETE, 태그 목록/플랫폼 옵션 GET, 삭제 DELETE)
+- `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH, 책 정보 PATCH(카테고리 포함), ISBN 연결/해제 PATCH, 태그 POST/DELETE, 태그 목록/플랫폼 옵션 GET, 삭제 DELETE)
 - `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth(로컬 조회는 bookshelf 레포지토리 재사용, 수정은 서버 PATCH 성공 후 로컬 반영)
 - `lib/features/book_record/providers/book_record_providers.dart` — 책 기록 관련 Riverpod provider(단일 책 상태 컨트롤러, 태그 자동완성, 플랫폼 옵션)
 - `lib/features/book_record/screens/widgets/book_thumbnail_field.dart` — 책 표지 이미지 선택/미리보기 공용 위젯(책 정보 수정·직접 등록에서 공유)
@@ -97,3 +97,4 @@
 - `docs/review/20260813-183444-app-snackbar-review.md` — 공통 스낵바의 오류 색상 대비와 메시지 큐 초기화 동작 리뷰
 - `docs/review/20260814-121328-app-snackbar-rereview.md` — 공통 스낵바의 미해결 색상 대비·메시지 큐 문제 재리뷰
 - `docs/review/20260814-124800-reading-date-bottom-sheet-review.md` — 독서 날짜 바텀시트의 삭제 동기화·오늘 선택·접근성 리뷰
+- `docs/review/20260815-185416-isbn-link-and-bookshelf-refresh-review.md` — ISBN 연결 저장 정합성·표지 반영과 완독 필터 재조회 리뷰

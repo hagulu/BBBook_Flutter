@@ -145,12 +145,13 @@ class BookRecordController
     );
   }
 
-  Future<void> updateBookInfo({
+  Future<BookItem> updateBookInfo({
     required String title,
     String? author,
     String? publisher,
     int? totalPages,
     int? categoryId,
+    String? coverImageUrl,
     File? thumbnailFile,
     bool removeThumbnail = false,
   }) {
@@ -162,13 +163,21 @@ class BookRecordController
         publisher: publisher,
         totalPages: totalPages,
         categoryId: categoryId,
+        coverImageUrl: coverImageUrl,
         thumbnailFile: thumbnailFile,
         removeThumbnail: removeThumbnail,
       ),
     );
   }
 
-  Future<void> addTag(String name) =>
+  /// ISBN 연결/재연결/연결 해제. [isbn13]이 null이면 연결 해제다. 호출부
+  /// (책 정보 수정 팝업)가 응답의 최신 display 필드로 입력창을 즉시 다시
+  /// 채울 수 있도록 갱신된 [BookItem]을 그대로 반환한다.
+  Future<BookItem> linkBook({required String? isbn13}) {
+    return _mutate(() => _repository.linkBook(arg, isbn13: isbn13));
+  }
+
+  Future<BookItem> addTag(String name) =>
       _mutate(() => _repository.addTag(arg, name));
 
   /// 태그 삭제는 다른 필드 수정과 달리 로딩 상태를 거치지 않고 칩을 화면에서
@@ -231,7 +240,7 @@ class BookRecordController
   /// 같은 컨트롤러에서 수정이 겹치는 것을 막는다([deleteBook]과 동일한 이유
   /// — 진행 중인 PATCH와 또 다른 PATCH/DELETE가 응답 순서 역전으로 서로의
   /// 결과를 덮어쓰는 것을 방지). 조용히 무시하지 않고 던지는 이유도 동일하다.
-  Future<void> _mutate(Future<BookItem> Function() action) async {
+  Future<BookItem> _mutate(Future<BookItem> Function() action) async {
     if (state.isLoading || _isMutating) {
       throw const ApiException('저장 중입니다. 잠시 후 다시 시도해주세요.');
     }
@@ -241,6 +250,7 @@ class BookRecordController
       final updated = await action();
       state = AsyncValue.data(updated);
       ref.read(bookshelfSyncVersionProvider.notifier).state++;
+      return updated;
     } catch (e, st) {
       state = previous;
       Error.throwWithStackTrace(e, st);
