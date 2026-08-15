@@ -12,6 +12,7 @@ import '../../models/finished_filter.dart';
 import '../../providers/bookshelf_providers.dart';
 import 'book_cover.dart';
 import 'bookshelf_refresh_indicator.dart';
+import 'bulk_isbn_link_banner.dart';
 import 'finished_filter_panel.dart';
 import 'finished_month_index_bar.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
@@ -75,6 +76,7 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
   final _scrollController = ScrollController();
   final _scrubNotifier = ValueNotifier<({String label, double dy})?>(null);
   final _filterPanelKey = GlobalKey();
+  final _unlinkedBannerKey = GlobalKey();
   Timer? _searchDebounce;
   bool _searchOpen = false;
   bool _filterPanelOpen = false;
@@ -196,6 +198,10 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
 
   double _contentStartOffset() {
     var offset = _kFinishedIconBarHeight;
+    // ISBN 미연결 배너는 있을 때만(그리고 권수에 따라 줄바꿈 여부도 달라질
+    // 수 있어) 높이가 고정돼 있지 않다 — 필터 패널과 같은 방식으로 실제
+    // 렌더링된 높이를 측정해 더한다(없으면 0).
+    offset += _unlinkedBannerKey.currentContext?.size?.height ?? 0;
     if (_searchOpen) {
       offset += _kFinishedSearchBarHeight;
       if (_filterPanelOpen) {
@@ -279,6 +285,12 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
                     child: _FinishedIconBar(
                       searchOpen: _searchOpen,
                       onSearchTap: _toggleSearch,
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: KeyedSubtree(
+                      key: _unlinkedBannerKey,
+                      child: const UnlinkedFinishedBanner(),
                     ),
                   ),
                   if (_searchOpen)

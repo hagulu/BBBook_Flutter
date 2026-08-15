@@ -191,6 +191,19 @@ final finishedBooksProvider = FutureProvider<List<BookItem>>((ref) {
   return ref.watch(bookshelfRepositoryProvider).searchFinished(filter);
 });
 
+/// 완독한 책 중 ISBN(공용 book 연결)이 없는 책. 완독 상단 배너(일괄 연결
+/// 진입점)용이라 사용자가 걸어둔 검색/필터([finishedFilterProvider])와는
+/// 무관하게 항상 전체 완독 목록 기준으로 센다.
+final unlinkedFinishedBooksProvider = FutureProvider<List<BookItem>>((
+  ref,
+) async {
+  ref.watch(bookshelfSyncVersionProvider);
+  final all = await ref
+      .watch(bookshelfRepositoryProvider)
+      .searchFinished(const FinishedFilter());
+  return all.where((book) => book.isbn13 == null).toList();
+});
+
 final finishedCategoryOptionsProvider = FutureProvider<List<String>>((ref) {
   ref.watch(bookshelfSyncVersionProvider);
   return ref.watch(bookshelfRepositoryProvider).getDistinctCategories();

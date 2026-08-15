@@ -15,22 +15,37 @@ import '../../../bookshelf/providers/bookshelf_providers.dart';
 import '../../providers/book_record_providers.dart';
 import 'book_category_field.dart';
 import 'book_thumbnail_field.dart';
+import 'bulk_link_progress_bar.dart';
 import 'isbn_link_dialog.dart';
 import 'isbn_link_search_sheet.dart';
 import 'record_dialog_shell.dart';
 
 /// "책 정보 수정" 모달(제목/저자/출판사/총쪽수/표지/카테고리/ISBN 연결).
+///
+/// [initialIsbnToFill]이 있으면 시트가 열리자마자 그 ISBN의 공개 책 정보로
+/// 입력창을 채운다(검색을 새로 띄우지 않는다) — 완독 목록의 ISBN 일괄 연결
+/// 배너(`bulk_isbn_link_banner.dart`)가 검색 바텀시트에서 이미 고른 책의
+/// 정보를 바로 채워 보여줄 때 쓴다. [bulkProgress]/[onBulkStop]도 그 흐름
+/// 전용이다(진행 상황 표시, "중단" 시 콜백 호출).
 Future<void> showBookInfoEditDialog(
   BuildContext context, {
   required int userBookId,
   required BookItem book,
+  String? initialIsbnToFill,
+  ({int index, int total})? bulkProgress,
+  VoidCallback? onBulkStop,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) =>
-        BookInfoEditDialog(userBookId: userBookId, book: book),
+    builder: (context) => BookInfoEditDialog(
+      userBookId: userBookId,
+      book: book,
+      initialIsbnToFill: initialIsbnToFill,
+      bulkProgress: bulkProgress,
+      onBulkStop: onBulkStop,
+    ),
   );
 }
 
@@ -39,10 +54,16 @@ class BookInfoEditDialog extends ConsumerStatefulWidget {
     super.key,
     required this.userBookId,
     required this.book,
+    this.initialIsbnToFill,
+    this.bulkProgress,
+    this.onBulkStop,
   });
 
   final int userBookId;
   final BookItem book;
+  final String? initialIsbnToFill;
+  final ({int index, int total})? bulkProgress;
+  final VoidCallback? onBulkStop;
 
   @override
   ConsumerState<BookInfoEditDialog> createState() => _BookInfoEditDialogState();
@@ -72,6 +93,20 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
     fontWeight: FontWeight.w600,
     color: AppColors.tertiaryText,
   );
+
+  @override
+  void initState() {
+    super.initState();
+    final isbn = widget.initialIsbnToFill;
+    if (isbn != null) {
+      // 시트가 화면에 실제로 올라온 뒤(첫 프레임 이후)에 채운다 — build()
+      // 도중에 바로 네트워크 호출을 시작하면 아직 마운트되지 않은 상태에서
+      // setState를 부르게 될 수 있다.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _fillFromIsbn(isbn);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -185,7 +220,7 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
     if (action == null || !mounted) return;
     switch (action) {
       case IsbnLinkAction.reload:
-        await _fillFromIsbn(_isbn13!, message: '책 정보를 다시 불러왔습니다. 저장을 눌러 반영해주세요.');
+        await _fillFromIsbn(_isbn13!);
       case IsbnLinkAction.change:
         await _openChangeSearch();
       case IsbnLinkAction.unlink:
@@ -199,18 +234,32 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
       if (widget.book.publisher != null && widget.book.publisher!.isNotEmpty)
         widget.book.publisher!,
     ].join(' ');
-    final selectedIsbn = await showIsbnLinkSearchSheet(
+    // 이 시트에서 여는 검색은 항상 "골라서 검토 후 저장" 흐름이다 — 검색
+    // 시트의 "즉시 저장" 토글은 완독 목록의 일괄 연결 배너
+    // (`bulk_isbn_link_banner.dart`)가 이 시트를 거치지 않고 직접 검색을
+    // 여는 경로에서만 쓰므로 여기서는 [immediateSave]를 넘기지 않는다.
+    final result = await showIsbnLinkSearchSheet(
       context,
       initialQuery: query,
+      bulkProgress: widget.bulkProgress,
     );
-    if (selectedIsbn == null || !mounted) return;
-    await _fillFromIsbn(selectedIsbn, message: '책 정보를 불러왔습니다. 저장을 눌러 반영해주세요.');
+    if (result == null || !mounted) return;
+    switch (result.action) {
+      case IsbnSearchAction.picked:
+        await _fillFromIsbn(result.isbn!);
+      case IsbnSearchAction.skip:
+      case IsbnSearchAction.savedDirectly:
+        Navigator.of(context).pop();
+      case IsbnSearchAction.stop:
+        widget.onBulkStop?.call();
+        Navigator.of(context).pop();
+    }
   }
 
   /// 선택한 ISBN의 공개 책 정보(`GET /api/books/:isbn` — 조회 전용, 서재에는
   /// 아무 영향 없음)로 입력창만 채운다. 실제로 서재에 연결/반영되는 시점은
   /// "저장" 버튼을 눌렀을 때다.
-  Future<void> _fillFromIsbn(String isbn, {required String message}) async {
+  Future<void> _fillFromIsbn(String isbn) async {
     AppLoading.show(context);
     try {
       final detail = await ref.read(bookDetailApiProvider).getBookDetail(isbn);
@@ -229,7 +278,6 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
         _isbn13 = isbn;
         _errorText = null;
       });
-      AppSnackBar.info(context, message);
     } on ApiException catch (e) {
       if (mounted) AppSnackBar.error(context, e.message);
     } finally {
@@ -273,12 +321,31 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
 
   @override
   Widget build(BuildContext context) {
+    // 이 시트가 book_record_screen.dart를 거치지 않고(완독 목록의 ISBN
+    // 일괄 연결 배너 등) 바로 열리면, 이 컨트롤러(autoDispose)를 지켜보는
+    // 화면이 아무도 없다. `_save()`가 연결 PATCH와 책 정보 PATCH를
+    // 순서대로 두 번 보내는 사이 아무도 watch하지 않는 채로 provider가
+    // 폐기됐다가 두 번째 호출에서 새로 만들어지면, 새 인스턴스는 자기
+    // 초기 build()(로컬 DB 조회)가 끝나기 전이라 `state.isLoading`이
+    // true라 "저장 중입니다" 오류로 잘못 막힌다. 여기서 watch해 시트가
+    // 열려 있는 동안은 계속 살아있게 한다.
+    ref.watch(bookRecordControllerProvider(widget.userBookId));
     final categoriesAsync = ref.watch(bookCategoriesProvider);
     return RecordDialogShell(
       title: '책 정보 수정',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (widget.bulkProgress != null) ...[
+            BulkLinkProgressBar(
+              onSkip: () => Navigator.of(context).pop(),
+              onStop: () {
+                widget.onBulkStop?.call();
+                Navigator.of(context).pop();
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
           BookThumbnailField(
             title: widget.book.title,
             currentCoverUrl: _currentCoverUrl,

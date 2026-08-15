@@ -4,34 +4,82 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_loading.dart';
+import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../book_search/models/book_search_item.dart';
 import '../../../book_search/providers/book_search_providers.dart';
 import '../../../book_search/screens/widgets/search_result_card.dart';
+import '../../providers/book_record_providers.dart';
+import 'bulk_link_progress_bar.dart';
+import 'pill_option.dart';
+
+/// [showIsbnLinkSearchSheet] 결과 종류. [picked]만 [isbn]이 채워진다.
+/// [savedDirectly]는 "즉시 저장"이 켜진 상태에서 고른 뒤 이 시트가 연결
+/// PATCH 응답까지 기다려 스스로 반영을 끝냈다는 뜻이다 — 호출부는 책 정보
+/// 수정 시트를 열 필요 없이 그냥 다음으로 넘어가면 된다.
+enum IsbnSearchAction { picked, skip, stop, savedDirectly }
+
+/// [showIsbnLinkSearchSheet]의 결과. 바텀시트를 바깥 탭/뒤로가기로 그냥
+/// 닫으면(취소) 이 타입 자체가 아니라 `null`이 반환된다 — [skip]/[stop]은
+/// 일괄 연결 흐름에서 진행/중단 버튼을 명시적으로 눌렀을 때만 나온다.
+class IsbnSearchResult {
+  const IsbnSearchResult.picked(this.isbn) : action = IsbnSearchAction.picked;
+  const IsbnSearchResult.skip() : isbn = null, action = IsbnSearchAction.skip;
+  const IsbnSearchResult.stop() : isbn = null, action = IsbnSearchAction.stop;
+  const IsbnSearchResult.savedDirectly()
+    : isbn = null,
+      action = IsbnSearchAction.savedDirectly;
+
+  final String? isbn;
+  final IsbnSearchAction action;
+}
 
 /// "책 정보 수정 > ISBN > 변경"(및 미연결 책의 최초 연결) 전용 검색·선택
 /// 바텀시트. `BookSearchScreen`은 결과를 탭하면 책 상세로 이동하지만, 이
 /// 시트는 탭한 책의 ISBN을 바로 `Navigator.pop`으로 돌려주고 닫힌다.
 ///
+/// [bulkProgress]가 non-null이면(완독 목록의 ISBN 일괄 연결 흐름 —
+/// `bulk_isbn_link_banner.dart`) 진행 상황과 "건너뛰기"/"중단" 버튼, "즉시
+/// 저장" 토글을 함께 보여준다. [immediateSave]가 켜져 있으면 [userBookId]로
+/// 연결 PATCH 응답까지 기다린 뒤에만(로딩 표시) 닫힌다 — 다음 책으로
+/// 넘어가기 전에 이 책이 실제로 저장됐다는 걸 보장한다.
+///
 /// `bookSearchControllerProvider`(패밀리가 아닌 단일 autoDispose provider)를
 /// 그대로 재사용하면, 검색 화면이 이미 열려 있는 상태에서 이 시트를 겹쳐
 /// 열었을 때 두 화면이 같은 인스턴스를 공유해 서로의 검색 상태를 덮어쓸 수
 /// 있다 — 그래서 `BookSearchApi`만 직접 불러 시트 자체 상태로 검색을 관리한다.
-Future<String?> showIsbnLinkSearchSheet(
+Future<IsbnSearchResult?> showIsbnLinkSearchSheet(
   BuildContext context, {
   required String initialQuery,
+  ({int index, int total})? bulkProgress,
+  int? userBookId,
+  ValueNotifier<bool>? immediateSave,
 }) {
-  return showModalBottomSheet<String>(
+  return showModalBottomSheet<IsbnSearchResult>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => _IsbnLinkSearchSheet(initialQuery: initialQuery),
+    builder: (context) => _IsbnLinkSearchSheet(
+      initialQuery: initialQuery,
+      bulkProgress: bulkProgress,
+      userBookId: userBookId,
+      immediateSave: immediateSave,
+    ),
   );
 }
 
 class _IsbnLinkSearchSheet extends ConsumerStatefulWidget {
-  const _IsbnLinkSearchSheet({required this.initialQuery});
+  const _IsbnLinkSearchSheet({
+    required this.initialQuery,
+    this.bulkProgress,
+    this.userBookId,
+    this.immediateSave,
+  });
 
   final String initialQuery;
+  final ({int index, int total})? bulkProgress;
+  final int? userBookId;
+  final ValueNotifier<bool>? immediateSave;
 
   @override
   ConsumerState<_IsbnLinkSearchSheet> createState() =>
@@ -97,6 +145,37 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
     }
   }
 
+  /// 결과 카드를 골랐을 때. "즉시 저장"이 켜져 있으면 이 시트가 직접
+  /// 연결 PATCH 응답까지 기다린 뒤 닫는다 — 그러지 않으면 평소처럼 고른
+  /// isbn만 바로 돌려주고, 책 정보 수정 시트가 필드를 채워 사용자가
+  /// 검토·저장하게 한다.
+  Future<void> _handlePick(String isbn) async {
+    if (widget.userBookId != null && (widget.immediateSave?.value ?? false)) {
+      await _saveDirectly(isbn);
+      return;
+    }
+    Navigator.of(context).pop(IsbnSearchResult.picked(isbn));
+  }
+
+  Future<void> _saveDirectly(String isbn) async {
+    AppLoading.show(context);
+    try {
+      await ref
+          .read(bookRecordControllerProvider(widget.userBookId!).notifier)
+          .linkBook(isbn13: isbn);
+      if (mounted) {
+        Navigator.of(context).pop(const IsbnSearchResult.savedDirectly());
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        AppSnackBar.error(context, e.message);
+        Navigator.of(context).pop(const IsbnSearchResult.skip());
+      }
+    } finally {
+      AppLoading.hide();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // 흰 배경 컨테이너가 화면 맨 아래까지 이어지도록 SafeArea로 감싸 크기를
@@ -131,20 +210,57 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
               ),
             ),
             const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '책 연결',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.titleText,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      '책 연결',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.titleText,
+                      ),
+                    ),
                   ),
-                ),
+                  if (widget.bulkProgress != null)
+                    Text(
+                      '${widget.bulkProgress!.index} / ${widget.bulkProgress!.total}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.tertiaryText,
+                      ),
+                    ),
+                ],
               ),
             ),
+            if (widget.bulkProgress != null) ...[
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: BulkLinkProgressBar(
+                  onSkip: () =>
+                      Navigator.of(context).pop(const IsbnSearchResult.skip()),
+                  onStop: () =>
+                      Navigator.of(context).pop(const IsbnSearchResult.stop()),
+                  leading:
+                      widget.userBookId != null && widget.immediateSave != null
+                      ? ValueListenableBuilder<bool>(
+                          valueListenable: widget.immediateSave!,
+                          builder: (context, checked, _) => PillOption(
+                            label: '즉시 저장',
+                            icon: PhosphorIconsRegular.lightning,
+                            selected: checked,
+                            onTap: () =>
+                                widget.immediateSave!.value = !checked,
+                          ),
+                        )
+                      : null,
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -212,7 +328,7 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
             for (final item in _items) ...[
               SearchResultCard(
                 item: item,
-                onTap: () => Navigator.of(context).pop(item.isbn),
+                onTap: () => _handlePick(item.isbn),
               ),
               const SizedBox(height: 10),
             ],

@@ -185,7 +185,7 @@ class BookRecordController
   /// 되돌린다. `state.isLoading`을 세우지 않으므로 [_mutate]/[deleteBook]과의
   /// 동시성 가드는 [_isMutating] 플래그로 별도 관리한다.
   Future<void> removeTag(int tagId) async {
-    if (state.isLoading || _isMutating) {
+    if (_isMutating) {
       throw const ApiException('저장 중입니다. 잠시 후 다시 시도해주세요.');
     }
     final current = state.value;
@@ -222,10 +222,11 @@ class BookRecordController
   /// 에러로 보여주므로, 조용히 return하면 "저장된 것처럼 보이지만 실제로는
   /// 무시된" 상태가 된다 — 반드시 던져야 한다.
   Future<void> deleteBook() async {
-    if (state.isLoading || _isMutating) {
+    if (_isMutating) {
       throw const ApiException('저장 중입니다. 잠시 후 다시 시도해주세요.');
     }
     final previous = state;
+    _isMutating = true;
     state = const AsyncValue<BookItem?>.loading().copyWithPrevious(state);
     try {
       await _repository.deleteBook(arg);
@@ -234,17 +235,28 @@ class BookRecordController
     } catch (e, st) {
       state = previous;
       Error.throwWithStackTrace(e, st);
+    } finally {
+      _isMutating = false;
     }
   }
 
   /// 같은 컨트롤러에서 수정이 겹치는 것을 막는다([deleteBook]과 동일한 이유
   /// — 진행 중인 PATCH와 또 다른 PATCH/DELETE가 응답 순서 역전으로 서로의
   /// 결과를 덮어쓰는 것을 방지). 조용히 무시하지 않고 던지는 이유도 동일하다.
+  ///
+  /// 가드는 [_isMutating]만 본다(`state.isLoading`은 보지 않는다) — 이
+  /// 컨트롤러를 지켜보는 화면 없이(예: 완독 목록의 ISBN 일괄 연결 배너처럼
+  /// `book_record_screen.dart`를 거치지 않는 경로) `ref.read`로 막 만들어진
+  /// 인스턴스는 자기 초기 [build]가 아직 로컬 DB를 읽는 중이라
+  /// `state.isLoading`이 true다. 그걸 "이미 저장 중"으로 오인하면, 이
+  /// 컨트롤러의 첫 변이 요청부터 실제로는 아무 충돌도 없는데 "저장
+  /// 중입니다"로 잘못 거부된다.
   Future<BookItem> _mutate(Future<BookItem> Function() action) async {
-    if (state.isLoading || _isMutating) {
+    if (_isMutating) {
       throw const ApiException('저장 중입니다. 잠시 후 다시 시도해주세요.');
     }
     final previous = state;
+    _isMutating = true;
     state = const AsyncValue<BookItem?>.loading().copyWithPrevious(state);
     try {
       final updated = await action();
@@ -254,12 +266,15 @@ class BookRecordController
     } catch (e, st) {
       state = previous;
       Error.throwWithStackTrace(e, st);
+    } finally {
+      _isMutating = false;
     }
   }
 
-  /// [removeTag]가 낙관적 갱신 중임을 표시하는 플래그. `state.isLoading`은
-  /// 낙관적 삭제 동안 그대로 false이므로(로딩 상태를 세우지 않음) 별도로
-  /// 관리해야 다른 변이(_mutate/deleteBook)와의 동시 실행을 막을 수 있다.
+  /// 진행 중인 변이(각 메서드가 값을 채워 넣음)를 표시하는 플래그. 초기
+  /// [build]가 아직 안 끝나 `state.isLoading`이 true인 것과 "지금 이
+  /// 컨트롤러가 저장 중"인 것을 구분하기 위해 별도로 관리한다(위 [_mutate]
+  /// 문서 참고).
   bool _isMutating = false;
 }
 
