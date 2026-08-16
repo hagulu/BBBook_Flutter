@@ -276,6 +276,12 @@ class BookshelfRepository {
 
   Future<List<BookTag>> getDistinctTags() => _dao.getDistinctTags();
 
+  Future<void> markIsbnLinkDismissed(int userBookId) =>
+      _dao.markIsbnLinkDismissed(userBookId);
+
+  Future<Set<int>> getDismissedIsbnLinkUserBookIds() =>
+      _dao.getDismissedIsbnLinkUserBookIds();
+
   Future<DateTime?> getLastSyncedAt() => _dao.getLastSyncedAt();
 
   Future<bool> getPrivacySetting() => _api.getPrivacySetting();

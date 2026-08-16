@@ -31,7 +31,7 @@ class BookshelfDatabase {
     final path = join(dbPath, 'bookshelf.db');
     return openDatabase(
       path,
-      version: 3,
+      version: 5,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -54,6 +54,20 @@ class BookshelfDatabase {
             where: 'key = ?',
             whereArgs: ['last_synced_at'],
           );
+        }
+        if (oldVersion < 4) {
+          await _createDismissedIsbnLinkTable(db);
+        }
+        if (oldVersion < 5) {
+          // v4의 `dismissed_isbn_link`는 `user_book`을 ON DELETE CASCADE로
+          // 참조했다. 그런데 `user_book` 갱신은 거의 다 `INSERT OR REPLACE`를
+          // 쓰는데(동기화 반영/로컬 우선 편집/push 확정), SQLite의 REPLACE는
+          // 기존 행을 지운 뒤 다시 넣는 방식이라 그때마다 CASCADE가 걸려
+          // 방금 기록한 "제외" 표시가 곧바로 지워졌다 — 사실상 기능이 동작하지
+          // 않았다. FK 없는 테이블로 다시 만든다(정말 책이 삭제됐을 때의
+          // 정리는 deleteOne/reconcile/applyChanges에서 직접 한다).
+          await db.execute('DROP TABLE IF EXISTS dismissed_isbn_link');
+          await _createDismissedIsbnLinkTable(db);
         }
       },
       onCreate: (db, version) async {
@@ -111,6 +125,7 @@ class BookshelfDatabase {
           )
         ''');
         await _createBookCategoryTable(db);
+        await _createDismissedIsbnLinkTable(db);
       },
     );
   }
@@ -129,6 +144,25 @@ class BookshelfDatabase {
     ''');
   }
 
+  /// 완독 목록의 "ISBN 미연결" 일괄 연결 배너에서 사용자가 "목록에서
+  /// 제외"를 선택하고 건너뛴 책을 기록한다(`bulk_isbn_link_banner.dart`).
+  ///
+  /// 일부러 `user_book`을 참조하는 외래 키를 걸지 않는다 — `user_book`
+  /// 갱신은 거의 항상 `INSERT OR REPLACE`(동기화 반영/로컬 우선 편집/push
+  /// 확정)를 쓰는데, REPLACE는 기존 행을 지운 뒤 다시 넣는 방식이라
+  /// ON DELETE CASCADE를 걸면 그때마다 방금 남긴 "제외" 기록이 함께
+  /// 지워진다(v5 마이그레이션 참고). 정말 책이 삭제됐을 때의 정리는
+  /// [BookshelfDao.deleteOne]/[BookshelfDao.reconcile]/
+  /// [BookshelfDao.applyChanges]가 직접 한다.
+  static Future<void> _createDismissedIsbnLinkTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS dismissed_isbn_link (
+        user_book_id INTEGER PRIMARY KEY,
+        dismissed_at TEXT NOT NULL
+      )
+    ''');
+  }
+
   /// 로그아웃 시 이전 계정 데이터가 다음 로그인 사용자에게 노출되지 않도록 전부 비운다.
   /// `book_category`는 계정과 무관한 전역 마스터 데이터(인증 불필요 API 응답)라
   /// 로그아웃해도 지우지 않는다.
@@ -137,6 +171,7 @@ class BookshelfDatabase {
     final db = await instance();
     await db.transaction((txn) async {
       await txn.delete('user_book_tag');
+      await txn.delete('dismissed_isbn_link');
       await txn.delete('user_book');
       await txn.delete('sync_meta');
     });

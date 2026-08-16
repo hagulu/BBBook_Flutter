@@ -9,6 +9,7 @@ import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../book_search/models/book_search_item.dart';
 import '../../../book_search/providers/book_search_providers.dart';
 import '../../../book_search/screens/widgets/search_result_card.dart';
+import '../../../bookshelf/providers/bookshelf_providers.dart';
 import '../../providers/book_record_providers.dart';
 import 'bulk_link_progress_bar.dart';
 import 'pill_option.dart';
@@ -40,9 +41,12 @@ class IsbnSearchResult {
 ///
 /// [bulkProgress]가 non-null이면(완독 목록의 ISBN 일괄 연결 흐름 —
 /// `bulk_isbn_link_banner.dart`) 진행 상황과 "건너뛰기"/"중단" 버튼, "즉시
-/// 저장" 토글을 함께 보여준다. [immediateSave]가 켜져 있으면 [userBookId]로
-/// 연결 PATCH 응답까지 기다린 뒤에만(로딩 표시) 닫힌다 — 다음 책으로
-/// 넘어가기 전에 이 책이 실제로 저장됐다는 걸 보장한다.
+/// 저장"·"목록에서 제외" 토글을 함께 보여준다. [immediateSave]가 켜져
+/// 있으면 [userBookId]로 연결 PATCH 응답까지 기다린 뒤에만(로딩 표시)
+/// 닫힌다 — 다음 책으로 넘어가기 전에 이 책이 실제로 저장됐다는 걸
+/// 보장한다. [excludeFromList]가 켜진 채로 "건너뛰기"를 누르면 이 책을
+/// 로컬에 기록해 다음부터 완독 목록의 "ISBN 미연결" 배너/일괄 연결 흐름에
+/// 아예 나오지 않게 한다.
 ///
 /// `bookSearchControllerProvider`(패밀리가 아닌 단일 autoDispose provider)를
 /// 그대로 재사용하면, 검색 화면이 이미 열려 있는 상태에서 이 시트를 겹쳐
@@ -54,6 +58,7 @@ Future<IsbnSearchResult?> showIsbnLinkSearchSheet(
   ({int index, int total})? bulkProgress,
   int? userBookId,
   ValueNotifier<bool>? immediateSave,
+  ValueNotifier<bool>? excludeFromList,
 }) {
   return showModalBottomSheet<IsbnSearchResult>(
     context: context,
@@ -64,6 +69,7 @@ Future<IsbnSearchResult?> showIsbnLinkSearchSheet(
       bulkProgress: bulkProgress,
       userBookId: userBookId,
       immediateSave: immediateSave,
+      excludeFromList: excludeFromList,
     ),
   );
 }
@@ -74,12 +80,14 @@ class _IsbnLinkSearchSheet extends ConsumerStatefulWidget {
     this.bulkProgress,
     this.userBookId,
     this.immediateSave,
+    this.excludeFromList,
   });
 
   final String initialQuery;
   final ({int index, int total})? bulkProgress;
   final int? userBookId;
   final ValueNotifier<bool>? immediateSave;
+  final ValueNotifier<bool>? excludeFromList;
 
   @override
   ConsumerState<_IsbnLinkSearchSheet> createState() =>
@@ -100,6 +108,7 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
   List<BookSearchItem> _items = const [];
   int _page = 1;
   int _totalResults = 0;
+  bool _isSkipping = false;
 
   int get _totalPages =>
       _totalResults <= 0 ? 1 : (_totalResults / _size).ceil();
@@ -176,6 +185,33 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
     }
   }
 
+  /// "건너뛰기" — "목록에서 제외"가 켜져 있으면 이 책을 로컬에 기록해
+  /// 완독 목록의 "ISBN 미연결" 배너/개수에서 다음부터 빠지게 한다. 로컬
+  /// 쓰기라도 실패할 수 있으니(디스크 오류 등) 응답을 기다린 뒤에만
+  /// 시트를 닫는다 — 실패하면 사용자가 "건너뛰기를 안 눌린 셈"이 되는 걸
+  /// 모른 채 다음 책으로 넘어가지 않도록 스낵바로 알리고 시트를 그대로
+  /// 둬서 다시 시도할 수 있게 한다. [_isSkipping]으로 처리 중 중복 탭도 막는다.
+  Future<void> _handleSkip() async {
+    if (_isSkipping) return;
+    if (!(widget.userBookId != null && (widget.excludeFromList?.value ?? false))) {
+      Navigator.of(context).pop(const IsbnSearchResult.skip());
+      return;
+    }
+    setState(() => _isSkipping = true);
+    try {
+      await ref
+          .read(bookshelfRepositoryProvider)
+          .markIsbnLinkDismissed(widget.userBookId!);
+      ref.read(bookshelfSyncVersionProvider.notifier).state++;
+      if (mounted) Navigator.of(context).pop(const IsbnSearchResult.skip());
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isSkipping = false);
+        AppSnackBar.error(context, '건너뛰기 처리에 실패했습니다. 다시 시도해주세요.');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // 흰 배경 컨테이너가 화면 맨 아래까지 이어지도록 SafeArea로 감싸 크기를
@@ -210,12 +246,25 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
               ),
             ),
             const SizedBox(height: 16),
+            // 제목은 왼쪽, 진행 개수 + 건너뛰기/중단은 오른쪽에 묶는다
+            // (좁은 화면·큰 글자 배율에서는 `Wrap`이 오른쪽 묶음을 다음
+            // 줄로 자연스럽게 내린다).
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: Text(
+              // 이 시트를 감싼 바깥 `Column`이 `crossAxisAlignment`를
+              // 지정하지 않아(기본값 center) `Wrap`이 그냥 두면 자기
+              // 콘텐츠 폭만큼만 차지해 `spaceBetween`이 벌릴 여유 공간이
+              // 없다 — `SizedBox(width: double.infinity)`로 가로 폭을
+              // 강제로 꽉 채운다.
+              child: SizedBox(
+                width: double.infinity,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    const Text(
                       '책 연결',
                       style: TextStyle(
                         fontSize: 18,
@@ -223,41 +272,73 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
                         color: AppColors.titleText,
                       ),
                     ),
-                  ),
-                  if (widget.bulkProgress != null)
-                    Text(
-                      '${widget.bulkProgress!.index} / ${widget.bulkProgress!.total}',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.tertiaryText,
+                    if (widget.bulkProgress != null)
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${widget.bulkProgress!.index} / ${widget.bulkProgress!.total}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.tertiaryText,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          SkipStopButtons(
+                            onSkip: _handleSkip,
+                            onStop: () => Navigator.of(
+                              context,
+                            ).pop(const IsbnSearchResult.stop()),
+                          ),
+                        ],
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
-            if (widget.bulkProgress != null) ...[
+            if (widget.bulkProgress != null &&
+                widget.userBookId != null &&
+                (widget.immediateSave != null ||
+                    widget.excludeFromList != null)) ...[
               const SizedBox(height: 10),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: BulkLinkProgressBar(
-                  onSkip: () =>
-                      Navigator.of(context).pop(const IsbnSearchResult.skip()),
-                  onStop: () =>
-                      Navigator.of(context).pop(const IsbnSearchResult.stop()),
-                  leading:
-                      widget.userBookId != null && widget.immediateSave != null
-                      ? ValueListenableBuilder<bool>(
-                          valueListenable: widget.immediateSave!,
-                          builder: (context, checked, _) => PillOption(
-                            label: '즉시 저장',
-                            icon: PhosphorIconsRegular.lightning,
-                            selected: checked,
-                            onTap: () =>
-                                widget.immediateSave!.value = !checked,
-                          ),
-                        )
-                      : null,
+                // 위 제목 행과 같은 이유로 `SizedBox`로 가로 폭을 꽉
+                // 채워야 `spaceBetween`이 두 토글을 양 끝으로 벌린다.
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Wrap(
+                    alignment: WrapAlignment.spaceBetween,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ?widget.immediateSave != null
+                          ? ValueListenableBuilder<bool>(
+                              valueListenable: widget.immediateSave!,
+                              builder: (context, checked, _) => PillOption(
+                                label: '즉시 저장',
+                                icon: PhosphorIconsRegular.lightning,
+                                selected: checked,
+                                onTap: () =>
+                                    widget.immediateSave!.value = !checked,
+                              ),
+                            )
+                          : null,
+                      ?widget.excludeFromList != null
+                          ? ValueListenableBuilder<bool>(
+                              valueListenable: widget.excludeFromList!,
+                              builder: (context, checked, _) => PillOption(
+                                label: '연결 대상 목록에서 제외',
+                                icon: PhosphorIconsRegular.eyeSlash,
+                                selected: checked,
+                                onTap: () =>
+                                    widget.excludeFromList!.value = !checked,
+                              ),
+                            )
+                          : null,
+                    ],
+                  ),
                 ),
               ),
             ],

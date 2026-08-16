@@ -835,6 +835,22 @@ class _FinishedBookCard extends StatelessWidget {
                     ),
                   ),
                 ),
+              // ISBN(공용 book 연결)이 없는 책 표시. 완독 목록 상단
+              // "ISBN 미연결 N권" 배너(bulk_isbn_link_banner.dart)로 일괄
+              // 연결할 수 있는 대상이라, 표지에서도 바로 눈에 띄게 한다.
+              if (book.isbn13 == null)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Semantics(
+                    label: 'ISBN 미연결',
+                    child: Icon(
+                      PhosphorIconsFill.linkBreak,
+                      size: 14,
+                      color: AppColors.error,
+                    ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 6),

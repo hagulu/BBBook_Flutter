@@ -99,3 +99,4 @@
 - `docs/review/20260814-124800-reading-date-bottom-sheet-review.md` — 독서 날짜 바텀시트의 삭제 동기화·오늘 선택·접근성 리뷰
 - `docs/review/20260815-185416-isbn-link-and-bookshelf-refresh-review.md` — ISBN 연결 저장 정합성·표지 반영과 완독 필터 재조회 리뷰
 - `docs/review/20260815-200333-bulk-isbn-link-and-overlay-snackbar-review.md` — ISBN 일괄 연결과 오버레이 스낵바의 상태·생명주기·접근성 리뷰
+- `docs/review/20260816-150901-isbn-link-dismissal-review.md` — ISBN 미연결 제외 기록의 영속성·비동기 오류 처리·상태 표시 접근성 리뷰

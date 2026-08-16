@@ -89,9 +89,11 @@ class UnlinkedFinishedBanner extends ConsumerWidget {
     List<BookItem> books,
   ) async {
     var stopped = false;
-    // 검색 시트의 "즉시 저장" 토글 상태. 책마다 새로 만들지 않고 이 흐름
-    // 전체에서 하나를 공유해, 한 번 켜면 다음 책에도 그대로 유지된다.
+    // 검색 시트의 "즉시 저장"/"연결 대상 목록에서 제외" 토글 상태. 책마다
+    // 새로 만들지 않고 이 흐름 전체에서 하나씩 공유해, 한 번 켜면 다음
+    // 책에도 그대로 유지된다.
     final immediateSave = ValueNotifier<bool>(false);
+    final excludeFromList = ValueNotifier<bool>(false);
     try {
       for (var i = 0; i < books.length; i++) {
         if (!context.mounted || stopped) break;
@@ -107,6 +109,7 @@ class UnlinkedFinishedBanner extends ConsumerWidget {
           bulkProgress: (index: i + 1, total: books.length),
           userBookId: book.userBookId,
           immediateSave: immediateSave,
+          excludeFromList: excludeFromList,
         );
         if (!context.mounted) break;
         // null(취소)/건너뛰기/즉시 저장(검색 시트가 이미 응답까지 기다려
@@ -131,6 +134,7 @@ class UnlinkedFinishedBanner extends ConsumerWidget {
       }
     } finally {
       immediateSave.dispose();
+      excludeFromList.dispose();
     }
     if (context.mounted) {
       AppSnackBar.info(

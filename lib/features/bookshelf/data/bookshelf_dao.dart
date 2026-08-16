@@ -84,6 +84,23 @@ class BookshelfDao {
     return _attachTags(db, rows);
   }
 
+  /// 완독 목록 "ISBN 미연결" 배너에서 "목록에서 제외"를 켠 채 건너뛴 책을
+  /// 기록한다(이미 있으면 dismissed_at만 갱신). `unlinkedFinishedBooksProvider`가
+  /// 다음부터 이 책을 미연결 개수/목록에서 뺀다.
+  Future<void> markIsbnLinkDismissed(int userBookId) async {
+    final db = await BookshelfDatabase.instance();
+    await db.insert('dismissed_isbn_link', {
+      'user_book_id': userBookId,
+      'dismissed_at': DateTime.now().toUtc().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  Future<Set<int>> getDismissedIsbnLinkUserBookIds() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query('dismissed_isbn_link', columns: ['user_book_id']);
+    return rows.map((r) => r['user_book_id'] as int).toSet();
+  }
+
   Future<List<String>> getDistinctCategories() async {
     final db = await BookshelfDatabase.instance();
     final rows = await db.rawQuery(
@@ -152,6 +169,7 @@ class BookshelfDao {
           whereArgs: serverIds,
         );
       }
+      await _pruneOrphanedDismissalsTxn(txn);
 
       await txn.insert('sync_meta', {
         'key': 'last_synced_at',
@@ -186,6 +204,7 @@ class BookshelfDao {
           whereArgs: deletedUserBookIds,
         );
       }
+      await _pruneOrphanedDismissalsTxn(txn);
 
       await txn.insert('sync_meta', {
         'key': 'last_synced_at',
@@ -232,13 +251,36 @@ class BookshelfDao {
     );
   }
 
-  /// 서재에서 책을 삭제(DELETE API 성공)한 뒤 로컬 행을 제거한다.
+  /// 서재에서 책을 삭제(DELETE API 성공)한 뒤 로컬 행을 제거하고, 그 책의
+  /// ISBN 일괄 연결 "제외" 기록(있다면)도 함께 지운다(`dismissed_isbn_link`는
+  /// `user_book`을 외래 키로 참조하지 않아 자동으로 정리되지 않는다 —
+  /// bookshelf_database.dart의 `_createDismissedIsbnLinkTable` 문서 참고).
   Future<void> deleteOne(int userBookId) async {
     final db = await BookshelfDatabase.instance();
-    await db.delete(
-      'user_book',
-      where: 'user_book_id = ?',
-      whereArgs: [userBookId],
+    await db.transaction((txn) async {
+      await txn.delete(
+        'user_book',
+        where: 'user_book_id = ?',
+        whereArgs: [userBookId],
+      );
+      await txn.delete(
+        'dismissed_isbn_link',
+        where: 'user_book_id = ?',
+        whereArgs: [userBookId],
+      );
+    });
+  }
+
+  /// [reconcile]/[applyChanges]가 실제로 `user_book` 행을 지운 뒤 호출한다.
+  /// `dismissed_isbn_link`가 `user_book`을 외래 키로 참조하지 않으므로(이유는
+  /// bookshelf_database.dart의 `_createDismissedIsbnLinkTable` 참고) 더 이상
+  /// 존재하지 않는 user_book_id를 가리키는 제외 기록을 여기서 직접 청소한다.
+  /// dirty라서 이번에 실제로 지워지지 않은 행은 `user_book`에 그대로
+  /// 남아 있으므로 이 조건에 걸리지 않는다.
+  Future<void> _pruneOrphanedDismissalsTxn(Transaction txn) async {
+    await txn.delete(
+      'dismissed_isbn_link',
+      where: 'user_book_id NOT IN (SELECT user_book_id FROM user_book)',
     );
   }
 
