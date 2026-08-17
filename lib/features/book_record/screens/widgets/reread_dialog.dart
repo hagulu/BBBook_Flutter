@@ -81,7 +81,7 @@ class _RereadDialogState extends State<_RereadDialog> {
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: AppColors.titleText,
+                color: AppColors.textStrong,
               ),
             ),
           ),
@@ -111,14 +111,14 @@ class _StepperButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.inputBackground,
+      color: AppColors.surfaceSubtle,
       shape: const CircleBorder(),
       child: InkWell(
         onTap: onPressed,
         customBorder: const CircleBorder(),
         child: Padding(
           padding: const EdgeInsets.all(10),
-          child: Icon(icon, color: AppColors.primary, size: 20),
+          child: Icon(icon, color: AppColors.accentForeground, size: 20),
         ),
       ),
     );

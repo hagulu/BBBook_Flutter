@@ -63,7 +63,7 @@ class _ReadingBookCard extends ConsumerWidget {
     }
 
     final card = Material(
-      color: AppColors.cardBackground,
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -75,11 +75,11 @@ class _ReadingBookCard extends ConsumerWidget {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.cardBackground,
+            color: AppColors.surface,
             borderRadius: BorderRadius.circular(16),
             boxShadow: const [
               BoxShadow(
-                color: Color(0x0F181C20),
+                color: AppColors.shadowSoft,
                 blurRadius: 4,
                 offset: Offset(0, 1),
               ),
@@ -112,7 +112,7 @@ class _ReadingBookCard extends ConsumerWidget {
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
-                        color: AppColors.titleText,
+                        color: AppColors.textStrong,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -123,7 +123,7 @@ class _ReadingBookCard extends ConsumerWidget {
                         _subtitle(book)!,
                         style: const TextStyle(
                           fontSize: 12,
-                          color: AppColors.tertiaryText,
+                          color: AppColors.textMuted,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -163,14 +163,14 @@ class _CategoryBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: (color ?? AppColors.mutedIcon).withValues(alpha: 0.14),
+        color: (color ?? AppColors.controlInactive).withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         text,
         style: const TextStyle(
           fontSize: 11,
-          color: AppColors.bodyText,
+          color: AppColors.textBody,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -197,14 +197,14 @@ class _ProgressRow extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: AppColors.accentFill,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
                   '+$elapsedDays일',
                   style: const TextStyle(
                     fontSize: 10,
-                    color: Colors.white,
+                    color: AppColors.textStrong,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -218,7 +218,7 @@ class _ProgressRow extends StatelessWidget {
                 '${ratio != null ? ' (${(ratio * 100).round()}%)' : ''}',
                 style: const TextStyle(
                   fontSize: 11,
-                  color: AppColors.tertiaryText,
+                  color: AppColors.textMuted,
                 ),
               ),
           ],
@@ -231,7 +231,7 @@ class _ProgressRow extends StatelessWidget {
               value: ratio,
               minHeight: 6,
               backgroundColor: AppColors.border,
-              valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+              valueColor: const AlwaysStoppedAnimation(AppColors.progressFill),
             ),
           ),
         ],

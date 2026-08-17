@@ -91,7 +91,7 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
   static const _labelStyle = TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.w600,
-    color: AppColors.tertiaryText,
+    color: AppColors.textMuted,
   );
 
   @override
@@ -421,7 +421,7 @@ class _IsbnField extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: AppColors.tertiaryText,
+            color: AppColors.textMuted,
           ),
         ),
         const SizedBox(height: 4),
@@ -431,7 +431,7 @@ class _IsbnField extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
             decoration: BoxDecoration(
-              color: AppColors.inputBackground,
+              color: AppColors.surfaceSubtle,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -439,7 +439,7 @@ class _IsbnField extends StatelessWidget {
                 const Icon(
                   PhosphorIconsRegular.link,
                   size: 15,
-                  color: AppColors.primary,
+                  color: AppColors.accentForeground,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
@@ -448,14 +448,14 @@ class _IsbnField extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      color: AppColors.accentForeground,
                     ),
                   ),
                 ),
                 const Icon(
                   PhosphorIconsRegular.caretRight,
                   size: 14,
-                  color: AppColors.primary,
+                  color: AppColors.accentForeground,
                 ),
               ],
             ),

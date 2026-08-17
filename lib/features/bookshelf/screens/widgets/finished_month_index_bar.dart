@@ -222,7 +222,7 @@ class _FinishedMonthIndexBarState extends State<FinishedMonthIndexBar> {
                     decoration: BoxDecoration(
                       // 반원(오른쪽은 화면 가장자리에 붙는 직선, 왼쪽만 완전히
                       // 둥글게)이 되도록 왼쪽 두 모서리 반지름을 폭(반지름)과 같게 둔다.
-                      color: AppColors.primary.withValues(
+                      color: AppColors.accentFill.withValues(
                         alpha: _isDragging ? 0.75 : 0.55,
                       ),
                       borderRadius: const BorderRadius.only(
@@ -235,7 +235,7 @@ class _FinishedMonthIndexBarState extends State<FinishedMonthIndexBar> {
                     child: const Icon(
                       PhosphorIconsRegular.dotsSixVertical,
                       size: 16,
-                      color: Colors.white,
+                      color: AppColors.accentForeground,
                     ),
                   ),
                 ),

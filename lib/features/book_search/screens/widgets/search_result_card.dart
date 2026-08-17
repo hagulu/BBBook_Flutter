@@ -16,7 +16,7 @@ class SearchResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.cardBackground,
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -46,7 +46,7 @@ class SearchResultCard extends StatelessWidget {
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
-                        color: AppColors.titleText,
+                        color: AppColors.textStrong,
                       ),
                     ),
                     if (item.author != null && item.author!.isNotEmpty) ...[
@@ -58,7 +58,7 @@ class SearchResultCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.tertiaryText,
+                          color: AppColors.textMuted,
                         ),
                       ),
                     ],
@@ -75,7 +75,7 @@ class SearchResultCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 11,
-                          color: AppColors.tertiaryText,
+                          color: AppColors.textMuted,
                         ),
                       ),
                     ],
@@ -91,7 +91,7 @@ class SearchResultCard extends StatelessWidget {
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.titleText,
+                              color: AppColors.textStrong,
                             ),
                           ),
                         ],

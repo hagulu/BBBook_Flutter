@@ -246,7 +246,7 @@ class _TagChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.only(left: 12, right: 4, top: 4, bottom: 4),
       decoration: BoxDecoration(
-        color: AppColors.inputBackground,
+        color: AppColors.surfaceSubtle,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -257,7 +257,7 @@ class _TagChip extends StatelessWidget {
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppColors.bodyText,
+              color: AppColors.textBody,
             ),
           ),
           Semantics(
@@ -273,7 +273,7 @@ class _TagChip extends StatelessWidget {
                   child: Icon(
                     PhosphorIconsRegular.x,
                     size: 14,
-                    color: AppColors.tertiaryText,
+                    color: AppColors.textMuted,
                   ),
                 ),
               ),
@@ -293,14 +293,18 @@ class _AddTagButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: onPressed == null ? AppColors.border : AppColors.primary,
+      color: onPressed == null ? AppColors.border : AppColors.accentFill,
       shape: const CircleBorder(),
       child: InkWell(
         onTap: onPressed,
         customBorder: const CircleBorder(),
-        child: const Padding(
-          padding: EdgeInsets.all(10),
-          child: Icon(PhosphorIconsRegular.plus, color: Colors.white, size: 18),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Icon(
+            PhosphorIconsRegular.plus,
+            color: onPressed == null ? Colors.white : AppColors.textStrong,
+            size: 18,
+          ),
         ),
       ),
     );

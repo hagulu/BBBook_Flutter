@@ -30,7 +30,7 @@ class UnlinkedFinishedBanner extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Material(
-        color: AppColors.accentLight.withValues(alpha: 0.35),
+        color: AppColors.accentSurface.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
@@ -42,7 +42,7 @@ class UnlinkedFinishedBanner extends ConsumerWidget {
                 const Icon(
                   PhosphorIconsRegular.link,
                   size: 18,
-                  color: AppColors.primary,
+                  color: AppColors.accentForeground,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -51,7 +51,7 @@ class UnlinkedFinishedBanner extends ConsumerWidget {
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.titleText,
+                      color: AppColors.textStrong,
                     ),
                   ),
                 ),
@@ -60,14 +60,14 @@ class UnlinkedFinishedBanner extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                    color: AppColors.accentForeground,
                   ),
                 ),
                 const SizedBox(width: 2),
                 const Icon(
                   PhosphorIconsRegular.caretRight,
                   size: 14,
-                  color: AppColors.primary,
+                  color: AppColors.accentForeground,
                 ),
               ],
             ),

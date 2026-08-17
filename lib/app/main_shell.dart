@@ -62,13 +62,13 @@ class _MainShellState extends ConsumerState<MainShell>
         title: const Text('책책책'),
         centerTitle: false,
         backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.titleText,
+        foregroundColor: AppColors.textStrong,
         elevation: 0,
       ),
       body: IndexedStack(index: _selectedIndex, children: _tabs),
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
-          color: AppColors.cardBackground,
+          color: AppColors.surface,
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
         child: SafeArea(
@@ -124,7 +124,7 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.primary : AppColors.mutedIcon;
+    final color = selected ? AppColors.accentForeground : AppColors.textMuted;
     return Expanded(
       child: Semantics(
         button: true,
@@ -138,7 +138,17 @@ class _NavItem extends StatelessWidget {
             children: [
               Icon(selected ? selectedIcon : icon, color: color),
               const SizedBox(height: 2),
-              Text(label, style: TextStyle(color: color, fontSize: 12)),
+              // primaryDark와 textMuted의 색 대비가 크지 않아(둘 다 중간
+              // 톤 초록) 아이콘 채움 변화 외에 글씨도 굵기로 선택 상태를
+              // 한 번 더 구분한다.
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                ),
+              ),
             ],
           ),
         ),
@@ -162,13 +172,13 @@ class _AddNavItem extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: const BoxDecoration(
-              color: AppColors.accentLight,
+              color: AppColors.accentSurface,
               shape: BoxShape.circle,
             ),
             child: const Icon(
               PhosphorIconsRegular.plus,
               size: 20,
-              color: AppColors.primary,
+              color: AppColors.accentForeground,
             ),
           ),
         ),

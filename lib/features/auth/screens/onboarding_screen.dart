@@ -74,7 +74,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         .isAppleSignInSupported;
 
     return Scaffold(
-      backgroundColor: AppColors.onboardingBackground,
+      backgroundColor: AppColors.pageBackground,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -84,11 +84,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               child: Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: AppColors.cardBackground,
+                  color: AppColors.surface,
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: const [
                     BoxShadow(
-                      color: Color(0x14181C20),
+                      color: AppColors.shadowSoft,
                       blurRadius: 24,
                       offset: Offset(0, 8),
                     ),
@@ -101,12 +101,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: AppColors.primary,
+                        color: AppColors.accentFill,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Icon(
                         PhosphorIconsRegular.bookOpen,
-                        color: Colors.white,
+                        color: AppColors.textStrong,
                         size: 30,
                       ),
                     ),
@@ -116,7 +116,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.titleText,
+                        color: AppColors.textStrong,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -124,7 +124,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       '로그인하고 기록을 시작하세요.',
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.tertiaryText,
+                        color: AppColors.textMuted,
                       ),
                     ),
                     const SizedBox(height: 28),
@@ -132,11 +132,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       label: '카카오로 시작하기',
                       icon: Icon(
                         PhosphorIconsRegular.chatCircle,
-                        color: Color(0xFF3C1E1E),
+                        color: AppBrandColors.kakaoLabel,
                         size: 20,
                       ),
-                      backgroundColor: Color(0xFFFEE500),
-                      foregroundColor: Color(0xFF3C1E1E),
+                      backgroundColor: AppBrandColors.kakao,
+                      foregroundColor: AppBrandColors.kakaoLabel,
                       onPressed: null,
                     ),
                     const SizedBox(height: 12),
@@ -149,7 +149,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      backgroundColor: Color(0xFF03C75A),
+                      backgroundColor: AppBrandColors.naver,
                       foregroundColor: Colors.white,
                       onPressed: null,
                     ),
@@ -159,13 +159,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       icon: const Text(
                         'G',
                         style: TextStyle(
-                          color: Color(0xFF4285F4),
+                          color: AppBrandColors.google,
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
                       ),
                       backgroundColor: Colors.white,
-                      foregroundColor: AppColors.titleText,
+                      foregroundColor: AppColors.textStrong,
                       border: const BorderSide(color: AppColors.border),
                       isLoading: _loading == _LoadingProvider.google,
                       onPressed: _isBusy ? null : _handleGoogleLogin,

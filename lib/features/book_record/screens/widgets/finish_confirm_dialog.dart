@@ -55,7 +55,7 @@ class _FinishConfirmDialogState extends State<_FinishConfirmDialog> {
         children: [
           const Text(
             '별점과 한줄평을 남겨보세요.',
-            style: TextStyle(fontSize: 13, color: AppColors.tertiaryText),
+            style: TextStyle(fontSize: 13, color: AppColors.textMuted),
           ),
           const SizedBox(height: 12),
           Center(

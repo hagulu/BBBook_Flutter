@@ -61,7 +61,7 @@ class BookRecordScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('책 기록'),
         backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.titleText,
+        foregroundColor: AppColors.textStrong,
         elevation: 0,
       ),
       body: body,
@@ -77,7 +77,7 @@ class _NotFoundBody extends StatelessWidget {
     return const Center(
       child: Text(
         '책을 찾을 수 없습니다.',
-        style: TextStyle(color: AppColors.tertiaryText),
+        style: TextStyle(color: AppColors.textMuted),
       ),
     );
   }
@@ -96,7 +96,7 @@ class _ErrorBody extends StatelessWidget {
         children: [
           const Text(
             '불러오지 못했습니다.',
-            style: TextStyle(color: AppColors.tertiaryText),
+            style: TextStyle(color: AppColors.textMuted),
           ),
           const SizedBox(height: 8),
           TextButton(onPressed: onRetry, child: const Text('다시 시도')),
@@ -158,14 +158,12 @@ class _BookRecordBody extends ConsumerWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
+                        const Text(
                           '명작',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
-                            color: book.isMasterpiece
-                                ? AppColors.masterpieceGold
-                                : AppColors.mutedIcon,
+                            color: AppColors.textStrong,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -175,8 +173,8 @@ class _BookRecordBody extends ConsumerWidget {
                               : PhosphorIconsRegular.crown,
                           size: 28,
                           color: book.isMasterpiece
-                              ? AppColors.masterpieceGold
-                              : AppColors.mutedIcon,
+                              ? AppColors.highlightGold
+                              : AppColors.textMuted,
                         ),
                       ],
                     ),
@@ -245,7 +243,7 @@ class _BookRecordBody extends ConsumerWidget {
                     Icon(
                       PhosphorIconsRegular.trash,
                       size: 16,
-                      color: AppColors.tertiaryText,
+                      color: AppColors.textMuted,
                     ),
                     SizedBox(width: 6),
                     Text(
@@ -253,7 +251,7 @@ class _BookRecordBody extends ConsumerWidget {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.tertiaryText,
+                        color: AppColors.textMuted,
                       ),
                     ),
                   ],
@@ -539,7 +537,7 @@ class _Header extends ConsumerWidget {
                         ),
                         decoration: BoxDecoration(
                           color:
-                              (categoryColor ?? AppColors.mutedIcon)
+                              (categoryColor ?? AppColors.controlInactive)
                                   .withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(999),
                         ),
@@ -547,7 +545,7 @@ class _Header extends ConsumerWidget {
                           book.category!,
                           style: const TextStyle(
                             fontSize: 11,
-                            color: AppColors.bodyText,
+                            color: AppColors.textBody,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -559,7 +557,7 @@ class _Header extends ConsumerWidget {
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 17,
-                        color: AppColors.titleText,
+                        color: AppColors.textStrong,
                       ),
                     ),
                     if (book.author != null && book.author!.isNotEmpty) ...[
@@ -569,7 +567,7 @@ class _Header extends ConsumerWidget {
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.tertiaryText,
+                          color: AppColors.textMuted,
                         ),
                       ),
                     ],
@@ -580,7 +578,7 @@ class _Header extends ConsumerWidget {
                         book.publisher!,
                         style: const TextStyle(
                           fontSize: 12,
-                          color: AppColors.tertiaryText,
+                          color: AppColors.textMuted,
                         ),
                       ),
                     ],

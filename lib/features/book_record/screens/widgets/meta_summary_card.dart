@@ -61,7 +61,7 @@ class MetaSummaryCard extends StatelessWidget {
                 child: Icon(
                   PhosphorIconsRegular.arrowRight,
                   size: 16,
-                  color: AppColors.mutedIcon,
+                  color: AppColors.controlInactive,
                 ),
               ),
               Expanded(
@@ -142,8 +142,8 @@ class _DateValue extends StatelessWidget {
               fontSize: currentDate == null ? 13 : 15,
               fontWeight: FontWeight.w600,
               color: currentDate == null
-                  ? AppColors.tertiaryText
-                  : AppColors.titleText,
+                  ? AppColors.textMuted
+                  : AppColors.textStrong,
             ),
           ),
         ),

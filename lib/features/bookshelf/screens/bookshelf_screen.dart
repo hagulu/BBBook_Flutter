@@ -99,7 +99,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
           children: [
             const Text(
               '책장을 불러오지 못했습니다.',
-              style: TextStyle(color: AppColors.tertiaryText),
+              style: TextStyle(color: AppColors.textMuted),
             ),
             const SizedBox(height: 8),
             TextButton(
@@ -129,8 +129,8 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
                 controller: _tabController,
                 isScrollable: true,
                 tabAlignment: TabAlignment.start,
-                labelColor: Colors.white,
-                unselectedLabelColor: AppColors.tertiaryText,
+                labelColor: AppColors.textStrong,
+                unselectedLabelColor: AppColors.textMuted,
                 labelStyle: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
@@ -140,7 +140,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
                   fontSize: 13,
                 ),
                 indicator: BoxDecoration(
-                  color: AppColors.primary,
+                  color: AppColors.accentFill,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,

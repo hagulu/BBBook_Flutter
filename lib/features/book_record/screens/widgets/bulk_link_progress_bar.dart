@@ -54,7 +54,7 @@ class SkipStopButtons extends StatelessWidget {
           label: '건너뛰기',
           icon: PhosphorIconsRegular.skipForward,
           onTap: onSkip,
-          color: AppColors.primary,
+          color: AppColors.accentForeground,
         ),
         const SizedBox(width: 8),
         BulkActionPillButton(

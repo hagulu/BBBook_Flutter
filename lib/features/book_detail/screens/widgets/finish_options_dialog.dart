@@ -88,7 +88,7 @@ class _FinishOptionsDialogState extends State<_FinishOptionsDialog> {
         children: [
           const Text(
             '별점과 한줄평을 남겨보세요.',
-            style: TextStyle(fontSize: 13, color: AppColors.tertiaryText),
+            style: TextStyle(fontSize: 13, color: AppColors.textMuted),
           ),
           const SizedBox(height: 12),
           Center(
@@ -129,7 +129,7 @@ class _FinishOptionsDialogState extends State<_FinishOptionsDialog> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
               decoration: BoxDecoration(
-                color: AppColors.inputBackground,
+                color: AppColors.surfaceSubtle,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -137,7 +137,7 @@ class _FinishOptionsDialogState extends State<_FinishOptionsDialog> {
                   const Icon(
                     PhosphorIconsRegular.calendarCheck,
                     size: 16,
-                    color: AppColors.mutedIcon,
+                    color: AppColors.controlInactive,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -145,14 +145,14 @@ class _FinishOptionsDialogState extends State<_FinishOptionsDialog> {
                       _finishedAt == null ? '완독일: 오늘' : '완독일: ${_formatDate(_finishedAt!)}',
                       style: const TextStyle(
                         fontSize: 13,
-                        color: AppColors.bodyText,
+                        color: AppColors.textBody,
                       ),
                     ),
                   ),
                   const Icon(
                     PhosphorIconsRegular.caretDown,
                     size: 14,
-                    color: AppColors.mutedIcon,
+                    color: AppColors.controlInactive,
                   ),
                 ],
               ),

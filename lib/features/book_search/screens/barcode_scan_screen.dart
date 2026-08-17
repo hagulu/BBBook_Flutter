@@ -222,7 +222,7 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
                   : '책 뒷면의 바코드를 화면 중앙에 맞춰주세요',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: _sawNonIsbnBarcode ? AppColors.warning : Colors.white,
+                color: _sawNonIsbnBarcode ? AppColors.highlightGold : Colors.white,
                 fontWeight: _sawNonIsbnBarcode ? FontWeight.w600 : FontWeight.normal,
                 fontSize: 14,
               ),
@@ -278,8 +278,8 @@ class _ControlBar extends StatelessWidget {
                     child: Checkbox(
                       value: quickRegister,
                       onChanged: onQuickRegisterChanged,
-                      activeColor: AppColors.primary,
-                      checkColor: Colors.white,
+                      activeColor: AppColors.accentFill,
+                      checkColor: AppColors.textStrong,
                       side: const BorderSide(color: Colors.white, width: 2),
                     ),
                   ),
@@ -403,8 +403,11 @@ class _StatusPill extends StatelessWidget {
     final Color background;
     final Color foreground;
     if (selected) {
-      background = AppColors.primary.withValues(alpha: enabled ? 1.0 : 0.4);
-      foreground = Colors.white;
+      background = AppColors.accentFill.withValues(alpha: enabled ? 1.0 : 0.4);
+      // enabled일 땐 불투명 accentFill 위라 진한 텍스트가 잘 읽히지만, 비활성
+      // 상태(반투명 0.4)는 카메라 화면이 그대로 비쳐 배경을 예측할 수 없어
+      // 흰 글씨를 유지한다.
+      foreground = enabled ? AppColors.textStrong : Colors.white;
     } else {
       background = Colors.white.withValues(alpha: enabled ? 0.22 : 0.1);
       foreground = enabled ? Colors.white : Colors.white38;

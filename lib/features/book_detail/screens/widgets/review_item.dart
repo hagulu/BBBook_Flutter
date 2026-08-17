@@ -40,7 +40,7 @@ class _ReviewItemState extends State<ReviewItem> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
@@ -51,7 +51,7 @@ class _ReviewItemState extends State<ReviewItem> {
             children: [
               CircleAvatar(
                 radius: 16,
-                backgroundColor: AppColors.accentLight,
+                backgroundColor: AppColors.accentSurface,
                 backgroundImage: review.user.profileImageUrl != null
                     ? NetworkImage(review.user.profileImageUrl!)
                     : null,
@@ -59,7 +59,7 @@ class _ReviewItemState extends State<ReviewItem> {
                     ? const Icon(
                         PhosphorIconsRegular.user,
                         size: 16,
-                        color: AppColors.primary,
+                        color: AppColors.accentForeground,
                       )
                     : null,
               ),
@@ -70,7 +70,7 @@ class _ReviewItemState extends State<ReviewItem> {
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.titleText,
+                    color: AppColors.textStrong,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -83,7 +83,7 @@ class _ReviewItemState extends State<ReviewItem> {
                   icon: const Icon(
                     PhosphorIconsRegular.dotsThreeVertical,
                     size: 18,
-                    color: AppColors.mutedIcon,
+                    color: AppColors.textMuted,
                   ),
                   onSelected: (action) {
                     switch (action) {
@@ -111,7 +111,7 @@ class _ReviewItemState extends State<ReviewItem> {
                   icon: const Icon(
                     PhosphorIconsRegular.flag,
                     size: 16,
-                    color: AppColors.mutedIcon,
+                    color: AppColors.textMuted,
                   ),
                   onPressed: widget.onReport,
                 ),
@@ -121,11 +121,15 @@ class _ReviewItemState extends State<ReviewItem> {
           if (review.isHidden)
             const Text(
               '숨김 처리된 리뷰입니다.',
-              style: TextStyle(fontSize: 13, color: AppColors.mutedIcon),
+              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
             )
           else ...[
             if (review.rating != null) ...[
-              StarRatingDisplay(rating: review.rating!, size: 14),
+              StarRatingDisplay(
+                rating: review.rating!,
+                size: 14,
+                filledColor: AppColors.accentGraphic,
+              ),
               const SizedBox(height: 6),
             ],
             if (review.isSpoiler && !_spoilerRevealed)
@@ -137,7 +141,7 @@ class _ReviewItemState extends State<ReviewItem> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.inputBackground,
+                    color: AppColors.surfaceSubtle,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Row(
@@ -146,14 +150,14 @@ class _ReviewItemState extends State<ReviewItem> {
                       Icon(
                         PhosphorIconsRegular.eyeSlash,
                         size: 14,
-                        color: AppColors.tertiaryText,
+                        color: AppColors.textMuted,
                       ),
                       SizedBox(width: 6),
                       Text(
                         '스포일러가 포함되어 있어요. 눌러서 보기',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.tertiaryText,
+                          color: AppColors.textMuted,
                         ),
                       ),
                     ],
@@ -163,7 +167,7 @@ class _ReviewItemState extends State<ReviewItem> {
             else
               Text(
                 review.content ?? '',
-                style: const TextStyle(fontSize: 14, color: AppColors.bodyText, height: 1.4),
+                style: const TextStyle(fontSize: 14, color: AppColors.textBody, height: 1.4),
               ),
             const SizedBox(height: 8),
             InkWell(
@@ -180,15 +184,15 @@ class _ReviewItemState extends State<ReviewItem> {
                           : PhosphorIconsRegular.heart,
                       size: 16,
                       color: review.isLiked
-                          ? const Color(0xFFEF4444)
-                          : AppColors.mutedIcon,
+                          ? AppColors.error
+                          : AppColors.controlInactive,
                     ),
                     const SizedBox(width: 4),
                     Text(
                       '${review.likeCount}',
                       style: const TextStyle(
                         fontSize: 12,
-                        color: AppColors.tertiaryText,
+                        color: AppColors.textMuted,
                       ),
                     ),
                   ],

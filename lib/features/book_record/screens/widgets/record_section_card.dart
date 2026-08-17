@@ -20,11 +20,11 @@ class RecordSectionCard extends StatelessWidget {
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x0F181C20),
+            color: AppColors.shadowSoft,
             blurRadius: 4,
             offset: Offset(0, 1),
           ),
@@ -47,14 +47,14 @@ class SectionLabel extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: AppColors.primary),
+        Icon(icon, size: 16, color: AppColors.accentForeground),
         const SizedBox(width: 6),
         Text(
           text,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 14,
-            color: AppColors.titleText,
+            color: AppColors.textStrong,
           ),
         ),
       ],

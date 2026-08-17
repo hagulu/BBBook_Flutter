@@ -77,11 +77,11 @@ class _OptionCell<T> extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
             decoration: BoxDecoration(
               color: selected
-                  ? AppColors.accentLight.withValues(alpha: 0.35)
-                  : AppColors.cardBackground,
+                  ? AppColors.accentSurface.withValues(alpha: 0.35)
+                  : AppColors.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: selected ? AppColors.primary : AppColors.border,
+                color: selected ? AppColors.accentForeground : AppColors.border,
                 width: selected ? 1.5 : 1,
               ),
             ),
@@ -91,7 +91,7 @@ class _OptionCell<T> extends StatelessWidget {
                 Icon(
                   option.icon,
                   size: option.iconSize,
-                  color: selected ? AppColors.primary : AppColors.mutedIcon,
+                  color: selected ? AppColors.accentForeground : AppColors.controlInactive,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -100,7 +100,7 @@ class _OptionCell<T> extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-                    color: selected ? AppColors.primary : AppColors.bodyText,
+                    color: selected ? AppColors.accentForeground : AppColors.textBody,
                   ),
                 ),
               ],

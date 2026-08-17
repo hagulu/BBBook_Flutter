@@ -224,7 +224,7 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
       child: Container(
         height: MediaQuery.sizeOf(context).height * 0.85,
         decoration: const BoxDecoration(
-          color: AppColors.cardBackground,
+          color: AppColors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: EdgeInsets.only(
@@ -269,7 +269,7 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.titleText,
+                        color: AppColors.textStrong,
                       ),
                     ),
                     if (widget.bulkProgress != null)
@@ -281,7 +281,7 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
                             style: const TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.tertiaryText,
+                              color: AppColors.textMuted,
                             ),
                           ),
                           const SizedBox(width: 10),
@@ -373,12 +373,12 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
         return const Center(
           child: Text(
             '검색어를 입력해주세요',
-            style: TextStyle(color: AppColors.tertiaryText),
+            style: TextStyle(color: AppColors.textMuted),
           ),
         );
       case _LoadState.loading:
         return const Center(
-          child: Text('검색 중...', style: TextStyle(color: AppColors.tertiaryText)),
+          child: Text('검색 중...', style: TextStyle(color: AppColors.textMuted)),
         );
       case _LoadState.error:
         return Center(
@@ -387,7 +387,7 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
             children: [
               const Text(
                 '검색 중 문제가 발생했습니다.',
-                style: TextStyle(color: AppColors.tertiaryText),
+                style: TextStyle(color: AppColors.textMuted),
               ),
               const SizedBox(height: 8),
               TextButton(onPressed: _search, child: const Text('다시 시도')),
@@ -399,7 +399,7 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
           return const Center(
             child: Text(
               '검색 결과가 없습니다',
-              style: TextStyle(color: AppColors.tertiaryText),
+              style: TextStyle(color: AppColors.textMuted),
             ),
           );
         }
@@ -426,7 +426,7 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
                     '$_page / $_totalPages',
                     style: const TextStyle(
                       fontSize: 13,
-                      color: AppColors.tertiaryText,
+                      color: AppColors.textMuted,
                     ),
                   ),
                   IconButton(

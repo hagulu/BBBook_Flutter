@@ -33,7 +33,7 @@ Future<CategorySelection?> showBookCategoryPickerDialog(
         children: [
           _CategoryChip(
             label: '미지정',
-            dotColor: AppColors.mutedIcon,
+            dotColor: AppColors.controlInactive,
             selected: initialCategoryId == null,
             onTap: () =>
                 Navigator.of(context).pop(const CategorySelection(null)),
@@ -97,7 +97,7 @@ class BookCategoryField extends StatelessWidget {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: AppColors.tertiaryText,
+            color: AppColors.textMuted,
           ),
         ),
         const SizedBox(height: 4),
@@ -107,7 +107,7 @@ class BookCategoryField extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
             decoration: BoxDecoration(
-              color: AppColors.inputBackground,
+              color: AppColors.surfaceSubtle,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -116,7 +116,7 @@ class BookCategoryField extends StatelessWidget {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: selected?.color ?? AppColors.mutedIcon,
+                    color: selected?.color ?? AppColors.controlInactive,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -124,14 +124,14 @@ class BookCategoryField extends StatelessWidget {
                 Expanded(
                   child: Text(
                     selected?.name ?? '미지정',
-                    style: const TextStyle(fontSize: 13, color: AppColors.bodyText),
+                    style: const TextStyle(fontSize: 13, color: AppColors.textBody),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const Icon(
                   PhosphorIconsRegular.caretDown,
                   size: 14,
-                  color: AppColors.mutedIcon,
+                  color: AppColors.controlInactive,
                 ),
               ],
             ),
@@ -169,7 +169,7 @@ class _CategoryChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? dotColor.withValues(alpha: 0.16)
-                : AppColors.inputBackground,
+                : AppColors.surfaceSubtle,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
               color: selected ? dotColor : Colors.transparent,
@@ -190,7 +190,7 @@ class _CategoryChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? AppColors.bodyText : AppColors.tertiaryText,
+                  color: selected ? AppColors.textBody : AppColors.textMuted,
                 ),
               ),
             ],

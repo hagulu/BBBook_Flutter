@@ -28,8 +28,8 @@ class ReadingStatusTile extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: AppColors.accentLight.withValues(alpha: 0.35),
-            child: Icon(status.icon, color: AppColors.primary, size: 24),
+            backgroundColor: AppColors.accentSurface.withValues(alpha: 0.35),
+            child: Icon(status.icon, color: AppColors.accentForeground, size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -41,7 +41,7 @@ class ReadingStatusTile extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.tertiaryText,
+                    color: AppColors.textMuted,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -50,7 +50,7 @@ class ReadingStatusTile extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.titleText,
+                    color: AppColors.textStrong,
                   ),
                 ),
               ],

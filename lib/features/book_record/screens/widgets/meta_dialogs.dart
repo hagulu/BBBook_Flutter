@@ -63,11 +63,11 @@ class _StatusCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             color: selected
-                ? AppColors.accentLight.withValues(alpha: 0.35)
-                : AppColors.cardBackground,
+                ? AppColors.accentSurface.withValues(alpha: 0.35)
+                : AppColors.surface,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: selected ? AppColors.primary : AppColors.border,
+              color: selected ? AppColors.accentForeground : AppColors.border,
               width: selected ? 1.5 : 1,
             ),
           ),
@@ -77,7 +77,7 @@ class _StatusCard extends StatelessWidget {
               Icon(
                 status.icon,
                 size: 28,
-                color: selected ? AppColors.primary : AppColors.mutedIcon,
+                color: selected ? AppColors.accentForeground : AppColors.controlInactive,
               ),
               const SizedBox(height: 8),
               Flexible(
@@ -89,7 +89,7 @@ class _StatusCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: selected ? FontWeight.bold : FontWeight.w600,
-                    color: selected ? AppColors.primary : AppColors.bodyText,
+                    color: selected ? AppColors.accentForeground : AppColors.textBody,
                   ),
                 ),
               ),
@@ -262,7 +262,7 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: AppColors.tertiaryText,
+                color: AppColors.textMuted,
               ),
             ),
             const SizedBox(height: 8),
@@ -449,26 +449,26 @@ class _ReadingDateDialog extends StatelessWidget {
         // 이 시트엔 별도 저장 버튼이 없어 탭 자체가 곧 확정이라, 같은 값을
         // 다시 탭했을 때만 콜백이 안 오면 그 상태로 멈춘 것처럼 보인다.
         allowSameValueSelection: true,
-        selectedDayHighlightColor: AppColors.primary,
+        selectedDayHighlightColor: AppColors.accentFill,
         dayBorderRadius: BorderRadius.circular(10),
         yearBorderRadius: BorderRadius.circular(10),
         selectedDayTextStyle: const TextStyle(
-          color: Colors.white,
+          color: AppColors.textStrong,
           fontWeight: FontWeight.bold,
         ),
         todayTextStyle: const TextStyle(
-          color: AppColors.primary,
+          color: AppColors.accentForeground,
           fontWeight: FontWeight.bold,
         ),
-        dayTextStyle: const TextStyle(color: AppColors.bodyText),
-        disabledDayTextStyle: const TextStyle(color: AppColors.mutedIcon),
+        dayTextStyle: const TextStyle(color: AppColors.textBody),
+        disabledDayTextStyle: const TextStyle(color: AppColors.controlInactive),
         weekdayLabelTextStyle: const TextStyle(
-          color: AppColors.tertiaryText,
+          color: AppColors.textMuted,
           fontWeight: FontWeight.w600,
           fontSize: 12,
         ),
         controlsTextStyle: const TextStyle(
-          color: AppColors.titleText,
+          color: AppColors.textStrong,
           fontWeight: FontWeight.bold,
           fontSize: 15,
         ),

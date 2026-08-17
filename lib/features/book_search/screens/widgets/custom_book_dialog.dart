@@ -59,7 +59,7 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
   static const _labelStyle = TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.w600,
-    color: AppColors.tertiaryText,
+    color: AppColors.textMuted,
   );
 
   @override

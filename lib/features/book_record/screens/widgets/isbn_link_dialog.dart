@@ -74,9 +74,9 @@ class _IsbnActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive ? AppColors.error : AppColors.primary;
+    final color = destructive ? AppColors.error : AppColors.accentForeground;
     return Material(
-      color: AppColors.cardBackground,
+      color: AppColors.surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -102,7 +102,7 @@ class _IsbnActionCard extends StatelessWidget {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
-                  color: destructive ? color : AppColors.titleText,
+                  color: destructive ? color : AppColors.textStrong,
                 ),
               ),
             ],

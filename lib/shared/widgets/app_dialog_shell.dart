@@ -40,7 +40,7 @@ class AppDialogShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppColors.cardBackground,
+      backgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Semantics(
         namesRoute: true,
@@ -66,10 +66,10 @@ class AppDialogShell extends StatelessWidget {
                               radius: 22,
                               backgroundColor:
                                   iconBackgroundColor ??
-                                  AppColors.warningBackground,
+                                  AppColors.highlightGoldSurface,
                               child: Icon(
                                 icon,
-                                color: iconColor ?? AppColors.warning,
+                                color: iconColor ?? AppColors.highlightGold,
                                 size: 22,
                               ),
                             ),
@@ -84,7 +84,7 @@ class AppDialogShell extends StatelessWidget {
                         message,
                         style: const TextStyle(
                           fontSize: 15,
-                          color: AppColors.bodyText,
+                          color: AppColors.textBody,
                           height: 1.4,
                         ),
                       ),
@@ -127,7 +127,7 @@ class _Title extends StatelessWidget {
       style: const TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.bold,
-        color: AppColors.titleText,
+        color: AppColors.textStrong,
       ),
     );
   }
@@ -144,11 +144,11 @@ class _ActionButton extends StatelessWidget {
     final Color foreground;
     switch (action.style) {
       case AppDialogActionStyle.primary:
-        background = AppColors.primary;
-        foreground = Colors.white;
+        background = AppColors.accentFill;
+        foreground = AppColors.textStrong;
       case AppDialogActionStyle.neutral:
-        background = AppColors.inputBackground;
-        foreground = AppColors.bodyText;
+        background = AppColors.surfaceSubtle;
+        foreground = AppColors.textBody;
       case AppDialogActionStyle.destructive:
         background = AppColors.error;
         foreground = Colors.white;

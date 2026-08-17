@@ -78,7 +78,7 @@ class _GridBookCard extends StatelessWidget {
             style: const TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 12,
-              color: AppColors.titleText,
+              color: AppColors.textStrong,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -88,7 +88,7 @@ class _GridBookCard extends StatelessWidget {
               displayAuthor(book.author!),
               style: const TextStyle(
                 fontSize: 11,
-                color: AppColors.tertiaryText,
+                color: AppColors.textMuted,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

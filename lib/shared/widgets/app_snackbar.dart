@@ -217,8 +217,10 @@ class _AppSnackBarContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (color, icon) = switch (type) {
-      AppSnackBarType.success => (AppColors.primary, PhosphorIconsFill.checkCircle),
-      AppSnackBarType.info => (AppColors.primary, PhosphorIconsFill.info),
+      // 스낵바는 흰 아이콘/텍스트를 얹는 불투명 pill이라, 옅어진
+      // AppColors.accentFill 대신 대비가 확실한 accentForeground를 쓴다.
+      AppSnackBarType.success => (AppColors.accentForeground, PhosphorIconsFill.checkCircle),
+      AppSnackBarType.info => (AppColors.accentForeground, PhosphorIconsFill.info),
       // 반투명 합성 후 흰 텍스트와의 대비가 WCAG AA(4.5:1)에 못 미쳐(원본
       // AppColors.error 88% 합성 시 약 3.71:1) 검정과 섞어 더 어둡게 만든다.
       AppSnackBarType.error => (

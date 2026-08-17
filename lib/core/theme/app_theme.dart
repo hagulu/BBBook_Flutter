@@ -1,42 +1,103 @@
 import 'package:flutter/material.dart';
 
-/// docs/porting-reference/design-system.md 기준 색상 토큰.
-/// 새로운 색상은 여기에서만 추가/관리한다.
+/// 앱 전역 색상 토큰. 새로운 색상은 반드시 여기에서만 추가/관리한다.
+///
+/// "북숲" 컨셉에 맞춘 **햇빛 드는 밝은 숲** 팔레트다.
+/// `docs/porting-reference/design-system.md`는 웹 원본의 블루 팔레트를 기록한
+/// 문서이며, 앱은 의도적으로 그린 계열로 분기했다. 문서의 hex 값을 그대로
+/// 되돌리지 말 것(역할 매핑만 참고).
+///
+/// 토큰은 "역할" 단위로만 나눈다. 비슷한 톤을 상황별로 쪼개지 않고,
+/// 아래 목록으로 모든 화면을 커버한다.
 class AppColors {
   const AppColors._();
 
-  static const primary = Color(0xFF0061A3);
-  static const primaryHover = Color(0xFF004F86);
-  static const accent = Color(0xFF5DAEFF);
-  static const accentLight = Color(0xFFBEDAFE);
+  // --- 브랜드: 숲 ---
+  /// 버튼·선택 칩·활성 탭 등 넓은 영역을 채우는 부드러운 라임 강조색.
+  /// 이 색 위의 글씨·아이콘은 [textStrong]을 사용한다.
+  static const accentFill = Color(0xFFCADB7A);
 
-  static const titleText = Color(0xFF181C20);
-  static const bodyText = Color(0xFF404751);
-  static const tertiaryText = Color(0xFF707882);
-  static const mutedIcon = Color(0xFF94A3B8);
+  /// 밝은 표면 위에서 읽혀야 하는 브랜드 텍스트·아이콘·보더·포커스 색.
+  static const accentForeground = Color(0xFF556B3B);
 
-  static const pageBackground = Color(0xFFF7F9FE);
-  static const onboardingBackground = Color(0xFFF4F7FA);
-  static const inputBackground = Color(0xFFF1F4F9);
-  static const cardBackground = Color(0xFFFFFFFF);
-  static const border = Color(0xFFE5E8ED);
+  /// 별점처럼 텍스트 없이 색 자체로 구분하는 브랜드 그래픽 강조색.
+  static const accentGraphic = Color(0xFF789A3F);
 
-  static const error = Color(0xFFE03C3C);
-  static const success = Color(0xFF16A34A);
-  static const warning = Color(0xFFD97706);
-  static const warningBackground = Color(0xFFFFFBEB);
+  /// 뱃지·아바타·선택 카드 배경에 사용하는 옅은 브랜드 표면색.
+  static const accentSurface = Color(0xFFE7EFD0);
 
-  static const starFilled = Color(0xFFFBBF24);
-  static const masterpieceGold = Color(0xFFF5C518);
-  static const masterpieceBackground = Color(0xFFFEF3C7);
+  /// 독서 진행률 숫자·슬라이더·진행 바의 활성 구간 전용 색.
+  static const progressFill = Color(0xFF627D3E);
+
+  // --- 브랜드: 햇살 ---
+  /// 나뭇잎 사이 햇살. 별점/걸작 표시/주의 아이콘 공용.
+  static const highlightGold = Color(0xFFF5C518);
+
+  /// 옅은 햇살 배경. 주의 안내/걸작 강조 배경.
+  static const highlightGoldSurface = Color(0xFFF6EFD9);
+
+  // --- 텍스트 ---
+  /// 제목·강조 텍스트.
+  static const textStrong = Color(0xFF27311F);
+
+  /// 본문 텍스트.
+  static const textBody = Color(0xFF454F3E);
+
+  /// 메타 정보·설명·placeholder. [surfaceSubtle] 위에서도 4.5:1을 넘도록
+  /// 조정된 값이다.
+  static const textMuted = Color(0xFF626E5B);
+
+  /// 비활성/off 상태 전용(비활성 탭 아이콘, 선택 안 된 토글 등).
+  /// 읽기용 텍스트에는 쓰지 않는다.
+  static const controlInactive = Color(0xFF7E8976);
+
+  // --- 표면 ---
+  /// 화면 전체 배경. 거의 흰색에 가깝지만 [accentFill]과 같은 라임 계열로
+  /// 아주 옅게 물들어 있다("보일듯 말듯").
+  static const pageBackground = Color(0xFFFBFCF6);
+
+  /// 카드·모달·시트 배경.
+  static const surface = Color(0xFFFFFFFF);
+
+  /// 입력창·비활성 필·보조 버튼 배경.
+  static const surfaceSubtle = Color(0xFFF1F5E9);
+
+  /// 보더·구분선·진행률 트랙.
+  static const border = Color(0xFFDDE5D2);
+
+  // --- 상태 ---
+  /// 오류·삭제·좋아요(하트) 등 경고성 강조.
+  static const error = Color(0xFFC34A45);
+
+  // --- 그림자 ---
+  /// 카드/시트 기본 그림자.
+  static const shadowSoft = Color(0x1427311F);
+
+  /// 떠 있는 요소(플로팅 버튼 등) 강한 그림자.
+  static const shadowStrong = Color(0x3327311F);
+}
+
+/// 외부 서비스 브랜드 고정 색상. 가이드라인상 임의 변경 불가이므로
+/// 앱 팔레트와 분리해 둔다.
+class AppBrandColors {
+  const AppBrandColors._();
+
+  static const kakao = Color(0xFFFEE500);
+  static const kakaoLabel = Color(0xFF3C1E1E);
+  static const naver = Color(0xFF03C75A);
+  static const google = Color(0xFF4285F4);
 }
 
 ThemeData buildAppTheme() {
   final colorScheme = ColorScheme.fromSeed(
-    seedColor: AppColors.primary,
-    primary: AppColors.primary,
+    seedColor: AppColors.accentFill,
+    primary: AppColors.accentFill,
+    onPrimary: AppColors.textStrong,
     error: AppColors.error,
-    surface: AppColors.cardBackground,
+    onError: Colors.white,
+    surface: AppColors.surface,
+    onSurface: AppColors.textStrong,
+    outline: AppColors.border,
   );
 
   return ThemeData(
@@ -46,12 +107,12 @@ ThemeData buildAppTheme() {
     // 기본 M3 bodyLarge(16px)는 TextField 입력 글씨로 쓰기엔 커 보여서(design-system.md
     // 본문 14~15px 기준) 앱 전역 입력창 글씨 크기를 낮춘다.
     textTheme: const TextTheme(
-      bodyLarge: TextStyle(fontSize: 14, color: AppColors.bodyText),
+      bodyLarge: TextStyle(fontSize: 14, color: AppColors.textBody),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.accentFill,
+        foregroundColor: AppColors.textStrong,
         minimumSize: const Size.fromHeight(48),
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -60,21 +121,21 @@ ThemeData buildAppTheme() {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.bodyText,
+        foregroundColor: AppColors.textBody,
         minimumSize: const Size.fromHeight(48),
         side: const BorderSide(color: AppColors.border),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
       ),
     ),
-    // design-system.md: "텍스트 입력/검색창: 보더 없이 bg-[#f1f4f9] rounded-xl
+    // design-system.md: "텍스트 입력/검색창: 보더 없이 필 배경 + rounded-xl
     // outline-none" — 밑줄(UnderlineInputBorder) 대신 보더 없는 필 배경으로 통일.
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: AppColors.inputBackground,
+      fillColor: AppColors.surfaceSubtle,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      hintStyle: const TextStyle(color: AppColors.tertiaryText),
-      labelStyle: const TextStyle(color: AppColors.tertiaryText, fontSize: 13),
+      hintStyle: const TextStyle(color: AppColors.textMuted),
+      labelStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -85,7 +146,7 @@ ThemeData buildAppTheme() {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.accentForeground, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

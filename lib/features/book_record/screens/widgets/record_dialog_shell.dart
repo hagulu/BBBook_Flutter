@@ -43,7 +43,7 @@ class RecordDialogShell extends StatelessWidget {
       color: Colors.transparent,
       child: Container(
         decoration: const BoxDecoration(
-          color: AppColors.cardBackground,
+          color: AppColors.surface,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         padding: EdgeInsets.fromLTRB(
@@ -75,7 +75,7 @@ class RecordDialogShell extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.titleText,
+                  color: AppColors.textStrong,
                 ),
               ),
               const SizedBox(height: 18),
@@ -110,11 +110,11 @@ class _Button extends StatelessWidget {
     final Color foreground;
     switch (button.style) {
       case RecordDialogButtonStyle.primary:
-        background = AppColors.primary;
-        foreground = Colors.white;
+        background = AppColors.accentFill;
+        foreground = AppColors.textStrong;
       case RecordDialogButtonStyle.neutral:
-        background = AppColors.inputBackground;
-        foreground = AppColors.bodyText;
+        background = AppColors.surfaceSubtle;
+        foreground = AppColors.textBody;
       case RecordDialogButtonStyle.destructive:
         background = AppColors.error;
         foreground = Colors.white;

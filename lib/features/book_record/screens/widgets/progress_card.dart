@@ -96,7 +96,7 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.titleText,
+                    color: AppColors.textStrong,
                   ),
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   onSubmitted: (_) => _pageFocus.unfocus(),
@@ -109,14 +109,14 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
               if (totalPages != null)
                 Text(
                   ' / $totalPages쪽',
-                  style: const TextStyle(color: AppColors.tertiaryText),
+                  style: const TextStyle(color: AppColors.textMuted),
                 ),
               const Spacer(),
               if (ratio != null)
                 Text(
                   '${(ratio * 100).round()}%',
                   style: const TextStyle(
-                    color: AppColors.primary,
+                    color: AppColors.progressFill,
                     fontWeight: FontWeight.bold,
                     fontSize: 17,
                   ),
@@ -148,7 +148,7 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
                   value: _sliderValue.clamp(0, totalPages.toDouble()),
                   min: 0,
                   max: totalPages.toDouble(),
-                  activeColor: AppColors.primary,
+                  activeColor: AppColors.progressFill,
                   onChanged: (v) => setState(() {
                     _sliderValue = v;
                     _pageController.text = '${v.round()}';

@@ -29,7 +29,7 @@ class FinishedFilterPanel extends ConsumerWidget {
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.cardBackground,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -42,16 +42,17 @@ class FinishedFilterPanel extends ConsumerWidget {
               _FilterChip(
                 label: '명작',
                 selected: filter.masterpieceOnly,
-                selectedColor: AppColors.masterpieceGold,
-                selectedTextColor: AppColors.titleText,
+                selectedColor: AppColors.highlightGold,
+                selectedTextColor: AppColors.textStrong,
+                selectedBorderColor: null,
                 leading: Icon(
                   filter.masterpieceOnly
                       ? PhosphorIconsFill.crown
                       : PhosphorIconsRegular.crown,
                   size: 14,
                   color: filter.masterpieceOnly
-                      ? AppColors.titleText
-                      : AppColors.tertiaryText,
+                      ? AppColors.textStrong
+                      : AppColors.textMuted,
                 ),
                 onTap: () =>
                     notifier.setMasterpieceOnly(!filter.masterpieceOnly),
@@ -76,7 +77,7 @@ class FinishedFilterPanel extends ConsumerWidget {
                     label: category,
                     selected: filter.categories.contains(category),
                     leading: _CategoryColorDot(
-                      color: categoryColors[category] ?? AppColors.mutedIcon,
+                      color: categoryColors[category] ?? AppColors.controlInactive,
                     ),
                     onTap: () => notifier.toggleCategory(category),
                   ),
@@ -138,7 +139,7 @@ class _SectionLabel extends StatelessWidget {
       style: const TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: AppColors.tertiaryText,
+        color: AppColors.textMuted,
       ),
     );
   }
@@ -165,8 +166,9 @@ class _FilterChip extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.leading,
-    this.selectedColor = AppColors.primary,
-    this.selectedTextColor = Colors.white,
+    this.selectedColor = AppColors.accentFill,
+    this.selectedTextColor = AppColors.textStrong,
+    this.selectedBorderColor = AppColors.accentForeground,
   });
 
   final String label;
@@ -175,6 +177,7 @@ class _FilterChip extends StatelessWidget {
   final Widget? leading;
   final Color selectedColor;
   final Color selectedTextColor;
+  final Color? selectedBorderColor;
 
   @override
   Widget build(BuildContext context) {
@@ -187,8 +190,13 @@ class _FilterChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
-            color: selected ? selectedColor : AppColors.inputBackground,
+            color: selected ? selectedColor : AppColors.surfaceSubtle,
             borderRadius: BorderRadius.circular(999),
+            // primary는 채도만 높고 명도는 흰색에 가까워, 선택 여부를 채우기색
+            // 만으로 구분하기 어렵다 — 보더로 보강한다.
+            border: selected && selectedBorderColor != null
+                ? Border.all(color: selectedBorderColor!, width: 1.2)
+                : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -199,7 +207,7 @@ class _FilterChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: selected ? selectedTextColor : AppColors.tertiaryText,
+                  color: selected ? selectedTextColor : AppColors.textMuted,
                 ),
               ),
             ],

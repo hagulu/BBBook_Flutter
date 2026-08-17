@@ -100,11 +100,9 @@ class _CoverPlaceholder extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.accentLight, AppColors.accent],
-        ),
+        // 흰 제목 텍스트가 얹히므로 accentFill(옅은 라임) 대신 어두운 숲 톤
+        // 하나로 채운다 — primary를 쓰면 밝은 쪽 절반에서 글자가 안 보인다.
+        color: AppColors.accentForeground,
       ),
       alignment: Alignment.center,
       padding: const EdgeInsets.all(8),

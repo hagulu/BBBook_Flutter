@@ -11,7 +11,7 @@
 
 ## core
 
-- `lib/core/theme/app_theme.dart` — 색상 토큰(AppColors)/ThemeData 정의(app·feature가 공통 참조)
+- `lib/core/theme/app_theme.dart` — 역할 기반 색상 토큰(AppColors: "햇빛 드는 밝은 숲" 그린 팔레트)/브랜드 고정색(AppBrandColors)/ThemeData 정의(app·feature가 공통 참조, 색상은 여기 외에 하드코딩 금지)
 - `lib/core/network/api_client.dart` — 공통 API 클라이언트, 401 시 refresh 1회 재시도 후 실패하면 로그아웃 처리
 - `lib/core/network/api_base_options.dart` — API 공통 base URL/timeout 정의(ApiClient·인증 전용 Dio 공유)
 - `lib/core/storage/token_storage.dart` — refreshToken 시큐어 스토리지 래퍼
@@ -100,3 +100,4 @@
 - `docs/review/20260815-185416-isbn-link-and-bookshelf-refresh-review.md` — ISBN 연결 저장 정합성·표지 반영과 완독 필터 재조회 리뷰
 - `docs/review/20260815-200333-bulk-isbn-link-and-overlay-snackbar-review.md` — ISBN 일괄 연결과 오버레이 스낵바의 상태·생명주기·접근성 리뷰
 - `docs/review/20260816-150901-isbn-link-dismissal-review.md` — ISBN 미연결 제외 기록의 영속성·비동기 오류 처리·상태 표시 접근성 리뷰
+- `docs/review/20260817-153500-forest-color-palette-review.md` — 밝은 숲 색상 팔레트 전환의 텍스트·활성 컨트롤 대비 접근성 리뷰

@@ -98,7 +98,7 @@ class BookThumbnailField extends StatelessWidget {
             _ThumbnailActionButton(
               icon: PhosphorIconsRegular.camera,
               label: hasThumbnail ? '표지 변경' : '표지 추가',
-              color: AppColors.primary,
+              color: AppColors.accentForeground,
               onTap: onPick,
             ),
             if (hasThumbnail) ...[
@@ -133,7 +133,7 @@ class _ThumbnailActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.inputBackground,
+      color: AppColors.surfaceSubtle,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,

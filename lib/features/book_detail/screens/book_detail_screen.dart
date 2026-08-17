@@ -141,7 +141,7 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
       appBar: AppBar(
         title: const Text('검색으로'),
         backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.titleText,
+        foregroundColor: AppColors.textStrong,
         elevation: 0,
       ),
       body: body,
@@ -213,7 +213,7 @@ class _ErrorBody extends StatelessWidget {
         children: [
           const Text(
             '불러오지 못했습니다.',
-            style: TextStyle(color: AppColors.tertiaryText),
+            style: TextStyle(color: AppColors.textMuted),
           ),
           const SizedBox(height: 8),
           TextButton(onPressed: onRetry, child: const Text('다시 시도')),
@@ -249,7 +249,7 @@ class _HeroSection extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: AppColors.accentLight.withValues(alpha: 0.4),
+              color: AppColors.accentSurface.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(999),
             ),
             child: Text(
@@ -257,7 +257,7 @@ class _HeroSection extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: AppColors.bodyText,
+                color: AppColors.textBody,
               ),
             ),
           ),
@@ -269,7 +269,7 @@ class _HeroSection extends StatelessWidget {
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 20,
-            color: AppColors.titleText,
+            color: AppColors.textStrong,
           ),
         ),
         if (detail.author != null && detail.author!.isNotEmpty) ...[
@@ -280,7 +280,7 @@ class _HeroSection extends StatelessWidget {
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: AppColors.tertiaryText,
+              color: AppColors.textMuted,
             ),
           ),
         ],
@@ -291,7 +291,7 @@ class _HeroSection extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11, color: AppColors.tertiaryText),
+            style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
           ),
         ],
         if (detail.displayRating != null) ...[
@@ -306,7 +306,7 @@ class _HeroSection extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.titleText,
+                  color: AppColors.textStrong,
                 ),
               ),
             ],
@@ -318,7 +318,7 @@ class _HeroSection extends StatelessWidget {
             width: double.infinity,
             child: Text(
               detail.description!,
-              style: const TextStyle(fontSize: 14, color: AppColors.bodyText, height: 1.5),
+              style: const TextStyle(fontSize: 14, color: AppColors.textBody, height: 1.5),
             ),
           ),
         ],

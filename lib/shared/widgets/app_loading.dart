@@ -46,7 +46,7 @@ class _FullScreenLoadingBarrier extends StatelessWidget {
           child: Semantics(
             liveRegion: true,
             label: '로딩 중',
-            child: const CircularProgressIndicator(color: AppColors.primary),
+            child: const CircularProgressIndicator(color: AppColors.accentForeground),
           ),
         ),
         // 아래 화면의 시맨틱스(포커스·스크린 리더 탐색)를 차단해 로딩 중 조작을 막는다.
@@ -84,7 +84,7 @@ class AppLoadingOverlay extends StatelessWidget {
                     liveRegion: true,
                     label: '로딩 중',
                     child: const CircularProgressIndicator(
-                      color: AppColors.primary,
+                      color: AppColors.accentForeground,
                     ),
                   ),
                 ),

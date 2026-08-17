@@ -455,7 +455,7 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
-                    color: AppColors.titleText,
+                    color: AppColors.textStrong,
                   ),
                 ),
               ),
@@ -487,7 +487,7 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(text, style: const TextStyle(color: AppColors.tertiaryText)),
+          Text(text, style: const TextStyle(color: AppColors.textMuted)),
           if (onRetry != null) ...[
             const SizedBox(height: 8),
             TextButton(onPressed: onRetry, child: const Text('다시 시도')),
@@ -584,7 +584,7 @@ class _FinishedIconBar extends ConsumerWidget {
                 searchOpen
                     ? PhosphorIconsRegular.x
                     : PhosphorIconsRegular.magnifyingGlass,
-                color: AppColors.primary,
+                color: AppColors.accentForeground,
                 size: 20,
               ),
               onPressed: onSearchTap,
@@ -604,7 +604,7 @@ class _FinishedIconBar extends ConsumerWidget {
                     isPublic
                         ? PhosphorIconsRegular.globe
                         : PhosphorIconsRegular.lock,
-                    color: AppColors.primary,
+                    color: AppColors.accentForeground,
                     size: 20,
                   ),
                   onPressed: privacyState.isLoading
@@ -630,7 +630,7 @@ class _FinishedIconBar extends ConsumerWidget {
                   tooltip: '완독 책장 공개 안내',
                   icon: const Icon(
                     PhosphorIconsRegular.question,
-                    color: AppColors.mutedIcon,
+                    color: AppColors.controlInactive,
                     size: 18,
                   ),
                   onPressed: () => AppAlert.show(
@@ -689,7 +689,7 @@ class _FinishedSearchBar extends StatelessWidget {
                   isDense: true,
                   hintText: '책 이름, 작가, 출판사 검색',
                   filled: true,
-                  fillColor: AppColors.inputBackground,
+                  fillColor: AppColors.surfaceSubtle,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -701,7 +701,7 @@ class _FinishedSearchBar extends StatelessWidget {
                   prefixIcon: const Icon(
                     PhosphorIconsRegular.magnifyingGlass,
                     size: 20,
-                    color: AppColors.tertiaryText,
+                    color: AppColors.textMuted,
                   ),
                   suffixIcon: ValueListenableBuilder<TextEditingValue>(
                     valueListenable: searchController,
@@ -711,7 +711,7 @@ class _FinishedSearchBar extends StatelessWidget {
                         icon: const Icon(
                           PhosphorIconsRegular.x,
                           size: 18,
-                          color: AppColors.tertiaryText,
+                          color: AppColors.textMuted,
                         ),
                         onPressed: onClearSearch,
                       );
@@ -773,11 +773,11 @@ class _ScrubBubble extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: AppColors.accentFill,
         borderRadius: BorderRadius.circular(16),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x33000000),
+            color: AppColors.shadowStrong,
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -786,7 +786,7 @@ class _ScrubBubble extends StatelessWidget {
       child: Text(
         label,
         style: const TextStyle(
-          color: Colors.white,
+          color: AppColors.textStrong,
           fontWeight: FontWeight.bold,
           fontSize: 13,
         ),
@@ -831,7 +831,7 @@ class _FinishedBookCard extends StatelessWidget {
                     child: const Icon(
                       PhosphorIconsFill.crown,
                       size: 20,
-                      color: AppColors.masterpieceGold,
+                      color: AppColors.highlightGold,
                     ),
                   ),
                 ),
@@ -859,7 +859,7 @@ class _FinishedBookCard extends StatelessWidget {
             style: const TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 12,
-              color: AppColors.titleText,
+              color: AppColors.textStrong,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -885,7 +885,9 @@ class _StarRow extends StatelessWidget {
         (i) => Icon(
           i < filled ? PhosphorIconsFill.star : PhosphorIconsRegular.star,
           size: 12,
-          color: i < filled ? AppColors.starFilled : AppColors.border,
+          // 완독 목록에 표시되는 별점은 알라딘 회원 평점이 아니라 서비스 안에서
+          // 직접 기록한 "내 평점"이라 아이덴티티 컬러로 구분한다.
+          color: i < filled ? AppColors.accentGraphic : AppColors.border,
         ),
       ),
     );

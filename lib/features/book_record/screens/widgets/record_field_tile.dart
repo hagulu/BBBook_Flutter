@@ -40,7 +40,7 @@ class RecordFieldTile extends StatelessWidget {
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 13,
-              color: AppColors.titleText,
+              color: AppColors.textStrong,
             ),
           ),
           const SizedBox(height: 4),
@@ -51,7 +51,7 @@ class RecordFieldTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               if (hasValue && valueIcon != null) ...[
-                Icon(valueIcon, size: 15, color: AppColors.primary),
+                Icon(valueIcon, size: 15, color: AppColors.accentForeground),
                 const SizedBox(width: 4),
               ],
               Flexible(
@@ -61,8 +61,8 @@ class RecordFieldTile extends StatelessWidget {
                     fontSize: hasValue ? 15 : 13,
                     fontWeight: hasValue ? FontWeight.w600 : FontWeight.w500,
                     color: hasValue
-                        ? AppColors.titleText
-                        : AppColors.mutedIcon,
+                        ? AppColors.textStrong
+                        : AppColors.textMuted,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

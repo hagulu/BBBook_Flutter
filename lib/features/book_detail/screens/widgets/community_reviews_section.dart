@@ -52,7 +52,7 @@ class CommunityReviewsSection extends ConsumerWidget {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 17,
-            color: AppColors.titleText,
+            color: AppColors.textStrong,
           ),
         ),
         const SizedBox(height: 12),
@@ -79,7 +79,7 @@ class CommunityReviewsSection extends ConsumerWidget {
                 children: [
                   const Text(
                     '리뷰를 불러오지 못했습니다.',
-                    style: TextStyle(color: AppColors.tertiaryText),
+                    style: TextStyle(color: AppColors.textMuted),
                   ),
                   const SizedBox(height: 8),
                   TextButton(
@@ -96,7 +96,7 @@ class CommunityReviewsSection extends ConsumerWidget {
             child: Center(
               child: Text(
                 '불러오는 중',
-                style: TextStyle(color: AppColors.tertiaryText),
+                style: TextStyle(color: AppColors.textMuted),
               ),
             ),
           ),
@@ -200,20 +200,24 @@ class _RatingSummary extends StatelessWidget {
 
     return Row(
       children: [
-        StarRatingDisplay(rating: average, size: 15),
+        StarRatingDisplay(
+          rating: average,
+          size: 15,
+          filledColor: AppColors.accentGraphic,
+        ),
         const SizedBox(width: 6),
         Text(
           average.toStringAsFixed(1),
           style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppColors.titleText,
+            color: AppColors.textStrong,
           ),
         ),
         const SizedBox(width: 4),
         Text(
           '(최근 ${rated.length}건)',
-          style: const TextStyle(fontSize: 12, color: AppColors.tertiaryText),
+          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
         ),
       ],
     );
@@ -290,8 +294,8 @@ class _EntryButton extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 16,
-                backgroundColor: AppColors.accentLight.withValues(alpha: 0.35),
-                child: Icon(icon, color: AppColors.primary, size: 16),
+                backgroundColor: AppColors.accentSurface.withValues(alpha: 0.35),
+                child: Icon(icon, color: AppColors.accentForeground, size: 16),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -303,7 +307,7 @@ class _EntryButton extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.tertiaryText,
+                        color: AppColors.textMuted,
                       ),
                     ),
                     Text(
@@ -311,7 +315,7 @@ class _EntryButton extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.titleText,
+                        color: AppColors.textStrong,
                       ),
                     ),
                   ],
@@ -350,7 +354,7 @@ class _ReviewsList extends StatelessWidget {
         child: Center(
           child: Text(
             '아직 리뷰가 없습니다',
-            style: TextStyle(color: AppColors.tertiaryText),
+            style: TextStyle(color: AppColors.textMuted),
           ),
         ),
       );
@@ -382,7 +386,7 @@ class _ReviewsList extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Text(
               '불러오는 중...',
-              style: TextStyle(color: AppColors.tertiaryText, fontSize: 12),
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),
           ),
       ],
