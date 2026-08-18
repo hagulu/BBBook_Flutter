@@ -119,3 +119,4 @@
 - `docs/review/20260817-153500-forest-color-palette-review.md` — 밝은 숲 색상 팔레트 전환의 텍스트·활성 컨트롤 대비 접근성 리뷰
 - `docs/review/20260817-171413-initial-record-sync-review.md` — 최초 기록 동기화의 실패 복구 동선과 파일 인덱스 구성 리뷰
 - `docs/review/20260818-190749-book-memo-sync-review.md` — 메모 서버 push·증분 동기화의 범위, 마이그레이션, 세션·동시 편집 데이터 안전성 리뷰
+- `docs/review/20260818-201131-book-memo-photo-create-review.md` — PHOTO 일괄 생성 API의 재시도 중복과 파일 검증·영구 실패 처리 리뷰

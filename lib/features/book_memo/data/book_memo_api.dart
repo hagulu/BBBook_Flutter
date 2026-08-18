@@ -12,9 +12,15 @@ import '../models/book_memo_sync_changes_result.dart';
 ///
 /// 문서: ../../../../../api-doc/api-me-books-userBookId-memos-title-put.md,
 /// api-me-books-userBookId-memos-items-post.md,
+/// api-me-books-userBookId-memos-items-photo-post.md,
 /// api-me-books-userBookId-memos-items-itemId-patch.md,
 /// api-me-books-userBookId-memos-items-itemId-delete.md,
 /// api-memos-memoId-images-post.md, api-me-memos-sync-changes-get.md
+///
+/// PHOTO 조각 생성은 [postPhotoItem](사진 파일 + memoId=null/기존 memoId를
+/// 한 요청으로 처리) 전용이고, [postItem]은 SUMMARY/QUOTE/THOUGHT만
+/// 지원한다 — PHOTO를 이 API로 만들 수 없다. [uploadImage]는 이미
+/// 존재하는 PHOTO 조각의 사진을 교체할 때만 쓴다([patchItem]과 짝).
 ///
 /// 인증 필요 요청이므로 401 시 1회 재시도 후 실패하면 로그아웃 처리하는
 /// [ApiClient]를 통해서만 호출한다(CLAUDE.md 인증 API 호출 규칙).
@@ -51,9 +57,8 @@ class BookMemoApi {
 
   /// POST /api/me/books/{userBookId}/memos/items
   ///
-  /// memoId가 null이면 새 메모를 함께 생성한다. itemType=PHOTO면 imageUrl(R2
-  /// 키, [uploadImage] 응답)이 필수이며, memoId=null과 함께 쓸 수 없다(문서
-  /// 참고 — 새 메모에서 첫 PHOTO를 만들려면 memoId를 먼저 확보해야 한다).
+  /// SUMMARY/QUOTE/THOUGHT 전용이다(PHOTO는 이 API로 만들 수 없다 —
+  /// [postPhotoItem] 참고). memoId가 null이면 새 메모를 함께 생성한다.
   Future<ServerBookMemoItem> postItem({
     required int userBookId,
     required int? memoId,
@@ -61,7 +66,6 @@ class BookMemoApi {
     required int? startPage,
     required int? endPage,
     required String? content,
-    required String? imageUrl,
     required bool isImportant,
   }) async {
     try {
@@ -73,9 +77,48 @@ class BookMemoApi {
           'startPage': startPage,
           'endPage': endPage,
           'content': content,
-          'imageUrl': imageUrl,
           'isImportant': isImportant,
         },
+      );
+      final data = _unwrapMap(response);
+      return ServerBookMemoItem.fromJson(data);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('서버 응답 형식이 올바르지 않습니다.', cause: e);
+    }
+  }
+
+  /// POST /api/me/books/{userBookId}/memos/items/photo
+  ///
+  /// PHOTO 조각을 사진 파일과 함께 한 번에 생성한다(별도 이미지 선업로드
+  /// 불필요). memoId가 null이면 새 메모를 함께 만든다 — 제목 없는 새
+  /// 메모에서도 이 한 번의 호출로 메모+사진 조각이 완성되므로, 중간에
+  /// 실패해도 서버에 반쪽짜리(다른 타입) 조각이 남지 않는다.
+  Future<ServerBookMemoItem> postPhotoItem({
+    required int userBookId,
+    required int? memoId,
+    required int? startPage,
+    required int? endPage,
+    required String? content,
+    required bool isImportant,
+    required File file,
+  }) async {
+    try {
+      final fileName = file.path.split(Platform.pathSeparator).last;
+      final formData = FormData.fromMap({
+        if (memoId != null) 'memoId': memoId.toString(),
+        if (startPage != null) 'startPage': startPage.toString(),
+        if (endPage != null) 'endPage': endPage.toString(),
+        'content': ?content,
+        'isImportant': isImportant.toString(),
+        'file': await MultipartFile.fromFile(file.path, filename: fileName),
+      });
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/api/me/books/$userBookId/memos/items/photo',
+        data: formData,
       );
       final data = _unwrapMap(response);
       return ServerBookMemoItem.fromJson(data);
@@ -147,6 +190,10 @@ class BookMemoApi {
   }
 
   /// POST /api/memos/{memoId}/images — 이미지 업로드 후 R2 키 반환.
+  ///
+  /// **기존 PHOTO 조각의 사진 교체 전용**이다([patchItem]과 짝) — 새 PHOTO
+  /// 조각 생성(신규든 기존 메모든)은 [postPhotoItem] 하나로 끝나므로 이
+  /// API를 거치지 않는다.
   Future<String> uploadImage({required int memoId, required File file}) async {
     try {
       final fileName = file.path.split(Platform.pathSeparator).last;

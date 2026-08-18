@@ -453,21 +453,6 @@ class BookMemoDao {
     });
   }
 
-  /// 조각의 `server_id`만 먼저 확정한다(다른 필드/`is_dirty`는 그대로 둠).
-  /// PHOTO 부트스트랩(자리표시용 타입으로 먼저 메모+조각을 만든 뒤 이미지
-  /// 업로드→PATCH로 승격)에서, 이미지 업로드가 실패해도 이 조각이 이미
-  /// 서버에 존재한다는 사실은 남겨야 다음 재시도가 POST(중복 생성) 대신
-  /// PATCH(수정) 경로를 타게 하기 위해 쓴다.
-  Future<void> setItemServerId(int localId, int serverId) async {
-    final db = await BookshelfDatabase.instance();
-    await db.update(
-      'book_memo_item',
-      {'server_id': serverId},
-      where: 'id = ?',
-      whereArgs: [localId],
-    );
-  }
-
   /// 삭제 push(또는 애초에 서버에 없던 로컬 전용 조각의 정리)가 끝난 조각을
   /// 로컬에서 물리 삭제한다.
   Future<void> purgeItem(int localId) async {

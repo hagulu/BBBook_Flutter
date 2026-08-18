@@ -497,6 +497,12 @@ class BookMemoRepository {
     return serverMemoId;
   }
 
+  /// [serverMemoId]가 null이면(제목 없는 신규 메모) 이 조각이 메모를 함께
+  /// 만든다. PHOTO는 [BookMemoApi.postPhotoItem] 하나로 메모 생성(필요한
+  /// 경우)·사진 저장·조각 생성이 한 요청에서 원자적으로 끝나므로, 중간
+  /// 실패로 서버에 반쪽짜리 상태가 남을 걱정이 없다(과거에는 PHOTO를
+  /// memoId 없이 만들 수 없어 자리표시용 타입으로 먼저 만든 뒤 PATCH로
+  /// 승격하는 우회가 필요했지만, 이 API 추가로 더 이상 필요 없다).
   Future<int> _createItemOnServer(
     int userBookId,
     int localMemoId,
@@ -505,104 +511,36 @@ class BookMemoRepository {
     int expectedGeneration,
     DateTime memoUpdatedAt,
   ) async {
-    if (serverMemoId == null) {
-      // 메모가 아직 서버에 없다(제목 없는 신규 메모) — 이 조각이 메모를
-      // 함께 만든다.
-      if (item.type == BookMemoItemType.photo) {
-        // PHOTO는 memoId 없이 만들 수 없다(업로드한 R2 키가 그 memoId
-        // 하위여야 함 — api-doc 참고). 우선 자리표시용 타입(SUMMARY)으로
-        // 메모+조각을 만들어 memoId를 확보한 뒤, 그 memoId로 이미지를
-        // 업로드하고 PATCH로 PHOTO로 승격한다. 서버에 짧게 남는 잘못된
-        // 타입은 이 요청들이 모두 끝나면 사라지며, 사용자에게 노출되는
-        // 어떤 값(제목 등)도 만들어내지 않는다.
-        final placeholder = await _api.postItem(
-          userBookId: userBookId,
-          memoId: null,
-          itemType: BookMemoItemType.summary,
-          startPage: item.startPage,
-          endPage: item.endPage,
-          content: item.content,
-          imageUrl: null,
-          isImportant: item.isImportant,
-        );
-        _checkSession(expectedGeneration);
-        final newMemoId = placeholder.memoId;
-        await _confirmMemoBootstrapped(localMemoId, newMemoId, memoUpdatedAt);
-        // 이 조각의 server_id를 이미지 업로드보다 먼저 확정한다(다른
-        // 필드/dirty는 그대로 둔 채) — 업로드가 실패해도 다음 재시도가
-        // POST(중복 조각 생성) 대신 PATCH(승격 재시도) 경로를 타게 하기
-        // 위함이다. [confirmItemSynced]가 아니라 [setItemServerId]를 쓰는
-        // 이유: 여기서 필드까지 자리표시용(SUMMARY) 값으로 확정해버리면
-        // 업로드가 실패했을 때 화면에는 사용자가 고른 사진 대신 빈 텍스트
-        // 조각이 "저장 완료"로 보이게 된다.
-        await _dao.setItemServerId(item.id, placeholder.id);
-        final r2Key = await _uploadLocalImage(newMemoId, item.imageUrl);
-        _checkSession(expectedGeneration);
-        final patched = await _api.patchItem(
-          userBookId: userBookId,
-          itemId: placeholder.id,
-          itemType: BookMemoItemType.photo,
-          startPage: item.startPage,
-          endPage: item.endPage,
-          content: item.content,
-          isImportant: item.isImportant,
-          imageUrl: r2Key,
-          includeImageUrl: true,
-        );
-        _checkSession(expectedGeneration);
-        await _confirmItemAndCleanupImage(item, patched);
-        return newMemoId;
-      }
-
-      final created = await _api.postItem(
+    final ServerBookMemoItem created;
+    if (item.type == BookMemoItemType.photo) {
+      final rawPath = _resolveLocalFilePath(item.imageUrl);
+      created = await _api.postPhotoItem(
         userBookId: userBookId,
-        memoId: null,
+        memoId: serverMemoId,
+        startPage: item.startPage,
+        endPage: item.endPage,
+        content: item.content,
+        isImportant: item.isImportant,
+        file: File(rawPath),
+      );
+    } else {
+      created = await _api.postItem(
+        userBookId: userBookId,
+        memoId: serverMemoId,
         itemType: item.type,
         startPage: item.startPage,
         endPage: item.endPage,
         content: item.content,
-        imageUrl: null,
         isImportant: item.isImportant,
       );
-      _checkSession(expectedGeneration);
-      final newMemoId = created.memoId;
-      await _confirmMemoBootstrapped(localMemoId, newMemoId, memoUpdatedAt);
-      await _confirmItemAndCleanupImage(item, created);
-      return newMemoId;
     }
-
-    // 메모는 이미 서버에 있다.
-    if (item.type == BookMemoItemType.photo) {
-      final r2Key = await _uploadLocalImage(serverMemoId, item.imageUrl);
-      _checkSession(expectedGeneration);
-      final created = await _api.postItem(
-        userBookId: userBookId,
-        memoId: serverMemoId,
-        itemType: BookMemoItemType.photo,
-        startPage: item.startPage,
-        endPage: item.endPage,
-        content: item.content,
-        imageUrl: r2Key,
-        isImportant: item.isImportant,
-      );
-      _checkSession(expectedGeneration);
-      await _confirmItemAndCleanupImage(item, created);
-      return serverMemoId;
-    }
-
-    final created = await _api.postItem(
-      userBookId: userBookId,
-      memoId: serverMemoId,
-      itemType: item.type,
-      startPage: item.startPage,
-      endPage: item.endPage,
-      content: item.content,
-      imageUrl: null,
-      isImportant: item.isImportant,
-    );
     _checkSession(expectedGeneration);
+    final newMemoId = created.memoId;
+    if (serverMemoId == null) {
+      await _confirmMemoBootstrapped(localMemoId, newMemoId, memoUpdatedAt);
+    }
     await _confirmItemAndCleanupImage(item, created);
-    return serverMemoId;
+    return newMemoId;
   }
 
   Future<void> _updateItemOnServer(
@@ -702,14 +640,21 @@ class BookMemoRepository {
     }
   }
 
+  /// 기존 PHOTO 조각의 사진을 교체할 때만 쓴다([_updateItemOnServer]) —
+  /// 새 조각 생성은 [_createItemOnServer]가 [BookMemoApi.postPhotoItem]으로
+  /// 한 번에 처리하므로 이 경로를 타지 않는다.
   Future<String> _uploadLocalImage(int serverMemoId, String? imageUrl) async {
+    final rawPath = _resolveLocalFilePath(imageUrl);
+    return _api.uploadImage(memoId: serverMemoId, file: File(rawPath));
+  }
+
+  String _resolveLocalFilePath(String? imageUrl) {
     if (imageUrl == null) {
       throw const ApiException('업로드할 사진이 없습니다.');
     }
-    final rawPath = imageUrl.startsWith('file://')
+    return imageUrl.startsWith('file://')
         ? Uri.parse(imageUrl).toFilePath()
         : imageUrl;
-    return _api.uploadImage(memoId: serverMemoId, file: File(rawPath));
   }
 
   bool _isLocalImage(String? url) {
@@ -723,6 +668,12 @@ class BookMemoRepository {
     return 'unknown';
   }
 
+  /// 서버(POST .../memos/items/photo, POST /api/memos/{memoId}/images)가
+  /// jpg/jpeg/png/webp·5MB 이하만 허용하므로, 여기서 걸러내지 않으면
+  /// 로컬 저장은 성공한 뒤 push가 영원히 400으로 실패하는 조각이 남는다.
+  static const _allowedImageExtensions = {'.jpg', '.jpeg', '.png', '.webp'};
+  static const _maxImageBytes = 5 * 1024 * 1024;
+
   Future<String?> _resolveImageUrl(BookMemoItemDraft draft) async {
     if (draft.type != BookMemoItemType.photo) return null;
     final pickedPath = draft.pickedImagePath;
@@ -730,13 +681,17 @@ class BookMemoRepository {
 
     final source = File(pickedPath);
     if (!await source.exists()) throw const FileSystemException();
+    final extension = path.extension(pickedPath).toLowerCase();
+    if (!_allowedImageExtensions.contains(extension)) {
+      throw FileSystemException('지원하지 않는 사진 형식입니다.', pickedPath);
+    }
+    if (await source.length() > _maxImageBytes) {
+      throw FileSystemException('사진 용량은 5MB 이하만 가능합니다.', pickedPath);
+    }
     final root = await getApplicationSupportDirectory();
     final directory = Directory(path.join(root.path, 'memo_images'));
     await directory.create(recursive: true);
-    final extension = path.extension(pickedPath).toLowerCase();
-    final fileName =
-        'memo_${DateTime.now().microsecondsSinceEpoch}'
-        '${extension.isEmpty ? '.jpg' : extension}';
+    final fileName = 'memo_${DateTime.now().microsecondsSinceEpoch}$extension';
     return source
         .copy(path.join(directory.path, fileName))
         .then((file) => file.path);
