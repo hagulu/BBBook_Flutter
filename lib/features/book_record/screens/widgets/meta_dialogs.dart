@@ -77,7 +77,9 @@ class _StatusCard extends StatelessWidget {
               Icon(
                 status.icon,
                 size: 28,
-                color: selected ? AppColors.accentForeground : AppColors.controlInactive,
+                color: selected
+                    ? AppColors.accentForeground
+                    : AppColors.controlInactive,
               ),
               const SizedBox(height: 8),
               Flexible(
@@ -89,7 +91,9 @@ class _StatusCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: selected ? FontWeight.bold : FontWeight.w600,
-                    color: selected ? AppColors.accentForeground : AppColors.textBody,
+                    color: selected
+                        ? AppColors.accentForeground
+                        : AppColors.textBody,
                   ),
                 ),
               ),
@@ -443,8 +447,8 @@ class _ReadingDateDialog extends StatelessWidget {
         weekdayLabels: const ['일', '월', '화', '수', '목', '금', '토'],
         modePickerTextHandler: ({required monthDate, isMonthPicker}) =>
             isMonthPicker == true
-                ? '${monthDate.month}월'
-                : '${monthDate.year}년',
+            ? '${monthDate.month}월'
+            : '${monthDate.year}년',
         // 날짜를 다시 탭해도(이미 선택된 날짜 재확인) 닫히도록 허용한다 —
         // 이 시트엔 별도 저장 버튼이 없어 탭 자체가 곧 확정이라, 같은 값을
         // 다시 탭했을 때만 콜백이 안 오면 그 상태로 멈춘 것처럼 보인다.

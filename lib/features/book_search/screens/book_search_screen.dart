@@ -31,7 +31,9 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
 
   void _submit() {
     FocusManager.instance.primaryFocus?.unfocus();
-    ref.read(bookSearchControllerProvider.notifier).search(_queryController.text);
+    ref
+        .read(bookSearchControllerProvider.notifier)
+        .search(_queryController.text);
   }
 
   void _clear() {
@@ -51,21 +53,24 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
         ),
       );
     } else {
-      AppSnackBar.success(context, '등록되었습니다. 목록 반영에 시간이 걸릴 수 있어요. 잠시 후 책장에서 확인해주세요.');
+      AppSnackBar.success(
+        context,
+        '등록되었습니다. 목록 반영에 시간이 걸릴 수 있어요. 잠시 후 책장에서 확인해주세요.',
+      );
     }
   }
 
   void _openDetail(String isbn) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => BookDetailScreen(isbn: isbn)),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => BookDetailScreen(isbn: isbn)));
   }
 
   /// 바코드(ISBN) 스캔에 성공하면 검색 결과를 거치지 않고 바로 책 상세로 이동한다.
   Future<void> _scanBarcode() async {
-    final isbn = await Navigator.of(
-      context,
-    ).push<String>(MaterialPageRoute(builder: (_) => const BarcodeScanScreen()));
+    final isbn = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const BarcodeScanScreen()),
+    );
     if (isbn != null && mounted) _openDetail(isbn);
   }
 
@@ -110,8 +115,9 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
               child: _SearchResultsBody(
                 state: state,
                 onOpenDetail: _openDetail,
-                onGoToPage: (page) =>
-                    ref.read(bookSearchControllerProvider.notifier).goToPage(page),
+                onGoToPage: (page) => ref
+                    .read(bookSearchControllerProvider.notifier)
+                    .goToPage(page),
                 onRetry: _submit,
               ),
             )
@@ -132,7 +138,10 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
 }
 
 class _EmptyQueryActions extends StatelessWidget {
-  const _EmptyQueryActions({required this.onTapCustomBook, required this.onTapScan});
+  const _EmptyQueryActions({
+    required this.onTapCustomBook,
+    required this.onTapScan,
+  });
 
   final VoidCallback onTapCustomBook;
   final VoidCallback onTapScan;
@@ -239,7 +248,10 @@ class _SearchResultsBody extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_errorMessage(error), style: const TextStyle(color: AppColors.textMuted)),
+            Text(
+              _errorMessage(error),
+              style: const TextStyle(color: AppColors.textMuted),
+            ),
             if (error != BookSearchErrorType.auth) ...[
               const SizedBox(height: 8),
               TextButton(onPressed: onRetry, child: const Text('다시 시도')),
@@ -331,7 +343,10 @@ class _PaginationBar extends StatelessWidget {
           item == null
               ? const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 4),
-                  child: Text('···', style: TextStyle(color: AppColors.textMuted)),
+                  child: Text(
+                    '···',
+                    style: TextStyle(color: AppColors.textMuted),
+                  ),
                 )
               : Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -373,8 +388,7 @@ class _PageNumberButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? AppColors.accentFill : Colors.transparent,
           shape: BoxShape.circle,
-          // primary는 채도만 높고 명도는 흰색에 가까워, 선택 페이지 배경만으로
-          // 구분하기 어렵다 — 보더로 보강한다.
+          // 선택 배경만으로 구분하기 어려우므로 강조색 보더를 함께 쓴다.
           border: selected
               ? Border.all(color: AppColors.accentForeground, width: 1.2)
               : null,

@@ -43,9 +43,8 @@ Future<CategorySelection?> showBookCategoryPickerDialog(
               label: category.name,
               dotColor: category.color,
               selected: initialCategoryId == category.id,
-              onTap: () => Navigator.of(
-                context,
-              ).pop(CategorySelection(category.id)),
+              onTap: () =>
+                  Navigator.of(context).pop(CategorySelection(category.id)),
             ),
         ],
       ),
@@ -124,7 +123,10 @@ class BookCategoryField extends StatelessWidget {
                 Expanded(
                   child: Text(
                     selected?.name ?? '미지정',
-                    style: const TextStyle(fontSize: 13, color: AppColors.textBody),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textBody,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -182,7 +184,10 @@ class _CategoryChip extends StatelessWidget {
               Container(
                 width: 8,
                 height: 8,
-                decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
               ),
               const SizedBox(width: 6),
               Text(

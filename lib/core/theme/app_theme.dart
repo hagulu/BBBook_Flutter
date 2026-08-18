@@ -36,6 +36,23 @@ class AppColors {
   /// 옅은 햇살 배경. 주의 안내/걸작 강조 배경.
   static const highlightGoldSurface = Color(0xFFF6EFD9);
 
+  // --- 메모 조각 타입 ---
+  /// 요약 조각: 차분한 파란색.
+  static const memoSummaryForeground = Color(0xFF245F8F);
+  static const memoSummarySurface = Color(0xFFDCEEFF);
+
+  /// 발췌 조각: 문장을 구분하기 위한 보라색.
+  static const memoQuoteForeground = Color(0xFF7250A5);
+  static const memoQuoteSurface = Color(0xFFEFE7FA);
+
+  /// 생각 조각: 아이디어를 연상시키는 호박색.
+  static const memoThoughtForeground = Color(0xFF96600B);
+  static const memoThoughtSurface = Color(0xFFFFF0C9);
+
+  /// 사진 조각: 이미지 콘텐츠를 구분하는 로즈색.
+  static const memoPhotoForeground = Color(0xFFA34062);
+  static const memoPhotoSurface = Color(0xFFFBE2EB);
+
   // --- 텍스트 ---
   /// 제목·강조 텍스트.
   static const textStrong = Color(0xFF27311F);
@@ -146,7 +163,10 @@ ThemeData buildAppTheme() {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.accentForeground, width: 1.5),
+        borderSide: const BorderSide(
+          color: AppColors.accentForeground,
+          width: 1.5,
+        ),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

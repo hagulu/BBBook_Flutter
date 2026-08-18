@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/widgets/app_confirm.dart';
 import '../../auth/providers/auth_notifier.dart';
 
 /// TODO: 프로필 기능 포팅 전까지 사용하는 임시 화면(이번 작업 범위 아님).
@@ -20,7 +21,19 @@ class ProfileTabPlaceholder extends ConsumerWidget {
           Text('${user?.nickname ?? '사용자'}님, 로그인되었습니다.'),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () => ref.read(authNotifierProvider.notifier).logout(),
+            onPressed: () async {
+              final confirmed = await AppConfirm.show(
+                context,
+                title: '로그아웃',
+                message:
+                    '아직 서버에 동기화되지 않은 메모와 사진은 이 기기에서 '
+                    '삭제되어 복구할 수 없습니다. 로그아웃할까요?',
+                confirmText: '로그아웃',
+                destructive: true,
+              );
+              if (!confirmed || !context.mounted) return;
+              await ref.read(authNotifierProvider.notifier).logout();
+            },
             child: const Text('로그아웃'),
           ),
         ],

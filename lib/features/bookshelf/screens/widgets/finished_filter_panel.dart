@@ -77,7 +77,8 @@ class FinishedFilterPanel extends ConsumerWidget {
                     label: category,
                     selected: filter.categories.contains(category),
                     leading: _CategoryColorDot(
-                      color: categoryColors[category] ?? AppColors.controlInactive,
+                      color:
+                          categoryColors[category] ?? AppColors.controlInactive,
                     ),
                     onTap: () => notifier.toggleCategory(category),
                   ),
@@ -192,8 +193,7 @@ class _FilterChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected ? selectedColor : AppColors.surfaceSubtle,
             borderRadius: BorderRadius.circular(999),
-            // primary는 채도만 높고 명도는 흰색에 가까워, 선택 여부를 채우기색
-            // 만으로 구분하기 어렵다 — 보더로 보강한다.
+            // 밝은 선택 배경은 보더를 함께 써서 상태를 명확히 구분한다.
             border: selected && selectedBorderColor != null
                 ? Border.all(color: selectedBorderColor!, width: 1.2)
                 : null,

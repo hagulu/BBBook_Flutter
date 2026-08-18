@@ -18,7 +18,7 @@ class IconOption<T> {
 }
 
 /// 단일 선택 아이콘 카드 그룹(독서 상태/난이도/출처처럼 소수의 고정 선택지를
-/// 아이콘과 함께 한눈에 비교하게 보여준다). 선택된 카드만 파란 보더 + 옅은
+/// 아이콘과 함께 한눈에 비교하게 보여준다). 선택된 카드만 강조색 보더 + 옅은
 /// 강조 배경으로 두드러지게 한다.
 class IconOptionSelector<T> extends StatelessWidget {
   const IconOptionSelector({
@@ -91,7 +91,9 @@ class _OptionCell<T> extends StatelessWidget {
                 Icon(
                   option.icon,
                   size: option.iconSize,
-                  color: selected ? AppColors.accentForeground : AppColors.controlInactive,
+                  color: selected
+                      ? AppColors.accentForeground
+                      : AppColors.controlInactive,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -100,7 +102,9 @@ class _OptionCell<T> extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-                    color: selected ? AppColors.accentForeground : AppColors.textBody,
+                    color: selected
+                        ? AppColors.accentForeground
+                        : AppColors.textBody,
                   ),
                 ),
               ],

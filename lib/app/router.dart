@@ -6,6 +6,7 @@ import '../features/auth/providers/auth_notifier.dart';
 import '../features/auth/providers/auth_state.dart';
 import '../features/auth/screens/onboarding_screen.dart';
 import '../features/auth/widgets/auth_loading_gate.dart';
+import '../features/record_sync/screens/initial_record_sync_screen.dart';
 import 'main_shell.dart';
 
 /// Riverpod의 인증 상태 변화를 go_router의 `refresh`에 연결한다.
@@ -51,7 +52,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/feed',
-        builder: (context, state) => const AuthLoadingGate(child: MainShell()),
+        builder: (context, state) => const AuthLoadingGate(
+          child: InitialRecordSyncGate(child: MainShell()),
+        ),
       ),
     ],
   );

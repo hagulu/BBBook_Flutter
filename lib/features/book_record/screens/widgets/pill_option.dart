@@ -34,8 +34,8 @@ class PillOption extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected ? AppColors.accentFill : AppColors.surfaceSubtle,
             borderRadius: BorderRadius.circular(999),
-            // primary가 배경 대비 채도만 높고 명도는 거의 흰색이라, 선택
-            // 여부를 채우기색만으로 구분하기 어렵다 — 보더로 보강한다.
+            // accentFill은 밝은 표면과 명도 차가 작아 선택 배경만으로
+            // 구분하기 어려우므로 강조색 보더로 상태를 보강한다.
             border: selected
                 ? Border.all(color: AppColors.accentForeground, width: 1.2)
                 : null,

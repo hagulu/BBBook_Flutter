@@ -97,7 +97,10 @@ class BookshelfDao {
 
   Future<Set<int>> getDismissedIsbnLinkUserBookIds() async {
     final db = await BookshelfDatabase.instance();
-    final rows = await db.query('dismissed_isbn_link', columns: ['user_book_id']);
+    final rows = await db.query(
+      'dismissed_isbn_link',
+      columns: ['user_book_id'],
+    );
     return rows.map((r) => r['user_book_id'] as int).toSet();
   }
 
@@ -152,30 +155,42 @@ class BookshelfDao {
     DateTime requestedAt,
   ) async {
     final db = await BookshelfDatabase.instance();
-    await db.transaction((txn) async {
-      final serverIds = serverItems.map((e) => e.userBookId).toList();
+    await db.transaction(
+      (txn) => reconcileInTransaction(txn, serverItems, requestedAt),
+    );
+  }
 
-      for (final item in serverItems) {
-        await _upsertItemTxn(txn, item, syncedUpdatedAt: item.updatedAt);
-      }
+  /// 통합 최초 조회처럼 책장 외 데이터와 같은 트랜잭션에 전체 스냅샷을
+  /// 저장해야 하는 호출을 위한 transaction 버전이다.
+  Future<void> reconcileInTransaction(
+    Transaction txn,
+    List<BookItem> serverItems,
+    DateTime requestedAt, {
+    void Function()? onItemSaved,
+  }) async {
+    final serverIds = serverItems.map((e) => e.userBookId).toList();
 
-      if (serverIds.isEmpty) {
-        await txn.delete('user_book', where: 'is_dirty = 0');
-      } else {
-        final placeholders = List.filled(serverIds.length, '?').join(', ');
-        await txn.delete(
-          'user_book',
-          where: 'user_book_id NOT IN ($placeholders) AND is_dirty = 0',
-          whereArgs: serverIds,
-        );
-      }
-      await _pruneOrphanedDismissalsTxn(txn);
+    for (final item in serverItems) {
+      await _upsertItemTxn(txn, item, syncedUpdatedAt: item.updatedAt);
+      onItemSaved?.call();
+    }
 
-      await txn.insert('sync_meta', {
-        'key': 'last_synced_at',
-        'value': requestedAt.toUtc().toIso8601String(),
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
-    });
+    if (serverIds.isEmpty) {
+      await txn.delete('user_book', where: 'is_dirty = 0');
+    } else {
+      final placeholders = List.filled(serverIds.length, '?').join(', ');
+      await txn.delete(
+        'user_book',
+        where: 'user_book_id NOT IN ($placeholders) AND is_dirty = 0',
+        whereArgs: serverIds,
+      );
+    }
+    await _pruneOrphanedDismissalsTxn(txn);
+
+    await txn.insert('sync_meta', {
+      'key': 'last_synced_at',
+      'value': requestedAt.toUtc().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   /// 증분 동기화 결과를 로컬 DB에 반영한다: upserted 항목은 upsert, deletedUserBookIds는

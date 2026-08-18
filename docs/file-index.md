@@ -38,7 +38,7 @@
 
 - `lib/features/bookshelf/screens/bookshelf_screen.dart` — 책장 탭 콘텐츠(읽고 싶음/읽는 중/완독/중단 4탭, 기본은 읽는 중)
 - `lib/features/bookshelf/data/bookshelf_api.dart` — 책장 API 호출(전체 동기화, 증분 동기화, 완독 공개 설정 조회/수정, 카테고리 목록 GET)
-- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(user_book/user_book_tag/sync_meta/book_category, v3)
+- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타, v7)
 - `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호)
 - `lib/features/bookshelf/data/book_category_dao.dart` — 카테고리 마스터 목록 로컬 캐시 DAO(계정 무관, 로그아웃 시에도 유지)
 - `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화, 카테고리는 로컬 캐시 우선 조회
@@ -53,6 +53,20 @@
 - `lib/features/book_record/providers/book_record_providers.dart` — 책 기록 관련 Riverpod provider(단일 책 상태 컨트롤러, 태그 자동완성, 플랫폼 옵션)
 - `lib/features/book_record/screens/widgets/book_thumbnail_field.dart` — 책 표지 이미지 선택/미리보기 공용 위젯(책 정보 수정·직접 등록에서 공유)
 - `lib/features/book_record/screens/widgets/book_category_field.dart` — 카테고리 선택 필드 + 선택 팝업 공용 위젯(책 정보 수정·직접 등록에서 공유)
+
+## features/book_memo
+
+- `lib/features/book_memo/screens/book_memo_list.dart` — 책 기록 상세의 로컬 메모 목록 탭(메모 추가·상세 진입)
+- `lib/features/book_memo/screens/book_memo_detail_screen.dart` — 메모 제목 자동 저장과 타입별 조각 타임라인·로컬 CRUD 화면
+- `lib/features/book_memo/data/book_memo_repository.dart` — 서버 호출 없이 로컬 메모 조회·dirty CRUD·사진 파일 보관을 조율하는 source of truth
+- `lib/features/book_memo/providers/book_memo_providers.dart` — 책별 메모 목록·상세 상태 Riverpod provider
+
+## features/record_sync
+
+- `lib/features/record_sync/screens/initial_record_sync_screen.dart` — 인증 후 일반 화면 진입을 막고 최초 기록 다운로드·저장 진행 상태와 재시도를 표시하는 게이트 화면
+- `lib/features/record_sync/providers/record_sync_providers.dart` — 사용자별 최초 기록 동기화 단계·진행률·재시도 상태 관리
+- `lib/features/record_sync/data/record_sync_api.dart` — 전체 책장·기록 조회(`/api/me/records`) API 호출
+- `lib/features/record_sync/data/record_sync_repository.dart` — 전체 책장·기록 조회와 원자적 로컬 저장을 조율하는 초기 동기화 source of truth
 
 ## features/book_search
 
@@ -101,3 +115,4 @@
 - `docs/review/20260815-200333-bulk-isbn-link-and-overlay-snackbar-review.md` — ISBN 일괄 연결과 오버레이 스낵바의 상태·생명주기·접근성 리뷰
 - `docs/review/20260816-150901-isbn-link-dismissal-review.md` — ISBN 미연결 제외 기록의 영속성·비동기 오류 처리·상태 표시 접근성 리뷰
 - `docs/review/20260817-153500-forest-color-palette-review.md` — 밝은 숲 색상 팔레트 전환의 텍스트·활성 컨트롤 대비 접근성 리뷰
+- `docs/review/20260817-171413-initial-record-sync-review.md` — 최초 기록 동기화의 실패 복구 동선과 파일 인덱스 구성 리뷰

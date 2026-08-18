@@ -7,6 +7,7 @@ import '../../../core/utils/author_display.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../book_memo/screens/book_memo_list.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/models/book_status.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
@@ -118,148 +119,187 @@ class _BookRecordBody extends ConsumerWidget {
       bookRecordControllerProvider(userBookId).notifier,
     );
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _Header(
-            book: book,
-            onEditBookInfo: () => showBookInfoEditDialog(
-              context,
-              userBookId: userBookId,
-              book: book,
-            ),
-          ),
-          if (book.status == BookStatus.reading ||
-              book.status == BookStatus.paused) ...[
-            const SizedBox(height: 12),
-            ProgressCard(userBookId: userBookId, book: book),
-          ],
-          const SizedBox(height: 20),
-          RecordSectionCard(
-            child: Row(
+    return DefaultTabController(
+      length: 2,
+      child: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            sliver: SliverList.list(
               children: [
-                Expanded(
-                  child: ReadingStatusTile(
-                    status: book.status,
-                    summary: _statusSummary(book),
-                    onTap: () => _openReadingStatusDialog(context, controller),
+                _Header(
+                  book: book,
+                  onEditBookInfo: () => showBookInfoEditDialog(
+                    context,
+                    userBookId: userBookId,
+                    book: book,
                   ),
                 ),
-                InkWell(
-                  onTap: () => _toggleMasterpiece(context, controller),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 4,
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          '명작',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textStrong,
+                if (book.status == BookStatus.reading ||
+                    book.status == BookStatus.paused) ...[
+                  const SizedBox(height: 12),
+                  ProgressCard(userBookId: userBookId, book: book),
+                ],
+              ],
+            ),
+          ),
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: _RecordTabBarDelegate(
+              const TabBar(
+                tabs: [
+                  Tab(text: '정보'),
+                  Tab(text: '메모'),
+                ],
+                labelColor: AppColors.textStrong,
+                unselectedLabelColor: AppColors.textMuted,
+                indicatorColor: AppColors.accentForeground,
+                dividerColor: AppColors.border,
+              ),
+            ),
+          ),
+        ],
+        body: TabBarView(
+          children: [
+            ListView(
+              key: const PageStorageKey('book-record-info'),
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
+              children: [
+                RecordSectionCard(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ReadingStatusTile(
+                          status: book.status,
+                          summary: _statusSummary(book),
+                          onTap: () =>
+                              _openReadingStatusDialog(context, controller),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => _toggleMasterpiece(context, controller),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 4,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                '명작',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textStrong,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Icon(
+                                book.isMasterpiece
+                                    ? PhosphorIconsFill.crown
+                                    : PhosphorIconsRegular.crown,
+                                size: 28,
+                                color: book.isMasterpiece
+                                    ? AppColors.highlightGold
+                                    : AppColors.textMuted,
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Icon(
-                          book.isMasterpiece
-                              ? PhosphorIconsFill.crown
-                              : PhosphorIconsRegular.crown,
-                          size: 28,
-                          color: book.isMasterpiece
-                              ? AppColors.highlightGold
-                              : AppColors.textMuted,
-                        ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                MetaSummaryCard(
+                  startedAt: book.startedAt,
+                  onTapStartedAt: () => _pickDate(
+                    context,
+                    controller,
+                    current: book.startedAt,
+                    isStartedAt: true,
+                  ),
+                  finishedAt: book.finishedAt,
+                  onTapFinishedAt: () => _pickDate(
+                    context,
+                    controller,
+                    current: book.finishedAt,
+                    isStartedAt: false,
+                  ),
+                  sourceValue: _sourceSummary(book),
+                  sourceHasValue:
+                      BookSourceType.fromApiValue(book.sourceType) != null,
+                  onTapSource: () =>
+                      _openSourceDialog(context, ref, controller),
+                  sourceIcon: BookSourceType.fromApiValue(
+                    book.sourceType,
+                  )?.icon,
+                  difficultyValue:
+                      DifficultyLevel.fromApiValue(book.difficulty)?.label ??
+                      DifficultyLevel.values.map((d) => d.label).join(' · '),
+                  difficultyHasValue:
+                      DifficultyLevel.fromApiValue(book.difficulty) != null,
+                  onTapDifficulty: () =>
+                      _openDifficultyDialog(context, controller),
+                  difficultyIcon: DifficultyLevel.fromApiValue(
+                    book.difficulty,
+                  )?.icon,
+                ),
+                const SizedBox(height: 12),
+                RatingReviewCard(userBookId: userBookId, book: book),
+                const SizedBox(height: 12),
+                RecordSectionCard(
+                  child: RecordFieldTile(
+                    label: '알게 된 경로',
+                    value: book.discoverySource ?? '미설정',
+                    hasValue: book.discoverySource != null,
+                    onTap: () =>
+                        _openDiscoverySourceDialog(context, controller),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                RecordSectionCard(
+                  child: TagSection(userBookId: userBookId, tags: book.tags),
+                ),
+                const SizedBox(height: 20),
+                Center(
+                  child: InkWell(
+                    onTap: () => _confirmDelete(context, ref),
+                    borderRadius: BorderRadius.circular(8),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 12,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            PhosphorIconsRegular.trash,
+                            size: 16,
+                            color: AppColors.textMuted,
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            '서재에서 삭제',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 16),
-          MetaSummaryCard(
-            startedAt: book.startedAt,
-            onTapStartedAt: () => _pickDate(
-              context,
-              controller,
-              current: book.startedAt,
-              isStartedAt: true,
-            ),
-            finishedAt: book.finishedAt,
-            onTapFinishedAt: () => _pickDate(
-              context,
-              controller,
-              current: book.finishedAt,
-              isStartedAt: false,
-            ),
-            sourceValue: _sourceSummary(book),
-            sourceHasValue:
-                BookSourceType.fromApiValue(book.sourceType) != null,
-            onTapSource: () => _openSourceDialog(context, ref, controller),
-            sourceIcon: BookSourceType.fromApiValue(book.sourceType)?.icon,
-            difficultyValue:
-                DifficultyLevel.fromApiValue(book.difficulty)?.label ??
-                DifficultyLevel.values.map((d) => d.label).join(' · '),
-            difficultyHasValue:
-                DifficultyLevel.fromApiValue(book.difficulty) != null,
-            onTapDifficulty: () => _openDifficultyDialog(context, controller),
-            difficultyIcon: DifficultyLevel.fromApiValue(book.difficulty)?.icon,
-          ),
-          const SizedBox(height: 12),
-          RatingReviewCard(userBookId: userBookId, book: book),
-          const SizedBox(height: 12),
-          RecordSectionCard(
-            child: RecordFieldTile(
-              label: '알게 된 경로',
-              value: book.discoverySource ?? '미설정',
-              hasValue: book.discoverySource != null,
-              onTap: () => _openDiscoverySourceDialog(context, controller),
-            ),
-          ),
-          const SizedBox(height: 12),
-          RecordSectionCard(
-            child: TagSection(userBookId: userBookId, tags: book.tags),
-          ),
-          const SizedBox(height: 20),
-          Center(
-            child: InkWell(
-              onTap: () => _confirmDelete(context, ref),
-              borderRadius: BorderRadius.circular(8),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 8,
-                  horizontal: 12,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(
-                      PhosphorIconsRegular.trash,
-                      size: 16,
-                      color: AppColors.textMuted,
-                    ),
-                    SizedBox(width: 6),
-                    Text(
-                      '서재에서 삭제',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+            BookMemoList(userBookId: userBookId, bookTitle: book.title),
+          ],
+        ),
       ),
     );
   }
@@ -484,6 +524,30 @@ class _BookRecordBody extends ConsumerWidget {
   }
 }
 
+class _RecordTabBarDelegate extends SliverPersistentHeaderDelegate {
+  const _RecordTabBarDelegate(this.tabBar);
+
+  final TabBar tabBar;
+
+  @override
+  double get minExtent => 49;
+
+  @override
+  double get maxExtent => 49;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return ColoredBox(color: AppColors.pageBackground, child: tabBar);
+  }
+
+  @override
+  bool shouldRebuild(covariant _RecordTabBarDelegate oldDelegate) => false;
+}
+
 class _Header extends ConsumerWidget {
   const _Header({required this.book, required this.onEditBookInfo});
 
@@ -536,9 +600,8 @@ class _Header extends ConsumerWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color:
-                              (categoryColor ?? AppColors.controlInactive)
-                                  .withValues(alpha: 0.14),
+                          color: (categoryColor ?? AppColors.controlInactive)
+                              .withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(

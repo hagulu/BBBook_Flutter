@@ -1,4 +1,8 @@
+import 'dart:developer' as developer;
+import 'dart:io';
+
 import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// 책장 로컬 DB(sqflite) 스키마.
@@ -31,7 +35,7 @@ class BookshelfDatabase {
     final path = join(dbPath, 'bookshelf.db');
     return openDatabase(
       path,
-      version: 5,
+      version: 7,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -68,6 +72,15 @@ class BookshelfDatabase {
           // 정리는 deleteOne/reconcile/applyChanges에서 직접 한다).
           await db.execute('DROP TABLE IF EXISTS dismissed_isbn_link');
           await _createDismissedIsbnLinkTable(db);
+        }
+        if (oldVersion < 7) {
+          // v6은 이전 중첩 응답에 있던 책 snapshot을 메모/독후감에도
+          // 중복 저장했다. v7부터 API의 4개 flat 배열과 같은 테이블 단위
+          // 구조로 다시 만들며, 완료 키도 함께 바뀌어 전체 데이터를 재수신한다.
+          await db.execute('DROP TABLE IF EXISTS book_memo_item');
+          await db.execute('DROP TABLE IF EXISTS book_memo');
+          await db.execute('DROP TABLE IF EXISTS book_reflection');
+          await _createRecordTables(db);
         }
       },
       onCreate: (db, version) async {
@@ -126,6 +139,7 @@ class BookshelfDatabase {
         ''');
         await _createBookCategoryTable(db);
         await _createDismissedIsbnLinkTable(db);
+        await _createRecordTables(db);
       },
     );
   }
@@ -163,17 +177,99 @@ class BookshelfDatabase {
     ''');
   }
 
-  /// 로그아웃 시 이전 계정 데이터가 다음 로그인 사용자에게 노출되지 않도록 전부 비운다.
-  /// `book_category`는 계정과 무관한 전역 마스터 데이터(인증 불필요 API 응답)라
-  /// 로그아웃해도 지우지 않는다.
+  /// 전체 기록 조회(`/api/me/records`) 결과를 저장하는 로컬 테이블.
+  ///
+  /// `owner_user_id`는 API 응답 필드가 아닌 로컬 계정 격리용 값이다. 서버
+  /// PK(`id`)와 관계 키(`user_book_id`, `memo_id`)는 원형 그대로 유지한다.
+  /// 현재 전체 조회 응답에 없는 서버 삭제/수정 시각 컬럼은 향후 증분
+  /// 동기화를 위해 nullable로 준비한다.
+  static Future<void> _createRecordTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS book_memo (
+        id INTEGER PRIMARY KEY,
+        owner_user_id INTEGER NOT NULL,
+        user_book_id INTEGER NOT NULL,
+        title TEXT,
+        deleted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        is_dirty INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_book_memo_owner_user_book '
+      'ON book_memo(owner_user_id, user_book_id)',
+    );
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS book_memo_item (
+        id INTEGER PRIMARY KEY,
+        memo_id INTEGER NOT NULL,
+        item_type TEXT NOT NULL,
+        start_page INTEGER,
+        end_page INTEGER,
+        content TEXT,
+        image_url TEXT,
+        is_important INTEGER NOT NULL DEFAULT 0,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        deleted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT,
+        is_dirty INTEGER NOT NULL DEFAULT 0,
+        FOREIGN KEY (memo_id) REFERENCES book_memo(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_book_memo_item_memo_sort '
+      'ON book_memo_item(memo_id, sort_order)',
+    );
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS book_reflection (
+        id INTEGER PRIMARY KEY,
+        owner_user_id INTEGER NOT NULL,
+        user_book_id INTEGER NOT NULL,
+        reflection_type TEXT NOT NULL,
+        title TEXT,
+        content_json TEXT,
+        content_text TEXT,
+        is_public INTEGER NOT NULL DEFAULT 0,
+        is_hidden INTEGER NOT NULL DEFAULT 0,
+        deleted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        is_dirty INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_book_reflection_owner_user_book '
+      'ON book_reflection(owner_user_id, user_book_id)',
+    );
+  }
+
+  /// 로그아웃 시 이전 계정 데이터가 다음 로그인 사용자에게 노출되지 않도록
+  /// 책장·기록·동기화 완료 상태를 모두 비운다. `book_category`만 계정과
+  /// 무관한 전역 마스터 데이터라 유지한다.
   static Future<void> clearAll() async {
     sessionGeneration++;
     final db = await instance();
     await db.transaction((txn) async {
+      await txn.delete('book_memo_item');
+      await txn.delete('book_memo');
+      await txn.delete('book_reflection');
       await txn.delete('user_book_tag');
       await txn.delete('dismissed_isbn_link');
       await txn.delete('user_book');
       await txn.delete('sync_meta');
     });
+    await _clearMemoImages();
+  }
+
+  static Future<void> _clearMemoImages() async {
+    try {
+      final root = await getApplicationSupportDirectory();
+      final directory = Directory(join(root.path, 'memo_images'));
+      if (await directory.exists()) await directory.delete(recursive: true);
+    } catch (_) {
+      developer.log('[메모 사진 전체 정리] result=FAIL reason=local_file_error');
+    }
   }
 }

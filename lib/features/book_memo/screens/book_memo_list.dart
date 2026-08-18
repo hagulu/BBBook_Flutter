@@ -1,0 +1,288 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
+
+import '../../../core/theme/app_theme.dart';
+import '../../auth/providers/auth_notifier.dart';
+import '../models/book_memo.dart';
+import '../providers/book_memo_providers.dart';
+import 'book_memo_detail_screen.dart';
+
+/// 책 기록 상세의 메모 탭. 서버 요청 없이 [bookMemoListProvider]가 로컬 DB만
+/// 조회하며, 상세 화면에서 돌아오면 로컬 목록을 다시 읽는다.
+class BookMemoList extends ConsumerWidget {
+  const BookMemoList({
+    super.key,
+    required this.userBookId,
+    required this.bookTitle,
+  });
+
+  final int userBookId;
+  final String bookTitle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ownerUserId = ref.watch(
+      authNotifierProvider.select((auth) => auth.user?.id),
+    );
+    final asyncMemos = ref.watch(bookMemoListProvider(userBookId));
+
+    return CustomScrollView(
+      key: const PageStorageKey('book-memo-list'),
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
+          sliver: SliverToBoxAdapter(
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '개인 메모',
+                    style: TextStyle(
+                      color: AppColors.textStrong,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: ownerUserId == null
+                      ? null
+                      : () => _openMemo(context, ref, ownerUserId: ownerUserId),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(0, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  icon: const Icon(PhosphorIconsRegular.plus, size: 15),
+                  label: const Text('메모 추가'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        switch (asyncMemos) {
+          AsyncData(:final value) when value.isEmpty =>
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: _EmptyMemos(),
+            ),
+          AsyncData(:final value) => SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+            sliver: SliverList.separated(
+              itemCount: value.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final summary = value[index];
+                return _MemoCard(
+                  summary: summary,
+                  memoNumber: index + 1,
+                  onTap: ownerUserId == null
+                      ? null
+                      : () => _openMemo(
+                          context,
+                          ref,
+                          ownerUserId: ownerUserId,
+                          memoId: summary.memo.id,
+                        ),
+                );
+              },
+            ),
+          ),
+          AsyncError() => SliverFillRemaining(
+            hasScrollBody: false,
+            child: _MemoLoadError(
+              onRetry: () => ref.invalidate(bookMemoListProvider(userBookId)),
+            ),
+          ),
+          _ => const SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        },
+      ],
+    );
+  }
+
+  Future<void> _openMemo(
+    BuildContext context,
+    WidgetRef ref, {
+    required int ownerUserId,
+    int? memoId,
+  }) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => BookMemoDetailScreen(
+          ownerUserId: ownerUserId,
+          userBookId: userBookId,
+          bookTitle: bookTitle,
+          memoId: memoId,
+        ),
+      ),
+    );
+    ref.invalidate(bookMemoListProvider(userBookId));
+  }
+}
+
+class _MemoCard extends StatelessWidget {
+  const _MemoCard({
+    required this.summary,
+    required this.memoNumber,
+    required this.onTap,
+  });
+
+  final BookMemoSummary summary;
+  final int memoNumber;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = summary.memo.title?.trim();
+    return Material(
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+            boxShadow: const [
+              BoxShadow(
+                color: AppColors.shadowSoft,
+                blurRadius: 4,
+                offset: Offset(0, 1),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title == null || title.isEmpty
+                                ? '#$memoNumber'
+                                : title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textStrong,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if (summary.pageLabel != null) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            summary.pageLabel!,
+                            style: const TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      '${_formatDate(summary.memo.updatedAt)} · '
+                      '조각 ${summary.itemCount}개',
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Icon(
+                PhosphorIconsRegular.caretRight,
+                color: AppColors.controlInactive,
+                size: 18,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static String _formatDate(DateTime value) {
+    final local = value.toLocal();
+    return '${local.year}.${local.month}.${local.day}';
+  }
+}
+
+class _EmptyMemos extends StatelessWidget {
+  const _EmptyMemos();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(32, 24, 32, 80),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              PhosphorIconsRegular.notePencil,
+              size: 44,
+              color: AppColors.controlInactive,
+            ),
+            SizedBox(height: 14),
+            Text(
+              '아직 메모가 없습니다.',
+              style: TextStyle(
+                color: AppColors.textStrong,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 6),
+            Text(
+              '읽으며 떠오른 생각과 기억하고 싶은 문장을 남겨보세요.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textMuted, height: 1.4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MemoLoadError extends StatelessWidget {
+  const _MemoLoadError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            '메모를 불러오지 못했습니다.',
+            style: TextStyle(color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 8),
+          TextButton(onPressed: onRetry, child: const Text('다시 시도')),
+        ],
+      ),
+    );
+  }
+}
