@@ -35,7 +35,7 @@ class BookshelfDatabase {
     final path = join(dbPath, 'bookshelf.db');
     return openDatabase(
       path,
-      version: 7,
+      version: 8,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -81,6 +81,54 @@ class BookshelfDatabase {
           await db.execute('DROP TABLE IF EXISTS book_memo');
           await db.execute('DROP TABLE IF EXISTS book_reflection');
           await _createRecordTables(db);
+        }
+        if (oldVersion < 8) {
+          // 메모 저장/수정/삭제에 서버 동기화(dirty push + 전체/증분 새로고침)를
+          // 붙이며 로컬 PK(`id`)와 서버 PK를 분리한다. `id`는 오프라인에서
+          // 즉시 부여하는 음수 임시값일 수 있어(book_memo_dao._nextLocalId) 더
+          // 이상 "서버에 존재하는 실제 ID"라는 보장이 없다 — 그런데
+          // `book_memo_item.memo_id` 외래 키(ON DELETE CASCADE, ON UPDATE
+          // 없음)가 그 `id`를 그대로 참조하므로, push 성공 후 `id`를 서버
+          // 값으로 바꿔치기(remap)하면 CASCADE 없이 자식 FK가 끊어지거나(v8
+          // 이전) 자식을 다시 연결하는 별도 트랜잭션이 필요해진다. 대신
+          // `server_id`를 별도 컬럼으로 둬 `id`는 절대 바뀌지 않게 하고(상세
+          // 화면이 들고 있는 memoId 캐시가 push 이후에도 계속 유효),
+          // PATCH/DELETE 등 서버 호출에는 `server_id`만 쓴다. 이 컬럼이
+          // null이면 "아직 서버에 한 번도 반영되지 못한 로컬 전용 행"이라는
+          // 뜻이 되어 dirty push 대상 판별에도 쓰인다.
+          //
+          // v6 이하에서 v8로 건너뛰어 업그레이드하면 바로 위 `oldVersion < 7`
+          // 블록이 이미 `_createRecordTables()`(server_id 포함 최신 스키마)로
+          // 테이블을 새로 만들어 컬럼이 이미 존재한다 — 그 상태에서 아래
+          // ALTER를 또 실행하면 `duplicate column name`으로 DB 오픈 자체가
+          // 실패한다. `PRAGMA table_info`로 컬럼 존재 여부를 먼저 확인해
+          // v7에서 v8로 올라오는 경우에만 실제로 컬럼을 추가한다(건너뛰기
+          // 업그레이드는 어차피 그 블록에서 테이블이 빈 채로 새로 만들어져
+          // 백필할 대상 자체가 없다).
+          if (!await _hasColumn(db, 'book_memo', 'server_id')) {
+            await db.execute(
+              'ALTER TABLE book_memo ADD COLUMN server_id INTEGER',
+            );
+            await db.execute(
+              'ALTER TABLE book_memo_item ADD COLUMN server_id INTEGER',
+            );
+            // v7에도 이미 `_nextLocalId` 기반 로컬 전용 생성(오프라인
+            // 메모/조각 작성, 음수 `id`)이 있었다 — 이번 작업 이전에는
+            // 그 행을 서버로 push하는 경로가 아예 없었을 뿐, "로컬에만
+            // 있고 아직 서버에 반영되지 못한 dirty 행"은 이미 존재할 수
+            // 있었다. 그런 행까지 `server_id = id`(음수)로 채우면 이후
+            // push가 "이미 서버에 있는 행"으로 오인해 존재하지도 않는
+            // 음수 ID로 PATCH/DELETE를 반복하며 dirty가 영영 풀리지
+            // 않는다. `id > 0`인 행(=서버 GET 응답으로 들어온, 확실히
+            // 서버에 존재하는 행)만 백필하고, 음수 ID 행은 server_id를
+            // NULL로 남겨 다음 push가 생성(POST/PUT) 경로를 타게 한다.
+            await db.execute(
+              'UPDATE book_memo SET server_id = id WHERE id > 0',
+            );
+            await db.execute(
+              'UPDATE book_memo_item SET server_id = id WHERE id > 0',
+            );
+          }
         }
       },
       onCreate: (db, version) async {
@@ -144,6 +192,15 @@ class BookshelfDatabase {
     );
   }
 
+  static Future<bool> _hasColumn(
+    Database db,
+    String table,
+    String column,
+  ) async {
+    final rows = await db.rawQuery('PRAGMA table_info($table)');
+    return rows.any((row) => row['name'] == column);
+  }
+
   /// `sort_order`는 서버 응답 배열의 위치를 그대로 저장한다(API가 `sort_order`
   /// 값 자체는 내려주지 않고 이미 정렬된 배열만 반환하므로).
   static Future<void> _createBookCategoryTable(Database db) async {
@@ -179,14 +236,25 @@ class BookshelfDatabase {
 
   /// 전체 기록 조회(`/api/me/records`) 결과를 저장하는 로컬 테이블.
   ///
-  /// `owner_user_id`는 API 응답 필드가 아닌 로컬 계정 격리용 값이다. 서버
-  /// PK(`id`)와 관계 키(`user_book_id`, `memo_id`)는 원형 그대로 유지한다.
-  /// 현재 전체 조회 응답에 없는 서버 삭제/수정 시각 컬럼은 향후 증분
-  /// 동기화를 위해 nullable로 준비한다.
+  /// `owner_user_id`는 API 응답 필드가 아닌 로컬 계정 격리용 값이다. 서버에서
+  /// 받은 행은 서버 PK(`id`)와 관계 키(`user_book_id`, `memo_id`)를 원형
+  /// 그대로 유지한다. 현재 전체 조회 응답에 없는 서버 삭제/수정 시각 컬럼은
+  /// 향후 증분 동기화를 위해 nullable로 준비한다.
+  ///
+  /// `book_memo`/`book_memo_item`의 `server_id`는 `id`와 별도의 컬럼이다.
+  /// 메모/조각은 오프라인에서 즉시 로컬 음수 ID로 생성될 수 있는데(
+  /// `BookMemoDao._nextLocalId`), 그 상태의 `id`는 서버에 아직 존재하지
+  /// 않는다. push가 성공하면 서버가 내려준 진짜 ID를 `server_id`에 채우고
+  /// `id`는 그대로 둔다 — `id`를 서버 값으로 바꿔치기하면
+  /// `book_memo_item.memo_id`(ON DELETE CASCADE, ON UPDATE 없음) FK가
+  /// 깨지고, 상세 화면이 들고 있는 memoId 캐시도 함께 무효화된다. PATCH/DELETE
+  /// 등 서버 호출은 항상 `server_id`를 쓰고, `server_id IS NULL`이면 "아직
+  /// 서버에 한 번도 반영되지 못한 로컬 전용 행"이라는 뜻이다.
   static Future<void> _createRecordTables(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS book_memo (
         id INTEGER PRIMARY KEY,
+        server_id INTEGER,
         owner_user_id INTEGER NOT NULL,
         user_book_id INTEGER NOT NULL,
         title TEXT,
@@ -203,6 +271,7 @@ class BookshelfDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS book_memo_item (
         id INTEGER PRIMARY KEY,
+        server_id INTEGER,
         memo_id INTEGER NOT NULL,
         item_type TEXT NOT NULL,
         start_page INTEGER,

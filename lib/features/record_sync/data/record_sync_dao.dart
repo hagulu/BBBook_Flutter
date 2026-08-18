@@ -77,6 +77,11 @@ class RecordSyncDao {
       for (final memo in payload.memos) {
         await txn.insert('book_memo', {
           'id': memo.id,
+          // 최초 동기화로 받은 행은 서버에 이미 존재하는 행이므로 server_id를
+          // id와 동일하게 채운다 — BookMemoRepository.sync()의 dirty push가
+          // "server_id == null"을 "아직 서버에 없는 로컬 전용 행"으로
+          // 판별하는 기준이 되므로 비워두면 안 된다.
+          'server_id': memo.id,
           'owner_user_id': userId,
           'user_book_id': memo.userBookId,
           'title': memo.title,
@@ -91,6 +96,7 @@ class RecordSyncDao {
       for (final item in payload.items) {
         await txn.insert('book_memo_item', {
           'id': item.id,
+          'server_id': item.id,
           'memo_id': item.memoId,
           'item_type': item.itemType,
           'start_page': item.startPage,
@@ -101,7 +107,7 @@ class RecordSyncDao {
           'sort_order': item.sortOrder,
           'deleted_at': null,
           'created_at': _date(item.createdAt),
-          'updated_at': null,
+          'updated_at': _date(item.updatedAt),
           'is_dirty': 0,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
         onProgress(++saved, total);
@@ -139,6 +145,13 @@ class RecordSyncDao {
       await txn.insert('sync_meta', {
         'key': _completionKey(userId),
         'value': DateTime.now().toUtc().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      // 메모 동기화 기준값(BookMemoRepository.sync()가 쓰는 since)도 이번
+      // 요청 시각으로 함께 시딩한다 — 그러지 않으면 최초 동기화 직후의 첫
+      // 메모 sync()가 방금 다 받은 데이터를 또 전체 조회로 중복 요청한다.
+      await txn.insert('sync_meta', {
+        'key': 'last_synced_at_memo',
+        'value': requestedAt.toUtc().toIso8601String(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     });
 

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../book_memo/providers/book_memo_providers.dart';
 import '../../book_record/providers/book_record_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../data/auth_api.dart' show SocialProvider;
@@ -166,6 +167,15 @@ class AuthNotifier extends Notifier<AuthState> {
       // 기록 화면이 열린 채로 로그아웃하는 경우까지 대비해 명시적으로도 비운다.
       ref.invalidate(bookRecordControllerProvider);
       ref.read(bookshelfSyncVersionProvider.notifier).state++;
+      // 메모 동기화 컨트롤러도 같은 이유로 비운다 — 안 비우면 다음 로그인
+      // 사용자 세션에서도 이전 계정의 "마지막 동기화 시각"이 캐시된 채
+      // 남아, 실제로는 방금 clearLocal()로 로컬 DB의 sync_meta까지 비웠는데
+      // 화면은 여전히 그 값을 들고 있게 된다. 목록/상세 provider도(autoDispose
+      // family) 책 기록 화면과 같은 이유로 명시적으로 비운다.
+      ref.invalidate(bookMemoSyncControllerProvider);
+      ref.invalidate(bookMemoListProvider);
+      ref.invalidate(bookMemoDetailProvider);
+      ref.read(bookMemoSyncVersionProvider.notifier).state++;
     }
   }
 

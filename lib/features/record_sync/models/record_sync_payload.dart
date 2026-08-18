@@ -12,6 +12,7 @@ class ServerBookMemoItem {
     required this.isImportant,
     required this.sortOrder,
     required this.createdAt,
+    required this.updatedAt,
   });
 
   factory ServerBookMemoItem.fromJson(Map<String, dynamic> json) {
@@ -26,6 +27,14 @@ class ServerBookMemoItem {
       isImportant: json['isImportant'] as bool,
       sortOrder: json['sortOrder'] as int,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      // GET /api/me/records 응답의 items[n]은 api-doc 기준
+      // `GET /api/me/memos/sync/changes`의 upsertedItems[n]과 같은
+      // 스키마라 updatedAt을 포함하지만, 혹시 누락돼도(구버전 서버 등)
+      // createdAt으로 대체해 항상 값이 있게 한다 — 이후 증분 동기화가
+      // 이 값을 변경 감지 기준으로 쓴다.
+      updatedAt: json['updatedAt'] == null
+          ? DateTime.parse(json['createdAt'] as String)
+          : DateTime.parse(json['updatedAt'] as String),
     );
   }
 
@@ -39,6 +48,7 @@ class ServerBookMemoItem {
   final bool isImportant;
   final int sortOrder;
   final DateTime createdAt;
+  final DateTime updatedAt;
 }
 
 class ServerBookMemo {

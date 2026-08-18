@@ -7,9 +7,12 @@ import '../../auth/providers/auth_notifier.dart';
 import '../models/book_memo.dart';
 import '../providers/book_memo_providers.dart';
 import 'book_memo_detail_screen.dart';
+import 'widgets/book_memo_refresh_indicator.dart';
 
-/// 책 기록 상세의 메모 탭. 서버 요청 없이 [bookMemoListProvider]가 로컬 DB만
-/// 조회하며, 상세 화면에서 돌아오면 로컬 목록을 다시 읽는다.
+/// 책 기록 상세의 메모 탭. [bookMemoListProvider]가 로컬 DB만 조회하고,
+/// 상세 화면에서 돌아오면 로컬 목록을 다시 읽는다. 서버와의 동기화(dirty
+/// push + 전체/증분 새로고침)는 당겨서 새로고침([BookMemoRefreshIndicator])
+/// 또는 앱 저장/수정/삭제 직후의 백그라운드 push로만 일어난다.
 class BookMemoList extends ConsumerWidget {
   const BookMemoList({
     super.key,
@@ -27,83 +30,87 @@ class BookMemoList extends ConsumerWidget {
     );
     final asyncMemos = ref.watch(bookMemoListProvider(userBookId));
 
-    return CustomScrollView(
-      key: const PageStorageKey('book-memo-list'),
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
-          sliver: SliverToBoxAdapter(
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    '개인 메모',
-                    style: TextStyle(
-                      color: AppColors.textStrong,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+    return BookMemoRefreshIndicator(
+      child: CustomScrollView(
+        key: const PageStorageKey('book-memo-list'),
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
+            sliver: SliverToBoxAdapter(
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      '개인 메모',
+                      style: TextStyle(
+                        color: AppColors.textStrong,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: ownerUserId == null
-                      ? null
-                      : () => _openMemo(context, ref, ownerUserId: ownerUserId),
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    textStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                  ElevatedButton.icon(
+                    onPressed: ownerUserId == null
+                        ? null
+                        : () =>
+                              _openMemo(context, ref, ownerUserId: ownerUserId),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(0, 36),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      textStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                    icon: const Icon(PhosphorIconsRegular.plus, size: 15),
+                    label: const Text('메모 추가'),
                   ),
-                  icon: const Icon(PhosphorIconsRegular.plus, size: 15),
-                  label: const Text('메모 추가'),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-        switch (asyncMemos) {
-          AsyncData(:final value) when value.isEmpty =>
-            const SliverFillRemaining(
+          switch (asyncMemos) {
+            AsyncData(:final value) when value.isEmpty =>
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyMemos(),
+              ),
+            AsyncData(:final value) => SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              sliver: SliverList.separated(
+                itemCount: value.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final summary = value[index];
+                  return _MemoCard(
+                    summary: summary,
+                    memoNumber: index + 1,
+                    onTap: ownerUserId == null
+                        ? null
+                        : () => _openMemo(
+                            context,
+                            ref,
+                            ownerUserId: ownerUserId,
+                            memoId: summary.memo.id,
+                          ),
+                  );
+                },
+              ),
+            ),
+            AsyncError() => SliverFillRemaining(
               hasScrollBody: false,
-              child: _EmptyMemos(),
+              child: _MemoLoadError(
+                onRetry: () => ref.invalidate(bookMemoListProvider(userBookId)),
+              ),
             ),
-          AsyncData(:final value) => SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-            sliver: SliverList.separated(
-              itemCount: value.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                final summary = value[index];
-                return _MemoCard(
-                  summary: summary,
-                  memoNumber: index + 1,
-                  onTap: ownerUserId == null
-                      ? null
-                      : () => _openMemo(
-                          context,
-                          ref,
-                          ownerUserId: ownerUserId,
-                          memoId: summary.memo.id,
-                        ),
-                );
-              },
+            _ => const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(child: CircularProgressIndicator()),
             ),
-          ),
-          AsyncError() => SliverFillRemaining(
-            hasScrollBody: false,
-            child: _MemoLoadError(
-              onRetry: () => ref.invalidate(bookMemoListProvider(userBookId)),
-            ),
-          ),
-          _ => const SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(child: CircularProgressIndicator()),
-          ),
-        },
-      ],
+          },
+        ],
+      ),
     );
   }
 

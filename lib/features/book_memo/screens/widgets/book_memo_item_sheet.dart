@@ -286,13 +286,10 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
           TextButton(
             onPressed: _submit,
             style: TextButton.styleFrom(
-              backgroundColor: AppColors.accentFill,
-              foregroundColor: AppColors.textStrong,
-              minimumSize: const Size(58, 36),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              shape: const StadiumBorder(),
+              foregroundColor: AppColors.accentForeground,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               textStyle: const TextStyle(
-                fontSize: 14,
+                fontSize: 15,
                 fontWeight: FontWeight.bold,
               ),
             ),

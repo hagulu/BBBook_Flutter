@@ -370,7 +370,7 @@ class _MemoTimelineItem extends StatelessWidget {
     final headerBackground = Color.lerp(
       AppColors.surface,
       typeStyle.background,
-      0.32,
+      0.62,
     )!;
     return Material(
       color: cardBackground,
@@ -490,9 +490,19 @@ class _MemoTimelineItem extends StatelessWidget {
 
   static String _formatDateTime(DateTime value) {
     final local = value.toLocal();
+    final difference = DateTime.now().difference(local);
+    final elapsed = difference.isNegative ? Duration.zero : difference;
+    if (elapsed.inSeconds < 60) {
+      final seconds = elapsed.inSeconds < 1 ? 1 : elapsed.inSeconds;
+      return '$seconds초 전';
+    }
+    if (elapsed.inMinutes < 60) return '${elapsed.inMinutes}분 전';
+    if (elapsed.inHours < 24) return '${elapsed.inHours}시간 전';
+    if (elapsed.inDays < 30) return '${elapsed.inDays}일 전';
+
     final hour = local.hour.toString().padLeft(2, '0');
     final minute = local.minute.toString().padLeft(2, '0');
-    return '${local.month}.${local.day} $hour:$minute';
+    return '${local.month}-${local.day} $hour:$minute';
   }
 }
 

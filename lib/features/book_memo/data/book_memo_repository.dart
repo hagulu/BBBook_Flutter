@@ -1,21 +1,45 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
+import '../../../core/network/api_exception.dart';
+import '../../bookshelf/data/bookshelf_database.dart';
+import '../../record_sync/data/record_sync_api.dart';
+import '../../record_sync/models/record_sync_payload.dart';
 import '../models/book_memo.dart';
+import 'book_memo_api.dart';
 import 'book_memo_dao.dart';
 
-/// 메모 화면의 로컬 source of truth.
+/// 메모 화면의 source of truth.
 ///
-/// 이 Repository는 네트워크/API 의존성을 갖지 않는다. 모든 조회·CRUD는
-/// `book_memo`/`book_memo_item` 로컬 테이블만 사용하며, 쓰기는 DAO가
-/// `is_dirty=1`과 `updated_at`을 함께 기록한다.
+/// 화면은 항상 이 Repository를 통해 로컬 DB만 읽고 쓴다. 저장/수정/삭제는
+/// 로컬에 즉시 반영하고 `is_dirty=1`로 표시한 뒤([BookMemoDao]), 그 자리에서
+/// 조용히 서버로 push를 시도한다([pushMemo]) — 성공하면 dirty가 풀리고,
+/// 실패(오프라인 등)하면 dirty가 남아 다음 [sync] 호출 때 재시도된다. 즉
+/// 화면의 CRUD 호출은 네트워크 실패와 무관하게 항상 즉시 완료된다.
+///
+/// [sync]는 dirty push를 먼저 처리한 뒤, 로컬에 동기화 기준값(마지막 since)이
+/// 없으면(최초 로그인 등) 전체 동기화를, 있으면 증분 동기화를 수행한다.
 class BookMemoRepository {
-  const BookMemoRepository(this._dao);
+  BookMemoRepository({
+    required this._api,
+    required this._recordSyncApi,
+    this._dao = const BookMemoDao(),
+  });
 
+  final BookMemoApi _api;
+  final RecordSyncApi _recordSyncApi;
   final BookMemoDao _dao;
+
+  /// [pushMemo] 호출을 메모별로 순서대로 실행시키는 체인.
+  /// [BookshelfRepository._dirtyPushChains]와 같은 이유로 필요하다: 서버에
+  /// 아직 없는(로컬 음수 ID) 메모에 대해 겹치는 push가 동시에 나가면 제목
+  /// PUT(또는 첫 조각 POST)이 두 번 실행되어 서버에 메모가 두 개 생길 수
+  /// 있다.
+  final Map<int, Future<void>> _dirtyPushChains = {};
 
   Future<List<BookMemoSummary>> findByUserBook({
     required int ownerUserId,
@@ -63,6 +87,7 @@ class BookMemoRepository {
         '[$operation] userId=$ownerUserId bookId=$userBookId '
         'memoId=${memo.id} result=SUCCESS',
       );
+      unawaited(pushMemo(memo.id));
       return memo;
     } catch (error) {
       developer.log(
@@ -93,6 +118,7 @@ class BookMemoRepository {
         '[메모 조각 생성] userId=$ownerUserId bookId=$userBookId '
         'memoId=$memoId itemId=${item.id} result=SUCCESS',
       );
+      unawaited(pushMemo(memoId));
       return item;
     } catch (error) {
       if (draft.pickedImagePath != null) {
@@ -130,6 +156,7 @@ class BookMemoRepository {
         '[메모 조각 수정] userId=$ownerUserId bookId=$userBookId '
         'memoId=$memoId itemId=$itemId result=SUCCESS',
       );
+      unawaited(pushMemo(memoId));
       return item;
     } catch (error) {
       if (draft.pickedImagePath != null) {
@@ -163,6 +190,7 @@ class BookMemoRepository {
         '[메모 조각 삭제] userId=$ownerUserId bookId=$userBookId '
         'memoId=$memoId itemId=$itemId result=SUCCESS',
       );
+      unawaited(pushMemo(memoId));
       return result;
     } catch (error) {
       developer.log(
@@ -172,6 +200,527 @@ class BookMemoRepository {
       );
       rethrow;
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // 서버 동기화
+  // ---------------------------------------------------------------------
+
+  Future<DateTime?> getLastSyncedAtMemo() => _dao.getLastSyncedAtMemo();
+
+  /// dirty push(제목/조각 생성·수정·삭제) → since가 없으면 전체 동기화,
+  /// 있으면 증분 동기화 → 증분 응답이 fullSyncRequired면 전체 동기화로 대체.
+  /// [BookshelfRepository.sync]와 같은 구조다.
+  ///
+  /// 반환값은 실제로 로컬 DB가 바뀌었는지 여부.
+  Future<bool> sync({required int ownerUserId}) async {
+    final expectedGeneration = BookshelfDatabase.sessionGeneration;
+
+    await pushAllDirty();
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+      return false;
+    }
+
+    final since = await _dao.getLastSyncedAtMemo();
+    if (since == null) {
+      return _fullSync(ownerUserId, expectedGeneration);
+    }
+
+    final result = await _api.getSyncChanges(since: since);
+    if (result.fullSyncRequired) {
+      // 증분 응답의 syncedAt(서버 시각)을 기준값으로 쓴다 — 클라이언트
+      // now()를 쓰면 기기 시계가 서버보다 앞서 있을 때 그 오차만큼 이후
+      // 서버 변경을 영구히 놓칠 수 있다.
+      return _fullSync(
+        ownerUserId,
+        expectedGeneration,
+        baseline: result.syncedAt,
+      );
+    }
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+      return false;
+    }
+
+    await _dao.applyMemoChanges(
+      ownerUserId: ownerUserId,
+      upsertedMemos: result.upsertedMemos,
+      deletedMemoIds: result.deletedMemoIds,
+      upsertedItems: result.upsertedItems,
+      deletedItemIds: result.deletedItemIds,
+      syncedAt: result.syncedAt,
+    );
+    return result.upsertedMemos.isNotEmpty ||
+        result.deletedMemoIds.isNotEmpty ||
+        result.upsertedItems.isNotEmpty ||
+        result.deletedItemIds.isNotEmpty;
+  }
+
+  /// [baseline]을 넘기지 않으면(최초 동기화 등 서버 시각을 알 수 없을 때)
+  /// 요청 직전 클라이언트 시각(UTC)을 기준값으로 쓴다. `/api/me/records`(최초
+  /// 기록 전체 조회 — record_sync 기능과 같은 API)를 그대로 재사용한다.
+  /// api-doc(`api-me-memos-sync-changes-get.md`)이 `fullSyncRequired`일 때의
+  /// 복구 경로로 이 API를 명시하고 있다.
+  Future<bool> _fullSync(
+    int ownerUserId,
+    int expectedGeneration, {
+    DateTime? baseline,
+  }) async {
+    final requestedAt = baseline ?? DateTime.now().toUtc();
+    final payload = await _recordSyncApi.getAllRecords();
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+      return false;
+    }
+    await _dao.reconcileFullMemo(
+      ownerUserId: ownerUserId,
+      activeUserBookIds: payload.books
+          .map((b) => b.userBookId)
+          .toList(growable: false),
+      memos: payload.memos,
+      items: payload.items,
+      requestedAt: requestedAt,
+    );
+    return true;
+  }
+
+  /// dirty 표시된 메모/조각을 모두 서버로 일괄 재전송한다. 각 메모는
+  /// 독립적으로 처리한다 — 하나가 실패해도 다른 메모의 push는 계속
+  /// 시도하고, dirty가 남은 메모는 다음 [sync] 때 다시 재시도된다.
+  Future<void> pushAllDirty() async {
+    final expectedGeneration = BookshelfDatabase.sessionGeneration;
+    final memoIds = <int>{
+      ...await _dao.getDirtyMemoLocalIds(),
+      ...await _dao.getMemoIdsWithDirtyItems(),
+    };
+    for (final id in memoIds) {
+      if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+      await pushMemo(id);
+    }
+  }
+
+  /// 특정 메모(제목 + 조각 전체)의 dirty 로컬 편집을 서버로 push한다. 편집
+  /// 직후([saveTitle]/[createItem]/[updateItem]/[deleteItem])와 동기화
+  /// 시점([pushAllDirty]) 모두에서 호출되며, 같은 메모에 대한 동시 호출은
+  /// [_dirtyPushChains]로 직렬화한다.
+  Future<void> pushMemo(int localMemoId) {
+    final previous = _dirtyPushChains[localMemoId] ?? Future<void>.value();
+    final chained = previous
+        .then((_) => _pushOneMemo(localMemoId))
+        // 체인에 쌓인 Future가 에러로 완료되면 뒤에 이어붙는 호출들이 전부
+        // 건너뛰어지므로 여기서 삼켜 체인이 끊기지 않게 한다(실패는 이미
+        // 내부에서 로그로만 남기고 dirty를 유지한다).
+        .catchError((_, _) {});
+    _dirtyPushChains[localMemoId] = chained;
+    return chained;
+  }
+
+  Future<void> _pushOneMemo(int localMemoId) async {
+    final expectedGeneration = BookshelfDatabase.sessionGeneration;
+    final memo = await _dao.getMemoByLocalId(localMemoId);
+    if (memo == null) return; // 이미 로컬에서 정리됨
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+
+    int? serverMemoId = memo.serverId;
+
+    // 소프트 삭제된 메모(마지막 조각까지 지워짐)는 제목을 새로 만들거나
+    // 갱신할 이유가 없다 — 서버에는 조각 삭제 push만으로 충분하다(메모
+    // 전용 삭제 API가 없고, 마지막 조각이 지워지면 서버가 메모도 함께
+    // 지운다). 아래 조각 루프로 바로 넘어간다.
+    if (memo.deletedAt == null) {
+      if (serverMemoId == null) {
+        if (memo.title != null) {
+          try {
+            final result = await _api.putTitle(
+              userBookId: memo.userBookId,
+              memoId: null,
+              title: memo.title,
+            );
+            if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+              return;
+            }
+            serverMemoId = result.memoId;
+            if (serverMemoId != null) {
+              await _dao.confirmMemoCreated(
+                localId: localMemoId,
+                serverId: serverMemoId,
+                capturedUpdatedAt: memo.updatedAt,
+              );
+            }
+            developer.log(
+              '[메모 생성 push] userBookId=${memo.userBookId} '
+              'localMemoId=$localMemoId result=SUCCESS',
+            );
+          } catch (e) {
+            developer.log(
+              '[메모 생성 push] userBookId=${memo.userBookId} '
+              'localMemoId=$localMemoId result=FAIL reason=${_reasonOf(e)}',
+            );
+            // 메모 자체가 아직 서버에 없으니 조각도 보낼 수 없다 — 다음
+            // push 때 제목부터 다시 시도한다.
+            return;
+          }
+        }
+        // title == null이면 여기서 아무 것도 하지 않는다 — 서버는
+        // memoId/title이 모두 없는 PUT을 no-op으로 처리하므로, 아래 조각
+        // 루프가 첫 조각으로 메모를 함께 만든다.
+      } else if (memo.isDirty) {
+        try {
+          await _api.putTitle(
+            userBookId: memo.userBookId,
+            memoId: serverMemoId,
+            title: memo.title,
+          );
+          if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+            return;
+          }
+          await _dao.confirmMemoTitlePush(
+            localId: localMemoId,
+            capturedUpdatedAt: memo.updatedAt,
+          );
+          developer.log(
+            '[메모 제목 push] userBookId=${memo.userBookId} '
+            'localMemoId=$localMemoId result=SUCCESS',
+          );
+        } catch (e) {
+          developer.log(
+            '[메모 제목 push] userBookId=${memo.userBookId} '
+            'localMemoId=$localMemoId result=FAIL reason=${_reasonOf(e)}',
+          );
+          // 메모는 이미 서버에 있으니 제목 push가 실패해도 조각 push는
+          // 계속 시도한다(서로 독립적인 필드).
+        }
+      }
+    }
+
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+    await _pushItemsForMemo(
+      localMemoId,
+      memo.userBookId,
+      serverMemoId,
+      expectedGeneration,
+      memo.updatedAt,
+    );
+    await _dao.purgeMemoIfFullyDeleted(localMemoId);
+  }
+
+  Future<void> _pushItemsForMemo(
+    int localMemoId,
+    int userBookId,
+    int? serverMemoId,
+    int expectedGeneration,
+    DateTime memoUpdatedAt,
+  ) async {
+    final dirtyItems = await _dao.getDirtyItemsForMemo(localMemoId);
+    for (final item in dirtyItems) {
+      if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+      if (item.deletedAt != null) {
+        await _pushDeletedItem(userBookId, item, expectedGeneration);
+        continue;
+      }
+      // 직전 조각의 push가 메모 생성까지는 성공했지만 그 다음 단계(예:
+      // PHOTO 승격을 위한 이미지 업로드)에서 실패했을 수 있다 — 그 경우
+      // [_pushLiveItem]의 반환값은 실패로 인해 여전히 null이지만 메모
+      // 자체는 이미 서버에 존재한다. serverMemoId가 null일 때마다 DB에서
+      // 다시 확인해야 같은 메모를 두 번 만들지 않는다.
+      serverMemoId ??= (await _dao.getMemoByLocalId(localMemoId))?.serverId;
+      serverMemoId = await _pushLiveItem(
+        userBookId,
+        localMemoId,
+        serverMemoId,
+        item,
+        expectedGeneration,
+        memoUpdatedAt,
+      );
+    }
+  }
+
+  Future<void> _pushDeletedItem(
+    int userBookId,
+    BookMemoItem item,
+    int expectedGeneration,
+  ) async {
+    try {
+      if (item.serverId != null) {
+        await _api.deleteItem(userBookId: userBookId, itemId: item.serverId!);
+      }
+      _checkSession(expectedGeneration);
+      await _dao.purgeItem(item.id);
+      developer.log(
+        '[메모 조각 삭제 push] userBookId=$userBookId itemId=${item.id} '
+        'result=SUCCESS',
+      );
+    } catch (e) {
+      developer.log(
+        '[메모 조각 삭제 push] userBookId=$userBookId itemId=${item.id} '
+        'result=FAIL reason=${_reasonOf(e)}',
+      );
+    }
+  }
+
+  /// 조각 하나를 push하고, 이 조각이 (제목 없는) 신규 메모를 함께 만들었다면
+  /// 그 서버 메모 ID를 반환한다(다음 조각부터는 그 값을 그대로 쓴다).
+  Future<int?> _pushLiveItem(
+    int userBookId,
+    int localMemoId,
+    int? serverMemoId,
+    BookMemoItem item,
+    int expectedGeneration,
+    DateTime memoUpdatedAt,
+  ) async {
+    try {
+      if (item.serverId == null) {
+        serverMemoId = await _createItemOnServer(
+          userBookId,
+          localMemoId,
+          serverMemoId,
+          item,
+          expectedGeneration,
+          memoUpdatedAt,
+        );
+      } else {
+        await _updateItemOnServer(
+          userBookId,
+          serverMemoId!,
+          item,
+          expectedGeneration,
+        );
+      }
+      developer.log(
+        '[메모 조각 push] userBookId=$userBookId itemId=${item.id} '
+        'result=SUCCESS',
+      );
+    } catch (e) {
+      developer.log(
+        '[메모 조각 push] userBookId=$userBookId itemId=${item.id} '
+        'result=FAIL reason=${_reasonOf(e)}',
+      );
+    }
+    return serverMemoId;
+  }
+
+  Future<int> _createItemOnServer(
+    int userBookId,
+    int localMemoId,
+    int? serverMemoId,
+    BookMemoItem item,
+    int expectedGeneration,
+    DateTime memoUpdatedAt,
+  ) async {
+    if (serverMemoId == null) {
+      // 메모가 아직 서버에 없다(제목 없는 신규 메모) — 이 조각이 메모를
+      // 함께 만든다.
+      if (item.type == BookMemoItemType.photo) {
+        // PHOTO는 memoId 없이 만들 수 없다(업로드한 R2 키가 그 memoId
+        // 하위여야 함 — api-doc 참고). 우선 자리표시용 타입(SUMMARY)으로
+        // 메모+조각을 만들어 memoId를 확보한 뒤, 그 memoId로 이미지를
+        // 업로드하고 PATCH로 PHOTO로 승격한다. 서버에 짧게 남는 잘못된
+        // 타입은 이 요청들이 모두 끝나면 사라지며, 사용자에게 노출되는
+        // 어떤 값(제목 등)도 만들어내지 않는다.
+        final placeholder = await _api.postItem(
+          userBookId: userBookId,
+          memoId: null,
+          itemType: BookMemoItemType.summary,
+          startPage: item.startPage,
+          endPage: item.endPage,
+          content: item.content,
+          imageUrl: null,
+          isImportant: item.isImportant,
+        );
+        _checkSession(expectedGeneration);
+        final newMemoId = placeholder.memoId;
+        await _confirmMemoBootstrapped(localMemoId, newMemoId, memoUpdatedAt);
+        // 이 조각의 server_id를 이미지 업로드보다 먼저 확정한다(다른
+        // 필드/dirty는 그대로 둔 채) — 업로드가 실패해도 다음 재시도가
+        // POST(중복 조각 생성) 대신 PATCH(승격 재시도) 경로를 타게 하기
+        // 위함이다. [confirmItemSynced]가 아니라 [setItemServerId]를 쓰는
+        // 이유: 여기서 필드까지 자리표시용(SUMMARY) 값으로 확정해버리면
+        // 업로드가 실패했을 때 화면에는 사용자가 고른 사진 대신 빈 텍스트
+        // 조각이 "저장 완료"로 보이게 된다.
+        await _dao.setItemServerId(item.id, placeholder.id);
+        final r2Key = await _uploadLocalImage(newMemoId, item.imageUrl);
+        _checkSession(expectedGeneration);
+        final patched = await _api.patchItem(
+          userBookId: userBookId,
+          itemId: placeholder.id,
+          itemType: BookMemoItemType.photo,
+          startPage: item.startPage,
+          endPage: item.endPage,
+          content: item.content,
+          isImportant: item.isImportant,
+          imageUrl: r2Key,
+          includeImageUrl: true,
+        );
+        _checkSession(expectedGeneration);
+        await _confirmItemAndCleanupImage(item, patched);
+        return newMemoId;
+      }
+
+      final created = await _api.postItem(
+        userBookId: userBookId,
+        memoId: null,
+        itemType: item.type,
+        startPage: item.startPage,
+        endPage: item.endPage,
+        content: item.content,
+        imageUrl: null,
+        isImportant: item.isImportant,
+      );
+      _checkSession(expectedGeneration);
+      final newMemoId = created.memoId;
+      await _confirmMemoBootstrapped(localMemoId, newMemoId, memoUpdatedAt);
+      await _confirmItemAndCleanupImage(item, created);
+      return newMemoId;
+    }
+
+    // 메모는 이미 서버에 있다.
+    if (item.type == BookMemoItemType.photo) {
+      final r2Key = await _uploadLocalImage(serverMemoId, item.imageUrl);
+      _checkSession(expectedGeneration);
+      final created = await _api.postItem(
+        userBookId: userBookId,
+        memoId: serverMemoId,
+        itemType: BookMemoItemType.photo,
+        startPage: item.startPage,
+        endPage: item.endPage,
+        content: item.content,
+        imageUrl: r2Key,
+        isImportant: item.isImportant,
+      );
+      _checkSession(expectedGeneration);
+      await _confirmItemAndCleanupImage(item, created);
+      return serverMemoId;
+    }
+
+    final created = await _api.postItem(
+      userBookId: userBookId,
+      memoId: serverMemoId,
+      itemType: item.type,
+      startPage: item.startPage,
+      endPage: item.endPage,
+      content: item.content,
+      imageUrl: null,
+      isImportant: item.isImportant,
+    );
+    _checkSession(expectedGeneration);
+    await _confirmItemAndCleanupImage(item, created);
+    return serverMemoId;
+  }
+
+  Future<void> _updateItemOnServer(
+    int userBookId,
+    int serverMemoId,
+    BookMemoItem item,
+    int expectedGeneration,
+  ) async {
+    if (item.type == BookMemoItemType.photo && _isLocalImage(item.imageUrl)) {
+      final r2Key = await _uploadLocalImage(serverMemoId, item.imageUrl);
+      _checkSession(expectedGeneration);
+      final patched = await _api.patchItem(
+        userBookId: userBookId,
+        itemId: item.serverId!,
+        itemType: item.type,
+        startPage: item.startPage,
+        endPage: item.endPage,
+        content: item.content,
+        isImportant: item.isImportant,
+        imageUrl: r2Key,
+        includeImageUrl: true,
+      );
+      _checkSession(expectedGeneration);
+      await _confirmItemAndCleanupImage(item, patched);
+      return;
+    }
+    final patched = await _api.patchItem(
+      userBookId: userBookId,
+      itemId: item.serverId!,
+      itemType: item.type,
+      startPage: item.startPage,
+      endPage: item.endPage,
+      content: item.content,
+      isImportant: item.isImportant,
+    );
+    _checkSession(expectedGeneration);
+    await _confirmItemAndCleanupImage(item, patched);
+  }
+
+  /// [expectedGeneration]이 이 push를 시작한 시점의 세션과 다르면(그 사이
+  /// 로그아웃 등으로 [BookshelfDatabase.clearAll]이 실행됨) 남은 DAO 쓰기를
+  /// 모두 건너뛴다. 이 예외는 [_pushLiveItem]/[_pushDeletedItem]의
+  /// try/catch가 삼켜 로그만 남긴다 — 어차피 로그아웃된 세션의 로컬 행은
+  /// 곧 [BookshelfDatabase.clearAll]로 지워지거나, 지워지지 않았더라도 다음
+  /// 세션에서 다시 push를 시도하면 그만이라 재시도 자체는 안전하다.
+  void _checkSession(int expectedGeneration) {
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+      throw const _SessionChanged();
+    }
+  }
+
+  /// [capturedMemoUpdatedAt]은 이 push 사이클을 시작하기 *직전*(네트워크
+  /// 요청 전) [BookMemo.updatedAt]이어야 한다. 응답을 받은 뒤 DB를 다시
+  /// 읽어 그 값을 쓰면, 마침 이 요청이 오가는 동안 사용자가 같은 메모의
+  /// 제목을 새로 입력했을 때 그 "방금 들어온" 값을 "요청 당시 값"으로
+  /// 착각해 [BookMemoDao.confirmMemoCreated]의 "변경 없음" 판정을 통과시켜
+  /// 버린다 — 실제로는 이번 요청에 전혀 포함되지 않은 새 제목인데도 dirty가
+  /// 풀려 영영 push되지 않는다.
+  Future<void> _confirmMemoBootstrapped(
+    int localMemoId,
+    int serverMemoId,
+    DateTime capturedMemoUpdatedAt,
+  ) async {
+    await _dao.confirmMemoCreated(
+      localId: localMemoId,
+      serverId: serverMemoId,
+      capturedUpdatedAt: capturedMemoUpdatedAt,
+    );
+  }
+
+  Future<void> _confirmItemAndCleanupImage(
+    BookMemoItem localItem,
+    ServerBookMemoItem response,
+  ) async {
+    final applied = await _dao.confirmItemSynced(
+      localId: localItem.id,
+      serverId: response.id,
+      capturedUpdatedAt: localItem.updatedAt,
+      itemType: BookMemoItemType.fromDb(response.itemType),
+      startPage: response.startPage,
+      endPage: response.endPage,
+      content: response.content,
+      imageUrl: response.imageUrl,
+      isImportant: response.isImportant,
+      sortOrder: response.sortOrder,
+    );
+    // [applied]가 false면(네트워크가 오가는 동안 이 조각이 또 편집돼
+    // "변경 없음" 판정에 실패) DB의 image_url은 이 응답 값으로 덮이지
+    // 않고 옛 로컬 경로를 그대로 들고 있다 — 그런데도 여기서 파일을
+    // 지우면 DB는 이제 존재하지 않는 파일을 계속 가리키게 된다. 실제로
+    // DB가 새 원격 URL로 갱신됐을 때만(=이 로컬 파일이 더 이상 어디서도
+    // 참조되지 않을 때만) 지운다.
+    if (applied &&
+        _isLocalImage(localItem.imageUrl) &&
+        localItem.imageUrl != response.imageUrl) {
+      await _deleteManagedImage(localItem.imageUrl);
+    }
+  }
+
+  Future<String> _uploadLocalImage(int serverMemoId, String? imageUrl) async {
+    if (imageUrl == null) {
+      throw const ApiException('업로드할 사진이 없습니다.');
+    }
+    final rawPath = imageUrl.startsWith('file://')
+        ? Uri.parse(imageUrl).toFilePath()
+        : imageUrl;
+    return _api.uploadImage(memoId: serverMemoId, file: File(rawPath));
+  }
+
+  bool _isLocalImage(String? url) {
+    if (url == null || url.isEmpty) return false;
+    return !url.startsWith('http://') && !url.startsWith('https://');
+  }
+
+  String _reasonOf(Object error) {
+    if (error is _SessionChanged) return 'session_changed';
+    if (error is ApiException) return '${error.statusCode ?? "network"}';
+    return 'unknown';
   }
 
   Future<String?> _resolveImageUrl(BookMemoItemDraft draft) async {
@@ -216,4 +765,10 @@ class BookMemoRepository {
       developer.log('[메모 사진 정리] result=FAIL reason=local_file_error');
     }
   }
+}
+
+/// push 진행 중 로그아웃 등으로 세션이 바뀌었을 때 남은 DAO 쓰기를
+/// 건너뛰기 위한 내부 신호. [BookMemoRepository._checkSession] 참고.
+class _SessionChanged implements Exception {
+  const _SessionChanged();
 }

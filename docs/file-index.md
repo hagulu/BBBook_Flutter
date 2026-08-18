@@ -38,7 +38,7 @@
 
 - `lib/features/bookshelf/screens/bookshelf_screen.dart` — 책장 탭 콘텐츠(읽고 싶음/읽는 중/완독/중단 4탭, 기본은 읽는 중)
 - `lib/features/bookshelf/data/bookshelf_api.dart` — 책장 API 호출(전체 동기화, 증분 동기화, 완독 공개 설정 조회/수정, 카테고리 목록 GET)
-- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타, v7)
+- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타, v8)
 - `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호)
 - `lib/features/bookshelf/data/book_category_dao.dart` — 카테고리 마스터 목록 로컬 캐시 DAO(계정 무관, 로그아웃 시에도 유지)
 - `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화, 카테고리는 로컬 캐시 우선 조회
@@ -56,10 +56,12 @@
 
 ## features/book_memo
 
-- `lib/features/book_memo/screens/book_memo_list.dart` — 책 기록 상세의 로컬 메모 목록 탭(메모 추가·상세 진입)
+- `lib/features/book_memo/screens/book_memo_list.dart` — 책 기록 상세의 메모 목록 탭(메모 추가·상세 진입, 당겨서 새로고침)
 - `lib/features/book_memo/screens/book_memo_detail_screen.dart` — 메모 제목 자동 저장과 타입별 조각 타임라인·로컬 CRUD 화면
-- `lib/features/book_memo/data/book_memo_repository.dart` — 서버 호출 없이 로컬 메모 조회·dirty CRUD·사진 파일 보관을 조율하는 source of truth
-- `lib/features/book_memo/providers/book_memo_providers.dart` — 책별 메모 목록·상세 상태 Riverpod provider
+- `lib/features/book_memo/data/book_memo_api.dart` — 메모 제목 PUT, 조각 생성/수정/삭제, 사진 업로드, 증분 동기화 조회 API 호출
+- `lib/features/book_memo/data/book_memo_dao.dart` — 로컬 DB 쿼리·dirty push 확정·전체/증분 reconcile(dirty 행 보호, 로컬 PK와 server_id 분리)
+- `lib/features/book_memo/data/book_memo_repository.dart` — 메모 화면 source of truth, 로컬 우선 CRUD 직후 조용히 서버 push하고 실패 시 dirty 유지, 최초엔 전체(`/api/me/records`)·이후엔 증분(`/api/me/memos/sync/changes`) 동기화
+- `lib/features/book_memo/providers/book_memo_providers.dart` — 책별 메모 목록·상세 상태 및 메모 동기화 컨트롤러 Riverpod provider
 
 ## features/record_sync
 
@@ -116,3 +118,4 @@
 - `docs/review/20260816-150901-isbn-link-dismissal-review.md` — ISBN 미연결 제외 기록의 영속성·비동기 오류 처리·상태 표시 접근성 리뷰
 - `docs/review/20260817-153500-forest-color-palette-review.md` — 밝은 숲 색상 팔레트 전환의 텍스트·활성 컨트롤 대비 접근성 리뷰
 - `docs/review/20260817-171413-initial-record-sync-review.md` — 최초 기록 동기화의 실패 복구 동선과 파일 인덱스 구성 리뷰
+- `docs/review/20260818-190749-book-memo-sync-review.md` — 메모 서버 push·증분 동기화의 범위, 마이그레이션, 세션·동시 편집 데이터 안전성 리뷰

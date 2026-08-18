@@ -20,16 +20,26 @@ enum BookMemoItemType {
 class BookMemo {
   const BookMemo({
     required this.id,
+    required this.serverId,
     required this.userBookId,
     required this.title,
+    required this.deletedAt,
     required this.createdAt,
     required this.updatedAt,
     required this.isDirty,
   });
 
   final int id;
+
+  /// 서버에 반영된 뒤 서버가 내려준 실제 메모 ID. null이면 아직 서버에 한
+  /// 번도 반영되지 못한 로컬 전용 행이라는 뜻이다(`id`는 오프라인 임시
+  /// 음수값). PATCH/DELETE 등 서버 호출은 반드시 이 값을 써야 한다.
+  /// `id`와 다른 별도 컬럼인 이유는 `BookshelfDatabase._createRecordTables`
+  /// 참고.
+  final int? serverId;
   final int userBookId;
   final String? title;
+  final DateTime? deletedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isDirty;
@@ -38,6 +48,7 @@ class BookMemo {
 class BookMemoItem {
   const BookMemoItem({
     required this.id,
+    required this.serverId,
     required this.memoId,
     required this.type,
     required this.startPage,
@@ -46,12 +57,17 @@ class BookMemoItem {
     required this.imageUrl,
     required this.isImportant,
     required this.sortOrder,
+    required this.deletedAt,
     required this.createdAt,
     required this.updatedAt,
     required this.isDirty,
   });
 
   final int id;
+
+  /// 서버 조각 ID. null이면 아직 서버에 반영되지 못한 로컬 전용 조각이다.
+  /// [BookMemo.serverId] 참고.
+  final int? serverId;
   final int memoId;
   final BookMemoItemType type;
   final int? startPage;
@@ -60,6 +76,7 @@ class BookMemoItem {
   final String? imageUrl;
   final bool isImportant;
   final int sortOrder;
+  final DateTime? deletedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
   final bool isDirty;

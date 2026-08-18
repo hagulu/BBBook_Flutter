@@ -3,6 +3,9 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_notifier.dart';
+import '../../auth/providers/auth_providers.dart';
+import '../../record_sync/providers/record_sync_providers.dart';
+import '../data/book_memo_api.dart';
 import '../data/book_memo_dao.dart';
 import '../data/book_memo_repository.dart';
 import '../models/book_memo.dart';
@@ -11,9 +14,73 @@ final bookMemoDaoProvider = Provider<BookMemoDao>((ref) {
   return const BookMemoDao();
 });
 
-final bookMemoRepositoryProvider = Provider<BookMemoRepository>((ref) {
-  return BookMemoRepository(ref.watch(bookMemoDaoProvider));
+final bookMemoApiProvider = Provider<BookMemoApi>((ref) {
+  return BookMemoApi(apiClient: ref.watch(apiClientProvider));
 });
+
+final bookMemoRepositoryProvider = Provider<BookMemoRepository>((ref) {
+  return BookMemoRepository(
+    api: ref.watch(bookMemoApiProvider),
+    // 최초 기록 전체 조회(`/api/me/records`)를 메모 전체 동기화에도 그대로
+    // 재사용한다(record_sync 기능이 이미 그 API를 감싸고 있다).
+    recordSyncApi: ref.watch(recordSyncApiProvider),
+    dao: ref.watch(bookMemoDaoProvider),
+  );
+});
+
+/// 동기화로 로컬 DB가 실제로 바뀌었을 때만 값을 올려 메모 목록 Provider를
+/// 무효화한다(변경 없는 증분 동기화는 재조회를 생략) —
+/// `bookshelfSyncVersionProvider`와 같은 역할.
+final bookMemoSyncVersionProvider = StateProvider<int>((ref) => 0);
+
+/// 메모 동기화 실행/상태 관리(최초엔 전체 동기화, 이후엔 증분 동기화).
+/// `/api/me/memos/sync/changes`는 책 단위가 아닌 계정 전체를 대상으로 하므로
+/// 이 컨트롤러도 책 하나에 매이지 않는 전역 상태다 —
+/// `BookshelfSyncController`와 같은 구조.
+class BookMemoSyncController extends AsyncNotifier<DateTime?> {
+  late BookMemoRepository _repository;
+  Future<void>? _inFlight;
+  bool _disposed = false;
+
+  @override
+  FutureOr<DateTime?> build() async {
+    ref.onDispose(() => _disposed = true);
+    _repository = ref.watch(bookMemoRepositoryProvider);
+    return _repository.getLastSyncedAtMemo();
+  }
+
+  /// 당겨서 새로고침 등 겹쳐 호출돼도 진행 중인 동기화 Future를 그대로
+  /// 공유해, 중복 네트워크 요청과 상태 덮어쓰기를 막는다.
+  Future<void> syncNow() {
+    return _inFlight ??= _runSync().whenComplete(() => _inFlight = null);
+  }
+
+  Future<void> _runSync() async {
+    final ownerUserId = ref.read(
+      authNotifierProvider.select((auth) => auth.user?.id),
+    );
+    if (ownerUserId == null) return;
+
+    state = const AsyncValue<DateTime?>.loading().copyWithPrevious(state);
+    try {
+      final changed = await _repository.sync(ownerUserId: ownerUserId);
+      final syncedAt = await _repository.getLastSyncedAtMemo();
+      if (_disposed) return;
+      state = AsyncValue.data(syncedAt);
+      if (changed) {
+        ref.read(bookMemoSyncVersionProvider.notifier).state++;
+      }
+    } catch (e, st) {
+      if (_disposed) return;
+      state = AsyncValue<DateTime?>.error(e, st).copyWithPrevious(state);
+    }
+  }
+}
+
+final bookMemoSyncControllerProvider =
+    AsyncNotifierProvider<BookMemoSyncController, DateTime?>(
+      BookMemoSyncController.new,
+    );
 
 final bookMemoListProvider = FutureProvider.autoDispose
     .family<List<BookMemoSummary>, int>((ref, userBookId) async {
@@ -21,6 +88,7 @@ final bookMemoListProvider = FutureProvider.autoDispose
         authNotifierProvider.select((auth) => auth.user?.id),
       );
       if (ownerUserId == null) return const [];
+      ref.watch(bookMemoSyncVersionProvider);
       return ref
           .watch(bookMemoRepositoryProvider)
           .findByUserBook(ownerUserId: ownerUserId, userBookId: userBookId);
