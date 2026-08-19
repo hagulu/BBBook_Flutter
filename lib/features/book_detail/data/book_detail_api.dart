@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../bookshelf/models/user_book_create_result.dart';
 import '../models/book_detail.dart';
 import '../models/book_review.dart';
 
@@ -59,11 +60,13 @@ class BookDetailApi {
   }
 
   /// POST /api/me/books — ISBN13으로 서재 담기(선택적으로 완독 메타데이터 포함).
-  /// 이미 서재에 있으면 409([ApiException.statusCode] == 409). 응답에 포함된
-  /// [title]도 함께 반환한다(바코드 빠른 등록 화면이 "등록완료" 안내에 쓴다).
-  Future<({int userBookId, String title})> addToBookshelf({
+  /// 이미 서재에 있으면 409([ApiException.statusCode] == 409).
+  /// [clientRequestId]는 로컬 `user_book` 생성 때 발급해 저장한 UUID를 받으며,
+  /// 이 메서드 안에서는 절대 새로 만들지 않는다.
+  Future<UserBookCreateResult> addToBookshelf({
     required String isbn13,
     required String status,
+    required String clientRequestId,
     String? sourceType,
     double? myRating,
     String? shortReview,
@@ -78,6 +81,7 @@ class BookDetailApi {
       'shortReview': ?shortReview,
       'difficulty': ?difficulty,
       'finishedAt': ?finishedAt,
+      'clientRequestId': clientRequestId,
     };
 
     try {
@@ -87,10 +91,7 @@ class BookDetailApi {
         options: Options(headers: const {'X-Timezone': 'Asia/Seoul'}),
       );
       final data = _unwrapMap(response);
-      return (
-        userBookId: data['userBookId'] as int,
-        title: data['title'] as String,
-      );
+      return UserBookCreateResult.fromJson(data);
     } on DioException catch (e) {
       throw _mapError(e, overrides: const {409: '이미 서재에 담긴 책입니다.'});
     } on ApiException {
@@ -195,7 +196,10 @@ class BookDetailApi {
   }
 
   /// POST /api/likes/{targetType}/{targetId} — 공감 추가. 반환값은 변경 후 공감 수.
-  Future<int> postLike({required String targetType, required int targetId}) async {
+  Future<int> postLike({
+    required String targetType,
+    required int targetId,
+  }) async {
     try {
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
         '/api/likes/$targetType/$targetId',
@@ -249,10 +253,7 @@ class BookDetailApi {
     } on DioException catch (e) {
       throw _mapError(
         e,
-        overrides: const {
-          404: '신고 대상을 찾을 수 없습니다.',
-          409: '이미 신고한 콘텐츠입니다.',
-        },
+        overrides: const {404: '신고 대상을 찾을 수 없습니다.', 409: '이미 신고한 콘텐츠입니다.'},
       );
     } on ApiException {
       rethrow;

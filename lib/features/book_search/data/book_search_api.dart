@@ -6,6 +6,7 @@ import 'package:http_parser/http_parser.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../bookshelf/models/user_book_create_result.dart';
 import '../models/book_search_item.dart';
 
 /// 책 검색 및 직접 등록 API 호출.
@@ -45,7 +46,7 @@ class BookSearchApi {
   /// 총쪽수/표지/카테고리)에 상태·완독 옵션을 더해 받는다. [thumbnailFile]이
   /// 있으면 multipart(방식 B)로, 없으면 JSON(방식 A)으로 보낸다 — 새로
   /// 등록하는 책이라 기존 표지를 지우는 개념(removeThumbnail)은 없다.
-  Future<int> postCustomBook({
+  Future<UserBookCreateResult> postCustomBook({
     required String title,
     String? author,
     String? publisher,
@@ -53,6 +54,7 @@ class BookSearchApi {
     int? categoryId,
     File? thumbnailFile,
     required String status,
+    required String clientRequestId,
     String? sourceType,
     double? myRating,
     String? shortReview,
@@ -71,6 +73,7 @@ class BookSearchApi {
       'shortReview': ?shortReview,
       'difficulty': ?difficulty,
       'finishedAt': ?finishedAt,
+      'clientRequestId': clientRequestId,
     };
 
     try {
@@ -96,7 +99,7 @@ class BookSearchApi {
         );
       }
       final data = _unwrapMap(response);
-      return data['userBookId'] as int;
+      return UserBookCreateResult.fromJson(data);
     } on DioException catch (e) {
       throw _mapError(e, overrides: const {400: '입력값을 확인해주세요.'});
     } on ApiException {

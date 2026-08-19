@@ -11,6 +11,7 @@ import '../../../shared/widgets/app_snackbar.dart';
 import '../models/book_memo.dart';
 import '../providers/book_memo_providers.dart';
 import 'widgets/book_memo_item_sheet.dart';
+import 'widgets/book_memo_refresh_indicator.dart';
 
 class BookMemoDetailScreen extends ConsumerStatefulWidget {
   const BookMemoDetailScreen({
@@ -31,8 +32,6 @@ class BookMemoDetailScreen extends ConsumerStatefulWidget {
       _BookMemoDetailScreenState();
 }
 
-enum _TitleSaveStatus { idle, saving, saved, error }
-
 class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
   late final TextEditingController _titleController;
   late final FocusNode _titleFocusNode;
@@ -42,7 +41,6 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
   bool _isSavingItem = false;
   bool _allowPop = false;
   bool _isClosing = false;
-  _TitleSaveStatus _titleStatus = _TitleSaveStatus.idle;
   Future<void> _titleSaveChain = Future.value();
 
   @override
@@ -70,9 +68,13 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
   Widget build(BuildContext context) {
     final asyncDetail = ref.watch(bookMemoDetailProvider(_args));
     final detail = asyncDetail.valueOrNull;
-    if (!_titleInitialized && detail?.memo != null) {
-      _titleController.text = detail!.memo!.title ?? '';
-      _titleInitialized = true;
+    if (detail?.memo != null) {
+      final syncedTitle = detail!.memo!.title ?? '';
+      if (!_titleInitialized ||
+          (!_titleFocusNode.hasFocus && _titleController.text != syncedTitle)) {
+        _titleController.text = syncedTitle;
+        _titleInitialized = true;
+      }
     }
 
     return PopScope<void>(
@@ -132,104 +134,83 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     final visibleItems = _importantOnly
         ? detail.items.where((item) => item.isImportant).toList(growable: false)
         : detail.items;
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-          sliver: SliverList.list(
-            children: [
-              TextField(
-                controller: _titleController,
-                focusNode: _titleFocusNode,
-                textInputAction: TextInputAction.done,
-                onChanged: (_) =>
-                    setState(() => _titleStatus = _TitleSaveStatus.idle),
-                onSubmitted: (_) => unawaited(_saveTitle()),
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textStrong,
+    return BookMemoRefreshIndicator(
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+            sliver: SliverList.list(
+              children: [
+                TextField(
+                  controller: _titleController,
+                  focusNode: _titleFocusNode,
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => unawaited(_saveTitle()),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textStrong,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: '제목을 입력하세요 (선택)',
+                    fillColor: Colors.transparent,
+                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+                  ),
                 ),
-                decoration: const InputDecoration(
-                  hintText: '제목을 입력하세요 (선택)',
-                  fillColor: Colors.transparent,
-                  contentPadding: EdgeInsets.symmetric(vertical: 10),
-                ),
-              ),
-              SizedBox(
-                height: 20,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    _titleStatusText,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: _titleStatus == _TitleSaveStatus.error
-                          ? AppColors.error
+                const SizedBox(height: 2),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilterChip(
+                    selected: _importantOnly,
+                    onSelected: (selected) =>
+                        setState(() => _importantOnly = selected),
+                    avatar: Icon(
+                      PhosphorIconsRegular.highlighter,
+                      size: 16,
+                      color: _importantOnly
+                          ? AppColors.textStrong
                           : AppColors.textMuted,
+                    ),
+                    label: const Text('강조 조각만'),
+                    selectedColor: AppColors.highlightGoldSurface,
+                    backgroundColor: AppColors.surface,
+                    side: const BorderSide(color: AppColors.border),
+                    labelStyle: const TextStyle(
+                      color: AppColors.textBody,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilterChip(
-                  selected: _importantOnly,
-                  onSelected: (selected) =>
-                      setState(() => _importantOnly = selected),
-                  avatar: Icon(
-                    PhosphorIconsRegular.highlighter,
-                    size: 16,
-                    color: _importantOnly
-                        ? AppColors.textStrong
-                        : AppColors.textMuted,
-                  ),
-                  label: const Text('강조 조각만'),
-                  selectedColor: AppColors.highlightGoldSurface,
-                  backgroundColor: AppColors.surface,
-                  side: const BorderSide(color: AppColors.border),
-                  labelStyle: const TextStyle(
-                    color: AppColors.textBody,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        if (visibleItems.isEmpty)
-          SliverFillRemaining(
-            hasScrollBody: false,
-            child: _EmptyItems(importantOnly: _importantOnly),
-          )
-        else
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
-            sliver: SliverList.separated(
-              itemCount: visibleItems.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 12),
-              itemBuilder: (context, index) => _MemoTimelineItem(
-                item: visibleItems[index],
-                onTap: () => _editItem(visibleItems[index]),
-                onDelete: () => _deleteItem(
-                  visibleItems[index],
-                  totalItemCount: detail.items.length,
+          if (visibleItems.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: _EmptyItems(importantOnly: _importantOnly),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+              sliver: SliverList.separated(
+                itemCount: visibleItems.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                itemBuilder: (context, index) => _MemoTimelineItem(
+                  item: visibleItems[index],
+                  onTap: () => _editItem(visibleItems[index]),
+                  onDelete: () => _deleteItem(
+                    visibleItems[index],
+                    totalItemCount: detail.items.length,
+                  ),
                 ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
-
-  String get _titleStatusText => switch (_titleStatus) {
-    _TitleSaveStatus.idle => '',
-    _TitleSaveStatus.saving => '저장 중…',
-    _TitleSaveStatus.saved => '저장됨',
-    _TitleSaveStatus.error => '제목을 저장하지 못했습니다.',
-  };
 
   void _onTitleFocusChanged() {
     if (!_titleFocusNode.hasFocus) unawaited(_saveTitle());
@@ -270,15 +251,12 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     if (title.isEmpty && currentMemo == null && !createWhenEmpty) {
       return false;
     }
-    setState(() => _titleStatus = _TitleSaveStatus.saving);
     try {
       await ref
           .read(bookMemoDetailProvider(_args).notifier)
           .saveTitle(title.isEmpty ? null : title);
-      if (mounted) setState(() => _titleStatus = _TitleSaveStatus.saved);
       return true;
     } catch (_) {
-      if (mounted) setState(() => _titleStatus = _TitleSaveStatus.error);
       return false;
     }
   }

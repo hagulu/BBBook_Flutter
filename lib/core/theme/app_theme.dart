@@ -34,7 +34,7 @@ class AppColors {
   static const highlightGold = Color(0xFFF5C518);
 
   /// 옅은 햇살 배경. 주의 안내/걸작 강조 배경.
-  static const highlightGoldSurface = Color(0xFFF6EFD9);
+  static const highlightGoldSurface = Color(0xFFFEF3C7);
 
   // --- 메모 조각 타입 ---
   /// 요약 조각: 차분한 파란색.
@@ -78,6 +78,9 @@ class AppColors {
 
   /// 입력창·비활성 필·보조 버튼 배경.
   static const surfaceSubtle = Color(0xFFF1F5E9);
+
+  /// 카메라·이미지처럼 화면 비율 차이로 생기는 미디어 바깥 여백.
+  static const mediaBackdrop = Color(0xFF000000);
 
   /// 보더·구분선·진행률 트랙.
   static const border = Color(0xFFDDE5D2);

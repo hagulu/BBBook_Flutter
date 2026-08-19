@@ -10,6 +10,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_alert.dart';
 import '../../models/book_memo.dart';
 import 'highlight_text_field.dart';
+import 'memo_ocr_capture.dart';
 
 Future<BookMemoItemDraft?> showBookMemoItemEditor(
   BuildContext context, {
@@ -129,6 +130,17 @@ class _BookMemoQuickComposerState extends State<_BookMemoQuickComposer> {
                       ],
                     ),
                   ),
+                  if (_type == BookMemoItemType.quote)
+                    IconButton(
+                      onPressed: _scanQuote,
+                      tooltip: '카메라로 발췌 인식 (OCR)',
+                      visualDensity: VisualDensity.compact,
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.memoQuoteSurface,
+                        foregroundColor: AppColors.memoQuoteForeground,
+                      ),
+                      icon: const Icon(PhosphorIconsRegular.camera, size: 18),
+                    ),
                   IconButton(
                     onPressed: _expand,
                     tooltip: '전체 편집 화면으로 확장',
@@ -204,6 +216,16 @@ class _BookMemoQuickComposerState extends State<_BookMemoQuickComposer> {
   );
 
   void _submit() => Navigator.of(context).pop(_draft);
+
+  Future<void> _scanQuote() async {
+    final text = await captureMemoQuoteWithOcr(context);
+    if (!mounted || text == null || text.trim().isEmpty) return;
+    _insertTextAtSelection(_contentController, text);
+    setState(() {});
+    final draft = await showBookMemoItemEditor(context, initialDraft: _draft);
+    if (!mounted || draft == null) return;
+    Navigator.of(context).pop<BookMemoItemDraft>(draft);
+  }
 
   Future<void> _expand() async {
     final draft = await showBookMemoItemEditor(context, initialDraft: _draft);
@@ -399,6 +421,7 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
                         }
                       }
                     : null,
+                onExtract: _type == BookMemoItemType.quote ? _scanQuote : null,
                 onShowHelp: () => _showHighlightHelp(context),
               );
             },
@@ -427,6 +450,15 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
         setState(() => _errorText = '사진을 불러오지 못했습니다.');
       }
     }
+  }
+
+  Future<void> _scanQuote() async {
+    _contentFocusNode.unfocus();
+    final text = await captureMemoQuoteWithOcr(context);
+    if (!mounted || text == null || text.trim().isEmpty) return;
+    _insertTextAtSelection(_contentController, text);
+    setState(() => _errorText = null);
+    _contentFocusNode.requestFocus();
   }
 
   void _submit() {
@@ -464,7 +496,9 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
         content: content.isEmpty ? null : content,
         imageUrl: isPhoto ? _imageUrl : null,
         pickedImagePath: isPhoto ? _pickedImagePath : null,
-        isImportant: isPhoto ? _photoImportant : _contentController.hasHighlight,
+        isImportant: isPhoto
+            ? _photoImportant
+            : _contentController.hasHighlight,
       ),
     );
   }
@@ -490,6 +524,28 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
   }
 }
 
+void _insertTextAtSelection(TextEditingController controller, String text) {
+  final value = controller.value;
+  final selection = value.selection;
+  final hasValidSelection =
+      selection.isValid &&
+      selection.start <= value.text.length &&
+      selection.end <= value.text.length;
+  final start = hasValidSelection ? selection.start : value.text.length;
+  final end = hasValidSelection ? selection.end : value.text.length;
+  final before = value.text.substring(0, start);
+  final after = value.text.substring(end);
+  var inserted = text.trim();
+  if (before.isNotEmpty && !before.endsWith('\n')) inserted = '\n$inserted';
+  if (after.isNotEmpty && !after.startsWith('\n')) inserted = '$inserted\n';
+
+  controller.value = value.copyWith(
+    text: '$before$inserted$after',
+    selection: TextSelection.collapsed(offset: start + inserted.length),
+    composing: TextRange.empty,
+  );
+}
+
 class _EditorToolbar extends StatelessWidget {
   const _EditorToolbar({
     required this.startPageController,
@@ -498,6 +554,7 @@ class _EditorToolbar extends StatelessWidget {
     required this.toggleEnabled,
     required this.onPageChanged,
     required this.onToggleHighlight,
+    required this.onExtract,
     required this.onShowHelp,
   });
 
@@ -507,6 +564,7 @@ class _EditorToolbar extends StatelessWidget {
   final bool toggleEnabled;
   final VoidCallback onPageChanged;
   final VoidCallback? onToggleHighlight;
+  final VoidCallback? onExtract;
   final VoidCallback onShowHelp;
 
   @override
@@ -520,63 +578,105 @@ class _EditorToolbar extends StatelessWidget {
           decoration: const BoxDecoration(
             border: Border(top: BorderSide(color: AppColors.border)),
           ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 76,
-                child: _PageInput(
-                  controller: startPageController,
-                  hintText: '시작',
-                  textInputAction: TextInputAction.next,
-                  onChanged: onPageChanged,
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 5),
-                child: Text('–', style: TextStyle(color: AppColors.textMuted)),
-              ),
-              SizedBox(
-                width: 76,
-                child: _PageInput(
-                  controller: endPageController,
-                  hintText: '끝',
-                  textInputAction: TextInputAction.done,
-                  onChanged: onPageChanged,
-                ),
-              ),
-              const Spacer(),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 82,
-                child: _EditorToolButton(
-                  icon: PhosphorIconsRegular.highlighter,
-                  label: '강조',
-                  foreground: isActive
-                      ? AppColors.highlightGold
-                      : AppColors.textMuted,
-                  background: isActive
-                      ? AppColors.highlightGoldSurface
-                      : AppColors.surfaceSubtle,
-                  selected: isActive,
-                  enabled: toggleEnabled,
-                  onTap: onToggleHighlight,
-                ),
-              ),
-              IconButton(
-                onPressed: onShowHelp,
-                tooltip: '강조 사용법',
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints.tightFor(
-                  width: 48,
-                  height: 48,
-                ),
-                icon: const Icon(
-                  PhosphorIconsRegular.info,
-                  size: 18,
-                  color: AppColors.textMuted,
-                ),
-              ),
-            ],
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final actionWidth = onExtract == null ? 108.0 : 200.0;
+              final pageWidth = (constraints.maxWidth - actionWidth).clamp(
+                92.0,
+                148.0,
+              );
+              return Row(
+                children: [
+                  SizedBox(
+                    width: pageWidth,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _PageInput(
+                            controller: startPageController,
+                            hintText: '시작',
+                            textInputAction: TextInputAction.next,
+                            onChanged: onPageChanged,
+                          ),
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            '–',
+                            style: TextStyle(color: AppColors.textMuted),
+                          ),
+                        ),
+                        Expanded(
+                          child: _PageInput(
+                            controller: endPageController,
+                            hintText: '끝',
+                            textInputAction: TextInputAction.done,
+                            onChanged: onPageChanged,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  const SizedBox(width: 8),
+                  if (onExtract != null) ...[
+                    SizedBox(
+                      width: 78,
+                      child: _EditorToolButton(
+                        icon: PhosphorIconsRegular.camera,
+                        label: '추출',
+                        foreground: AppColors.memoQuoteForeground,
+                        background: AppColors.memoQuoteSurface,
+                        onTap: onExtract,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                  ],
+                  SizedBox(
+                    width: 100,
+                    height: 48,
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 78,
+                          child: _EditorToolButton(
+                            icon: PhosphorIconsRegular.highlighter,
+                            label: '강조',
+                            foreground: isActive
+                                ? AppColors.highlightGold
+                                : AppColors.textMuted,
+                            background: isActive
+                                ? AppColors.highlightGoldSurface
+                                : AppColors.surfaceSubtle,
+                            selected: isActive,
+                            enabled: toggleEnabled,
+                            onTap: onToggleHighlight,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        SizedBox(
+                          width: 20,
+                          child: IconButton(
+                            onPressed: onShowHelp,
+                            tooltip: '강조 사용법',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 20,
+                              height: 48,
+                            ),
+                            icon: const Icon(
+                              PhosphorIconsRegular.info,
+                              size: 18,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -612,12 +712,23 @@ class _PageInput extends StatelessWidget {
       ),
       decoration: InputDecoration(
         hintText: hintText,
-        prefixText: 'p.',
-        prefixStyle: const TextStyle(
-          color: AppColors.textMuted,
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
+        prefixIcon: const Align(
+          alignment: Alignment.centerRight,
+          widthFactor: 1,
+          heightFactor: 1,
+          child: Padding(
+            padding: EdgeInsets.only(left: 3),
+            child: Text(
+              'p.',
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         ),
+        prefixIconConstraints: const BoxConstraints(minWidth: 18, minHeight: 0),
         hintStyle: const TextStyle(
           color: AppColors.textMuted,
           fontSize: 12,
@@ -626,7 +737,7 @@ class _PageInput extends StatelessWidget {
         filled: true,
         fillColor: AppColors.surfaceSubtle,
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 7, vertical: 8),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: AppColors.border),

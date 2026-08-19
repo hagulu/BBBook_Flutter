@@ -4,6 +4,7 @@ import '../models/book_item.dart';
 import '../models/book_status.dart';
 import '../models/book_tag.dart';
 import '../models/finished_filter.dart';
+import '../models/user_book_create_result.dart';
 import 'bookshelf_database.dart';
 
 /// 책장 로컬 DB 쿼리/쓰기 전담.
@@ -26,6 +27,18 @@ class BookshelfDao {
     if (rows.isEmpty) return null;
     final items = await _attachTags(db, rows);
     return items.first;
+  }
+
+  Future<BookItem?> getByIsbn13(String isbn13) async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'user_book',
+      where: 'isbn13 = ?',
+      whereArgs: [isbn13],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return (await _attachTags(db, rows)).single;
   }
 
   Future<List<BookItem>> getByStatuses(List<BookStatus> statuses) async {
@@ -168,7 +181,9 @@ class BookshelfDao {
     DateTime requestedAt, {
     void Function()? onItemSaved,
   }) async {
-    final serverIds = serverItems.map((e) => e.userBookId).toList();
+    final serverIds = serverItems
+        .map((e) => e.serverId ?? e.userBookId)
+        .toList();
 
     for (final item in serverItems) {
       await _upsertItemTxn(txn, item, syncedUpdatedAt: item.updatedAt);
@@ -181,7 +196,9 @@ class BookshelfDao {
       final placeholders = List.filled(serverIds.length, '?').join(', ');
       await txn.delete(
         'user_book',
-        where: 'user_book_id NOT IN ($placeholders) AND is_dirty = 0',
+        where:
+            '(server_id IS NULL OR server_id NOT IN ($placeholders)) '
+            'AND is_dirty = 0',
         whereArgs: serverIds,
       );
     }
@@ -215,7 +232,7 @@ class BookshelfDao {
         ).join(', ');
         await txn.delete(
           'user_book',
-          where: 'user_book_id IN ($placeholders) AND is_dirty = 0',
+          where: 'server_id IN ($placeholders) AND is_dirty = 0',
           whereArgs: deletedUserBookIds,
         );
       }
@@ -316,6 +333,70 @@ class BookshelfDao {
         'synced_updated_at': syncedUpdatedAt,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
       await _writeTagsTxn(txn, item);
+    });
+  }
+
+  /// 서버 요청 전에 로컬 CREATE 행을 먼저 만든다. [item.clientRequestId]는
+  /// 호출부가 이 로컬 생성 작업을 시작하며 발급한 UUID이고, 이후 모든 dirty
+  /// POST 재시도에서 이 컬럼을 그대로 읽어 사용한다.
+  Future<BookItem> insertLocalCreate(BookItem item) async {
+    final db = await BookshelfDatabase.instance();
+    return db.transaction((txn) async {
+      final localId = await _nextLocalUserBookId(txn);
+      final values = <String, Object?>{
+        ..._bookItemToRow(item),
+        'user_book_id': localId,
+        'server_id': null,
+        'is_dirty': 1,
+        'synced_updated_at': null,
+      };
+      await txn.insert('user_book', values);
+      return _rowToBookItem(values, const []);
+    });
+  }
+
+  /// CREATE 성공 또는 동일 clientRequestId 재시도로 기존 서버 행을 반환받은
+  /// 뒤 실제 서버 ID를 확정한다. 네트워크 왕복 중 로컬 편집이 없었을 때만
+  /// 응답 필드로 확정하고 dirty를 해제하며, 편집이 있었다면 server_id만
+  /// 채우고 dirty는 유지해 다음 push가 UPDATE로 이어지게 한다.
+  Future<bool> confirmCreate({
+    required int localId,
+    required DateTime capturedUpdatedAt,
+    required UserBookCreateResult response,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    return db.transaction((txn) async {
+      final rows = await txn.query(
+        'user_book',
+        columns: ['updated_at'],
+        where: 'user_book_id = ?',
+        whereArgs: [localId],
+        limit: 1,
+      );
+      if (rows.isEmpty) return false;
+      final current = DateTime.parse(rows.single['updated_at'] as String);
+      final unchanged = current.isAtSameMomentAs(capturedUpdatedAt);
+      await txn.update(
+        'user_book',
+        {
+          'server_id': response.userBookId,
+          'book_id': response.bookId,
+          'isbn13': response.isbn13,
+          'create_thumbnail_path': null,
+          if (unchanged) ...{
+            'title': response.title,
+            'author': response.author,
+            'publisher': response.publisher,
+            'total_pages': response.totalPages,
+            'cover_image_url': response.coverImageUrl,
+            'status': response.status,
+            'is_dirty': 0,
+          },
+        },
+        where: 'user_book_id = ?',
+        whereArgs: [localId],
+      );
+      return unchanged;
     });
   }
 
@@ -432,11 +513,29 @@ class BookshelfDao {
     BookItem item, {
     DateTime? syncedUpdatedAt,
   }) async {
+    // 서버 ID가 없는 신규 로컬 행은 음수 local PK를 server_id에 쓰지 않는다.
+    // CREATE 확정 직후 오래된 스냅샷이 들어와도 실제 server_id를 음수 값으로
+    // 덮을 수 없도록 방어한다. 기존 양수 PK 행은 마이그레이션 호환을 위해
+    // 종전처럼 PK를 서버 ID 대체값으로 허용한다.
+    final incomingServerId =
+        item.serverId ?? (item.userBookId > 0 ? item.userBookId : null);
     final existing = await txn.query(
       'user_book',
-      columns: ['is_dirty', 'synced_updated_at'],
-      where: 'user_book_id = ?',
-      whereArgs: [item.userBookId],
+      columns: [
+        'user_book_id',
+        'server_id',
+        'is_dirty',
+        'synced_updated_at',
+        'client_request_id',
+        'create_thumbnail_path',
+      ],
+      where: incomingServerId == null
+          ? 'user_book_id = ?'
+          : 'server_id = ? OR user_book_id = ?',
+      whereArgs: incomingServerId == null
+          ? [item.userBookId]
+          : [incomingServerId, item.userBookId],
+      limit: 1,
     );
     final isDirtyLocally =
         existing.isNotEmpty && existing.first['is_dirty'] == 1;
@@ -455,23 +554,47 @@ class BookshelfDao {
             ? null
             : existing.first['synced_updated_at'] as String?);
 
+    final localId = existing.isEmpty
+        ? item.userBookId
+        : existing.first['user_book_id'] as int;
+    final resolvedServerId =
+        item.serverId ??
+        (existing.isEmpty ? null : existing.first['server_id'] as int?) ??
+        incomingServerId;
     await txn.insert('user_book', {
       ..._bookItemToRow(item),
+      'user_book_id': localId,
+      'server_id': resolvedServerId,
+      'client_request_id':
+          item.clientRequestId ??
+          (existing.isEmpty
+              ? null
+              : existing.first['client_request_id'] as String?),
+      'create_thumbnail_path':
+          item.createThumbnailPath ??
+          (existing.isEmpty
+              ? null
+              : existing.first['create_thumbnail_path'] as String?),
       'synced_updated_at': resolvedSyncedUpdatedAt,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
 
-    await _writeTagsTxn(txn, item);
+    await _writeTagsTxn(txn, item, localUserBookId: localId);
   }
 
-  Future<void> _writeTagsTxn(Transaction txn, BookItem item) async {
+  Future<void> _writeTagsTxn(
+    Transaction txn,
+    BookItem item, {
+    int? localUserBookId,
+  }) async {
+    final userBookId = localUserBookId ?? item.userBookId;
     await txn.delete(
       'user_book_tag',
       where: 'user_book_id = ?',
-      whereArgs: [item.userBookId],
+      whereArgs: [userBookId],
     );
     for (final tag in item.tags) {
       await txn.insert('user_book_tag', {
-        'user_book_id': item.userBookId,
+        'user_book_id': userBookId,
         'tag_id': tag.id,
         'tag_name': tag.name,
       });
@@ -509,6 +632,7 @@ class BookshelfDao {
   Map<String, Object?> _bookItemToRow(BookItem item) {
     return {
       'user_book_id': item.userBookId,
+      'server_id': item.serverId,
       'book_id': item.bookId,
       'isbn13': item.isbn13,
       'title': item.title,
@@ -535,12 +659,17 @@ class BookshelfDao {
       'created_at': item.createdAt.toIso8601String(),
       'updated_at': item.updatedAt.toIso8601String(),
       'is_dirty': 0,
+      'client_request_id': item.clientRequestId,
+      'create_thumbnail_path': item.createThumbnailPath,
     };
   }
 
   BookItem _rowToBookItem(Map<String, dynamic> row, List<BookTag> tags) {
     return BookItem(
       userBookId: row['user_book_id'] as int,
+      serverId: row['server_id'] as int?,
+      clientRequestId: row['client_request_id'] as String?,
+      createThumbnailPath: row['create_thumbnail_path'] as String?,
       bookId: row['book_id'] as int?,
       isbn13: row['isbn13'] as String?,
       title: row['title'] as String,
@@ -575,4 +704,12 @@ class BookshelfDao {
 
   DateTime? _parseDate(String? value) =>
       value == null ? null : DateTime.parse(value);
+
+  Future<int> _nextLocalUserBookId(Transaction txn) async {
+    final rows = await txn.rawQuery(
+      'SELECT MIN(user_book_id) AS min_id FROM user_book',
+    );
+    final current = rows.single['min_id'] as int?;
+    return current != null && current <= 0 ? current - 1 : -1;
+  }
 }

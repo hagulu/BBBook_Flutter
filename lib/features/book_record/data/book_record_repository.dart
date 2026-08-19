@@ -131,8 +131,9 @@ class BookRecordRepository {
   }) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final current = await _requireLocal(userBookId);
+    final serverUserBookId = await _requireServerId(current);
     await _api.patchRecord(
-      userBookId: userBookId,
+      userBookId: serverUserBookId,
       startedAt: isStartedAt ? '' : null,
       finishedAt: isStartedAt ? null : '',
     );
@@ -162,8 +163,9 @@ class BookRecordRepository {
   }) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final current = await _requireLocal(userBookId);
+    final serverUserBookId = await _requireServerId(current);
     final data = await _api.patchBookInfo(
-      userBookId: userBookId,
+      userBookId: serverUserBookId,
       title: title,
       author: author,
       publisher: publisher,
@@ -184,7 +186,11 @@ class BookRecordRepository {
   Future<BookItem> linkBook(int userBookId, {required String? isbn13}) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final current = await _requireLocal(userBookId);
-    final data = await _api.patchLink(userBookId: userBookId, isbn13: isbn13);
+    final serverUserBookId = await _requireServerId(current);
+    final data = await _api.patchLink(
+      userBookId: serverUserBookId,
+      isbn13: isbn13,
+    );
     return _persist(current, data, expectedGeneration);
   }
 
@@ -193,9 +199,14 @@ class BookRecordRepository {
   Future<BookItem> addTag(int userBookId, String name) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final current = await _requireLocal(userBookId);
-    final tag = await _api.postTag(userBookId: userBookId, name: name);
-    final updated = current.copyWithTags([
-      ...current.tags,
+    final serverUserBookId = await _requireServerId(current);
+    final tag = await _api.postTag(userBookId: serverUserBookId, name: name);
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+      return current;
+    }
+    final latest = await _requireLocal(userBookId);
+    final updated = latest.copyWithTags([
+      ...latest.tags.where((existing) => existing.id != tag.id),
       tag,
     ], updatedAt: DateTime.now().toUtc());
     if (BookshelfDatabase.sessionGeneration == expectedGeneration) {
@@ -207,9 +218,14 @@ class BookRecordRepository {
   Future<BookItem> removeTag(int userBookId, int tagId) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final current = await _requireLocal(userBookId);
-    await _api.deleteTag(userBookId: userBookId, tagId: tagId);
-    final updated = current.copyWithTags(
-      current.tags.where((t) => t.id != tagId).toList(),
+    final serverUserBookId = await _requireServerId(current);
+    await _api.deleteTag(userBookId: serverUserBookId, tagId: tagId);
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+      return current;
+    }
+    final latest = await _requireLocal(userBookId);
+    final updated = latest.copyWithTags(
+      latest.tags.where((t) => t.id != tagId).toList(),
       updatedAt: DateTime.now().toUtc(),
     );
     if (BookshelfDatabase.sessionGeneration == expectedGeneration) {
@@ -225,7 +241,9 @@ class BookRecordRepository {
 
   Future<void> deleteBook(int userBookId) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
-    await _api.deleteUserBook(userBookId);
+    final current = await _requireLocal(userBookId);
+    final serverUserBookId = await _requireServerId(current);
+    await _api.deleteUserBook(serverUserBookId);
     if (BookshelfDatabase.sessionGeneration == expectedGeneration) {
       await _bookshelfRepository.deleteLocal(userBookId);
     }
@@ -242,6 +260,14 @@ class BookRecordRepository {
     return item;
   }
 
+  Future<int> _requireServerId(BookItem item) async {
+    if (item.serverId != null) return item.serverId!;
+    await _bookshelfRepository.pushDirtyRecord(item.userBookId);
+    final latest = await _bookshelfRepository.getById(item.userBookId);
+    if (latest?.serverId != null) return latest!.serverId!;
+    throw const ApiException('서버 연결 후 다시 시도해주세요.');
+  }
+
   /// 책 정보 PATCH 응답(`createdAt` 없음, `updatedAt`은 있음 — api-doc)을
   /// [current]의 createdAt으로 보강해 로컬 DB에 반영한다. 응답의 `updatedAt`은
   /// 실제 서버 값이라 [BookshelfRepository.upsertLocal]에 충돌 검사
@@ -255,7 +281,13 @@ class BookRecordRepository {
     Map<String, dynamic> data,
     int expectedGeneration,
   ) async {
-    final updated = BookItem.fromDetailJson(data, createdAt: current.createdAt);
+    final updated = BookItem.fromDetailJson(
+      data,
+      createdAt: current.createdAt,
+      localUserBookId: current.userBookId,
+      clientRequestId: current.clientRequestId,
+      createThumbnailPath: current.createThumbnailPath,
+    );
     if (BookshelfDatabase.sessionGeneration == expectedGeneration) {
       await _bookshelfRepository.upsertLocal(
         updated,

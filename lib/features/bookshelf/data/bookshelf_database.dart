@@ -35,7 +35,7 @@ class BookshelfDatabase {
     final path = join(dbPath, 'bookshelf.db');
     return openDatabase(
       path,
-      version: 8,
+      version: 9,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -130,11 +130,42 @@ class BookshelfDatabase {
             );
           }
         }
+        if (oldVersion < 9) {
+          // CREATE 멱등 키는 최초 로컬 생성 때 한 번 발급해 행과 함께
+          // 보존한다. user_book은 이제 로컬 음수 PK와 서버 PK를 분리해,
+          // 서버 ID가 없는 dirty 행만 POST 재시도 대상으로 판별한다.
+          if (!await _hasColumn(db, 'user_book', 'server_id')) {
+            await db.execute(
+              'ALTER TABLE user_book ADD COLUMN server_id INTEGER',
+            );
+            await db.execute(
+              'ALTER TABLE user_book ADD COLUMN client_request_id TEXT',
+            );
+            await db.execute(
+              'ALTER TABLE user_book ADD COLUMN create_thumbnail_path TEXT',
+            );
+            await db.execute(
+              'UPDATE user_book SET server_id = user_book_id '
+              'WHERE user_book_id > 0',
+            );
+          }
+          if (!await _hasColumn(db, 'book_memo_item', 'client_request_id')) {
+            await db.execute(
+              'ALTER TABLE book_memo_item '
+              'ADD COLUMN client_request_id TEXT',
+            );
+          }
+          await db.execute(
+            'CREATE UNIQUE INDEX IF NOT EXISTS idx_user_book_server_id '
+            'ON user_book(server_id) WHERE server_id IS NOT NULL',
+          );
+        }
       },
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE user_book (
             user_book_id INTEGER PRIMARY KEY,
+            server_id INTEGER,
             book_id INTEGER,
             isbn13 TEXT,
             title TEXT NOT NULL,
@@ -161,9 +192,15 @@ class BookshelfDatabase {
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             is_dirty INTEGER NOT NULL DEFAULT 0,
-            synced_updated_at TEXT
+            synced_updated_at TEXT,
+            client_request_id TEXT,
+            create_thumbnail_path TEXT
           )
         ''');
+        await db.execute(
+          'CREATE UNIQUE INDEX idx_user_book_server_id '
+          'ON user_book(server_id) WHERE server_id IS NOT NULL',
+        );
         await db.execute(
           'CREATE INDEX idx_user_book_status ON user_book(status)',
         );
@@ -272,6 +309,7 @@ class BookshelfDatabase {
       CREATE TABLE IF NOT EXISTS book_memo_item (
         id INTEGER PRIMARY KEY,
         server_id INTEGER,
+        client_request_id TEXT,
         memo_id INTEGER NOT NULL,
         item_type TEXT NOT NULL,
         start_page INTEGER,
@@ -330,6 +368,7 @@ class BookshelfDatabase {
       await txn.delete('sync_meta');
     });
     await _clearMemoImages();
+    await _clearPendingBookThumbnails();
   }
 
   static Future<void> _clearMemoImages() async {
@@ -339,6 +378,16 @@ class BookshelfDatabase {
       if (await directory.exists()) await directory.delete(recursive: true);
     } catch (_) {
       developer.log('[메모 사진 전체 정리] result=FAIL reason=local_file_error');
+    }
+  }
+
+  static Future<void> _clearPendingBookThumbnails() async {
+    try {
+      final root = await getApplicationSupportDirectory();
+      final directory = Directory(join(root.path, 'pending_book_thumbnails'));
+      if (await directory.exists()) await directory.delete(recursive: true);
+    } catch (_) {
+      developer.log('[책 표지 전체 정리] result=FAIL reason=local_file_error');
     }
   }
 }

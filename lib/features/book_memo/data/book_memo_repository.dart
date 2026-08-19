@@ -6,6 +6,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../bookshelf/data/bookshelf_repository.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
 import '../../record_sync/data/record_sync_api.dart';
 import '../../record_sync/models/record_sync_payload.dart';
@@ -28,11 +29,13 @@ class BookMemoRepository {
   BookMemoRepository({
     required this._api,
     required this._recordSyncApi,
+    required this._bookshelfRepository,
     this._dao = const BookMemoDao(),
   });
 
   final BookMemoApi _api;
   final RecordSyncApi _recordSyncApi;
+  final BookshelfRepository _bookshelfRepository;
   final BookMemoDao _dao;
 
   /// [pushMemo] 호출을 메모별로 순서대로 실행시키는 체인.
@@ -342,6 +345,14 @@ class BookMemoRepository {
     final memo = await _dao.getMemoByLocalId(localMemoId);
     if (memo == null) return; // 이미 로컬에서 정리됨
     if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+    final serverUserBookId = await _resolveServerUserBookId(memo.userBookId);
+    if (serverUserBookId == null) {
+      developer.log(
+        '[메모 더티 push] localUserBookId=${memo.userBookId} '
+        'result=FAIL reason=book_create_pending',
+      );
+      return;
+    }
 
     int? serverMemoId = memo.serverId;
 
@@ -354,7 +365,7 @@ class BookMemoRepository {
         if (memo.title != null) {
           try {
             final result = await _api.putTitle(
-              userBookId: memo.userBookId,
+              userBookId: serverUserBookId,
               memoId: null,
               title: memo.title,
             );
@@ -389,7 +400,7 @@ class BookMemoRepository {
       } else if (memo.isDirty) {
         try {
           await _api.putTitle(
-            userBookId: memo.userBookId,
+            userBookId: serverUserBookId,
             memoId: serverMemoId,
             title: memo.title,
           );
@@ -418,12 +429,21 @@ class BookMemoRepository {
     if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
     await _pushItemsForMemo(
       localMemoId,
-      memo.userBookId,
+      serverUserBookId,
       serverMemoId,
       expectedGeneration,
       memo.updatedAt,
     );
     await _dao.purgeMemoIfFullyDeleted(localMemoId);
+  }
+
+  Future<int?> _resolveServerUserBookId(int localUserBookId) async {
+    var book = await _bookshelfRepository.getById(localUserBookId);
+    if (book == null) return null;
+    if (book.serverId != null) return book.serverId;
+    await _bookshelfRepository.pushDirtyRecord(localUserBookId);
+    book = await _bookshelfRepository.getById(localUserBookId);
+    return book?.serverId;
   }
 
   Future<void> _pushItemsForMemo(
@@ -546,6 +566,7 @@ class BookMemoRepository {
         content: item.content,
         isImportant: item.isImportant,
         file: File(rawPath),
+        clientRequestId: item.clientRequestId,
       );
     } else {
       created = await _api.postItem(
@@ -556,6 +577,7 @@ class BookMemoRepository {
         endPage: item.endPage,
         content: item.content,
         isImportant: item.isImportant,
+        clientRequestId: item.clientRequestId,
       );
     }
     _checkSession(expectedGeneration);

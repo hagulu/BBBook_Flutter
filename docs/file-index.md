@@ -38,7 +38,7 @@
 
 - `lib/features/bookshelf/screens/bookshelf_screen.dart` — 책장 탭 콘텐츠(읽고 싶음/읽는 중/완독/중단 4탭, 기본은 읽는 중)
 - `lib/features/bookshelf/data/bookshelf_api.dart` — 책장 API 호출(전체 동기화, 증분 동기화, 완독 공개 설정 조회/수정, 카테고리 목록 GET)
-- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타, v8)
+- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타, v9)
 - `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호)
 - `lib/features/bookshelf/data/book_category_dao.dart` — 카테고리 마스터 목록 로컬 캐시 DAO(계정 무관, 로그아웃 시에도 유지)
 - `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화, 카테고리는 로컬 캐시 우선 조회
@@ -58,10 +58,12 @@
 
 - `lib/features/book_memo/screens/book_memo_list.dart` — 책 기록 상세의 메모 목록 탭(메모 추가·상세 진입, 당겨서 새로고침)
 - `lib/features/book_memo/screens/book_memo_detail_screen.dart` — 메모 제목 자동 저장과 타입별 조각 타임라인·로컬 CRUD 화면
+- `lib/features/book_memo/screens/memo_ocr_camera_screen.dart` — 발췌 OCR용 카메라 미리보기·수평 가이드 및 갤러리 이미지 선택 화면
 - `lib/features/book_memo/data/book_memo_api.dart` — 메모 제목 PUT, 조각 생성/수정/삭제, 사진 업로드, 증분 동기화 조회 API 호출
 - `lib/features/book_memo/data/book_memo_dao.dart` — 로컬 DB 쿼리·dirty push 확정·전체/증분 reconcile(dirty 행 보호, 로컬 PK와 server_id 분리)
 - `lib/features/book_memo/data/book_memo_repository.dart` — 메모 화면 source of truth, 로컬 우선 CRUD 직후 조용히 서버 push하고 실패 시 dirty 유지, 최초엔 전체(`/api/me/records`)·이후엔 증분(`/api/me/memos/sync/changes`) 동기화
 - `lib/features/book_memo/providers/book_memo_providers.dart` — 책별 메모 목록·상세 상태 및 메모 동기화 컨트롤러 Riverpod provider
+- `lib/features/book_memo/services/book_memo_ocr_service.dart` — 촬영 이미지에서 한국어 단어와 선택용 좌표를 추출하는 온디바이스 OCR 서비스
 - `lib/features/book_memo/utils/memo_highlight.dart` — 웹과 동일한 `::hl[[]]` 강조 마크업 파싱/직렬화, `isImportant` 파생 기준(`hasMemoHighlight`)
 - `lib/features/book_memo/screens/widgets/highlight_text_field.dart` — 강조(::hl[[]]) 편집을 지원하는 `MemoHighlightController`(TextEditingController), 커서/선택 기반 토글·타이핑 상속·range 이동
 - `docs/policies/memo-highlight-toggle.md` — 강조 토글 버튼 정책 문서(상태 판단·경계 공백 삽입·IME 조합 세션 고정), 다른 화면/플랫폼에 재구현할 때 참고
@@ -124,3 +126,4 @@
 - `docs/review/20260818-190749-book-memo-sync-review.md` — 메모 서버 push·증분 동기화의 범위, 마이그레이션, 세션·동시 편집 데이터 안전성 리뷰
 - `docs/review/20260818-201131-book-memo-photo-create-review.md` — PHOTO 일괄 생성 API의 재시도 중복과 파일 검증·영구 실패 처리 리뷰
 - `docs/review/20260819-140034-memo-highlight-editor-review.md` — 메모 강조 편집기의 선택 교체·IME 조합 표시·접근성·정책 문서 정합성 리뷰
+- `docs/review/20260819-162246-local-create-and-ocr-review.md` — 로컬 책 CREATE의 상태 경합·영구 실패 처리와 OCR 카메라 생명주기·접근성 리뷰

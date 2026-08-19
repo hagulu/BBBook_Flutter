@@ -1,7 +1,14 @@
 import 'dart:developer' as developer;
+import 'dart:io';
+
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../book_detail/data/book_detail_api.dart';
 import '../../book_record/data/book_record_api.dart';
+import '../../book_search/data/book_search_api.dart';
 import '../models/book_category.dart';
 import '../models/book_item.dart';
 import '../models/book_status.dart';
@@ -18,14 +25,20 @@ class BookshelfRepository {
   BookshelfRepository({
     required this._api,
     required this._recordApi,
+    required this._bookDetailApi,
+    required this._bookSearchApi,
     this._dao = const BookshelfDao(),
     this._categoryDao = const BookCategoryDao(),
+    this._uuid = const Uuid(),
   });
 
   final BookshelfApi _api;
   final BookRecordApi _recordApi;
+  final BookDetailApi _bookDetailApi;
+  final BookSearchApi _bookSearchApi;
   final BookshelfDao _dao;
   final BookCategoryDao _categoryDao;
+  final Uuid _uuid;
 
   /// [pushDirtyRecord] 호출을 책별로 순서대로 실행시키는 체인. 겹치는 호출이
   /// 동시에 같은 baseline으로 push를 보내면 서버가 뒤에 도착한 요청을 (실제
@@ -126,27 +139,40 @@ class BookshelfRepository {
   /// 스냅샷을 들고 있지 않음) — 그래야 대기 중이던 호출이 실제로 실행될
   /// 때 그 사이 쌓인 편집까지 포함해서 보낸다. dirty가 아니면(이미 push가
   /// 끝났으면) 아무 것도 하지 않는다.
-  Future<void> pushDirtyRecord(int userBookId) {
+  Future<void> pushDirtyRecord(
+    int userBookId, {
+    bool reportPermanentCreateFailure = false,
+  }) {
     final previous = _dirtyPushChains[userBookId] ?? Future<void>.value();
-    final chained = previous
-        .then((_) => _pushOneDirtyRecord(userBookId))
-        // 체인에 쌓인 Future가 에러로 완료되면 그 뒤에 이어붙는 호출들이
-        // 전부 건너뛰어지므로 여기서 삼켜 체인이 끊기지 않게 한다(실패는
-        // 이미 [_pushDirtyItem] 내부에서 로그로만 남기고 dirty를 유지한다).
-        .catchError((_, _) {});
-    _dirtyPushChains[userBookId] = chained;
-    return chained;
+    final operation = previous.then(
+      (_) => _pushOneDirtyRecord(
+        userBookId,
+        reportPermanentCreateFailure: reportPermanentCreateFailure,
+      ),
+    );
+    // 호출부에 영구 CREATE 오류를 전달하더라도 내부 큐는 성공 Future로
+    // 이어서 다음 dirty push가 건너뛰어지지 않게 한다.
+    _dirtyPushChains[userBookId] = operation.catchError((_, _) {});
+    return operation;
   }
 
   /// 실행 시점(대기열에서 순서가 왔을 때)의 최신 세션 generation과 dirty
   /// 상태를 기준으로 한다 — 큐에 오래 대기했을 수 있어 호출 시점 값을
   /// 넘겨받지 않고 여기서 새로 읽는다.
-  Future<void> _pushOneDirtyRecord(int userBookId) async {
+  Future<void> _pushOneDirtyRecord(
+    int userBookId, {
+    required bool reportPermanentCreateFailure,
+  }) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final dirty = await _dao.getDirtyRecord(userBookId);
     if (dirty == null) return;
     if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
-    await _pushDirtyItem(dirty.$1, dirty.$2, expectedGeneration);
+    await _pushDirtyItem(
+      dirty.$1,
+      dirty.$2,
+      expectedGeneration,
+      reportPermanentCreateFailure: reportPermanentCreateFailure,
+    );
   }
 
   /// dirty 행 한 건을 서버로 push한다. 이 행이 현재 로컬에 들고 있는 필드
@@ -174,11 +200,16 @@ class BookshelfRepository {
   Future<void> _pushDirtyItem(
     BookItem item,
     DateTime? baseUpdatedAt,
-    int expectedGeneration,
-  ) async {
+    int expectedGeneration, {
+    required bool reportPermanentCreateFailure,
+  }) async {
     try {
+      if (item.serverId == null) {
+        await _createDirtyItem(item, expectedGeneration);
+        return;
+      }
       final data = await _recordApi.patchRecord(
-        userBookId: item.userBookId,
+        userBookId: item.serverId!,
         status: (item.status == BookStatus.finished && item.finishedAt == null)
             ? null
             : item.status.apiValue,
@@ -207,6 +238,9 @@ class BookshelfRepository {
       final serverItem = BookItem.fromDetailJson(
         data,
         createdAt: item.createdAt,
+        localUserBookId: item.userBookId,
+        clientRequestId: item.clientRequestId,
+        createThumbnailPath: item.createThumbnailPath,
       );
       if (latest.updatedAt == item.updatedAt) {
         await _dao.confirmPush(serverItem);
@@ -221,7 +255,15 @@ class BookshelfRepository {
       );
     } on ApiException catch (e) {
       if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
-      if (e.statusCode == 409) {
+      if (item.serverId == null && _isPermanentCreateFailure(e)) {
+        await _dao.deleteOne(item.userBookId);
+        await _deleteManagedPendingThumbnail(item.createThumbnailPath);
+        developer.log(
+          '[책 CREATE 더티 push] localUserBookId=${item.userBookId} '
+          'result=FAIL reason=permanent_api_error status=${e.statusCode}',
+        );
+        if (reportPermanentCreateFailure) rethrow;
+      } else if (e.statusCode == 409 && item.serverId != null) {
         await _dao.resolveConflict(item.userBookId);
         developer.log(
           '[책 기록 더티 push] userBookId=${item.userBookId} result=FAIL reason=conflict',
@@ -238,6 +280,63 @@ class BookshelfRepository {
     }
   }
 
+  bool _isPermanentCreateFailure(ApiException error) =>
+      error.statusCode == 400 ||
+      error.statusCode == 404 ||
+      error.statusCode == 409;
+
+  /// server_id가 없는 dirty 로컬 책만 CREATE한다. clientRequestId가 없는
+  /// 기존 호환 행은 새 UUID를 push 시점에 만들어서는 안 되므로 그대로
+  /// 실패 상태를 유지한다.
+  Future<void> _createDirtyItem(BookItem item, int expectedGeneration) async {
+    final clientRequestId = item.clientRequestId;
+    if (clientRequestId == null) {
+      throw StateError('Pending user_book has no clientRequestId');
+    }
+
+    final response = item.isbn13 == null
+        ? await _bookSearchApi.postCustomBook(
+            title: item.title,
+            author: item.author,
+            publisher: item.publisher,
+            totalPages: item.totalPages,
+            categoryId: item.displayCategoryId,
+            thumbnailFile: item.createThumbnailPath == null
+                ? null
+                : File(item.createThumbnailPath!),
+            status: item.status.apiValue,
+            clientRequestId: clientRequestId,
+            sourceType: item.sourceType,
+            myRating: item.myRating,
+            shortReview: item.shortReview,
+            difficulty: item.difficulty,
+            finishedAt: _formatDate(item.finishedAt),
+          )
+        : await _bookDetailApi.addToBookshelf(
+            isbn13: item.isbn13!,
+            status: item.status.apiValue,
+            clientRequestId: clientRequestId,
+            sourceType: item.sourceType,
+            myRating: item.myRating,
+            shortReview: item.shortReview,
+            difficulty: item.difficulty,
+            finishedAt: _formatDate(item.finishedAt),
+          );
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+
+    await _dao.confirmCreate(
+      localId: item.userBookId,
+      capturedUpdatedAt: item.updatedAt,
+      response: response,
+    );
+    await _deleteManagedPendingThumbnail(item.createThumbnailPath);
+    developer.log(
+      '[책 CREATE 더티 push] localUserBookId=${item.userBookId} '
+      'serverUserBookId=${response.userBookId} result=SUCCESS '
+      'created=${response.created}',
+    );
+  }
+
   String? _formatDate(DateTime? date) =>
       date?.toIso8601String().substring(0, 10);
 
@@ -246,6 +345,156 @@ class BookshelfRepository {
   }
 
   Future<BookItem?> getById(int userBookId) => _dao.getById(userBookId);
+
+  /// ISBN 책을 로컬에 먼저 생성하고 같은 clientRequestId로 즉시 push를
+  /// 시도한다. 네트워크 실패 시에도 로컬 행과 UUID는 dirty 상태로 남아 다음
+  /// [sync]에서 재사용된다.
+  Future<BookItem> createIsbnBook({
+    required String isbn13,
+    required String title,
+    String? author,
+    String? publisher,
+    int? totalPages,
+    String? coverImageUrl,
+    int? categoryId,
+    String? category,
+    required BookStatus status,
+    String? sourceType,
+    double? myRating,
+    String? shortReview,
+    String? difficulty,
+    String? finishedAt,
+  }) async {
+    final existing = await _dao.getByIsbn13(isbn13);
+    if (existing != null) {
+      throw const ApiException('이미 서재에 추가된 책입니다.', statusCode: 409);
+    }
+
+    final now = DateTime.now().toUtc();
+    final local = await _dao.insertLocalCreate(
+      BookItem(
+        userBookId: 0,
+        clientRequestId: _uuid.v4(),
+        isbn13: isbn13,
+        title: title,
+        author: author,
+        publisher: publisher,
+        totalPages: totalPages,
+        coverImageUrl: coverImageUrl,
+        displayCategoryId: categoryId,
+        category: category,
+        status: status,
+        currentPage: 0,
+        myRating: myRating,
+        shortReview: shortReview,
+        isMasterpiece: false,
+        sourceType: sourceType,
+        rereadCount: 0,
+        difficulty: difficulty,
+        finishedAt: _createFinishedAt(status, finishedAt),
+        tags: const [],
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await pushDirtyRecord(local.userBookId, reportPermanentCreateFailure: true);
+    return await _dao.getById(local.userBookId) ?? local;
+  }
+
+  /// 사용자 직접 등록도 일반 책과 동일한 local-first/dirty 정책을 쓴다.
+  /// 선택 표지는 앱 재시작 뒤 재시도할 수 있도록 로컬 생성 전에 관리
+  /// 디렉터리로 복사하고, CREATE 확정 후에만 지운다.
+  Future<BookItem> createCustomBook({
+    required String title,
+    String? author,
+    String? publisher,
+    int? totalPages,
+    int? categoryId,
+    File? thumbnailFile,
+    required BookStatus status,
+    String? sourceType,
+    double? myRating,
+    String? shortReview,
+    String? difficulty,
+    String? finishedAt,
+  }) async {
+    final clientRequestId = _uuid.v4();
+    final thumbnailPath = await _persistPendingThumbnail(
+      thumbnailFile,
+      clientRequestId,
+    );
+    final now = DateTime.now().toUtc();
+    late final BookItem local;
+    try {
+      local = await _dao.insertLocalCreate(
+        BookItem(
+          userBookId: 0,
+          clientRequestId: clientRequestId,
+          createThumbnailPath: thumbnailPath,
+          title: title,
+          author: author,
+          publisher: publisher,
+          totalPages: totalPages,
+          displayCategoryId: categoryId,
+          status: status,
+          currentPage: 0,
+          myRating: myRating,
+          shortReview: shortReview,
+          isMasterpiece: false,
+          sourceType: sourceType,
+          rereadCount: 0,
+          difficulty: difficulty,
+          finishedAt: _createFinishedAt(status, finishedAt),
+          tags: const [],
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+    } catch (_) {
+      await _deleteManagedPendingThumbnail(thumbnailPath);
+      rethrow;
+    }
+    await pushDirtyRecord(local.userBookId, reportPermanentCreateFailure: true);
+    return await _dao.getById(local.userBookId) ?? local;
+  }
+
+  DateTime? _createFinishedAt(BookStatus status, String? value) {
+    if (value != null) return DateTime.parse(value);
+    if (status != BookStatus.finished) return null;
+    final kstNow = DateTime.now().toUtc().add(const Duration(hours: 9));
+    return DateTime(kstNow.year, kstNow.month, kstNow.day);
+  }
+
+  Future<String?> _persistPendingThumbnail(
+    File? source,
+    String clientRequestId,
+  ) async {
+    if (source == null) return null;
+    final root = await getApplicationSupportDirectory();
+    final directory = Directory(
+      path.join(root.path, 'pending_book_thumbnails'),
+    );
+    await directory.create(recursive: true);
+    final extension = path.extension(source.path).toLowerCase();
+    final target = path.join(directory.path, '$clientRequestId$extension');
+    return (await source.copy(target)).path;
+  }
+
+  Future<void> _deleteManagedPendingThumbnail(String? thumbnailPath) async {
+    if (thumbnailPath == null || thumbnailPath.isEmpty) return;
+    try {
+      final root = await getApplicationSupportDirectory();
+      final managedDirectory = path.normalize(
+        path.absolute(path.join(root.path, 'pending_book_thumbnails')),
+      );
+      final targetPath = path.normalize(path.absolute(thumbnailPath));
+      if (!path.isWithin(managedDirectory, targetPath)) return;
+      final file = File(targetPath);
+      if (await file.exists()) await file.delete();
+    } catch (_) {
+      developer.log('[책 CREATE 표지 정리] result=FAIL reason=local_file_error');
+    }
+  }
 
   /// 책 기록 화면에서 서버 PATCH가 성공한 뒤 그 결과를 로컬에 반영한다.
   /// [syncedUpdatedAt]은 응답에 실제 서버 updated_at이 함께 내려오는

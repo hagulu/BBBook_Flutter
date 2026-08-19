@@ -8,7 +8,6 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_alert.dart';
 import '../../../shared/widgets/app_snackbar.dart';
-import '../../book_detail/providers/book_detail_providers.dart';
 import '../../book_record/models/record_labels.dart';
 import '../../bookshelf/models/book_status.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
@@ -124,15 +123,19 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
     setState(() => _processing = true);
     try {
       final result = await ref
-          .read(bookDetailApiProvider)
-          .addToBookshelf(isbn13: isbn13, status: status.apiValue);
-      await ref
-          .read(bookshelfSyncControllerProvider.notifier)
-          .ensureSynced(result.userBookId);
+          .read(bookshelfRepositoryProvider)
+          .createIsbnBook(
+            isbn13: isbn13,
+            title: 'ISBN $isbn13',
+            status: status,
+          );
+      ref.read(bookshelfSyncVersionProvider.notifier).state++;
       if (mounted) {
         AppSnackBar.success(
           context,
-          '\'${result.title}\' 책 등록완료 (${status.label})',
+          result.serverId == null
+              ? '\'${result.title}\' 임시 저장됨 · 연결 시 자동 등록됩니다.'
+              : '\'${result.title}\' 책 등록완료 (${status.label})',
           duration: const Duration(seconds: 2),
           replaceCurrent: true,
         );
@@ -222,8 +225,12 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
                   : '책 뒷면의 바코드를 화면 중앙에 맞춰주세요',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: _sawNonIsbnBarcode ? AppColors.highlightGold : Colors.white,
-                fontWeight: _sawNonIsbnBarcode ? FontWeight.w600 : FontWeight.normal,
+                color: _sawNonIsbnBarcode
+                    ? AppColors.highlightGold
+                    : Colors.white,
+                fontWeight: _sawNonIsbnBarcode
+                    ? FontWeight.w600
+                    : FontWeight.normal,
                 fontSize: 14,
               ),
             ),

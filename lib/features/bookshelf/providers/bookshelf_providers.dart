@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_providers.dart';
+import '../../book_detail/data/book_detail_api.dart';
 import '../../book_record/data/book_record_api.dart';
+import '../../book_search/data/book_search_api.dart';
 import '../data/bookshelf_api.dart';
 import '../data/bookshelf_repository.dart';
 import '../models/book_category.dart';
@@ -25,6 +27,8 @@ final bookshelfRepositoryProvider = Provider<BookshelfRepository>((ref) {
   return BookshelfRepository(
     api: ref.watch(bookshelfApiProvider),
     recordApi: BookRecordApi(apiClient: ref.watch(apiClientProvider)),
+    bookDetailApi: BookDetailApi(apiClient: ref.watch(apiClientProvider)),
+    bookSearchApi: BookSearchApi(apiClient: ref.watch(apiClientProvider)),
   );
 });
 

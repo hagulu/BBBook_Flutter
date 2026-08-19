@@ -15,7 +15,6 @@ import '../../../book_record/screens/widgets/record_dialog_shell.dart';
 import '../../../book_record/screens/widgets/record_field_tile.dart';
 import '../../../bookshelf/models/book_status.dart';
 import '../../../bookshelf/providers/bookshelf_providers.dart';
-import '../../providers/book_search_providers.dart';
 
 /// "직접 등록" 모달(book-search.md, `CustomBookModal` add 모드 대응). 항목은
 /// 책 기록 상세의 "책 정보 수정" 팝업(표지/제목/저자/출판사/카테고리/총쪽수)과
@@ -136,9 +135,9 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
     AppLoading.show(context);
     try {
       final options = _finishOptions;
-      final userBookId = await ref
-          .read(bookSearchApiProvider)
-          .postCustomBook(
+      final book = await ref
+          .read(bookshelfRepositoryProvider)
+          .createCustomBook(
             title: title,
             author: _authorController.text.trim().isEmpty
                 ? null
@@ -149,7 +148,7 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
             totalPages: totalPages,
             categoryId: _selectedCategoryId,
             thumbnailFile: _pickedThumbnail,
-            status: _status.apiValue,
+            status: _status,
             sourceType: options?.sourceType?.apiValue,
             myRating: options?.myRating,
             shortReview: options?.shortReview,
@@ -158,13 +157,9 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
                 ? null
                 : _formatDate(options!.finishedAt!),
           );
-      final synced = await ref
-          .read(bookshelfSyncControllerProvider.notifier)
-          .ensureSynced(userBookId);
+      ref.read(bookshelfSyncVersionProvider.notifier).state++;
       if (mounted) {
-        Navigator.of(
-          context,
-        ).pop((userBookId: userBookId, synced: synced));
+        Navigator.of(context).pop((userBookId: book.userBookId, synced: true));
       }
     } on ApiException catch (e) {
       if (mounted) setState(() => _errorText = e.message);
@@ -204,7 +199,9 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           BookThumbnailField(
-            title: _titleController.text.isEmpty ? '책 표지' : _titleController.text,
+            title: _titleController.text.isEmpty
+                ? '책 표지'
+                : _titleController.text,
             currentCoverUrl: null,
             pickedFile: _pickedThumbnail,
             hasThumbnail: _pickedThumbnail != null,
@@ -212,9 +209,17 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
             onRemove: _clearThumbnail,
           ),
           const SizedBox(height: 20),
-          _labeledField(label: '제목', controller: _titleController, maxLength: 255),
+          _labeledField(
+            label: '제목',
+            controller: _titleController,
+            maxLength: 255,
+          ),
           const SizedBox(height: 10),
-          _labeledField(label: '저자', controller: _authorController, maxLength: 255),
+          _labeledField(
+            label: '저자',
+            controller: _authorController,
+            maxLength: 255,
+          ),
           const SizedBox(height: 10),
           _labeledField(
             label: '출판사',
@@ -260,9 +265,7 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
           ],
         ],
       ),
-      buttons: [
-        RecordDialogButton(label: '등록', onPressed: _save),
-      ],
+      buttons: [RecordDialogButton(label: '등록', onPressed: _save)],
     );
   }
 }

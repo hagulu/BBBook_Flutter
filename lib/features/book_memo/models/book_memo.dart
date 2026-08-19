@@ -49,6 +49,7 @@ class BookMemoItem {
   const BookMemoItem({
     required this.id,
     required this.serverId,
+    required this.clientRequestId,
     required this.memoId,
     required this.type,
     required this.startPage,
@@ -68,6 +69,10 @@ class BookMemoItem {
   /// 서버 조각 ID. null이면 아직 서버에 반영되지 못한 로컬 전용 조각이다.
   /// [BookMemo.serverId] 참고.
   final int? serverId;
+
+  /// 로컬 CREATE 시 한 번 생성해 저장하는 멱등 UUID. 기존 로컬/서버 동기화
+  /// 데이터는 null일 수 있으며 UPDATE에는 새 값을 만들거나 전송하지 않는다.
+  final String? clientRequestId;
   final int memoId;
   final BookMemoItemType type;
   final int? startPage;

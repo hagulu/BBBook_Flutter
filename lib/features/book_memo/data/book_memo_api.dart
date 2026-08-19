@@ -67,6 +67,7 @@ class BookMemoApi {
     required int? endPage,
     required String? content,
     required bool isImportant,
+    required String? clientRequestId,
   }) async {
     try {
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
@@ -78,6 +79,7 @@ class BookMemoApi {
           'endPage': endPage,
           'content': content,
           'isImportant': isImportant,
+          'clientRequestId': clientRequestId,
         },
       );
       final data = _unwrapMap(response);
@@ -105,6 +107,7 @@ class BookMemoApi {
     required String? content,
     required bool isImportant,
     required File file,
+    required String? clientRequestId,
   }) async {
     try {
       final fileName = file.path.split(Platform.pathSeparator).last;
@@ -114,6 +117,7 @@ class BookMemoApi {
         if (endPage != null) 'endPage': endPage.toString(),
         'content': ?content,
         'isImportant': isImportant.toString(),
+        'clientRequestId': ?clientRequestId,
         'file': await MultipartFile.fromFile(file.path, filename: fileName),
       });
       final response = await _apiClient.dio.post<Map<String, dynamic>>(

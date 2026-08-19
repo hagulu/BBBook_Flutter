@@ -46,10 +46,19 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
     AppLoading.show(context);
     try {
       final result = await ref
-          .read(bookDetailApiProvider)
-          .addToBookshelf(
+          .read(bookshelfRepositoryProvider)
+          .createIsbnBook(
             isbn13: data.detail.isbn,
-            status: status.apiValue,
+            title: data.detail.title,
+            author: data.detail.author,
+            publisher: data.detail.publisher,
+            totalPages: data.detail.pageCount == 0
+                ? null
+                : data.detail.pageCount,
+            coverImageUrl: data.detail.coverUrl,
+            categoryId: data.detail.categoryId,
+            category: data.detail.category,
+            status: status,
             sourceType: options?.sourceType?.apiValue,
             myRating: options?.myRating,
             shortReview: options?.shortReview,
@@ -58,14 +67,17 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                 ? null
                 : _formatDate(options!.finishedAt!),
           );
-      await ref
-          .read(bookshelfSyncControllerProvider.notifier)
-          .ensureSynced(result.userBookId);
       if (!mounted) return;
+      ref.read(bookshelfSyncVersionProvider.notifier).state++;
       ref
           .read(bookDetailControllerProvider(widget.isbn).notifier)
           .markAddedToShelf(result.userBookId);
-      AppSnackBar.success(context, '서재에 추가되었습니다.');
+      AppSnackBar.success(
+        context,
+        result.serverId == null
+            ? '임시 저장되었습니다. 연결되면 자동으로 등록됩니다.'
+            : '서재에 추가되었습니다.',
+      );
     } on ApiException catch (e) {
       if (e.statusCode == 409) {
         ref.invalidate(bookDetailControllerProvider(widget.isbn));
@@ -125,13 +137,15 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
       bottomBar = _BottomActionBar(
         data: value,
         onAddToShelf: () => _addToShelf(value),
-        onBuy: value.detail.productUrl == null || value.detail.productUrl!.isEmpty
+        onBuy:
+            value.detail.productUrl == null || value.detail.productUrl!.isEmpty
             ? null
             : () => _openProductUrl(value.detail.productUrl!),
       );
     } else if (state.hasError) {
       body = _ErrorBody(
-        onRetry: () => ref.invalidate(bookDetailControllerProvider(widget.isbn)),
+        onRetry: () =>
+            ref.invalidate(bookDetailControllerProvider(widget.isbn)),
       );
     } else {
       body = const Center(child: CircularProgressIndicator());
@@ -189,7 +203,10 @@ class _BottomActionBar extends StatelessWidget {
             Expanded(
               child: OutlinedButton.icon(
                 onPressed: onBuy,
-                icon: const Icon(PhosphorIconsRegular.shoppingCartSimple, size: 18),
+                icon: const Icon(
+                  PhosphorIconsRegular.shoppingCartSimple,
+                  size: 18,
+                ),
                 label: const Text('구매'),
               ),
             ),
@@ -232,7 +249,8 @@ class _HeroSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final detail = data.detail;
     final metaParts = <String>[
-      if (detail.publisher != null && detail.publisher!.isNotEmpty) detail.publisher!,
+      if (detail.publisher != null && detail.publisher!.isNotEmpty)
+        detail.publisher!,
       if (detail.pageCount > 0) '${detail.pageCount}쪽',
       if (detail.pubDate != null && detail.pubDate!.isNotEmpty) detail.pubDate!,
     ];
@@ -318,7 +336,11 @@ class _HeroSection extends StatelessWidget {
             width: double.infinity,
             child: Text(
               detail.description!,
-              style: const TextStyle(fontSize: 14, color: AppColors.textBody, height: 1.5),
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textBody,
+                height: 1.5,
+              ),
             ),
           ),
         ],

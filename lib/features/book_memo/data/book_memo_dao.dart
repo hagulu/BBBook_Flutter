@@ -1,6 +1,7 @@
 import 'dart:developer' as developer;
 
 import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../bookshelf/data/bookshelf_database.dart';
 import '../../record_sync/models/record_sync_payload.dart';
@@ -159,6 +160,9 @@ class BookMemoDao {
       final values = <String, Object?>{
         'id': id,
         'server_id': null,
+        // 네트워크 push가 아니라 로컬 신규 생성 트랜잭션에서 한 번만
+        // 발급한다. 이후 재시도는 이 컬럼을 다시 읽어 같은 값을 사용한다.
+        'client_request_id': const Uuid().v4(),
         'memo_id': memoId,
         'item_type': draft.type.dbValue,
         'start_page': draft.startPage,
@@ -515,6 +519,10 @@ class BookMemoDao {
   }) async {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
+      final localActiveUserBookIds = await _localUserBookIdsForServerIds(
+        txn,
+        activeUserBookIds,
+      );
       for (final memo in memos) {
         await _upsertServerMemoTxn(txn, ownerUserId, memo);
       }
@@ -547,7 +555,7 @@ class BookMemoDao {
       await _deleteMissingItemsTxn(
         txn,
         ownerUserId,
-        activeUserBookIds,
+        localActiveUserBookIds,
         serverItemIds,
       );
 
@@ -555,7 +563,7 @@ class BookMemoDao {
       await _deleteMissingMemosTxn(
         txn,
         ownerUserId,
-        activeUserBookIds,
+        localActiveUserBookIds,
         serverMemoIds,
       );
 
@@ -647,6 +655,9 @@ class BookMemoDao {
     int ownerUserId,
     ServerBookMemo memo,
   ) async {
+    final localUserBookId =
+        await _findLocalUserBookIdByServerId(txn, memo.userBookId) ??
+        memo.userBookId;
     final existing = await txn.query(
       'book_memo',
       columns: ['id', 'is_dirty'],
@@ -662,7 +673,7 @@ class BookMemoDao {
           'book_memo',
           {
             'title': memo.title,
-            'user_book_id': memo.userBookId,
+            'user_book_id': localUserBookId,
             'deleted_at': null,
             'updated_at': memo.updatedAt.toUtc().toIso8601String(),
           },
@@ -676,7 +687,7 @@ class BookMemoDao {
       'id': memo.id,
       'server_id': memo.id,
       'owner_user_id': ownerUserId,
-      'user_book_id': memo.userBookId,
+      'user_book_id': localUserBookId,
       'title': memo.title,
       'deleted_at': null,
       'created_at': memo.createdAt.toUtc().toIso8601String(),
@@ -752,6 +763,37 @@ class BookMemoDao {
       limit: 1,
     );
     return rows.isEmpty ? null : rows.single['id'] as int;
+  }
+
+  Future<int?> _findLocalUserBookIdByServerId(
+    Transaction txn,
+    int serverUserBookId,
+  ) async {
+    final rows = await txn.query(
+      'user_book',
+      columns: ['user_book_id'],
+      where: 'server_id = ? OR user_book_id = ?',
+      whereArgs: [serverUserBookId, serverUserBookId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.single['user_book_id'] as int;
+  }
+
+  Future<List<int>> _localUserBookIdsForServerIds(
+    Transaction txn,
+    List<int> serverUserBookIds,
+  ) async {
+    if (serverUserBookIds.isEmpty) return const [];
+    final placeholders = List.filled(serverUserBookIds.length, '?').join(', ');
+    final rows = await txn.query(
+      'user_book',
+      columns: ['user_book_id'],
+      where: 'server_id IN ($placeholders) OR user_book_id IN ($placeholders)',
+      whereArgs: [...serverUserBookIds, ...serverUserBookIds],
+    );
+    return rows
+        .map((row) => row['user_book_id'] as int)
+        .toList(growable: false);
   }
 
   /// [activeUserBookIds]가 비어 있으면(이론상 발생하지 않아야 하지만,
@@ -870,6 +912,7 @@ class BookMemoDao {
     return BookMemoItem(
       id: row['id'] as int,
       serverId: row['server_id'] as int?,
+      clientRequestId: row['client_request_id'] as String?,
       memoId: row['memo_id'] as int,
       type: BookMemoItemType.fromDb(row['item_type'] as String),
       startPage: row['start_page'] as int?,

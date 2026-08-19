@@ -5,6 +5,9 @@ import 'book_tag.dart';
 class BookItem {
   const BookItem({
     required this.userBookId,
+    this.serverId,
+    this.clientRequestId,
+    this.createThumbnailPath,
     this.bookId,
     this.isbn13,
     required this.title,
@@ -34,6 +37,19 @@ class BookItem {
   });
 
   final int userBookId;
+
+  /// 서버의 실제 `user_book.id`. 로컬 신규 생성 직후에는 null이고, CREATE
+  /// 성공(동일 clientRequestId 재시도로 기존 행을 받은 경우 포함) 후 채운다.
+  /// 로컬 [userBookId]는 화면/FK가 계속 참조하는 안정적인 PK라 바꾸지 않는다.
+  final int? serverId;
+
+  /// CREATE 멱등 키. 로컬 신규 생성 시 한 번 발급하며 dirty 재시도에서도
+  /// 같은 값을 계속 사용한다. 기존 데이터와 서버 동기화 행은 null일 수 있다.
+  final String? clientRequestId;
+
+  /// 커스텀 CREATE가 아직 성공하지 않은 동안 재업로드할 관리 디렉터리 표지
+  /// 경로. 성공 후 null로 정리한다.
+  final String? createThumbnailPath;
   final int? bookId;
   final String? isbn13;
   final String title;
@@ -74,6 +90,9 @@ class BookItem {
   BookItem copyWithTags(List<BookTag> tags, {required DateTime updatedAt}) {
     return BookItem(
       userBookId: userBookId,
+      serverId: serverId,
+      clientRequestId: clientRequestId,
+      createThumbnailPath: createThumbnailPath,
       bookId: bookId,
       isbn13: isbn13,
       title: title,
@@ -134,6 +153,9 @@ class BookItem {
     final autoFillFinishedAt = status == 'FINISHED' && finishedAt == null;
     return BookItem(
       userBookId: userBookId,
+      serverId: serverId,
+      clientRequestId: clientRequestId,
+      createThumbnailPath: createThumbnailPath,
       bookId: bookId,
       isbn13: isbn13,
       title: title,
@@ -190,9 +212,15 @@ class BookItem {
   factory BookItem.fromDetailJson(
     Map<String, dynamic> json, {
     required DateTime createdAt,
+    int? localUserBookId,
+    String? clientRequestId,
+    String? createThumbnailPath,
   }) {
     return BookItem(
-      userBookId: json['userBookId'] as int,
+      userBookId: localUserBookId ?? json['userBookId'] as int,
+      serverId: json['userBookId'] as int,
+      clientRequestId: clientRequestId,
+      createThumbnailPath: createThumbnailPath,
       bookId: json['bookId'] as int?,
       isbn13: json['isbn13'] as String?,
       title: json['title'] as String,
