@@ -7,7 +7,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_alert.dart';
 import '../../models/book_memo.dart';
+import 'highlight_text_field.dart';
 
 Future<BookMemoItemDraft?> showBookMemoItemEditor(
   BuildContext context, {
@@ -226,11 +228,14 @@ class _BookMemoItemEditorScreen extends StatefulWidget {
 
 class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
   late BookMemoItemType _type;
-  late final TextEditingController _contentController;
+  late final MemoHighlightController _contentController;
   late final TextEditingController _startPageController;
   late final TextEditingController _endPageController;
   late final FocusNode _contentFocusNode;
-  late bool _isImportant;
+
+  /// PHOTO 타입 전용 조각 전체 강조 토글. 텍스트 타입은 [_contentController]의
+  /// 강조(::hl[[]]) 존재 여부로 강조가 결정되므로 이 값을 쓰지 않는다.
+  late bool _photoImportant;
   String? _imageUrl;
   String? _pickedImagePath;
   String? _errorText;
@@ -241,8 +246,8 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
     final item = widget.initialItem;
     final draft = widget.initialDraft;
     _type = item?.type ?? draft?.type ?? BookMemoItemType.summary;
-    _contentController = TextEditingController(
-      text: item?.content ?? draft?.content ?? '',
+    _contentController = MemoHighlightController.fromRaw(
+      item?.content ?? draft?.content,
     );
     _startPageController = TextEditingController(
       text: (item?.startPage ?? draft?.startPage)?.toString() ?? '',
@@ -251,9 +256,16 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
       text: (item?.endPage ?? draft?.endPage)?.toString() ?? '',
     );
     _contentFocusNode = FocusNode();
-    _isImportant = item?.isImportant ?? draft?.isImportant ?? false;
+    // isImportant는 원래 타입이 PHOTO일 때만 "조각 전체 강조" 의미를 갖는다.
+    // 텍스트 타입 조각(강조는 content의 ::hl[[]]로 별도 관리)의 isImportant를
+    // 그대로 물려받으면, 강조가 있던 텍스트 조각을 PHOTO로 전환했을 때 사용자가
+    // 켠 적 없는 사진 강조 버튼이 ON으로 보인다.
+    _photoImportant = _type == BookMemoItemType.photo
+        ? (item?.isImportant ?? draft?.isImportant ?? false)
+        : false;
     _imageUrl = item?.imageUrl ?? draft?.imageUrl;
     _pickedImagePath = draft?.pickedImagePath;
+    if (_type == BookMemoItemType.photo) _contentController.clearHighlights();
   }
 
   @override
@@ -305,6 +317,9 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
             onSelected: (type) => setState(() {
               _type = type;
               _errorText = null;
+              if (type == BookMemoItemType.photo) {
+                _contentController.clearHighlights();
+              }
             }),
           ),
           if (isPhoto)
@@ -322,6 +337,7 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
             ),
           Expanded(
             child: TextField(
+              key: const Key('book_memo_content_field'),
               controller: _contentController,
               focusNode: _contentFocusNode,
               autofocus: true,
@@ -358,14 +374,34 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
                 style: const TextStyle(color: AppColors.error, fontSize: 12),
               ),
             ),
-          _EditorToolbar(
-            startPageController: _startPageController,
-            endPageController: _endPageController,
-            isImportant: _isImportant,
-            onPageChanged: () {
-              if (_errorText != null) setState(() => _errorText = null);
+          AnimatedBuilder(
+            animation: _contentController,
+            builder: (context, _) {
+              final isPhoto = _type == BookMemoItemType.photo;
+              final toggleEnabled =
+                  isPhoto || !_contentController.isBlockedAtSelection;
+              return _EditorToolbar(
+                startPageController: _startPageController,
+                endPageController: _endPageController,
+                isActive: isPhoto
+                    ? _photoImportant
+                    : _contentController.isActiveAtSelection,
+                toggleEnabled: toggleEnabled,
+                onPageChanged: () {
+                  if (_errorText != null) setState(() => _errorText = null);
+                },
+                onToggleHighlight: toggleEnabled
+                    ? () {
+                        if (isPhoto) {
+                          setState(() => _photoImportant = !_photoImportant);
+                        } else {
+                          _contentController.toggleAtSelection();
+                        }
+                      }
+                    : null,
+                onShowHelp: () => _showHighlightHelp(context),
+              );
             },
-            onTapImportant: () => setState(() => _isImportant = !_isImportant),
           ),
         ],
       ),
@@ -404,17 +440,21 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
       setState(() => _errorText = '끝 쪽은 시작 쪽보다 작을 수 없습니다.');
       return;
     }
-    final content = _contentController.text.trim();
-    if (_type != BookMemoItemType.photo && content.isEmpty) {
+    final isPhoto = _type == BookMemoItemType.photo;
+    final plainText = _contentController.text.trim();
+    if (!isPhoto && plainText.isEmpty) {
       setState(() => _errorText = '내용을 입력해 주세요.');
       return;
     }
-    if (_type == BookMemoItemType.photo &&
+    if (isPhoto &&
         _pickedImagePath == null &&
         (_imageUrl == null || _imageUrl!.isEmpty)) {
       setState(() => _errorText = '사진을 선택해 주세요.');
       return;
     }
+    // 평문을 먼저 trim하면 강조 range가 어긋나므로, ::hl[[]] 마크업으로 직렬화한
+    // 뒤에 raw 문자열을 trim한다.
+    final content = isPhoto ? plainText : _contentController.toRaw().trim();
 
     Navigator.of(context).pop(
       BookMemoItemDraft(
@@ -422,11 +462,9 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
         startPage: startPage,
         endPage: endPage,
         content: content.isEmpty ? null : content,
-        imageUrl: _type == BookMemoItemType.photo ? _imageUrl : null,
-        pickedImagePath: _type == BookMemoItemType.photo
-            ? _pickedImagePath
-            : null,
-        isImportant: _isImportant,
+        imageUrl: isPhoto ? _imageUrl : null,
+        pickedImagePath: isPhoto ? _pickedImagePath : null,
+        isImportant: isPhoto ? _photoImportant : _contentController.hasHighlight,
       ),
     );
   }
@@ -438,22 +476,38 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
     if (parsed == null || parsed < 1) return -1;
     return parsed;
   }
+
+  void _showHighlightHelp(BuildContext context) {
+    AppAlert.show(
+      context,
+      title: '강조 사용법',
+      message:
+          '• 강조를 켜고 작성하면 입력하는 내용이 강조됩니다.\n'
+          '• 작성된 텍스트를 선택해서 강조하거나 해제할 수 있습니다.\n'
+          '• 강조하며 쓰다가 강조 버튼을 다시 누르면 그 지점부터는 강조 없이 이어 쓸 수 있습니다.\n'
+          '• 사진은 사진 조각 전체가 강조됩니다.',
+    );
+  }
 }
 
 class _EditorToolbar extends StatelessWidget {
   const _EditorToolbar({
     required this.startPageController,
     required this.endPageController,
-    required this.isImportant,
+    required this.isActive,
+    required this.toggleEnabled,
     required this.onPageChanged,
-    required this.onTapImportant,
+    required this.onToggleHighlight,
+    required this.onShowHelp,
   });
 
   final TextEditingController startPageController;
   final TextEditingController endPageController;
-  final bool isImportant;
+  final bool isActive;
+  final bool toggleEnabled;
   final VoidCallback onPageChanged;
-  final VoidCallback onTapImportant;
+  final VoidCallback? onToggleHighlight;
+  final VoidCallback onShowHelp;
 
   @override
   Widget build(BuildContext context) {
@@ -491,20 +545,35 @@ class _EditorToolbar extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               SizedBox(
-                width: 92,
+                width: 82,
                 child: _EditorToolButton(
                   icon: PhosphorIconsRegular.highlighter,
-                  label: '중요',
-                  foreground: isImportant
-                      ? AppColors.memoThoughtForeground
+                  label: '강조',
+                  foreground: isActive
+                      ? AppColors.highlightGold
                       : AppColors.textMuted,
-                  background: isImportant
-                      ? AppColors.memoThoughtSurface
+                  background: isActive
+                      ? AppColors.highlightGoldSurface
                       : AppColors.surfaceSubtle,
-                  selected: isImportant,
-                  onTap: onTapImportant,
+                  selected: isActive,
+                  enabled: toggleEnabled,
+                  onTap: onToggleHighlight,
+                ),
+              ),
+              IconButton(
+                onPressed: onShowHelp,
+                tooltip: '강조 사용법',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 48,
+                  height: 48,
+                ),
+                icon: const Icon(
+                  PhosphorIconsRegular.info,
+                  size: 18,
+                  color: AppColors.textMuted,
                 ),
               ),
             ],
@@ -639,48 +708,56 @@ class _EditorToolButton extends StatelessWidget {
     required this.background,
     required this.onTap,
     this.selected = false,
+    this.enabled = true,
   });
 
   final IconData icon;
   final String label;
   final Color foreground;
   final Color background;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final bool selected;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: background,
-      shape: StadiumBorder(
-        side: BorderSide(
-          color: selected ? foreground : AppColors.border,
-          width: selected ? 1.4 : 1,
+    return Opacity(
+      opacity: enabled ? 1 : 0.45,
+      child: Material(
+        color: background,
+        shape: StadiumBorder(
+          side: BorderSide(
+            color: selected ? foreground : AppColors.border,
+            width: selected ? 1.4 : 1,
+          ),
         ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const StadiumBorder(),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: foreground),
-              const SizedBox(width: 5),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: foreground,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          customBorder: const StadiumBorder(),
+          // 본문 TextField가 포커스/키보드를 유지한 채로 강조를 토글할 수 있도록,
+          // 이 버튼이 포커스를 가져가지 않게 한다.
+          canRequestFocus: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 16, color: foreground),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: foreground,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

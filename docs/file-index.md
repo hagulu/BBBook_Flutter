@@ -62,6 +62,9 @@
 - `lib/features/book_memo/data/book_memo_dao.dart` — 로컬 DB 쿼리·dirty push 확정·전체/증분 reconcile(dirty 행 보호, 로컬 PK와 server_id 분리)
 - `lib/features/book_memo/data/book_memo_repository.dart` — 메모 화면 source of truth, 로컬 우선 CRUD 직후 조용히 서버 push하고 실패 시 dirty 유지, 최초엔 전체(`/api/me/records`)·이후엔 증분(`/api/me/memos/sync/changes`) 동기화
 - `lib/features/book_memo/providers/book_memo_providers.dart` — 책별 메모 목록·상세 상태 및 메모 동기화 컨트롤러 Riverpod provider
+- `lib/features/book_memo/utils/memo_highlight.dart` — 웹과 동일한 `::hl[[]]` 강조 마크업 파싱/직렬화, `isImportant` 파생 기준(`hasMemoHighlight`)
+- `lib/features/book_memo/screens/widgets/highlight_text_field.dart` — 강조(::hl[[]]) 편집을 지원하는 `MemoHighlightController`(TextEditingController), 커서/선택 기반 토글·타이핑 상속·range 이동
+- `docs/policies/memo-highlight-toggle.md` — 강조 토글 버튼 정책 문서(상태 판단·경계 공백 삽입·IME 조합 세션 고정), 다른 화면/플랫폼에 재구현할 때 참고
 
 ## features/record_sync
 
@@ -120,3 +123,4 @@
 - `docs/review/20260817-171413-initial-record-sync-review.md` — 최초 기록 동기화의 실패 복구 동선과 파일 인덱스 구성 리뷰
 - `docs/review/20260818-190749-book-memo-sync-review.md` — 메모 서버 push·증분 동기화의 범위, 마이그레이션, 세션·동시 편집 데이터 안전성 리뷰
 - `docs/review/20260818-201131-book-memo-photo-create-review.md` — PHOTO 일괄 생성 API의 재시도 중복과 파일 검증·영구 실패 처리 리뷰
+- `docs/review/20260819-140034-memo-highlight-editor-review.md` — 메모 강조 편집기의 선택 교체·IME 조합 표시·접근성·정책 문서 정합성 리뷰

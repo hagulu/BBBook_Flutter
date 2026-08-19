@@ -10,6 +10,7 @@ import '../../bookshelf/data/bookshelf_database.dart';
 import '../../record_sync/data/record_sync_api.dart';
 import '../../record_sync/models/record_sync_payload.dart';
 import '../models/book_memo.dart';
+import '../utils/memo_highlight.dart';
 import 'book_memo_api.dart';
 import 'book_memo_dao.dart';
 
@@ -104,6 +105,7 @@ class BookMemoRepository {
     required int memoId,
     required BookMemoItemDraft draft,
   }) async {
+    draft = _normalizeDraftImportance(draft);
     String? imageUrl;
     try {
       imageUrl = await _resolveImageUrl(draft);
@@ -140,6 +142,7 @@ class BookMemoRepository {
     required BookMemoItemDraft draft,
     required String? previousImageUrl,
   }) async {
+    draft = _normalizeDraftImportance(draft);
     String? imageUrl;
     try {
       imageUrl = await _resolveImageUrl(draft);
@@ -169,6 +172,27 @@ class BookMemoRepository {
       );
       rethrow;
     }
+  }
+
+  /// 텍스트 조각의 `isImportant`는 별도 입력이 아니라 [BookMemoItemDraft.content]
+  /// 안의 `::hl[[]]` 강조 존재 여부로만 정해진다. 에디터가 이미 계산해 보내더라도
+  /// 이 한 곳에서 다시 파생시켜, 어느 화면(퀵 작성 등)에서 만든 draft든 규칙이
+  /// 어긋나지 않게 한다. PHOTO는 조각 전체 강조가 수동 입력값이라 그대로 둔다.
+  /// 서버 동기화/reconcile 경로는 이미 같은 규칙으로 계산된 서버 값을 신뢰하므로
+  /// 여기서 건드리지 않는다.
+  BookMemoItemDraft _normalizeDraftImportance(BookMemoItemDraft draft) {
+    if (draft.type == BookMemoItemType.photo) return draft;
+    final derived = hasMemoHighlight(draft.content);
+    if (derived == draft.isImportant) return draft;
+    return BookMemoItemDraft(
+      type: draft.type,
+      startPage: draft.startPage,
+      endPage: draft.endPage,
+      content: draft.content,
+      imageUrl: draft.imageUrl,
+      pickedImagePath: draft.pickedImagePath,
+      isImportant: derived,
+    );
   }
 
   Future<DeleteMemoItemResult> deleteItem({

@@ -185,7 +185,7 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
                         ? AppColors.textStrong
                         : AppColors.textMuted,
                   ),
-                  label: const Text('중요 조각만'),
+                  label: const Text('강조 조각만'),
                   selectedColor: AppColors.highlightGoldSurface,
                   backgroundColor: AppColors.surface,
                   side: const BorderSide(color: AppColors.border),
@@ -671,7 +671,7 @@ class _EmptyItems extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              importantOnly ? '중요 조각이 없습니다.' : '아직 조각이 없습니다.',
+              importantOnly ? '강조 조각이 없습니다.' : '아직 조각이 없습니다.',
               style: const TextStyle(
                 color: AppColors.textStrong,
                 fontWeight: FontWeight.bold,
@@ -681,7 +681,7 @@ class _EmptyItems extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               importantOnly
-                  ? '중요 조각 표시를 한 기록이 여기에 모입니다.'
+                  ? '강조 표시를 한 기록이 여기에 모입니다.'
                   : '요약, 발췌, 생각, 사진을 차곡차곡 남겨보세요.',
               textAlign: TextAlign.center,
               style: const TextStyle(color: AppColors.textMuted, height: 1.4),

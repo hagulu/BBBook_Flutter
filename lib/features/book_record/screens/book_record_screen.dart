@@ -135,11 +135,6 @@ class _BookRecordBody extends ConsumerWidget {
                     book: book,
                   ),
                 ),
-                if (book.status == BookStatus.reading ||
-                    book.status == BookStatus.paused) ...[
-                  const SizedBox(height: 12),
-                  ProgressCard(userBookId: userBookId, book: book),
-                ],
               ],
             ),
           ),
@@ -165,6 +160,11 @@ class _BookRecordBody extends ConsumerWidget {
               key: const PageStorageKey('book-record-info'),
               padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
               children: [
+                if (book.status == BookStatus.reading ||
+                    book.status == BookStatus.paused) ...[
+                  ProgressCard(userBookId: userBookId, book: book),
+                  const SizedBox(height: 12),
+                ],
                 RecordSectionCard(
                   child: Row(
                     children: [
