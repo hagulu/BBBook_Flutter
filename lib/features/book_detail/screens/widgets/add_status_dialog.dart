@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../book_record/models/record_labels.dart';
 import '../../../book_record/screens/widgets/icon_option_selector.dart';
-import '../../../book_record/screens/widgets/record_dialog_shell.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../../bookshelf/models/book_status.dart';
 
 /// 서재 담기 상태 선택 팝업. book-detail.md 기준 읽고싶음/읽는 중/다 읽음

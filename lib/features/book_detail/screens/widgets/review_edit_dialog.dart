@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import '../../../book_record/screens/widgets/record_dialog_shell.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../../book_record/screens/widgets/star_rating.dart';
 import '../../models/book_review.dart';
 

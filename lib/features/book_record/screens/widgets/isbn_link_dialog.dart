@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import 'record_dialog_shell.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 
 /// ISBN 터치 시 뜨는 액션 시트의 선택 결과.
 enum IsbnLinkAction { reload, change, unlink }

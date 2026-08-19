@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../models/record_labels.dart';
 import 'icon_option_selector.dart';
-import 'record_dialog_shell.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 import 'star_rating.dart';
 
 /// "다 읽음" 전환 확인 팝업의 결과.

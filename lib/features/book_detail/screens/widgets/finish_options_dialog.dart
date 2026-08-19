@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../book_record/models/record_labels.dart';
 import '../../../book_record/screens/widgets/icon_option_selector.dart';
-import '../../../book_record/screens/widgets/record_dialog_shell.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../../book_record/screens/widgets/star_rating.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 

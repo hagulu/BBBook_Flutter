@@ -94,6 +94,7 @@
 - `lib/shared/widgets/app_confirm.dart` — 공통 Confirm 팝업(확인/취소, Future<bool> 반환)
 - `lib/shared/widgets/app_loading.dart` — 공통 Loading(전체 화면 `AppLoading`, 영역 단위 `AppLoadingOverlay`)
 - `lib/shared/widgets/app_snackbar.dart` — 공통 SnackBar(pill 형태, 성공/정보는 아이덴티티 컬러·에러는 에러 컬러 반투명 배경 + 상태 아이콘)
+- `lib/shared/widgets/record_dialog_shell.dart` — 여러 기능의 선택·수정 폼이 공유하는 바텀시트 셸(드래그 핸들·제목·콘텐츠·공통 버튼)
 
 ## docs
 

@@ -6,7 +6,7 @@ import '../../../bookshelf/models/book_status.dart';
 import '../../models/record_labels.dart';
 import 'icon_option_selector.dart';
 import 'pill_option.dart';
-import 'record_dialog_shell.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 독서 상태 선택 팝업. 정사각형 카드를 고르면 바로 그 상태를 반환하며 닫힌다.

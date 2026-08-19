@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/app_theme.dart';
+import '../../core/theme/app_theme.dart';
 
 enum RecordDialogButtonStyle { neutral, primary, destructive }
 
@@ -16,9 +16,8 @@ class RecordDialogButton {
   final RecordDialogButtonStyle style;
 }
 
-/// 책 기록 화면의 커스텀 폼형 팝업(완독 확인/재독/출처·플랫폼/난이도/책 정보
-/// 수정)이 공유하는 바텀시트 뼈대. 커스텀 콘텐츠가 필요한 폼에도 필 버튼
-/// 시각 언어를 그대로 적용해 팝업들이 한 가족처럼 보이게 한다.
+/// 여러 기능의 선택·수정 폼이 공유하는 바텀시트 뼈대. 커스텀 콘텐츠가
+/// 필요한 폼에도 필 버튼 시각 언어를 동일하게 적용한다.
 /// `showModalBottomSheet`의 `builder`에서 반환해 사용한다(선택/수정 항목은
 /// 바텀시트로, 단순 알림/확인은 `AppAlert`/`AppConfirm`을 그대로 쓴다).
 class RecordDialogShell extends StatelessWidget {

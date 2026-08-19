@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_confirm.dart';
-import 'record_dialog_shell.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// [showRereadDialog] 결과. 재독 횟수를 바꿨으면 [RereadCountUpdated], 0에서

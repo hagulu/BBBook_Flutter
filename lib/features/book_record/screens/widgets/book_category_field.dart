@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../bookshelf/models/book_category.dart';
-import 'record_dialog_shell.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 카테고리 선택 팝업 결과. 취소/바깥 탭으로 닫히면 `pop()`이 null을 반환해

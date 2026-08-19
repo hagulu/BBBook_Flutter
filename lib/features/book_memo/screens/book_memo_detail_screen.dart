@@ -1,15 +1,19 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_confirm.dart';
+import '../../../shared/widgets/record_dialog_shell.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../models/book_memo.dart';
 import '../providers/book_memo_providers.dart';
+import '../utils/memo_highlight.dart';
 import 'widgets/book_memo_item_sheet.dart';
 import 'widgets/book_memo_refresh_indicator.dart';
 
@@ -194,13 +198,12 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
-              sliver: SliverList.separated(
+              sliver: SliverList.builder(
                 itemCount: visibleItems.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
                 itemBuilder: (context, index) => _MemoTimelineItem(
                   item: visibleItems[index],
-                  onTap: () => _editItem(visibleItems[index]),
-                  onDelete: () => _deleteItem(
+                  showDivider: index < visibleItems.length - 1,
+                  onTap: () => _showItemActions(
                     visibleItems[index],
                     totalItemCount: detail.items.length,
                   ),
@@ -284,6 +287,54 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     });
   }
 
+  Future<void> _showItemActions(
+    BookMemoItem item, {
+    required int totalItemCount,
+  }) async {
+    if (_isSavingItem) {
+      AppSnackBar.info(context, '메모 조각을 저장하고 있습니다.');
+      return;
+    }
+    final action = await showModalBottomSheet<_MemoItemAction>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => const _MemoItemActionSheet(),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _MemoItemAction.edit:
+        await _editItem(item);
+      case _MemoItemAction.copy:
+        await _copyItem(item);
+      case _MemoItemAction.delete:
+        await _deleteItem(item, totalItemCount: totalItemCount);
+    }
+  }
+
+  Future<void> _copyItem(BookMemoItem item) async {
+    final content = stripMemoHighlightMarkup(item.content).trim();
+    if (content.isEmpty) {
+      AppSnackBar.info(context, '복사할 내용이 없습니다.');
+      return;
+    }
+    try {
+      await Clipboard.setData(ClipboardData(text: content));
+      developer.log(
+        '[메모 조각 복사] itemId=${item.id} target=clipboard result=SUCCESS',
+      );
+      if (mounted) AppSnackBar.success(context, '메모 조각을 복사했습니다.');
+    } catch (error, stackTrace) {
+      developer.log(
+        '[메모 조각 복사] itemId=${item.id} target=clipboard '
+        'result=FAIL reason=clipboard_write_error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) AppSnackBar.error(context, '메모 조각을 복사하지 못했습니다.');
+    }
+  }
+
   Future<void> _saveItem(Future<void> Function() save) async {
     setState(() => _isSavingItem = true);
     try {
@@ -330,132 +381,211 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
   }
 }
 
+enum _MemoItemAction { edit, copy, delete }
+
+class _MemoItemActionSheet extends StatelessWidget {
+  const _MemoItemActionSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return RecordDialogShell(
+      title: '메모 조각',
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _MemoItemActionTile(
+            icon: PhosphorIconsRegular.copy,
+            label: '복사',
+            onTap: () => Navigator.of(context).pop(_MemoItemAction.copy),
+          ),
+          const SizedBox(height: 8),
+          _MemoItemActionTile(
+            icon: PhosphorIconsRegular.pencil,
+            label: '수정',
+            onTap: () => Navigator.of(context).pop(_MemoItemAction.edit),
+          ),
+          const SizedBox(height: 8),
+          _MemoItemActionTile(
+            icon: PhosphorIconsRegular.trash,
+            label: '삭제',
+            destructive: true,
+            onTap: () => Navigator.of(context).pop(_MemoItemAction.delete),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MemoItemActionTile extends StatelessWidget {
+  const _MemoItemActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = destructive ? AppColors.error : AppColors.textStrong;
+    return Material(
+      color: AppColors.surfaceSubtle,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _MemoTimelineItem extends StatelessWidget {
   const _MemoTimelineItem({
     required this.item,
+    required this.showDivider,
     required this.onTap,
-    required this.onDelete,
   });
 
   final BookMemoItem item;
+  final bool showDivider;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final typeStyle = _MemoTypeStyle.of(item.type);
-    const cardBackground = AppColors.surface;
-    final headerBackground = Color.lerp(
-      AppColors.surface,
-      typeStyle.background,
-      0.62,
-    )!;
     return Material(
-      color: cardBackground,
-      borderRadius: BorderRadius.circular(16),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
         child: Ink(
-          decoration: BoxDecoration(
-            color: cardBackground,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: typeStyle.foreground.withValues(alpha: 0.1),
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: AppColors.shadowSoft,
-                blurRadius: 4,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              Container(
-                padding: const EdgeInsets.fromLTRB(14, 4, 6, 4),
-                decoration: BoxDecoration(
-                  color: headerBackground,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
+              if (item.type != BookMemoItemType.quote)
+                Positioned(
+                  left: 0,
+                  top: 4,
+                  bottom: showDivider ? 24 : 12,
+                  child: Container(
+                    width: 3,
+                    decoration: BoxDecoration(
+                      color: typeStyle.sidebar,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-                child: Row(
-                  children: [
-                    Icon(typeStyle.icon, color: typeStyle.foreground, size: 14),
-                    const SizedBox(width: 5),
-                    Text(
-                      item.type.label,
-                      style: TextStyle(
-                        color: typeStyle.foreground,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (item.isImportant) ...[
-                      const SizedBox(width: 7),
-                      const Icon(
-                        PhosphorIconsRegular.highlighter,
-                        size: 14,
-                        color: AppColors.highlightGold,
-                      ),
-                    ],
-                    const Spacer(),
-                    if (item.pageLabel != null) ...[
-                      Text(
-                        item.pageLabel!,
-                        style: const TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 10,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    Text(
-                      _formatDateTime(item.createdAt),
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: onDelete,
-                      tooltip: '조각 삭제',
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 36,
-                        height: 36,
-                      ),
-                      icon: const Icon(
-                        PhosphorIconsRegular.trash,
-                        size: 16,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
               Padding(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.fromLTRB(14, 14, 0, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (item.type == BookMemoItemType.photo &&
-                        item.imageUrl != null)
-                      _PhotoContent(imageUrl: item.imageUrl!),
-                    if (item.content != null && item.content!.isNotEmpty) ...[
-                      if (item.type == BookMemoItemType.photo &&
-                          item.imageUrl != null)
-                        const SizedBox(height: 10),
-                      _MemoRichText(
-                        item.content!,
-                        italic: item.type == BookMemoItemType.quote,
+                    Row(
+                      children: [
+                        Icon(
+                          typeStyle.icon,
+                          color: typeStyle.foreground,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          item.type.label,
+                          style: TextStyle(
+                            color: typeStyle.foreground,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (item.isImportant) ...[
+                          const SizedBox(width: 7),
+                          const Icon(
+                            PhosphorIconsRegular.highlighter,
+                            size: 14,
+                            color: AppColors.highlightGold,
+                          ),
+                        ],
+                        if (item.pageLabel != null) ...[
+                          const SizedBox(width: 16),
+                          Text(
+                            item.pageLabel!,
+                            style: const TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        Text(
+                          _formatDateTime(item.createdAt),
+                          style: const TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (item.type == BookMemoItemType.photo &&
+                              item.imageUrl != null)
+                            _PhotoContent(imageUrl: item.imageUrl!),
+                          if (item.content != null &&
+                              item.content!.isNotEmpty) ...[
+                            if (item.type == BookMemoItemType.photo &&
+                                item.imageUrl != null)
+                              const SizedBox(height: 10),
+                            if (item.type == BookMemoItemType.quote)
+                              _QuoteContent(item.content!)
+                            else
+                              _MemoRichText(item.content!, italic: false),
+                          ],
+                        ],
                       ),
-                    ],
+                    ),
+                    if (showDivider) ...[
+                      const SizedBox(height: 26),
+                      const Align(
+                        alignment: Alignment.center,
+                        child: SizedBox(
+                          width: 312,
+                          child: Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: AppColors.border,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ] else
+                      const SizedBox(height: 24),
                   ],
                 ),
               ),
@@ -495,6 +625,8 @@ class _MemoTypeStyle {
   final Color foreground;
   final Color background;
 
+  Color get sidebar => Color.lerp(background, foreground, 0.32)!;
+
   static _MemoTypeStyle of(BookMemoItemType type) => switch (type) {
     BookMemoItemType.summary => const _MemoTypeStyle(
       icon: PhosphorIconsRegular.notePencil,
@@ -517,6 +649,35 @@ class _MemoTypeStyle {
       background: AppColors.memoPhotoSurface,
     ),
   };
+}
+
+class _QuoteContent extends StatelessWidget {
+  const _QuoteContent(this.content);
+
+  final String content;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.translate(
+      offset: const Offset(-16, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '“',
+            style: TextStyle(
+              color: AppColors.memoQuoteForeground,
+              fontSize: 46,
+              height: 0.85,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: _MemoRichText(content, italic: true)),
+        ],
+      ),
+    );
+  }
 }
 
 class _MemoRichText extends StatelessWidget {

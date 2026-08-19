@@ -11,7 +11,7 @@ import '../../../book_detail/screens/widgets/finish_options_dialog.dart';
 import '../../../book_record/models/record_labels.dart';
 import '../../../book_record/screens/widgets/book_category_field.dart';
 import '../../../book_record/screens/widgets/book_thumbnail_field.dart';
-import '../../../book_record/screens/widgets/record_dialog_shell.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../../book_record/screens/widgets/record_field_tile.dart';
 import '../../../bookshelf/models/book_status.dart';
 import '../../../bookshelf/providers/bookshelf_providers.dart';

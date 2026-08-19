@@ -18,7 +18,7 @@ import 'book_thumbnail_field.dart';
 import 'bulk_link_progress_bar.dart';
 import 'isbn_link_dialog.dart';
 import 'isbn_link_search_sheet.dart';
-import 'record_dialog_shell.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 
 /// "책 정보 수정" 모달(제목/저자/출판사/총쪽수/표지/카테고리/ISBN 연결).
 ///

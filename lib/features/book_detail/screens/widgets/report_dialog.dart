@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../book_record/screens/widgets/record_dialog_shell.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 
 /// 신고 사유 4종(common-interactions.md `ReportModal` 대응).
 enum ReportReason {
