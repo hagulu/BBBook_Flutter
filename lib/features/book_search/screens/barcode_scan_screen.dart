@@ -130,12 +130,10 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
             status: status,
           );
       ref.read(bookshelfSyncVersionProvider.notifier).state++;
-      if (mounted) {
+      if (mounted && result.serverId != null) {
         AppSnackBar.success(
           context,
-          result.serverId == null
-              ? '\'${result.title}\' 임시 저장됨 · 연결 시 자동 등록됩니다.'
-              : '\'${result.title}\' 책 등록완료 (${status.label})',
+          '\'${result.title}\' 책 등록완료 (${status.label})',
           duration: const Duration(seconds: 2),
           replaceCurrent: true,
         );

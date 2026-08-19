@@ -72,12 +72,9 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
       ref
           .read(bookDetailControllerProvider(widget.isbn).notifier)
           .markAddedToShelf(result.userBookId);
-      AppSnackBar.success(
-        context,
-        result.serverId == null
-            ? '임시 저장되었습니다. 연결되면 자동으로 등록됩니다.'
-            : '서재에 추가되었습니다.',
-      );
+      if (result.serverId != null) {
+        AppSnackBar.success(context, '서재에 추가되었습니다.');
+      }
     } on ApiException catch (e) {
       if (e.statusCode == 409) {
         ref.invalidate(bookDetailControllerProvider(widget.isbn));
