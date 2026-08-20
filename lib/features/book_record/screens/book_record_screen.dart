@@ -124,26 +124,22 @@ class _BookRecordBody extends ConsumerWidget {
       length: 3,
       child: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            sliver: SliverList.list(
-              children: [
-                _Header(
-                  book: book,
-                  onEditBookInfo: () => showBookInfoEditDialog(
-                    context,
-                    userBookId: userBookId,
-                    book: book,
-                  ),
-                ),
-              ],
-            ),
-          ),
           SliverPersistentHeader(
             pinned: true,
-            delegate: _RecordTabBarDelegate(
-              const TabBar(
-                tabs: [
+            delegate: _CollapsingBookHeaderDelegate(
+              book: book,
+              onEditBookInfo: () => showBookInfoEditDialog(
+                context,
+                userBookId: userBookId,
+                book: book,
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: ColoredBox(
+              color: AppColors.pageBackground,
+              child: TabBar(
+                tabs: const [
                   Tab(text: '정보'),
                   Tab(text: '메모'),
                   Tab(text: '독후감'),
@@ -527,16 +523,26 @@ class _BookRecordBody extends ConsumerWidget {
   }
 }
 
-class _RecordTabBarDelegate extends SliverPersistentHeaderDelegate {
-  const _RecordTabBarDelegate(this.tabBar);
+/// 스크롤에 따라 책 정보 카드가 점점 작아지며 상단에 썸네일+제목만 남는
+/// 컴팩트 바로 자연스럽게 전환되는 헤더. `shrinkOffset`이 곧 스크롤 진행도라
+/// 별도 AnimationController 없이 opacity/scale을 직접 보간한다.
+class _CollapsingBookHeaderDelegate extends SliverPersistentHeaderDelegate {
+  const _CollapsingBookHeaderDelegate({
+    required this.book,
+    required this.onEditBookInfo,
+  });
 
-  final TabBar tabBar;
+  final BookItem book;
+  final VoidCallback onEditBookInfo;
+
+  static const double _expandedHeight = 208;
+  static const double _collapsedHeight = 56;
 
   @override
-  double get minExtent => 49;
+  double get minExtent => _collapsedHeight;
 
   @override
-  double get maxExtent => 49;
+  double get maxExtent => _expandedHeight;
 
   @override
   Widget build(
@@ -544,11 +550,96 @@ class _RecordTabBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return ColoredBox(color: AppColors.pageBackground, child: tabBar);
+    const range = _expandedHeight - _collapsedHeight;
+    final progress = (shrinkOffset / range).clamp(0.0, 1.0);
+    final expandedOpacity = 1 - Curves.easeOut.transform(progress);
+    final compactOpacity = Curves.easeIn.transform(progress);
+
+    return ClipRect(
+      child: ColoredBox(
+        color: AppColors.pageBackground,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (expandedOpacity > 0)
+              Opacity(
+                opacity: expandedOpacity,
+                child: Transform.scale(
+                  alignment: Alignment.topCenter,
+                  scale: 1 - progress * 0.1,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                    child: _Header(
+                      book: book,
+                      onEditBookInfo: onEditBookInfo,
+                    ),
+                  ),
+                ),
+              ),
+            if (compactOpacity > 0)
+              Align(
+                alignment: Alignment.topCenter,
+                child: Opacity(
+                  opacity: compactOpacity,
+                  child: SizedBox(
+                    height: _collapsedHeight,
+                    child: _CompactHeaderRow(book: book),
+                  ),
+                ),
+              ),
+            if (overlapsContent && compactOpacity > 0)
+              const Align(
+                alignment: Alignment.bottomCenter,
+                child: Divider(height: 1, thickness: 1, color: AppColors.border),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
-  bool shouldRebuild(covariant _RecordTabBarDelegate oldDelegate) => false;
+  bool shouldRebuild(covariant _CollapsingBookHeaderDelegate oldDelegate) =>
+      // BookItem은 값 동등성(==)을 오버라이드하지 않고 상태 갱신마다
+      // copyWith로 새 인스턴스가 나오므로, 참조 비교만으로 표시 필드는 물론
+      // onEditBookInfo 콜백(캡처된 book)까지 항상 최신 상태로 갱신된다.
+      // 필드를 나열해 비교하면 displayCategoryId 같은 항목이 누락되기 쉽다.
+      oldDelegate.book != book;
+}
+
+/// 컴팩트 헤더에 표시되는 썸네일+제목 한 줄.
+class _CompactHeaderRow extends StatelessWidget {
+  const _CompactHeaderRow({required this.book});
+
+  final BookItem book;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 28,
+            child: BookCover(imageUrl: book.coverImageUrl, title: book.title),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              book.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: AppColors.textStrong,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Header extends ConsumerWidget {
@@ -620,6 +711,8 @@ class _Header extends ConsumerWidget {
                     ],
                     Text(
                       book.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 17,
@@ -630,6 +723,8 @@ class _Header extends ConsumerWidget {
                       const SizedBox(height: 4),
                       Text(
                         displayAuthor(book.author!),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -642,6 +737,8 @@ class _Header extends ConsumerWidget {
                       const SizedBox(height: 2),
                       Text(
                         book.publisher!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 12,
                           color: AppColors.textMuted,

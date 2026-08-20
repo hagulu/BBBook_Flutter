@@ -142,3 +142,4 @@
 - `docs/review/20260819-202652-memo-and-progress-review.md` — 메모 조각 UI와 진행 쪽수 연속 조작·증감 툴바의 상태 정합성 및 접근성 리뷰
 - `docs/review/20260820-111142-memo-delete-and-photo-camera-review.md` — 메모 전체 삭제와 사진 촬영·선택 경로의 파일 규격 및 카메라 생명주기 리뷰
 - `docs/review/20260820-154246-book-reflection-read-review.md` — 독후감 읽기 기능의 초안 노출 범위·증분 동기화 기준 시각·공개 상태 접근성 리뷰
+- `docs/review/20260820-161749-book-record-collapsing-header-review.md` — 책 기록 접이식 헤더의 탭 탐색 유지·상태 최신성·텍스트 배율 대응 리뷰
