@@ -229,6 +229,17 @@ class BookMemoDetailController
     return false;
   }
 
+  Future<void> deleteMemo() async {
+    final memoId = _memoId;
+    if (memoId == null) throw StateError('Memo not found');
+    await _repository.deleteMemo(
+      ownerUserId: arg.ownerUserId,
+      userBookId: arg.userBookId,
+      memoId: memoId,
+    );
+    state = const AsyncValue.data(BookMemoDetail.empty());
+  }
+
   BookMemoItem _requireItem(BookMemoDetail detail, int itemId) {
     for (final item in detail.items) {
       if (item.id == itemId) return item;

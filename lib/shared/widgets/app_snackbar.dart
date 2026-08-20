@@ -186,7 +186,13 @@ class _AppSnackBarHostState extends State<_AppSnackBarHost> {
     return Positioned(
       left: 0,
       right: 0,
-      bottom: MediaQuery.paddingOf(context).bottom + 32,
+      // 키보드가 떠 있으면 그 위로 올라오도록 viewInsets.bottom(키보드
+      // 높이)도 더한다 — 이 값만 빠지면 입력 중 뜬 스낵바가 키보드에
+      // 가려져 보이지 않는다.
+      bottom:
+          MediaQuery.paddingOf(context).bottom +
+          MediaQuery.viewInsetsOf(context).bottom +
+          32,
       child: IgnorePointer(
         child: Center(
           child: AnimatedSlide(

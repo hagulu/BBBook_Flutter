@@ -85,7 +85,9 @@ class BookMemoList extends ConsumerWidget {
                   final summary = value[index];
                   return _MemoCard(
                     summary: summary,
-                    memoNumber: index + 1,
+                    // 목록은 최신순(updated_at DESC)이므로, 오래된 항목일수록
+                    // 작은 번호가 붙도록 뒤에서부터 센다.
+                    memoNumber: value.length - index,
                     onTap: ownerUserId == null
                         ? null
                         : () => _openMemo(

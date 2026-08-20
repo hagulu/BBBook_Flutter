@@ -229,6 +229,31 @@ class BookMemoRepository {
     }
   }
 
+  Future<void> deleteMemo({
+    required int ownerUserId,
+    required int userBookId,
+    required int memoId,
+  }) async {
+    try {
+      await _dao.deleteMemo(
+        ownerUserId: ownerUserId,
+        userBookId: userBookId,
+        memoId: memoId,
+      );
+      developer.log(
+        '[메모 삭제] userId=$ownerUserId bookId=$userBookId '
+        'memoId=$memoId result=SUCCESS',
+      );
+      unawaited(pushMemo(memoId));
+    } catch (error) {
+      developer.log(
+        '[메모 삭제] userId=$ownerUserId bookId=$userBookId '
+        'memoId=$memoId result=FAIL reason=local_storage_error',
+      );
+      rethrow;
+    }
+  }
+
   // ---------------------------------------------------------------------
   // 서버 동기화
   // ---------------------------------------------------------------------
@@ -354,75 +379,75 @@ class BookMemoRepository {
       return;
     }
 
-    int? serverMemoId = memo.serverId;
+    // 소프트 삭제된 메모는 제목/조각 push를 전혀 거치지 않고 메모 전용
+    // 삭제 API 한 번으로 끝낸다 — 조각까지 서버가 함께 지워준다.
+    if (memo.deletedAt != null) {
+      await _pushDeletedMemo(serverUserBookId, memo, expectedGeneration);
+      return;
+    }
 
-    // 소프트 삭제된 메모(마지막 조각까지 지워짐)는 제목을 새로 만들거나
-    // 갱신할 이유가 없다 — 서버에는 조각 삭제 push만으로 충분하다(메모
-    // 전용 삭제 API가 없고, 마지막 조각이 지워지면 서버가 메모도 함께
-    // 지운다). 아래 조각 루프로 바로 넘어간다.
-    if (memo.deletedAt == null) {
-      if (serverMemoId == null) {
-        if (memo.title != null) {
-          try {
-            final result = await _api.putTitle(
-              userBookId: serverUserBookId,
-              memoId: null,
-              title: memo.title,
-            );
-            if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
-              return;
-            }
-            serverMemoId = result.memoId;
-            if (serverMemoId != null) {
-              await _dao.confirmMemoCreated(
-                localId: localMemoId,
-                serverId: serverMemoId,
-                capturedUpdatedAt: memo.updatedAt,
-              );
-            }
-            developer.log(
-              '[메모 생성 push] userBookId=${memo.userBookId} '
-              'localMemoId=$localMemoId result=SUCCESS',
-            );
-          } catch (e) {
-            developer.log(
-              '[메모 생성 push] userBookId=${memo.userBookId} '
-              'localMemoId=$localMemoId result=FAIL reason=${_reasonOf(e)}',
-            );
-            // 메모 자체가 아직 서버에 없으니 조각도 보낼 수 없다 — 다음
-            // push 때 제목부터 다시 시도한다.
-            return;
-          }
-        }
-        // title == null이면 여기서 아무 것도 하지 않는다 — 서버는
-        // memoId/title이 모두 없는 PUT을 no-op으로 처리하므로, 아래 조각
-        // 루프가 첫 조각으로 메모를 함께 만든다.
-      } else if (memo.isDirty) {
+    int? serverMemoId = memo.serverId;
+    if (serverMemoId == null) {
+      if (memo.title != null) {
         try {
-          await _api.putTitle(
+          final result = await _api.putTitle(
             userBookId: serverUserBookId,
-            memoId: serverMemoId,
+            memoId: null,
             title: memo.title,
           );
           if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
             return;
           }
-          await _dao.confirmMemoTitlePush(
-            localId: localMemoId,
-            capturedUpdatedAt: memo.updatedAt,
-          );
+          serverMemoId = result.memoId;
+          if (serverMemoId != null) {
+            await _dao.confirmMemoCreated(
+              localId: localMemoId,
+              serverId: serverMemoId,
+              capturedUpdatedAt: memo.updatedAt,
+            );
+          }
           developer.log(
-            '[메모 제목 push] userBookId=${memo.userBookId} '
+            '[메모 생성 push] userBookId=${memo.userBookId} '
             'localMemoId=$localMemoId result=SUCCESS',
           );
         } catch (e) {
           developer.log(
-            '[메모 제목 push] userBookId=${memo.userBookId} '
+            '[메모 생성 push] userBookId=${memo.userBookId} '
             'localMemoId=$localMemoId result=FAIL reason=${_reasonOf(e)}',
           );
-          // 메모는 이미 서버에 있으니 제목 push가 실패해도 조각 push는
-          // 계속 시도한다(서로 독립적인 필드).
+          // 메모 자체가 아직 서버에 없으니 조각도 보낼 수 없다 — 다음
+          // push 때 제목부터 다시 시도한다.
+          return;
         }
+      }
+      // title == null이면 여기서 아무 것도 하지 않는다 — 서버는
+      // memoId/title이 모두 없는 PUT을 no-op으로 처리하므로, 아래 조각
+      // 루프가 첫 조각으로 메모를 함께 만든다.
+    } else if (memo.isDirty) {
+      try {
+        await _api.putTitle(
+          userBookId: serverUserBookId,
+          memoId: serverMemoId,
+          title: memo.title,
+        );
+        if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+          return;
+        }
+        await _dao.confirmMemoTitlePush(
+          localId: localMemoId,
+          capturedUpdatedAt: memo.updatedAt,
+        );
+        developer.log(
+          '[메모 제목 push] userBookId=${memo.userBookId} '
+          'localMemoId=$localMemoId result=SUCCESS',
+        );
+      } catch (e) {
+        developer.log(
+          '[메모 제목 push] userBookId=${memo.userBookId} '
+          'localMemoId=$localMemoId result=FAIL reason=${_reasonOf(e)}',
+        );
+        // 메모는 이미 서버에 있으니 제목 push가 실패해도 조각 push는
+        // 계속 시도한다(서로 독립적인 필드).
       }
     }
 
@@ -434,7 +459,38 @@ class BookMemoRepository {
       expectedGeneration,
       memo.updatedAt,
     );
-    await _dao.purgeMemoIfFullyDeleted(localMemoId);
+  }
+
+  /// 소프트 삭제된 메모를 메모 전용 삭제 API로 push한다. 조각 하나가 남긴
+  /// 마지막 삭제로 메모까지 함께 삭제 처리된 경우([BookMemoDao.deleteItem])와
+  /// 화면에서 메모 전체를 바로 삭제한 경우([BookMemoDao.deleteMemo]) 모두
+  /// 여기로 모인다 — 어느 쪽이든 로컬에는 이미 `book_memo.deleted_at`만
+  /// 찍혀 있고, 조각 행 자체는 push가 끝나야 정리된다.
+  Future<void> _pushDeletedMemo(
+    int userBookId,
+    BookMemo memo,
+    int expectedGeneration,
+  ) async {
+    try {
+      if (memo.serverId != null) {
+        await _api.deleteMemo(userBookId: userBookId, memoId: memo.serverId!);
+      }
+      _checkSession(expectedGeneration);
+      final items = await _dao.getAllItemsForMemo(memo.id);
+      for (final item in items) {
+        await _deleteManagedImage(item.imageUrl);
+      }
+      await _dao.purgeMemoAndItems(memo.id);
+      developer.log(
+        '[메모 삭제 push] userBookId=$userBookId localMemoId=${memo.id} '
+        'result=SUCCESS',
+      );
+    } catch (e) {
+      developer.log(
+        '[메모 삭제 push] userBookId=$userBookId localMemoId=${memo.id} '
+        'result=FAIL reason=${_reasonOf(e)}',
+      );
+    }
   }
 
   Future<int?> _resolveServerUserBookId(int localUserBookId) async {

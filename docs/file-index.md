@@ -59,6 +59,7 @@
 - `lib/features/book_memo/screens/book_memo_list.dart` — 책 기록 상세의 메모 목록 탭(메모 추가·상세 진입, 당겨서 새로고침)
 - `lib/features/book_memo/screens/book_memo_detail_screen.dart` — 메모 제목 자동 저장과 타입별 조각 타임라인·로컬 CRUD 화면
 - `lib/features/book_memo/screens/memo_ocr_camera_screen.dart` — 발췌 OCR용 카메라 미리보기·수평 가이드 및 갤러리 이미지 선택 화면
+- `lib/features/book_memo/screens/memo_photo_camera_screen.dart` — 메모 사진 조각용 카메라 미리보기(좌하단 갤러리 아이콘으로 갤러리 선택 겸용) 화면
 - `lib/features/book_memo/data/book_memo_api.dart` — 메모 제목 PUT, 조각 생성/수정/삭제, 사진 업로드, 증분 동기화 조회 API 호출
 - `lib/features/book_memo/data/book_memo_dao.dart` — 로컬 DB 쿼리·dirty push 확정·전체/증분 reconcile(dirty 행 보호, 로컬 PK와 server_id 분리)
 - `lib/features/book_memo/data/book_memo_repository.dart` — 메모 화면 source of truth, 로컬 우선 CRUD 직후 조용히 서버 push하고 실패 시 dirty 유지, 최초엔 전체(`/api/me/records`)·이후엔 증분(`/api/me/memos/sync/changes`) 동기화
@@ -130,3 +131,4 @@
 - `docs/review/20260819-162246-local-create-and-ocr-review.md` — 로컬 책 CREATE의 상태 경합·영구 실패 처리와 OCR 카메라 생명주기·접근성 리뷰
 - `docs/review/20260819-184302-book-memo-detail-review.md` — 메모 조각 액션 시트·타임라인 개편의 정책 문서 및 공용 컴포넌트 경계 리뷰
 - `docs/review/20260819-202652-memo-and-progress-review.md` — 메모 조각 UI와 진행 쪽수 연속 조작·증감 툴바의 상태 정합성 및 접근성 리뷰
+- `docs/review/20260820-111142-memo-delete-and-photo-camera-review.md` — 메모 전체 삭제와 사진 촬영·선택 경로의 파일 규격 및 카메라 생명주기 리뷰

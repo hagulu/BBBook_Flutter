@@ -100,6 +100,17 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
           backgroundColor: AppColors.pageBackground,
           foregroundColor: AppColors.textStrong,
           elevation: 0,
+          actions: [
+            if (switch (asyncDetail) {
+              AsyncData(:final value) => value.memo != null,
+              _ => false,
+            })
+              IconButton(
+                onPressed: _isSavingItem ? null : _deleteMemo,
+                tooltip: '메모 삭제',
+                icon: const Icon(PhosphorIconsRegular.trash),
+              ),
+          ],
         ),
         body: Stack(
           children: [
@@ -381,8 +392,16 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     setState(() => _isSavingItem = true);
     try {
       await save();
-    } catch (_) {
-      if (mounted) AppSnackBar.error(context, '메모 조각을 저장하지 못했습니다.');
+    } catch (error) {
+      // 사진 형식/용량 거절(FileSystemException.message)처럼 원인이 분명한
+      // 경우는 그대로 보여준다 — "저장하지 못했습니다"만으로는 사용자가
+      // 사진을 바꿔야 하는지조차 알 수 없다.
+      final reason = error is FileSystemException && error.message.isNotEmpty
+          ? error.message
+          : null;
+      if (mounted) {
+        AppSnackBar.error(context, reason ?? '메모 조각을 저장하지 못했습니다.');
+      }
     } finally {
       if (mounted) setState(() => _isSavingItem = false);
     }
@@ -418,6 +437,34 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
       }
     } catch (_) {
       if (mounted) AppSnackBar.error(context, '메모 조각을 삭제하지 못했습니다.');
+    }
+  }
+
+  Future<void> _deleteMemo() async {
+    if (_isSavingItem) {
+      AppSnackBar.info(context, '메모 조각을 저장하고 있습니다.');
+      return;
+    }
+    final confirmed = await AppConfirm.show(
+      context,
+      title: '메모 삭제',
+      message: '이 메모와 모든 조각을 삭제할까요?',
+      confirmText: '삭제',
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _isSavingItem = true);
+    try {
+      await ref.read(bookMemoDetailProvider(_args).notifier).deleteMemo();
+      if (!mounted) return;
+      _isClosing = true;
+      setState(() => _allowPop = true);
+      await WidgetsBinding.instance.endOfFrame;
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) AppSnackBar.error(context, '메모를 삭제하지 못했습니다.');
+    } finally {
+      if (mounted) setState(() => _isSavingItem = false);
     }
   }
 }
@@ -543,50 +590,65 @@ class _MemoTimelineItem extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Row(
+                      // 왼쪽 묶음(아이콘·라벨·강조·쪽수)과 시간, 딱 두
+                      // 덩어리만 flex 경쟁 없이 양 끝에 배치한다. 예전처럼
+                      // 라벨/쪽수/시간을 각각 Flexible로 두고 그 사이에
+                      // Spacer를 넣으면, 남는 공간이 이 flex 형제들
+                      // 전부에게 균등하게(1/N씩) 나눠져 Spacer가 실제
+                      // 남는 공간을 다 못 가져가고, 그 결과 시간이 오른쪽
+                      // 끝이 아니라 중간쯤에서 멈춘다.
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(
-                          typeStyle.icon,
-                          color: typeStyle.foreground,
-                          size: 14,
-                        ),
-                        const SizedBox(width: 5),
                         Flexible(
-                          child: Text(
-                            item.type.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: typeStyle.foreground,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        if (item.isImportant) ...[
-                          const SizedBox(width: 7),
-                          const Icon(
-                            PhosphorIconsRegular.highlighter,
-                            size: 14,
-                            color: AppColors.highlightGold,
-                          ),
-                        ],
-                        if (item.pageLabel != null) ...[
-                          const SizedBox(width: 16),
-                          Flexible(
-                            child: Text(
-                              item.pageLabel!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textMuted,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                typeStyle.icon,
+                                color: typeStyle.foreground,
+                                size: 14,
                               ),
-                            ),
+                              const SizedBox(width: 5),
+                              Flexible(
+                                child: Text(
+                                  item.type.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: typeStyle.foreground,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                              if (item.isImportant) ...[
+                                const SizedBox(width: 7),
+                                const Icon(
+                                  PhosphorIconsRegular.highlighter,
+                                  size: 14,
+                                  color: AppColors.highlightGold,
+                                ),
+                              ],
+                              if (item.pageLabel != null) ...[
+                                const SizedBox(width: 16),
+                                Flexible(
+                                  child: Text(
+                                    item.pageLabel!,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: AppColors.textMuted,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                        ],
-                        const Spacer(),
-                        Flexible(
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 8, right: 12),
                           child: Text(
                             _formatDateTime(item.createdAt),
                             maxLines: 1,
@@ -598,7 +660,6 @@ class _MemoTimelineItem extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 12),
                       ],
                     ),
                     const SizedBox(height: 12),

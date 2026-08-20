@@ -1,14 +1,15 @@
+import 'dart:async';
 import 'dart:io';
-import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_alert.dart';
+import '../../../../shared/widgets/app_snackbar.dart';
 import '../../models/book_memo.dart';
+import '../memo_photo_camera_screen.dart';
 import 'highlight_text_field.dart';
 import 'memo_ocr_capture.dart';
 
@@ -339,13 +340,22 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
         children: [
           _TypeSelector(
             selectedType: _type,
-            onSelected: (type) => setState(() {
-              _type = type;
-              _errorText = null;
-              if (type == BookMemoItemType.photo) {
-                _contentController.clearHighlights();
+            onSelected: (type) {
+              setState(() {
+                _type = type;
+                _errorText = null;
+                if (type == BookMemoItemType.photo) {
+                  _contentController.clearHighlights();
+                }
+              });
+              // 신규 작성일 때만 사진 종류를 고르는 즉시 촬영 화면으로
+              // 넘어간다 — 수정일 때 기존 사진을 보던 중 실수로 다시
+              // 눌러도 카메라가 튀어나오지 않게 한다.
+              if (type == BookMemoItemType.photo &&
+                  widget.initialItem == null) {
+                unawaited(_pickPhoto());
               }
-            }),
+            },
           ),
           if (isPhoto)
             Padding(
@@ -435,24 +445,12 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
   }
 
   Future<void> _pickPhoto() async {
-    try {
-      final file = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 85,
-        maxWidth: 1600,
-      );
-      if (file == null || !mounted) return;
-      developer.log('[메모 사진 선택] result=SUCCESS');
-      setState(() {
-        _pickedImagePath = file.path;
-        _errorText = null;
-      });
-    } catch (_) {
-      developer.log('[메모 사진 선택] result=FAIL reason=image_picker_error');
-      if (mounted) {
-        setState(() => _errorText = '사진을 불러오지 못했습니다.');
-      }
-    }
+    final path = await captureMemoPhoto(context);
+    if (path == null || !mounted) return;
+    setState(() {
+      _pickedImagePath = path;
+      _errorText = null;
+    });
   }
 
   Future<void> _scanQuote() async {
@@ -484,7 +482,7 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
     if (isPhoto &&
         _pickedImagePath == null &&
         (_imageUrl == null || _imageUrl!.isEmpty)) {
-      setState(() => _errorText = '사진을 선택해 주세요.');
+      AppSnackBar.error(context, '사진을 선택해 주세요.');
       return;
     }
     // 평문을 먼저 trim하면 강조 range가 어긋나므로, ::hl[[]] 마크업으로 직렬화한
@@ -932,10 +930,23 @@ class _PhotoPicker extends StatelessWidget {
     final hasImage =
         pickedImagePath != null || (imageUrl != null && imageUrl!.isNotEmpty);
     if (!hasImage) {
-      return OutlinedButton.icon(
-        onPressed: onPick,
-        icon: const Icon(PhosphorIconsRegular.imageSquare, size: 19),
-        label: const Text('사진 선택'),
+      return SizedBox(
+        width: double.infinity,
+        height: 76,
+        child: OutlinedButton.icon(
+          onPressed: onPick,
+          style: OutlinedButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            side: const BorderSide(color: AppColors.border),
+          ),
+          icon: const Icon(PhosphorIconsRegular.camera, size: 22),
+          label: const Text(
+            '사진 추가',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          ),
+        ),
       );
     }
 
@@ -968,10 +979,7 @@ class _PhotoPicker extends StatelessWidget {
                 Expanded(
                   child: TextButton.icon(
                     onPressed: onPick,
-                    icon: const Icon(
-                      PhosphorIconsRegular.imageSquare,
-                      size: 16,
-                    ),
+                    icon: const Icon(PhosphorIconsRegular.camera, size: 16),
                     label: const Text('변경'),
                   ),
                 ),

@@ -89,7 +89,7 @@ class _ReadingBookCard extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 64,
+                width: 76,
                 child: BookCover(
                   imageUrl: book.coverImageUrl,
                   title: book.title,

@@ -265,6 +265,61 @@ class BookMemoDao {
     });
   }
 
+  /// 메모 자체를 소프트 삭제한다. 조각은 건드리지 않는다 — 부모 메모가
+  /// `deleted_at IS NOT NULL`이 되는 순간 [findByUserBook]/[findDetail]
+  /// 모두 이 메모를 더 이상 보여주지 않으므로 화면상으로는 조각까지 함께
+  /// 사라진 것과 같고, 실제 서버 반영은 push 시점에 메모 전용 삭제 API
+  /// 한 번으로 조각까지 함께 처리된다([BookMemoRepository]의 push 로직
+  /// 참고).
+  Future<void> deleteMemo({
+    required int ownerUserId,
+    required int userBookId,
+    required int memoId,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    await db.transaction((txn) async {
+      await _requireActiveMemo(
+        txn,
+        ownerUserId: ownerUserId,
+        userBookId: userBookId,
+        memoId: memoId,
+      );
+      final now = DateTime.now().toUtc().toIso8601String();
+      await txn.update(
+        'book_memo',
+        {'deleted_at': now, 'updated_at': now, 'is_dirty': 1},
+        where: 'id = ?',
+        whereArgs: [memoId],
+      );
+    });
+  }
+
+  /// 메모 삭제 push([BookMemoRepository._pushDeletedMemo])가 정리할 이미지를
+  /// 판단하기 위해, 삭제 여부와 상관없이 그 메모에 딸린 조각 전부를 반환한다.
+  Future<List<BookMemoItem>> getAllItemsForMemo(int memoLocalId) async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'book_memo_item',
+      where: 'memo_id = ?',
+      whereArgs: [memoLocalId],
+    );
+    return rows.map(_itemFromRow).toList(growable: false);
+  }
+
+  /// 삭제 push가 끝난(또는 애초에 서버에 없던) 메모와 그 조각 전부를
+  /// 로컬에서 물리 삭제한다.
+  Future<void> purgeMemoAndItems(int memoLocalId) async {
+    final db = await BookshelfDatabase.instance();
+    await db.transaction((txn) async {
+      await txn.delete(
+        'book_memo_item',
+        where: 'memo_id = ?',
+        whereArgs: [memoLocalId],
+      );
+      await txn.delete('book_memo', where: 'id = ?', whereArgs: [memoLocalId]);
+    });
+  }
+
   // ---------------------------------------------------------------------
   // 서버 동기화(dirty push) 전용
   // ---------------------------------------------------------------------
@@ -462,36 +517,6 @@ class BookMemoDao {
   Future<void> purgeItem(int localId) async {
     final db = await BookshelfDatabase.instance();
     await db.delete('book_memo_item', where: 'id = ?', whereArgs: [localId]);
-  }
-
-  /// 소프트 삭제된(`deleted_at != null`) 메모에 남은 조각이 더 이상 없으면
-  /// 로컬에서도 메모 행을 물리 삭제한다. 서버에는 메모 전용 삭제 API가
-  /// 없고 "마지막 조각이 삭제되면 메모도 함께 삭제"되므로([deleteItem]과
-  /// 동일한 규칙), 그 조각들의 삭제 push가 모두 끝난 뒤 이 메서드를 부르면
-  /// 로컬 상태가 서버와 맞아떨어진다.
-  Future<void> purgeMemoIfFullyDeleted(int memoLocalId) async {
-    final db = await BookshelfDatabase.instance();
-    await db.transaction((txn) async {
-      final memoRows = await txn.query(
-        'book_memo',
-        columns: ['deleted_at'],
-        where: 'id = ?',
-        whereArgs: [memoLocalId],
-      );
-      if (memoRows.isEmpty) return;
-      if (memoRows.single['deleted_at'] == null) return;
-      final remaining = await txn.rawQuery(
-        'SELECT COUNT(*) AS c FROM book_memo_item WHERE memo_id = ?',
-        [memoLocalId],
-      );
-      if ((remaining.single['c'] as int) == 0) {
-        await txn.delete(
-          'book_memo',
-          where: 'id = ?',
-          whereArgs: [memoLocalId],
-        );
-      }
-    });
   }
 
   /// `/api/me/records` 전체 조회 결과로 메모/조각 테이블을 맞춘다: 서버에

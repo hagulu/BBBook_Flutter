@@ -158,6 +158,19 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
         children: [
           Row(
             children: [
+              if (ratio != null)
+                Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: Text(
+                    '${(ratio * 100).round()}%',
+                    style: const TextStyle(
+                      color: AppColors.progressFill,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                    ),
+                  ),
+                ),
+              const Spacer(),
               SizedBox(
                 width: 56,
                 child: TextField(
@@ -188,16 +201,6 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
                 Text(
                   ' / $totalPages쪽',
                   style: const TextStyle(color: AppColors.textMuted),
-                ),
-              const Spacer(),
-              if (ratio != null)
-                Text(
-                  '${(ratio * 100).round()}%',
-                  style: const TextStyle(
-                    color: AppColors.progressFill,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 17,
-                  ),
                 ),
             ],
           ),

@@ -15,6 +15,7 @@ import '../models/book_memo_sync_changes_result.dart';
 /// api-me-books-userBookId-memos-items-photo-post.md,
 /// api-me-books-userBookId-memos-items-itemId-patch.md,
 /// api-me-books-userBookId-memos-items-itemId-delete.md,
+/// api-me-books-userBookId-memos-memoId-delete.md,
 /// api-memos-memoId-images-post.md, api-me-memos-sync-changes-get.md
 ///
 /// PHOTO 조각 생성은 [postPhotoItem](사진 파일 + memoId=null/기존 memoId를
@@ -188,6 +189,25 @@ class BookMemoApi {
       // 이미 서버에서 지워진 뒤 재시도로 다시 호출된 경우(직전 시도의 응답만
       // 못 받고 실제로는 성공했던 경우 등)도 "지우려는 목표는 달성됨"으로
       // 취급해 성공 처리한다 — 그러지 않으면 dirty가 영원히 풀리지 않는다.
+      if (e.response?.statusCode == 404) return;
+      throw _mapError(e);
+    }
+  }
+
+  /// DELETE /api/me/books/{userBookId}/memos/{memoId}
+  ///
+  /// 메모와 그 소속 조각을 모두 함께 soft delete한다.
+  Future<void> deleteMemo({
+    required int userBookId,
+    required int memoId,
+  }) async {
+    try {
+      await _apiClient.dio.delete<Map<String, dynamic>>(
+        '/api/me/books/$userBookId/memos/$memoId',
+      );
+    } on DioException catch (e) {
+      // 이미 서버에서 지워진 뒤 재시도로 다시 호출된 경우도 "지우려는
+      // 목표는 달성됨"으로 취급한다([deleteItem]과 같은 이유).
       if (e.response?.statusCode == 404) return;
       throw _mapError(e);
     }
