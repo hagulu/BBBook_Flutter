@@ -7,6 +7,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_alert.dart';
+import '../../../../shared/widgets/app_confirm.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../models/book_memo.dart';
 import '../memo_photo_camera_screen.dart';
@@ -55,6 +56,7 @@ class _BookMemoQuickComposerState extends State<_BookMemoQuickComposer> {
     BookMemoItemType.summary,
     BookMemoItemType.thought,
     BookMemoItemType.quote,
+    BookMemoItemType.photo,
   ];
 
   final _contentController = TextEditingController();
@@ -86,7 +88,7 @@ class _BookMemoQuickComposerState extends State<_BookMemoQuickComposer> {
                 children: [
                   Expanded(
                     child: Wrap(
-                      spacing: 6,
+                      spacing: 4,
                       runSpacing: 4,
                       children: [
                         for (final type in _quickTypes)
@@ -112,36 +114,32 @@ class _BookMemoQuickComposerState extends State<_BookMemoQuickComposer> {
                                   width: selected ? 1.3 : 1,
                                 ),
                                 shape: const StadiumBorder(),
-                                visualDensity: VisualDensity.compact,
+                                visualDensity: const VisualDensity(
+                                  horizontal: -1,
+                                  vertical: 1,
+                                ),
                                 materialTapTargetSize:
                                     MaterialTapTargetSize.shrinkWrap,
+                                labelPadding: const EdgeInsets.only(
+                                  left: 3,
+                                  right: 5,
+                                ),
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
+                                  horizontal: 4,
+                                  vertical: 5,
                                 ),
                                 labelStyle: TextStyle(
                                   color: style.foreground,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                 ),
-                                onSelected: (_) => setState(() => _type = type),
+                                onSelected: (_) => _onTypeSelected(type),
                               );
                             },
                           ),
                       ],
                     ),
                   ),
-                  if (_type == BookMemoItemType.quote)
-                    IconButton(
-                      onPressed: _scanQuote,
-                      tooltip: '카메라로 발췌 인식 (OCR)',
-                      visualDensity: VisualDensity.compact,
-                      style: IconButton.styleFrom(
-                        backgroundColor: AppColors.memoQuoteSurface,
-                        foregroundColor: AppColors.memoQuoteForeground,
-                      ),
-                      icon: const Icon(PhosphorIconsRegular.camera, size: 18),
-                    ),
                   IconButton(
                     onPressed: _expand,
                     tooltip: '전체 편집 화면으로 확장',
@@ -159,7 +157,7 @@ class _BookMemoQuickComposerState extends State<_BookMemoQuickComposer> {
                       controller: _contentController,
                       autofocus: true,
                       minLines: 1,
-                      maxLines: 3,
+                      maxLines: 5,
                       keyboardType: TextInputType.multiline,
                       textInputAction: TextInputAction.newline,
                       style: const TextStyle(
@@ -218,21 +216,27 @@ class _BookMemoQuickComposerState extends State<_BookMemoQuickComposer> {
 
   void _submit() => Navigator.of(context).pop(_draft);
 
-  Future<void> _scanQuote() async {
-    final text = await captureMemoQuoteWithOcr(context);
-    if (!mounted || text == null || text.trim().isEmpty) return;
-    _insertTextAtSelection(_contentController, text);
-    setState(() {});
-    final draft = await showBookMemoItemEditor(context, initialDraft: _draft);
-    if (!mounted) return;
-    // 전체 편집 화면에서 뒤로 가면(draft == null이어도) 빠른 작성 시트로
-    // 되돌아가지 않고 곧바로 목록 화면이 보이도록, 시트도 함께 닫는다
-    // (아래로 확장하는 [_expand]와 동일한 규칙).
-    Navigator.of(context).pop<BookMemoItemDraft>(draft);
+  void _onTypeSelected(BookMemoItemType type) {
+    if (type == BookMemoItemType.photo) {
+      unawaited(_expand(initialType: type));
+      return;
+    }
+    setState(() => _type = type);
   }
 
-  Future<void> _expand() async {
-    final draft = await showBookMemoItemEditor(context, initialDraft: _draft);
+  Future<void> _expand({BookMemoItemType? initialType}) async {
+    final initialDraft = initialType == null
+        ? _draft
+        : BookMemoItemDraft(
+            type: initialType,
+            content: _contentController.text.trim().isEmpty
+                ? null
+                : _contentController.text.trim(),
+          );
+    final draft = await showBookMemoItemEditor(
+      context,
+      initialDraft: initialDraft,
+    );
     if (!mounted) return;
     Navigator.of(context).pop<BookMemoItemDraft>(draft);
   }
@@ -340,6 +344,8 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
         children: [
           _TypeSelector(
             selectedType: _type,
+            lockToSelectedType:
+                widget.initialItem?.type == BookMemoItemType.photo,
             onSelected: (type) {
               setState(() {
                 _type = type;
@@ -358,47 +364,88 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
             },
           ),
           if (isPhoto)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: _PhotoPicker(
-                imageUrl: _imageUrl,
-                pickedImagePath: _pickedImagePath,
-                onPick: _pickPhoto,
-                onRemove: () => setState(() {
-                  _imageUrl = null;
-                  _pickedImagePath = null;
-                }),
+            Expanded(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.manual,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _PhotoPicker(
+                      imageUrl: _imageUrl,
+                      pickedImagePath: _pickedImagePath,
+                      onPick: _pickPhoto,
+                      onRemove: () => setState(() {
+                        _imageUrl = null;
+                        _pickedImagePath = null;
+                      }),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      key: const Key('book_memo_content_field'),
+                      controller: _contentController,
+                      focusNode: _contentFocusNode,
+                      minLines: 5,
+                      maxLines: null,
+                      keyboardType: TextInputType.multiline,
+                      scrollPadding: const EdgeInsets.only(bottom: 120),
+                      style: const TextStyle(
+                        color: AppColors.textBody,
+                        fontSize: 16,
+                        height: 1.6,
+                      ),
+                      decoration: const InputDecoration(
+                        hintText: '사진에 대한 설명이나 기억을 남겨보세요.',
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 8,
+                        ),
+                      ),
+                      onChanged: (_) {
+                        if (_errorText != null) {
+                          setState(() => _errorText = null);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: TextField(
+                key: const Key('book_memo_content_field'),
+                controller: _contentController,
+                focusNode: _contentFocusNode,
+                autofocus: true,
+                expands: true,
+                minLines: null,
+                maxLines: null,
+                textAlignVertical: TextAlignVertical.top,
+                keyboardType: TextInputType.multiline,
+                style: const TextStyle(
+                  color: AppColors.textBody,
+                  fontSize: 16,
+                  height: 1.6,
+                ),
+                decoration: const InputDecoration(
+                  hintText: '기록할 내용을 입력하세요.',
+                  filled: false,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  contentPadding: EdgeInsets.fromLTRB(20, 20, 20, 24),
+                ),
+                onChanged: (_) {
+                  if (_errorText != null) setState(() => _errorText = null);
+                },
               ),
             ),
-          Expanded(
-            child: TextField(
-              key: const Key('book_memo_content_field'),
-              controller: _contentController,
-              focusNode: _contentFocusNode,
-              autofocus: true,
-              expands: true,
-              minLines: null,
-              maxLines: null,
-              textAlignVertical: TextAlignVertical.top,
-              keyboardType: TextInputType.multiline,
-              style: const TextStyle(
-                color: AppColors.textBody,
-                fontSize: 16,
-                height: 1.6,
-              ),
-              decoration: InputDecoration(
-                hintText: isPhoto ? '사진에 대한 설명을 남겨보세요.' : '기록할 내용을 입력하세요.',
-                filled: false,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-              ),
-              onChanged: (_) {
-                if (_errorText != null) setState(() => _errorText = null);
-              },
-            ),
-          ),
           if (_errorText != null)
             Container(
               width: double.infinity,
@@ -445,6 +492,7 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
   }
 
   Future<void> _pickPhoto() async {
+    _contentFocusNode.unfocus();
     final path = await captureMemoPhoto(context);
     if (path == null || !mounted) return;
     setState(() {
@@ -758,10 +806,15 @@ class _PageInput extends StatelessWidget {
 }
 
 class _TypeSelector extends StatelessWidget {
-  const _TypeSelector({required this.selectedType, required this.onSelected});
+  const _TypeSelector({
+    required this.selectedType,
+    required this.onSelected,
+    this.lockToSelectedType = false,
+  });
 
   final BookMemoItemType selectedType;
   final ValueChanged<BookMemoItemType> onSelected;
+  final bool lockToSelectedType;
 
   @override
   Widget build(BuildContext context) {
@@ -781,28 +834,33 @@ class _TypeSelector extends StatelessWidget {
               builder: (context) {
                 final style = _MemoTypeChoiceStyle.of(type);
                 final selected = selectedType == type;
-                return ChoiceChip(
-                  avatar: Icon(style.icon, size: 16, color: style.foreground),
-                  label: Text(type.label),
-                  selected: selected,
-                  showCheckmark: false,
-                  selectedColor: style.background,
-                  backgroundColor: style.background.withValues(alpha: 0.48),
-                  side: BorderSide(
-                    color: selected ? style.foreground : AppColors.border,
-                    width: selected ? 1.5 : 1,
+                final enabled = !lockToSelectedType || selected;
+                return Opacity(
+                  opacity: enabled ? 1 : 0.38,
+                  child: ChoiceChip(
+                    avatar: Icon(style.icon, size: 16, color: style.foreground),
+                    label: Text(type.label),
+                    selected: selected,
+                    showCheckmark: false,
+                    selectedColor: style.background,
+                    backgroundColor: style.background.withValues(alpha: 0.48),
+                    disabledColor: style.background.withValues(alpha: 0.32),
+                    side: BorderSide(
+                      color: selected ? style.foreground : AppColors.border,
+                      width: selected ? 1.5 : 1,
+                    ),
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11,
+                      vertical: 7,
+                    ),
+                    labelStyle: TextStyle(
+                      color: style.foreground,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    onSelected: enabled ? (_) => onSelected(type) : null,
                   ),
-                  shape: const StadiumBorder(),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 11,
-                    vertical: 7,
-                  ),
-                  labelStyle: TextStyle(
-                    color: style.foreground,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  onSelected: (_) => onSelected(type),
                 );
               },
             ),
@@ -912,7 +970,7 @@ class _MemoTypeChoiceStyle {
   };
 }
 
-class _PhotoPicker extends StatelessWidget {
+class _PhotoPicker extends StatefulWidget {
   const _PhotoPicker({
     required this.imageUrl,
     required this.pickedImagePath,
@@ -926,15 +984,23 @@ class _PhotoPicker extends StatelessWidget {
   final VoidCallback onRemove;
 
   @override
+  State<_PhotoPicker> createState() => _PhotoPickerState();
+}
+
+class _PhotoPickerState extends State<_PhotoPicker> {
+  bool _showActions = false;
+
+  @override
   Widget build(BuildContext context) {
     final hasImage =
-        pickedImagePath != null || (imageUrl != null && imageUrl!.isNotEmpty);
+        widget.pickedImagePath != null ||
+        (widget.imageUrl != null && widget.imageUrl!.isNotEmpty);
     if (!hasImage) {
       return SizedBox(
         width: double.infinity,
         height: 76,
         child: OutlinedButton.icon(
-          onPressed: onPick,
+          onPressed: widget.onPick,
           style: OutlinedButton.styleFrom(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
@@ -950,51 +1016,119 @@ class _PhotoPicker extends StatelessWidget {
       );
     }
 
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppColors.memoPhotoSurface.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppColors.memoPhotoForeground.withValues(alpha: 0.18),
-        ),
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: SizedBox(
-              width: 72,
-              height: 72,
-              child: _MemoImage(
-                imageUrl: imageUrl,
-                pickedImagePath: pickedImagePath,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Row(
+    return Semantics(
+      container: true,
+      label: '선택한 사진',
+      hint: '두 번 탭하면 사진 변경과 삭제 버튼이 표시됩니다.',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => setState(() => _showActions = !_showActions),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            height: 240,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: onPick,
-                    icon: const Icon(PhosphorIconsRegular.camera, size: 16),
-                    label: const Text('변경'),
-                  ),
+                const ColoredBox(color: AppColors.mediaBackdrop),
+                _MemoImage(
+                  imageUrl: widget.imageUrl,
+                  pickedImagePath: widget.pickedImagePath,
                 ),
-                Expanded(
-                  child: TextButton.icon(
-                    onPressed: onRemove,
-                    icon: const Icon(PhosphorIconsRegular.trash, size: 16),
-                    label: const Text('제거'),
-                  ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 160),
+                  child: _showActions
+                      ? ColoredBox(
+                          key: const ValueKey('photo-actions'),
+                          color: AppColors.mediaBackdrop.withValues(
+                            alpha: 0.52,
+                          ),
+                          child: Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _PhotoOverlayAction(
+                                  icon: PhosphorIconsRegular.camera,
+                                  label: '변경',
+                                  foregroundColor: AppColors.textStrong,
+                                  onPressed: () {
+                                    setState(() => _showActions = false);
+                                    widget.onPick();
+                                  },
+                                ),
+                                const SizedBox(width: 28),
+                                _PhotoOverlayAction(
+                                  icon: PhosphorIconsRegular.trash,
+                                  label: '삭제',
+                                  foregroundColor: AppColors.error,
+                                  onPressed: () async {
+                                    final confirmed = await AppConfirm.show(
+                                      context,
+                                      title: '사진을 삭제할까요?',
+                                      message: '선택한 사진이 메모에서 제거됩니다.',
+                                      confirmText: '삭제',
+                                      destructive: true,
+                                    );
+                                    if (!mounted || !confirmed) return;
+                                    setState(() => _showActions = false);
+                                    widget.onRemove();
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : const SizedBox.shrink(
+                          key: ValueKey('photo-actions-hidden'),
+                        ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _PhotoOverlayAction extends StatelessWidget {
+  const _PhotoOverlayAction({
+    required this.icon,
+    required this.label,
+    required this.foregroundColor,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color foregroundColor;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton.filled(
+          onPressed: onPressed,
+          tooltip: '사진 $label',
+          constraints: const BoxConstraints.tightFor(width: 64, height: 64),
+          style: IconButton.styleFrom(
+            backgroundColor: AppColors.surface,
+            foregroundColor: foregroundColor,
+          ),
+          icon: Icon(icon, size: 28),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.surface,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1013,13 +1147,13 @@ class _MemoImage extends StatelessWidget {
     if (localPath != null) {
       return Image.file(
         File(_asFilePath(localPath)),
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         errorBuilder: (_, _, _) => const _ImageError(),
       );
     }
     return Image.network(
       imageUrl!,
-      fit: BoxFit.cover,
+      fit: BoxFit.contain,
       errorBuilder: (_, _, _) => const _ImageError(),
     );
   }

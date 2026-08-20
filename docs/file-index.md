@@ -143,3 +143,5 @@
 - `docs/review/20260820-111142-memo-delete-and-photo-camera-review.md` — 메모 전체 삭제와 사진 촬영·선택 경로의 파일 규격 및 카메라 생명주기 리뷰
 - `docs/review/20260820-154246-book-reflection-read-review.md` — 독후감 읽기 기능의 초안 노출 범위·증분 동기화 기준 시각·공개 상태 접근성 리뷰
 - `docs/review/20260820-161749-book-record-collapsing-header-review.md` — 책 기록 접이식 헤더의 탭 탐색 유지·상태 최신성·텍스트 배율 대응 리뷰
+- `docs/review/20260820-194536-memo-photo-and-camera-orientation-review.md` — 메모 사진 작성·보기와 카메라 방향 잠금의 비동기·센서 생명주기 리뷰
+- `docs/review/20260820-195133-memo-photo-camera-orientation-rereview.md` — 메모 사진·카메라 방향 변경의 초기화 경합과 플랫폼 회전 제한 재리뷰

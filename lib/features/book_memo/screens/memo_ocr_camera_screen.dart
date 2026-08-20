@@ -4,7 +4,9 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:native_device_orientation/native_device_orientation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
@@ -12,6 +14,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_alert.dart';
 import '../../../shared/widgets/app_loading.dart';
+import 'widgets/camera_control_rotation.dart';
 
 /// 발췌 OCR용 촬영 화면. 책 문장을 수평으로 맞출 가이드만 제공한다.
 class MemoOcrCameraScreen extends StatefulWidget {
@@ -30,16 +33,28 @@ class _MemoOcrCameraScreenState extends State<MemoOcrCameraScreen>
   String? _errorMessage;
   int _cameraGeneration = 0;
 
+  // 회전 잠금 상태에서도 실제 기기 자세를 알아내 촬영 방향을 맞추고
+  // (lockCaptureOrientation), 컨트롤 아이콘 방향도 함께 돌리기 위한 값.
+  NativeDeviceOrientation _deviceOrientation =
+      NativeDeviceOrientation.portraitUp;
+  StreamSubscription<NativeDeviceOrientation>? _orientationSubscription;
+  Future<void> _orientationLockChain = Future<void>.value();
+  bool _orientationSubscriptionPaused = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _orientationSubscription = NativeDeviceOrientationCommunicator()
+        .onOrientationChanged(useSensor: true)
+        .listen(_handleOrientationChanged);
     _initializeCamera();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_orientationSubscription?.cancel());
     _cameraGeneration++;
     final controller = _controller;
     _controller = null;
@@ -47,16 +62,79 @@ class _MemoOcrCameraScreenState extends State<MemoOcrCameraScreen>
     super.dispose();
   }
 
+  void _handleOrientationChanged(NativeDeviceOrientation orientation) {
+    if (!mounted || orientation == _deviceOrientation) return;
+    setState(() => _deviceOrientation = orientation);
+    final controller = _controller;
+    if (controller != null && controller.value.isInitialized) {
+      unawaited(
+        _queueCaptureOrientationLock(
+          controller,
+          orientation,
+          _cameraGeneration,
+        ),
+      );
+    }
+  }
+
+  Future<bool> _queueCaptureOrientationLock(
+    CameraController controller,
+    NativeDeviceOrientation orientation,
+    int generation, {
+    bool requirePublishedController = true,
+  }) {
+    final result = Completer<bool>();
+    final lock = _orientationLockChain.then((_) async {
+      if (!mounted ||
+          generation != _cameraGeneration ||
+          (requirePublishedController && !identical(controller, _controller)) ||
+          !controller.value.isInitialized) {
+        result.complete(false);
+        return;
+      }
+      try {
+        await controller.lockCaptureOrientation(
+          orientation.deviceOrientation ?? DeviceOrientation.portraitUp,
+        );
+        result.complete(true);
+      } catch (error, stackTrace) {
+        developer.log(
+          '[메모 발췌 카메라 방향 잠금] target=camera '
+          'result=FAIL reason=capture_orientation_lock_error',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        result.complete(false);
+      }
+    });
+    _orientationLockChain = lock;
+    return result.future;
+  }
+
+  void _pauseOrientationSensor() {
+    if (_orientationSubscriptionPaused) return;
+    _orientationSubscription?.pause();
+    _orientationSubscriptionPaused = true;
+  }
+
+  void _resumeOrientationSensor() {
+    if (!_orientationSubscriptionPaused) return;
+    _orientationSubscription?.resume();
+    _orientationSubscriptionPaused = false;
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     switch (state) {
       case AppLifecycleState.resumed:
+        _resumeOrientationSensor();
         if (!_isPickingImage) _initializeCamera();
         break;
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
+        _pauseOrientationSensor();
         _releaseCamera();
         break;
     }
@@ -98,6 +176,24 @@ class _MemoOcrCameraScreenState extends State<MemoOcrCameraScreen>
       if (!mounted || generation != _cameraGeneration) {
         await nextController.dispose();
         return;
+      }
+      // 방향 잠금 중 새 센서 값이 들어오면 최신 방향까지 다시 적용한다.
+      // 각 await 뒤 세대를 확인해 백그라운드 전환으로 무효화된 컨트롤러가
+      // 화면에 다시 게시되지 않게 한다.
+      while (true) {
+        final orientation = _deviceOrientation;
+        final locked = await _queueCaptureOrientationLock(
+          nextController,
+          orientation,
+          generation,
+          requirePublishedController: false,
+        );
+        if (!mounted || generation != _cameraGeneration) {
+          await nextController.dispose();
+          return;
+        }
+        if (!locked) throw StateError('capture_orientation_lock_failed');
+        if (orientation == _deviceOrientation) break;
       }
       setState(() {
         _controller = nextController;
@@ -253,7 +349,10 @@ class _MemoOcrCameraScreenState extends State<MemoOcrCameraScreen>
                     backgroundColor: AppColors.surface.withValues(alpha: 0.84),
                     foregroundColor: AppColors.textStrong,
                   ),
-                  icon: const Icon(PhosphorIconsRegular.x),
+                  icon: RotatedControlIcon(
+                    orientation: _deviceOrientation,
+                    icon: PhosphorIconsRegular.x,
+                  ),
                 ),
               ),
             ),
@@ -291,7 +390,11 @@ class _MemoOcrCameraScreenState extends State<MemoOcrCameraScreen>
                     disabledBackgroundColor: AppColors.surfaceSubtle,
                     shape: const CircleBorder(),
                   ),
-                  icon: const Icon(PhosphorIconsRegular.imageSquare, size: 24),
+                  icon: RotatedControlIcon(
+                    orientation: _deviceOrientation,
+                    icon: PhosphorIconsRegular.imageSquare,
+                    size: 24,
+                  ),
                 ),
               ),
             ),
@@ -319,7 +422,11 @@ class _MemoOcrCameraScreenState extends State<MemoOcrCameraScreen>
                       ),
                       shape: const CircleBorder(),
                     ),
-                    icon: const Icon(PhosphorIconsRegular.camera, size: 28),
+                    icon: RotatedControlIcon(
+                      orientation: _deviceOrientation,
+                      icon: PhosphorIconsRegular.camera,
+                      size: 28,
+                    ),
                   ),
                 ),
               ),

@@ -227,14 +227,24 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
               sliver: SliverList.builder(
                 itemCount: visibleItems.length,
-                itemBuilder: (context, index) => _MemoTimelineItem(
-                  item: visibleItems[index],
-                  showDivider: index < visibleItems.length - 1,
-                  onTap: () => _showItemActions(
-                    visibleItems[index],
-                    totalItemCount: detail.items.length,
-                  ),
-                ),
+                itemBuilder: (context, index) {
+                  final item = visibleItems[index];
+                  return _MemoTimelineItem(
+                    item: item,
+                    showDivider: index < visibleItems.length - 1,
+                    onTap:
+                        item.type == BookMemoItemType.photo &&
+                            item.imageUrl != null
+                        ? () => _showPhotoItem(
+                            item,
+                            totalItemCount: detail.items.length,
+                          )
+                        : () => _showItemActions(
+                            item,
+                            totalItemCount: detail.items.length,
+                          ),
+                  );
+                },
               ),
             ),
         ],
@@ -362,6 +372,28 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     }
   }
 
+  Future<void> _showPhotoItem(
+    BookMemoItem item, {
+    required int totalItemCount,
+  }) async {
+    if (_isSavingItem) {
+      AppSnackBar.info(context, '메모 조각을 저장하고 있습니다.');
+      return;
+    }
+    final action = await showDialog<_PhotoItemAction>(
+      context: context,
+      useSafeArea: false,
+      builder: (context) => _PhotoItemViewer(imageUrl: item.imageUrl!),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _PhotoItemAction.edit:
+        await _editItem(item);
+      case _PhotoItemAction.delete:
+        await _deleteItem(item, totalItemCount: totalItemCount);
+    }
+  }
+
   Future<void> _copyItem(BookMemoItem item) async {
     // 화면(_MemoRichText)은 앞뒤 공백·줄바꿈을 그대로 표시하므로, 복사
     // 가능 여부 판단에만 trim()을 쓰고 실제로 복사하는 값은 마크업만
@@ -470,6 +502,93 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
 }
 
 enum _MemoItemAction { edit, copy, delete }
+
+enum _PhotoItemAction { edit, delete }
+
+class _PhotoItemViewer extends StatelessWidget {
+  const _PhotoItemViewer({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog.fullscreen(
+      backgroundColor: AppColors.mediaBackdrop,
+      child: Scaffold(
+        backgroundColor: AppColors.mediaBackdrop,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            SafeArea(
+              bottom: false,
+              child: InteractiveViewer(
+                minScale: 0.8,
+                maxScale: 4,
+                child: Center(
+                  child: _MemoPhotoImage(
+                    imageUrl: imageUrl,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 12,
+              left: 12,
+              child: SafeArea(
+                child: IconButton.filledTonal(
+                  onPressed: () => Navigator.of(context).pop(),
+                  tooltip: '닫기',
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.surface.withValues(alpha: 0.88),
+                    foregroundColor: AppColors.textStrong,
+                  ),
+                  icon: const Icon(PhosphorIconsRegular.x),
+                ),
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: Material(
+          color: AppColors.mediaBackdrop,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextButton.icon(
+                    onPressed: () =>
+                        Navigator.of(context).pop(_PhotoItemAction.edit),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.surface,
+                      minimumSize: const Size(96, 48),
+                    ),
+                    icon: const Icon(PhosphorIconsRegular.pencil, size: 19),
+                    label: const Text('수정'),
+                  ),
+                  const SizedBox(width: 20),
+                  TextButton.icon(
+                    onPressed: () =>
+                        Navigator.of(context).pop(_PhotoItemAction.delete),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      minimumSize: const Size(96, 48),
+                    ),
+                    icon: const Icon(PhosphorIconsRegular.trash, size: 19),
+                    label: const Text('삭제'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _MemoItemActionSheet extends StatelessWidget {
   const _MemoItemActionSheet();
@@ -840,32 +959,24 @@ class _PhotoContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final image = _buildImage(BoxFit.cover);
-    return Semantics(
-      button: true,
-      label: '사진 크게 보기',
-      child: GestureDetector(
-        onTap: () => showDialog<void>(
-          context: context,
-          builder: (context) => Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: const EdgeInsets.all(16),
-            child: InteractiveViewer(
-              minScale: 0.8,
-              maxScale: 4,
-              child: _buildImage(BoxFit.contain),
-            ),
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: AspectRatio(aspectRatio: 16 / 9, child: image),
-        ),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: _MemoPhotoImage(imageUrl: imageUrl, fit: BoxFit.cover),
       ),
     );
   }
+}
 
-  Widget _buildImage(BoxFit fit) {
+class _MemoPhotoImage extends StatelessWidget {
+  const _MemoPhotoImage({required this.imageUrl, required this.fit});
+
+  final String imageUrl;
+  final BoxFit fit;
+
+  @override
+  Widget build(BuildContext context) {
     if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
       return Image.network(
         imageUrl,
