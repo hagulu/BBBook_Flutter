@@ -175,7 +175,7 @@ class BookMemoDetailController
       draft: draft,
     );
     final current = state.value ?? const BookMemoDetail.empty();
-    state = AsyncValue.data(current.copyWith(items: [item, ...current.items]));
+    state = AsyncValue.data(current.copyWith(items: [...current.items, item]));
   }
 
   Future<void> updateItem(int itemId, BookMemoItemDraft draft) async {

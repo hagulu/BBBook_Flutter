@@ -128,3 +128,5 @@
 - `docs/review/20260818-201131-book-memo-photo-create-review.md` — PHOTO 일괄 생성 API의 재시도 중복과 파일 검증·영구 실패 처리 리뷰
 - `docs/review/20260819-140034-memo-highlight-editor-review.md` — 메모 강조 편집기의 선택 교체·IME 조합 표시·접근성·정책 문서 정합성 리뷰
 - `docs/review/20260819-162246-local-create-and-ocr-review.md` — 로컬 책 CREATE의 상태 경합·영구 실패 처리와 OCR 카메라 생명주기·접근성 리뷰
+- `docs/review/20260819-184302-book-memo-detail-review.md` — 메모 조각 액션 시트·타임라인 개편의 정책 문서 및 공용 컴포넌트 경계 리뷰
+- `docs/review/20260819-202652-memo-and-progress-review.md` — 메모 조각 UI와 진행 쪽수 연속 조작·증감 툴바의 상태 정합성 및 접근성 리뷰

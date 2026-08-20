@@ -223,7 +223,10 @@ class _BookMemoQuickComposerState extends State<_BookMemoQuickComposer> {
     _insertTextAtSelection(_contentController, text);
     setState(() {});
     final draft = await showBookMemoItemEditor(context, initialDraft: _draft);
-    if (!mounted || draft == null) return;
+    if (!mounted) return;
+    // 전체 편집 화면에서 뒤로 가면(draft == null이어도) 빠른 작성 시트로
+    // 되돌아가지 않고 곧바로 목록 화면이 보이도록, 시트도 함께 닫는다
+    // (아래로 확장하는 [_expand]와 동일한 규칙).
     Navigator.of(context).pop<BookMemoItemDraft>(draft);
   }
 

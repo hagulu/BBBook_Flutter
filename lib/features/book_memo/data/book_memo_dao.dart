@@ -73,7 +73,7 @@ class BookMemoDao {
         'book_memo_item',
         where: 'memo_id = ? AND deleted_at IS NULL',
         whereArgs: [memoId],
-        orderBy: 'created_at DESC, sort_order DESC, id DESC',
+        orderBy: 'created_at ASC, sort_order ASC, id ASC',
       );
       return BookMemoDetail(
         memo: _memoFromRow(memoRows.single),

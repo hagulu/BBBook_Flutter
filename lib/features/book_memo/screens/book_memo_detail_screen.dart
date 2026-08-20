@@ -39,12 +39,14 @@ class BookMemoDetailScreen extends ConsumerStatefulWidget {
 class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
   late final TextEditingController _titleController;
   late final FocusNode _titleFocusNode;
+  late final ScrollController _scrollController;
   late final BookMemoDetailArgs _args;
   bool _titleInitialized = false;
   bool _importantOnly = false;
   bool _isSavingItem = false;
   bool _allowPop = false;
   bool _isClosing = false;
+  bool _scrolledToInitialPosition = false;
   Future<void> _titleSaveChain = Future.value();
 
   @override
@@ -57,6 +59,7 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     );
     _titleController = TextEditingController();
     _titleFocusNode = FocusNode()..addListener(_onTitleFocusChanged);
+    _scrollController = ScrollController();
     if (widget.memoId == null) _titleInitialized = true;
   }
 
@@ -65,6 +68,7 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     _titleFocusNode.removeListener(_onTitleFocusChanged);
     _titleFocusNode.dispose();
     _titleController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -97,16 +101,51 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
           foregroundColor: AppColors.textStrong,
           elevation: 0,
         ),
-        body: switch (asyncDetail) {
-          AsyncData(:final value) =>
-            widget.memoId != null && value.memo == null
-                ? const _MemoNotFound()
-                : _buildContent(value),
-          AsyncError() => _LoadError(
-            onRetry: () => ref.invalidate(bookMemoDetailProvider(_args)),
-          ),
-          _ => const Center(child: CircularProgressIndicator()),
-        },
+        body: Stack(
+          children: [
+            switch (asyncDetail) {
+              AsyncData(:final value) =>
+                widget.memoId != null && value.memo == null
+                    ? const _MemoNotFound()
+                    : _buildContent(value),
+              AsyncError() => _LoadError(
+                onRetry: () => ref.invalidate(bookMemoDetailProvider(_args)),
+              ),
+              _ => const Center(child: CircularProgressIndicator()),
+            },
+            if (switch (asyncDetail) {
+              AsyncData(:final value) =>
+                widget.memoId == null || value.memo != null,
+              _ => false,
+            })
+              Positioned(
+                left: 16,
+                bottom: 16 + MediaQuery.paddingOf(context).bottom,
+                child: FilterChip(
+                  selected: _importantOnly,
+                  onSelected: (selected) =>
+                      setState(() => _importantOnly = selected),
+                  avatar: Icon(
+                    PhosphorIconsRegular.highlighter,
+                    size: 16,
+                    color: _importantOnly
+                        ? AppColors.textStrong
+                        : AppColors.textMuted,
+                  ),
+                  label: const Text('강조 조각만'),
+                  selectedColor: AppColors.highlightGoldSurface,
+                  backgroundColor: AppColors.surface,
+                  side: const BorderSide(color: AppColors.border),
+                  elevation: 3,
+                  labelStyle: const TextStyle(
+                    color: AppColors.textBody,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
+        ),
         floatingActionButton: switch (asyncDetail) {
           AsyncData(:final value)
               when widget.memoId == null || value.memo != null =>
@@ -135,11 +174,13 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
   }
 
   Widget _buildContent(BookMemoDetail detail) {
+    _scheduleInitialScrollToBottom();
     final visibleItems = _importantOnly
         ? detail.items.where((item) => item.isImportant).toList(growable: false)
         : detail.items;
     return BookMemoRefreshIndicator(
       child: CustomScrollView(
+        controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
@@ -160,31 +201,6 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
                     hintText: '제목을 입력하세요 (선택)',
                     fillColor: Colors.transparent,
                     contentPadding: EdgeInsets.symmetric(vertical: 10),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FilterChip(
-                    selected: _importantOnly,
-                    onSelected: (selected) =>
-                        setState(() => _importantOnly = selected),
-                    avatar: Icon(
-                      PhosphorIconsRegular.highlighter,
-                      size: 16,
-                      color: _importantOnly
-                          ? AppColors.textStrong
-                          : AppColors.textMuted,
-                    ),
-                    label: const Text('강조 조각만'),
-                    selectedColor: AppColors.highlightGoldSurface,
-                    backgroundColor: AppColors.surface,
-                    side: const BorderSide(color: AppColors.border),
-                    labelStyle: const TextStyle(
-                      color: AppColors.textBody,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
                   ),
                 ),
               ],
@@ -213,6 +229,28 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
         ],
       ),
     );
+  }
+
+  void _scheduleInitialScrollToBottom() {
+    if (_scrolledToInitialPosition) return;
+    _scrolledToInitialPosition = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    });
+  }
+
+  /// 새 조각은 목록 맨 아래(최신)에 추가되므로, 추가 직후 자연스럽게
+  /// 아래까지 스크롤해 방금 추가한 조각이 바로 보이게 한다.
+  void _scrollToNewestItem() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   void _onTitleFocusChanged() {
@@ -275,6 +313,7 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     await _saveItem(() {
       return ref.read(bookMemoDetailProvider(_args).notifier).createItem(draft);
     });
+    _scrollToNewestItem();
   }
 
   Future<void> _editItem(BookMemoItem item) async {
@@ -313,8 +352,11 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
   }
 
   Future<void> _copyItem(BookMemoItem item) async {
-    final content = stripMemoHighlightMarkup(item.content).trim();
-    if (content.isEmpty) {
+    // 화면(_MemoRichText)은 앞뒤 공백·줄바꿈을 그대로 표시하므로, 복사
+    // 가능 여부 판단에만 trim()을 쓰고 실제로 복사하는 값은 마크업만
+    // 제거한 원문을 그대로 둔다.
+    final content = stripMemoHighlightMarkup(item.content);
+    if (content.trim().isEmpty) {
       AppSnackBar.info(context, '복사할 내용이 없습니다.');
       return;
     }
@@ -339,7 +381,6 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     setState(() => _isSavingItem = true);
     try {
       await save();
-      if (mounted) AppSnackBar.success(context, '메모 조각을 저장했습니다.');
     } catch (_) {
       if (mounted) AppSnackBar.error(context, '메모 조각을 저장하지 못했습니다.');
     } finally {
@@ -509,12 +550,16 @@ class _MemoTimelineItem extends StatelessWidget {
                           size: 14,
                         ),
                         const SizedBox(width: 5),
-                        Text(
-                          item.type.label,
-                          style: TextStyle(
-                            color: typeStyle.foreground,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
+                        Flexible(
+                          child: Text(
+                            item.type.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: typeStyle.foreground,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                         if (item.isImportant) ...[
@@ -527,22 +572,30 @@ class _MemoTimelineItem extends StatelessWidget {
                         ],
                         if (item.pageLabel != null) ...[
                           const SizedBox(width: 16),
-                          Text(
-                            item.pageLabel!,
+                          Flexible(
+                            child: Text(
+                              item.pageLabel!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const Spacer(),
+                        Flexible(
+                          child: Text(
+                            _formatDateTime(item.createdAt),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               color: AppColors.textMuted,
                               fontSize: 10,
                               fontWeight: FontWeight.w500,
                             ),
-                          ),
-                        ],
-                        const Spacer(),
-                        Text(
-                          _formatDateTime(item.createdAt),
-                          style: const TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         const SizedBox(width: 12),
