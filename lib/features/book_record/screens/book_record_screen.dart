@@ -8,6 +8,7 @@ import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../book_memo/screens/book_memo_list.dart';
+import '../../book_reflection/screens/book_reflection_list.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/models/book_status.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
@@ -120,7 +121,7 @@ class _BookRecordBody extends ConsumerWidget {
     );
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverPadding(
@@ -145,6 +146,7 @@ class _BookRecordBody extends ConsumerWidget {
                 tabs: [
                   Tab(text: '정보'),
                   Tab(text: '메모'),
+                  Tab(text: '독후감'),
                 ],
                 labelColor: AppColors.textStrong,
                 unselectedLabelColor: AppColors.textMuted,
@@ -298,6 +300,7 @@ class _BookRecordBody extends ConsumerWidget {
               ],
             ),
             BookMemoList(userBookId: userBookId, bookTitle: book.title),
+            BookReflectionList(userBookId: userBookId, bookTitle: book.title),
           ],
         ),
       ),

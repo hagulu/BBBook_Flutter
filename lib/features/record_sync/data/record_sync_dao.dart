@@ -153,6 +153,12 @@ class RecordSyncDao {
         'key': 'last_synced_at_memo',
         'value': requestedAt.toUtc().toIso8601String(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
+      // 독후감 동기화 기준값(BookReflectionRepository.sync()가 쓰는 since)도
+      // 같은 이유로 함께 시딩한다.
+      await txn.insert('sync_meta', {
+        'key': 'last_synced_at_reflection',
+        'value': requestedAt.toUtc().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     });
 
     if (total == 0) onProgress(0, 0);

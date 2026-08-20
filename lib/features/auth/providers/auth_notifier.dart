@@ -7,6 +7,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../../book_memo/providers/book_memo_providers.dart';
 import '../../book_record/providers/book_record_providers.dart';
+import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../data/auth_api.dart' show SocialProvider;
 import '../data/auth_repository.dart';
@@ -176,6 +177,11 @@ class AuthNotifier extends Notifier<AuthState> {
       ref.invalidate(bookMemoListProvider);
       ref.invalidate(bookMemoDetailProvider);
       ref.read(bookMemoSyncVersionProvider.notifier).state++;
+      // 독후감 동기화 컨트롤러/목록/상세도 같은 이유로 비운다.
+      ref.invalidate(bookReflectionSyncControllerProvider);
+      ref.invalidate(bookReflectionListProvider);
+      ref.invalidate(bookReflectionDetailProvider);
+      ref.read(bookReflectionSyncVersionProvider.notifier).state++;
     }
   }
 

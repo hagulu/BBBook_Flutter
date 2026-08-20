@@ -69,6 +69,15 @@
 - `lib/features/book_memo/screens/widgets/highlight_text_field.dart` — 강조(::hl[[]]) 편집을 지원하는 `MemoHighlightController`(TextEditingController), 커서/선택 기반 토글·타이핑 상속·range 이동
 - `docs/policies/memo-highlight-toggle.md` — 강조 토글 버튼 정책 문서(상태 판단·경계 공백 삽입·IME 조합 세션 고정), 다른 화면/플랫폼에 재구현할 때 참고
 
+## features/book_reflection
+
+- `lib/features/book_reflection/screens/book_reflection_list.dart` — 책 기록 상세의 독후감 탭(로컬 목록, 당겨서 새로고침), 상세 진입점. 작성/수정/삭제(에디터)는 미구현
+- `lib/features/book_reflection/screens/book_reflection_detail_screen.dart` — 독후감 상세(읽기 전용). `content_json`(Tiptap) 리치 텍스트 렌더링은 미구현이라 `content_text`만 표시
+- `lib/features/book_reflection/data/book_reflection_api.dart` — 독후감 증분 동기화 API 호출(`GET /api/me/reflections/sync/changes`)
+- `lib/features/book_reflection/data/book_reflection_dao.dart` — 로컬 DB 쿼리·전체/증분 동기화 반영(로컬 편집 dirty push 경로는 아직 없음)
+- `lib/features/book_reflection/data/book_reflection_repository.dart` — 독후감 화면 source of truth(로컬 조회 전용), 최초엔 전체(`/api/me/records`)·이후엔 증분(`/api/me/reflections/sync/changes`) 동기화
+- `lib/features/book_reflection/providers/book_reflection_providers.dart` — 독후감 목록·상세 조회 및 동기화 컨트롤러 Riverpod provider
+
 ## features/record_sync
 
 - `lib/features/record_sync/screens/initial_record_sync_screen.dart` — 인증 후 일반 화면 진입을 막고 최초 기록 다운로드·저장 진행 상태와 재시도를 표시하는 게이트 화면
@@ -132,3 +141,4 @@
 - `docs/review/20260819-184302-book-memo-detail-review.md` — 메모 조각 액션 시트·타임라인 개편의 정책 문서 및 공용 컴포넌트 경계 리뷰
 - `docs/review/20260819-202652-memo-and-progress-review.md` — 메모 조각 UI와 진행 쪽수 연속 조작·증감 툴바의 상태 정합성 및 접근성 리뷰
 - `docs/review/20260820-111142-memo-delete-and-photo-camera-review.md` — 메모 전체 삭제와 사진 촬영·선택 경로의 파일 규격 및 카메라 생명주기 리뷰
+- `docs/review/20260820-154246-book-reflection-read-review.md` — 독후감 읽기 기능의 초안 노출 범위·증분 동기화 기준 시각·공개 상태 접근성 리뷰
