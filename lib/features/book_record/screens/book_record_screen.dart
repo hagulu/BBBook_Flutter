@@ -535,7 +535,7 @@ class _CollapsingBookHeaderDelegate extends SliverPersistentHeaderDelegate {
   final BookItem book;
   final VoidCallback onEditBookInfo;
 
-  static const double _expandedHeight = 208;
+  static const double _expandedHeight = 178;
   static const double _collapsedHeight = 56;
 
   @override
