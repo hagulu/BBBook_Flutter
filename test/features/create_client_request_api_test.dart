@@ -4,8 +4,8 @@ import 'dart:typed_data';
 
 import 'package:bbbook/core/network/api_client.dart';
 import 'package:bbbook/features/book_detail/data/book_detail_api.dart';
-import 'package:bbbook/features/book_memo/data/book_memo_api.dart';
-import 'package:bbbook/features/book_memo/models/book_memo.dart';
+import 'package:bbbook/features/book_note/data/book_note_api.dart';
+import 'package:bbbook/features/book_note/models/book_note.dart';
 import 'package:bbbook/features/book_search/data/book_search_api.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -66,14 +66,14 @@ void main() {
     expect(multipartAdapter.requestBody, contains('name="thumbnail"'));
   });
 
-  test('일반 메모 조각 CREATE JSON에 clientRequestId를 전달한다', () async {
-    final adapter = _CaptureAdapter(_memoResponse(itemType: 'SUMMARY'));
-    final api = BookMemoApi(apiClient: _client(adapter));
+  test('일반 메모 CREATE JSON에 clientRequestId를 전달한다', () async {
+    final adapter = _CaptureAdapter(_noteMemoResponse(memoType: 'SUMMARY'));
+    final api = BookNoteApi(apiClient: _client(adapter));
 
-    await api.postItem(
+    await api.postNoteMemo(
       userBookId: 91,
-      memoId: 12,
-      itemType: BookMemoItemType.summary,
+      noteId: 12,
+      memoType: BookNoteMemoType.summary,
       startPage: 1,
       endPage: 2,
       content: '내용',
@@ -81,14 +81,14 @@ void main() {
       clientRequestId: clientRequestId,
     );
 
-    expect(adapter.options?.path, '/api/me/books/91/memos/items');
+    expect(adapter.options?.path, '/api/me/books/91/notes/memos');
     expect(
       adapter.options?.data,
       containsPair('clientRequestId', clientRequestId),
     );
   });
 
-  test('PHOTO 메모 조각 CREATE multipart field에 clientRequestId를 전달한다', () async {
+  test('PHOTO 메모 CREATE multipart field에 clientRequestId를 전달한다', () async {
     final tempDirectory = await Directory.systemTemp.createTemp(
       'bbbook-photo-api-test-',
     );
@@ -96,11 +96,11 @@ void main() {
     await photo.writeAsBytes(const [1, 2, 3]);
     addTearDown(() => tempDirectory.delete(recursive: true));
 
-    final adapter = _CaptureAdapter(_memoResponse(itemType: 'PHOTO'));
-    final api = BookMemoApi(apiClient: _client(adapter));
-    await api.postPhotoItem(
+    final adapter = _CaptureAdapter(_noteMemoResponse(memoType: 'PHOTO'));
+    final api = BookNoteApi(apiClient: _client(adapter));
+    await api.postPhotoNoteMemo(
       userBookId: 91,
-      memoId: null,
+      noteId: null,
       startPage: null,
       endPage: null,
       content: '사진',
@@ -109,7 +109,7 @@ void main() {
       clientRequestId: clientRequestId,
     );
 
-    expect(adapter.options?.path, '/api/me/books/91/memos/items/photo');
+    expect(adapter.options?.path, '/api/me/books/91/notes/memos/photo');
     expect(adapter.requestBody, contains('name="clientRequestId"'));
     expect(adapter.requestBody, contains(clientRequestId));
     expect(adapter.requestBody, contains('name="file"'));
@@ -140,17 +140,17 @@ Map<String, dynamic> _bookResponse({required bool created}) {
   };
 }
 
-Map<String, dynamic> _memoResponse({required String itemType}) {
+Map<String, dynamic> _noteMemoResponse({required String memoType}) {
   return {
     'success': true,
     'data': {
       'id': 101,
-      'memoId': 12,
-      'itemType': itemType,
+      'noteId': 12,
+      'memoType': memoType,
       'startPage': null,
       'endPage': null,
       'content': '내용',
-      'imageUrl': itemType == 'PHOTO' ? 'https://example.com/photo.jpg' : null,
+      'imageUrl': memoType == 'PHOTO' ? 'https://example.com/photo.jpg' : null,
       'isImportant': false,
       'sortOrder': 0,
       'createdAt': '2026-08-19T00:00:00Z',

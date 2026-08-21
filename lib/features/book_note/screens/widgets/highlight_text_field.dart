@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../utils/memo_highlight.dart';
 
-/// 텍스트 메모 조각 본문에 웹과 동일한 `::hl[[]]` 강조를 지원하는
+/// 텍스트 메모 본문에 웹과 동일한 `::hl[[]]` 강조를 지원하는
 /// [TextEditingController].
 ///
 /// 사용자에게는 마크업 없는 평문만 보이고([text]), 강조 위치는 [highlights]로

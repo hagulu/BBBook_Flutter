@@ -9,30 +9,32 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_alert.dart';
 import '../../../../shared/widgets/app_confirm.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
-import '../../models/book_memo.dart';
+import '../../models/book_note.dart';
 import '../memo_photo_camera_screen.dart';
 import 'highlight_text_field.dart';
 import 'memo_ocr_capture.dart';
 
-Future<BookMemoItemDraft?> showBookMemoItemEditor(
+Future<BookNoteMemoDraft?> showBookNoteMemoEditor(
   BuildContext context, {
-  BookMemoItem? initialItem,
-  BookMemoItemDraft? initialDraft,
+  BookNoteMemo? initialMemo,
+  BookNoteMemoDraft? initialDraft,
 }) {
-  assert(initialItem == null || initialDraft == null);
-  return Navigator.of(context).push<BookMemoItemDraft>(
+  assert(initialMemo == null || initialDraft == null);
+  return Navigator.of(context).push<BookNoteMemoDraft>(
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) => _BookMemoItemEditorScreen(
-        initialItem: initialItem,
+      builder: (_) => _BookNoteMemoEditorScreen(
+        initialMemo: initialMemo,
         initialDraft: initialDraft,
       ),
     ),
   );
 }
 
-Future<BookMemoItemDraft?> showBookMemoQuickComposer(BuildContext context) {
-  return showModalBottomSheet<BookMemoItemDraft>(
+Future<BookNoteMemoDraft?> showBookNoteMemoQuickComposer(
+  BuildContext context,
+) {
+  return showModalBottomSheet<BookNoteMemoDraft>(
     context: context,
     isScrollControlled: true,
     showDragHandle: false,
@@ -40,27 +42,29 @@ Future<BookMemoItemDraft?> showBookMemoQuickComposer(BuildContext context) {
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
     ),
-    builder: (_) => const _BookMemoQuickComposer(),
+    builder: (_) => const _BookNoteMemoQuickComposer(),
   );
 }
 
-class _BookMemoQuickComposer extends StatefulWidget {
-  const _BookMemoQuickComposer();
+class _BookNoteMemoQuickComposer extends StatefulWidget {
+  const _BookNoteMemoQuickComposer();
 
   @override
-  State<_BookMemoQuickComposer> createState() => _BookMemoQuickComposerState();
+  State<_BookNoteMemoQuickComposer> createState() =>
+      _BookNoteMemoQuickComposerState();
 }
 
-class _BookMemoQuickComposerState extends State<_BookMemoQuickComposer> {
+class _BookNoteMemoQuickComposerState
+    extends State<_BookNoteMemoQuickComposer> {
   static const _quickTypes = [
-    BookMemoItemType.summary,
-    BookMemoItemType.thought,
-    BookMemoItemType.quote,
-    BookMemoItemType.photo,
+    BookNoteMemoType.summary,
+    BookNoteMemoType.thought,
+    BookNoteMemoType.quote,
+    BookNoteMemoType.photo,
   ];
 
   final _contentController = TextEditingController();
-  BookMemoItemType _type = BookMemoItemType.summary;
+  BookNoteMemoType _type = BookNoteMemoType.summary;
 
   @override
   void dispose() {
@@ -94,7 +98,7 @@ class _BookMemoQuickComposerState extends State<_BookMemoQuickComposer> {
                         for (final type in _quickTypes)
                           Builder(
                             builder: (context) {
-                              final style = _MemoTypeChoiceStyle.of(type);
+                              final style = _NoteMemoTypeChoiceStyle.of(type);
                               final selected = _type == type;
                               return ChoiceChip(
                                 avatar: Icon(
@@ -182,7 +186,7 @@ class _BookMemoQuickComposerState extends State<_BookMemoQuickComposer> {
                   const SizedBox(width: 10),
                   IconButton(
                     onPressed: canSave ? _submit : null,
-                    tooltip: '메모 조각 추가',
+                    tooltip: '메모 추가',
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints.tightFor(
@@ -207,7 +211,7 @@ class _BookMemoQuickComposerState extends State<_BookMemoQuickComposer> {
     );
   }
 
-  BookMemoItemDraft get _draft => BookMemoItemDraft(
+  BookNoteMemoDraft get _draft => BookNoteMemoDraft(
     type: _type,
     content: _contentController.text.trim().isEmpty
         ? null
@@ -216,54 +220,54 @@ class _BookMemoQuickComposerState extends State<_BookMemoQuickComposer> {
 
   void _submit() => Navigator.of(context).pop(_draft);
 
-  void _onTypeSelected(BookMemoItemType type) {
-    if (type == BookMemoItemType.photo) {
+  void _onTypeSelected(BookNoteMemoType type) {
+    if (type == BookNoteMemoType.photo) {
       unawaited(_expand(initialType: type));
       return;
     }
     setState(() => _type = type);
   }
 
-  Future<void> _expand({BookMemoItemType? initialType}) async {
+  Future<void> _expand({BookNoteMemoType? initialType}) async {
     final initialDraft = initialType == null
         ? _draft
-        : BookMemoItemDraft(
+        : BookNoteMemoDraft(
             type: initialType,
             content: _contentController.text.trim().isEmpty
                 ? null
                 : _contentController.text.trim(),
           );
-    final draft = await showBookMemoItemEditor(
+    final draft = await showBookNoteMemoEditor(
       context,
       initialDraft: initialDraft,
     );
     if (!mounted) return;
-    Navigator.of(context).pop<BookMemoItemDraft>(draft);
+    Navigator.of(context).pop<BookNoteMemoDraft>(draft);
   }
 }
 
-class _BookMemoItemEditorScreen extends StatefulWidget {
-  const _BookMemoItemEditorScreen({
-    required this.initialItem,
+class _BookNoteMemoEditorScreen extends StatefulWidget {
+  const _BookNoteMemoEditorScreen({
+    required this.initialMemo,
     required this.initialDraft,
   });
 
-  final BookMemoItem? initialItem;
-  final BookMemoItemDraft? initialDraft;
+  final BookNoteMemo? initialMemo;
+  final BookNoteMemoDraft? initialDraft;
 
   @override
-  State<_BookMemoItemEditorScreen> createState() =>
-      _BookMemoItemEditorScreenState();
+  State<_BookNoteMemoEditorScreen> createState() =>
+      _BookNoteMemoEditorScreenState();
 }
 
-class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
-  late BookMemoItemType _type;
+class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
+  late BookNoteMemoType _type;
   late final MemoHighlightController _contentController;
   late final TextEditingController _startPageController;
   late final TextEditingController _endPageController;
   late final FocusNode _contentFocusNode;
 
-  /// PHOTO 타입 전용 조각 전체 강조 토글. 텍스트 타입은 [_contentController]의
+  /// PHOTO 타입 전용 메모 전체 강조 토글. 텍스트 타입은 [_contentController]의
   /// 강조(::hl[[]]) 존재 여부로 강조가 결정되므로 이 값을 쓰지 않는다.
   late bool _photoImportant;
   String? _imageUrl;
@@ -273,29 +277,29 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
   @override
   void initState() {
     super.initState();
-    final item = widget.initialItem;
+    final memo = widget.initialMemo;
     final draft = widget.initialDraft;
-    _type = item?.type ?? draft?.type ?? BookMemoItemType.summary;
+    _type = memo?.type ?? draft?.type ?? BookNoteMemoType.summary;
     _contentController = MemoHighlightController.fromRaw(
-      item?.content ?? draft?.content,
+      memo?.content ?? draft?.content,
     );
     _startPageController = TextEditingController(
-      text: (item?.startPage ?? draft?.startPage)?.toString() ?? '',
+      text: (memo?.startPage ?? draft?.startPage)?.toString() ?? '',
     );
     _endPageController = TextEditingController(
-      text: (item?.endPage ?? draft?.endPage)?.toString() ?? '',
+      text: (memo?.endPage ?? draft?.endPage)?.toString() ?? '',
     );
     _contentFocusNode = FocusNode();
-    // isImportant는 원래 타입이 PHOTO일 때만 "조각 전체 강조" 의미를 갖는다.
-    // 텍스트 타입 조각(강조는 content의 ::hl[[]]로 별도 관리)의 isImportant를
-    // 그대로 물려받으면, 강조가 있던 텍스트 조각을 PHOTO로 전환했을 때 사용자가
+    // isImportant는 원래 타입이 PHOTO일 때만 "메모 전체 강조" 의미를 갖는다.
+    // 텍스트 타입 메모(강조는 content의 ::hl[[]]로 별도 관리)의 isImportant를
+    // 그대로 물려받으면, 강조가 있던 텍스트 메모를 PHOTO로 전환했을 때 사용자가
     // 켠 적 없는 사진 강조 버튼이 ON으로 보인다.
-    _photoImportant = _type == BookMemoItemType.photo
-        ? (item?.isImportant ?? draft?.isImportant ?? false)
+    _photoImportant = _type == BookNoteMemoType.photo
+        ? (memo?.isImportant ?? draft?.isImportant ?? false)
         : false;
-    _imageUrl = item?.imageUrl ?? draft?.imageUrl;
+    _imageUrl = memo?.imageUrl ?? draft?.imageUrl;
     _pickedImagePath = draft?.pickedImagePath;
-    if (_type == BookMemoItemType.photo) _contentController.clearHighlights();
+    if (_type == BookNoteMemoType.photo) _contentController.clearHighlights();
   }
 
   @override
@@ -309,7 +313,7 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isPhoto = _type == BookMemoItemType.photo;
+    final isPhoto = _type == BookNoteMemoType.photo;
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
@@ -318,7 +322,7 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
           icon: const Icon(PhosphorIconsRegular.x),
         ),
         title: Text(
-          widget.initialItem == null ? '메모 작성' : '메모 수정',
+          widget.initialMemo == null ? '메모 작성' : '메모 수정',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
         backgroundColor: AppColors.pageBackground,
@@ -345,20 +349,20 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
           _TypeSelector(
             selectedType: _type,
             lockToSelectedType:
-                widget.initialItem?.type == BookMemoItemType.photo,
+                widget.initialMemo?.type == BookNoteMemoType.photo,
             onSelected: (type) {
               setState(() {
                 _type = type;
                 _errorText = null;
-                if (type == BookMemoItemType.photo) {
+                if (type == BookNoteMemoType.photo) {
                   _contentController.clearHighlights();
                 }
               });
               // 신규 작성일 때만 사진 종류를 고르는 즉시 촬영 화면으로
               // 넘어간다 — 수정일 때 기존 사진을 보던 중 실수로 다시
               // 눌러도 카메라가 튀어나오지 않게 한다.
-              if (type == BookMemoItemType.photo &&
-                  widget.initialItem == null) {
+              if (type == BookNoteMemoType.photo &&
+                  widget.initialMemo == null) {
                 unawaited(_pickPhoto());
               }
             },
@@ -383,7 +387,7 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
                     ),
                     const SizedBox(height: 16),
                     TextField(
-                      key: const Key('book_memo_content_field'),
+                      key: const Key('book_note_memo_content_field'),
                       controller: _contentController,
                       focusNode: _contentFocusNode,
                       minLines: 5,
@@ -419,7 +423,7 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
           else
             Expanded(
               child: TextField(
-                key: const Key('book_memo_content_field'),
+                key: const Key('book_note_memo_content_field'),
                 controller: _contentController,
                 focusNode: _contentFocusNode,
                 autofocus: true,
@@ -459,7 +463,7 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
           AnimatedBuilder(
             animation: _contentController,
             builder: (context, _) {
-              final isPhoto = _type == BookMemoItemType.photo;
+              final isPhoto = _type == BookNoteMemoType.photo;
               final toggleEnabled =
                   isPhoto || !_contentController.isBlockedAtSelection;
               return _EditorToolbar(
@@ -481,7 +485,7 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
                         }
                       }
                     : null,
-                onExtract: _type == BookMemoItemType.quote ? _scanQuote : null,
+                onExtract: _type == BookNoteMemoType.quote ? _scanQuote : null,
                 onShowHelp: () => _showHighlightHelp(context),
               );
             },
@@ -521,7 +525,7 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
       setState(() => _errorText = '끝 쪽은 시작 쪽보다 작을 수 없습니다.');
       return;
     }
-    final isPhoto = _type == BookMemoItemType.photo;
+    final isPhoto = _type == BookNoteMemoType.photo;
     final plainText = _contentController.text.trim();
     if (!isPhoto && plainText.isEmpty) {
       setState(() => _errorText = '내용을 입력해 주세요.');
@@ -538,7 +542,7 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
     final content = isPhoto ? plainText : _contentController.toRaw().trim();
 
     Navigator.of(context).pop(
-      BookMemoItemDraft(
+      BookNoteMemoDraft(
         type: _type,
         startPage: startPage,
         endPage: endPage,
@@ -568,7 +572,7 @@ class _BookMemoItemEditorScreenState extends State<_BookMemoItemEditorScreen> {
           '• 강조를 켜고 작성하면 입력하는 내용이 강조됩니다.\n'
           '• 작성된 텍스트를 선택해서 강조하거나 해제할 수 있습니다.\n'
           '• 강조하며 쓰다가 강조 버튼을 다시 누르면 그 지점부터는 강조 없이 이어 쓸 수 있습니다.\n'
-          '• 사진은 사진 조각 전체가 강조됩니다.',
+          '• 사진은 사진 메모 전체가 강조됩니다.',
     );
   }
 }
@@ -812,8 +816,8 @@ class _TypeSelector extends StatelessWidget {
     this.lockToSelectedType = false,
   });
 
-  final BookMemoItemType selectedType;
-  final ValueChanged<BookMemoItemType> onSelected;
+  final BookNoteMemoType selectedType;
+  final ValueChanged<BookNoteMemoType> onSelected;
   final bool lockToSelectedType;
 
   @override
@@ -829,10 +833,10 @@ class _TypeSelector extends StatelessWidget {
         spacing: 8,
         runSpacing: 8,
         children: [
-          for (final type in BookMemoItemType.values)
+          for (final type in BookNoteMemoType.values)
             Builder(
               builder: (context) {
-                final style = _MemoTypeChoiceStyle.of(type);
+                final style = _NoteMemoTypeChoiceStyle.of(type);
                 final selected = selectedType == type;
                 final enabled = !lockToSelectedType || selected;
                 return Opacity(
@@ -935,8 +939,8 @@ class _EditorToolButton extends StatelessWidget {
   }
 }
 
-class _MemoTypeChoiceStyle {
-  const _MemoTypeChoiceStyle({
+class _NoteMemoTypeChoiceStyle {
+  const _NoteMemoTypeChoiceStyle({
     required this.icon,
     required this.foreground,
     required this.background,
@@ -946,23 +950,23 @@ class _MemoTypeChoiceStyle {
   final Color foreground;
   final Color background;
 
-  static _MemoTypeChoiceStyle of(BookMemoItemType type) => switch (type) {
-    BookMemoItemType.summary => const _MemoTypeChoiceStyle(
+  static _NoteMemoTypeChoiceStyle of(BookNoteMemoType type) => switch (type) {
+    BookNoteMemoType.summary => const _NoteMemoTypeChoiceStyle(
       icon: PhosphorIconsRegular.notePencil,
       foreground: AppColors.memoSummaryForeground,
       background: AppColors.memoSummarySurface,
     ),
-    BookMemoItemType.quote => const _MemoTypeChoiceStyle(
+    BookNoteMemoType.quote => const _NoteMemoTypeChoiceStyle(
       icon: PhosphorIconsRegular.quotes,
       foreground: AppColors.memoQuoteForeground,
       background: AppColors.memoQuoteSurface,
     ),
-    BookMemoItemType.thought => const _MemoTypeChoiceStyle(
+    BookNoteMemoType.thought => const _NoteMemoTypeChoiceStyle(
       icon: PhosphorIconsRegular.lightbulb,
       foreground: AppColors.memoThoughtForeground,
       background: AppColors.memoThoughtSurface,
     ),
-    BookMemoItemType.photo => const _MemoTypeChoiceStyle(
+    BookNoteMemoType.photo => const _NoteMemoTypeChoiceStyle(
       icon: PhosphorIconsRegular.imageSquare,
       foreground: AppColors.memoPhotoForeground,
       background: AppColors.memoPhotoSurface,

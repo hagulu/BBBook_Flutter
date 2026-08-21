@@ -4,8 +4,8 @@ import 'dart:ui' as ui;
 
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
-class BookMemoOcrWord {
-  const BookMemoOcrWord({
+class BookNoteMemoOcrWord {
+  const BookNoteMemoOcrWord({
     required this.text,
     required this.boundingBox,
     required this.lineOrder,
@@ -18,18 +18,18 @@ class BookMemoOcrWord {
   final int wordOrder;
 }
 
-class BookMemoOcrAnalysis {
-  const BookMemoOcrAnalysis({required this.imageSize, required this.words});
+class BookNoteMemoOcrAnalysis {
+  const BookNoteMemoOcrAnalysis({required this.imageSize, required this.words});
 
   final ui.Size imageSize;
-  final List<BookMemoOcrWord> words;
+  final List<BookNoteMemoOcrWord> words;
 }
 
 /// 촬영한 책 페이지를 한국어로 인식하고 단어별 이미지 좌표를 반환한다.
-class BookMemoOcrService {
-  const BookMemoOcrService();
+class BookNoteMemoOcrService {
+  const BookNoteMemoOcrService();
 
-  Future<BookMemoOcrAnalysis> analyzeImage(String imagePath) async {
+  Future<BookNoteMemoOcrAnalysis> analyzeImage(String imagePath) async {
     final stopwatch = Stopwatch()..start();
     final recognizer = TextRecognizer(script: TextRecognitionScript.korean);
     try {
@@ -37,7 +37,7 @@ class BookMemoOcrService {
       final recognized = await recognizer.processImage(
         InputImage.fromFilePath(imagePath),
       );
-      final words = <BookMemoOcrWord>[];
+      final words = <BookNoteMemoOcrWord>[];
       var lineOrder = 0;
       for (final block in recognized.blocks) {
         for (final line in block.lines) {
@@ -50,7 +50,7 @@ class BookMemoOcrService {
             final text = element.text.trim();
             if (text.isEmpty) continue;
             words.add(
-              BookMemoOcrWord(
+              BookNoteMemoOcrWord(
                 text: text,
                 boundingBox: element.boundingBox,
                 lineOrder: lineOrder,
@@ -66,7 +66,7 @@ class BookMemoOcrService {
         'result=SUCCESS wordCount=${words.length} '
         'durationMs=${stopwatch.elapsedMilliseconds}',
       );
-      return BookMemoOcrAnalysis(imageSize: imageSize, words: words);
+      return BookNoteMemoOcrAnalysis(imageSize: imageSize, words: words);
     } catch (error, stackTrace) {
       developer.log(
         '[메모 발췌 OCR] target=ml_kit script=korean '

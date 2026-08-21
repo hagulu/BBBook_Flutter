@@ -5,7 +5,7 @@ import '../../../../shared/widgets/app_snackbar.dart';
 import '../../providers/book_reflection_providers.dart';
 
 /// 독후감 탭 Pull to Refresh(동기화: 최초엔 전체, 이후엔 증분). 실패 시
-/// SnackBar로 안내한다. `BookMemoRefreshIndicator`와 같은 패턴.
+/// SnackBar로 안내한다. `BookNoteRefreshIndicator`와 같은 패턴.
 class BookReflectionRefreshIndicator extends ConsumerWidget {
   const BookReflectionRefreshIndicator({super.key, required this.child});
 

@@ -1,8 +1,8 @@
-# 메모 조각 강조(하이라이트) 토글 정책
+# 메모 강조(하이라이트) 토글 정책
 
-텍스트 메모 조각 본문 편집기에서 강조 버튼이 어떻게 동작해야 하는지에 대한
+텍스트 메모 본문 편집기에서 강조 버튼이 어떻게 동작해야 하는지에 대한
 정책 문서. 모바일 `MemoHighlightController`
-(`lib/features/book_memo/screens/widgets/highlight_text_field.dart`)의 구현
+(`lib/features/book_note/screens/widgets/highlight_text_field.dart`)의 구현
 기준이며, 다른 화면/플랫폼에 같은 편집기를 다시 구현할 때 참고한다.
 
 ## 저장 형식

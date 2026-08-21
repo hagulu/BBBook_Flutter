@@ -35,7 +35,7 @@ class BookshelfDatabase {
     final path = join(dbPath, 'bookshelf.db');
     return openDatabase(
       path,
-      version: 9,
+      version: 10,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -105,7 +105,8 @@ class BookshelfDatabase {
           // v7에서 v8로 올라오는 경우에만 실제로 컬럼을 추가한다(건너뛰기
           // 업그레이드는 어차피 그 블록에서 테이블이 빈 채로 새로 만들어져
           // 백필할 대상 자체가 없다).
-          if (!await _hasColumn(db, 'book_memo', 'server_id')) {
+          if (await _hasTable(db, 'book_memo') &&
+              !await _hasColumn(db, 'book_memo', 'server_id')) {
             await db.execute(
               'ALTER TABLE book_memo ADD COLUMN server_id INTEGER',
             );
@@ -149,7 +150,8 @@ class BookshelfDatabase {
               'WHERE user_book_id > 0',
             );
           }
-          if (!await _hasColumn(db, 'book_memo_item', 'client_request_id')) {
+          if (await _hasTable(db, 'book_memo_item') &&
+              !await _hasColumn(db, 'book_memo_item', 'client_request_id')) {
             await db.execute(
               'ALTER TABLE book_memo_item '
               'ADD COLUMN client_request_id TEXT',
@@ -160,6 +162,11 @@ class BookshelfDatabase {
             'ON user_book(server_id) WHERE server_id IS NOT NULL',
           );
         }
+        // v10: 백엔드가 메모(Memo/MemoItem) 도메인을 노트(Note/NoteMemo)로
+        // 개편해 클라이언트도 같은 명칭(`book_note`/`book_note_memo`)으로
+        // 맞춘다. 이 앱은 아직 배포 전이라 기존 로컬 데이터 보존이 필요
+        // 없어(재설치로 대응) 별도 업그레이드 블록을 두지 않는다 — 새
+        // 스키마는 `onCreate`/`_createRecordTables`에만 반영한다.
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -238,6 +245,14 @@ class BookshelfDatabase {
     return rows.any((row) => row['name'] == column);
   }
 
+  static Future<bool> _hasTable(Database db, String table) async {
+    final rows = await db.rawQuery(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+      [table],
+    );
+    return rows.isNotEmpty;
+  }
+
   /// `sort_order`는 서버 응답 배열의 위치를 그대로 저장한다(API가 `sort_order`
   /// 값 자체는 내려주지 않고 이미 정렬된 배열만 반환하므로).
   static Future<void> _createBookCategoryTable(Database db) async {
@@ -274,22 +289,22 @@ class BookshelfDatabase {
   /// 전체 기록 조회(`/api/me/records`) 결과를 저장하는 로컬 테이블.
   ///
   /// `owner_user_id`는 API 응답 필드가 아닌 로컬 계정 격리용 값이다. 서버에서
-  /// 받은 행은 서버 PK(`id`)와 관계 키(`user_book_id`, `memo_id`)를 원형
+  /// 받은 행은 서버 PK(`id`)와 관계 키(`user_book_id`, `note_id`)를 원형
   /// 그대로 유지한다. 현재 전체 조회 응답에 없는 서버 삭제/수정 시각 컬럼은
   /// 향후 증분 동기화를 위해 nullable로 준비한다.
   ///
-  /// `book_memo`/`book_memo_item`의 `server_id`는 `id`와 별도의 컬럼이다.
-  /// 메모/조각은 오프라인에서 즉시 로컬 음수 ID로 생성될 수 있는데(
-  /// `BookMemoDao._nextLocalId`), 그 상태의 `id`는 서버에 아직 존재하지
+  /// `book_note`/`book_note_memo`의 `server_id`는 `id`와 별도의 컬럼이다.
+  /// 노트/메모는 오프라인에서 즉시 로컬 음수 ID로 생성될 수 있는데(
+  /// `BookNoteDao._nextLocalId`), 그 상태의 `id`는 서버에 아직 존재하지
   /// 않는다. push가 성공하면 서버가 내려준 진짜 ID를 `server_id`에 채우고
   /// `id`는 그대로 둔다 — `id`를 서버 값으로 바꿔치기하면
-  /// `book_memo_item.memo_id`(ON DELETE CASCADE, ON UPDATE 없음) FK가
-  /// 깨지고, 상세 화면이 들고 있는 memoId 캐시도 함께 무효화된다. PATCH/DELETE
+  /// `book_note_memo.note_id`(ON DELETE CASCADE, ON UPDATE 없음) FK가
+  /// 깨지고, 상세 화면이 들고 있는 noteId 캐시도 함께 무효화된다. PATCH/DELETE
   /// 등 서버 호출은 항상 `server_id`를 쓰고, `server_id IS NULL`이면 "아직
   /// 서버에 한 번도 반영되지 못한 로컬 전용 행"이라는 뜻이다.
   static Future<void> _createRecordTables(Database db) async {
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS book_memo (
+      CREATE TABLE IF NOT EXISTS book_note (
         id INTEGER PRIMARY KEY,
         server_id INTEGER,
         owner_user_id INTEGER NOT NULL,
@@ -302,16 +317,16 @@ class BookshelfDatabase {
       )
     ''');
     await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_book_memo_owner_user_book '
-      'ON book_memo(owner_user_id, user_book_id)',
+      'CREATE INDEX IF NOT EXISTS idx_book_note_owner_user_book '
+      'ON book_note(owner_user_id, user_book_id)',
     );
     await db.execute('''
-      CREATE TABLE IF NOT EXISTS book_memo_item (
+      CREATE TABLE IF NOT EXISTS book_note_memo (
         id INTEGER PRIMARY KEY,
         server_id INTEGER,
         client_request_id TEXT,
-        memo_id INTEGER NOT NULL,
-        item_type TEXT NOT NULL,
+        note_id INTEGER NOT NULL,
+        memo_type TEXT NOT NULL,
         start_page INTEGER,
         end_page INTEGER,
         content TEXT,
@@ -322,12 +337,12 @@ class BookshelfDatabase {
         created_at TEXT NOT NULL,
         updated_at TEXT,
         is_dirty INTEGER NOT NULL DEFAULT 0,
-        FOREIGN KEY (memo_id) REFERENCES book_memo(id) ON DELETE CASCADE
+        FOREIGN KEY (note_id) REFERENCES book_note(id) ON DELETE CASCADE
       )
     ''');
     await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_book_memo_item_memo_sort '
-      'ON book_memo_item(memo_id, sort_order)',
+      'CREATE INDEX IF NOT EXISTS idx_book_note_memo_note_sort '
+      'ON book_note_memo(note_id, sort_order)',
     );
     await db.execute('''
       CREATE TABLE IF NOT EXISTS book_reflection (
@@ -359,8 +374,8 @@ class BookshelfDatabase {
     sessionGeneration++;
     final db = await instance();
     await db.transaction((txn) async {
-      await txn.delete('book_memo_item');
-      await txn.delete('book_memo');
+      await txn.delete('book_note_memo');
+      await txn.delete('book_note');
       await txn.delete('book_reflection');
       await txn.delete('user_book_tag');
       await txn.delete('dismissed_isbn_link');

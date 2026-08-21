@@ -6,10 +6,10 @@ import 'book_reflection_dao.dart';
 
 /// 독후감 화면의 source of truth.
 ///
-/// 화면은 항상 이 Repository를 통해 로컬 DB만 읽는다([BookMemoRepository]와
+/// 화면은 항상 이 Repository를 통해 로컬 DB만 읽는다([BookNoteRepository]와
 /// 같은 원칙). 아직 로컬 생성/수정/삭제(편집기) 기능이 없어 dirty push
 /// 경로는 없고, [sync]는 서버 조회 결과를 로컬에 반영하는 읽기 전용
-/// 동기화만 수행한다 — 편집기를 붙일 때 [BookMemoRepository]의 dirty push
+/// 동기화만 수행한다 — 편집기를 붙일 때 [BookNoteRepository]의 dirty push
 /// 패턴을 그대로 이식하면 된다.
 class BookReflectionRepository {
   BookReflectionRepository({
@@ -49,7 +49,7 @@ class BookReflectionRepository {
       _dao.getLastSyncedAtReflection();
 
   /// since가 없으면 전체 동기화, 있으면 증분 동기화 → 증분 응답이
-  /// fullSyncRequired면 전체 동기화로 대체. [BookMemoRepository.sync]와
+  /// fullSyncRequired면 전체 동기화로 대체. [BookNoteRepository.sync]와
   /// 같은 구조(단, dirty push 단계가 없다).
   ///
   /// 반환값은 실제로 로컬 DB가 바뀌었는지 여부.

@@ -11,39 +11,39 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
 import '../../../shared/widgets/app_snackbar.dart';
-import '../models/book_memo.dart';
-import '../providers/book_memo_providers.dart';
+import '../models/book_note.dart';
+import '../providers/book_note_providers.dart';
 import '../utils/memo_highlight.dart';
-import 'widgets/book_memo_item_sheet.dart';
-import 'widgets/book_memo_refresh_indicator.dart';
+import 'widgets/book_note_memo_sheet.dart';
+import 'widgets/book_note_refresh_indicator.dart';
 
-class BookMemoDetailScreen extends ConsumerStatefulWidget {
-  const BookMemoDetailScreen({
+class BookNoteDetailScreen extends ConsumerStatefulWidget {
+  const BookNoteDetailScreen({
     super.key,
     required this.ownerUserId,
     required this.userBookId,
     required this.bookTitle,
-    this.memoId,
+    this.noteId,
   });
 
   final int ownerUserId;
   final int userBookId;
   final String bookTitle;
-  final int? memoId;
+  final int? noteId;
 
   @override
-  ConsumerState<BookMemoDetailScreen> createState() =>
-      _BookMemoDetailScreenState();
+  ConsumerState<BookNoteDetailScreen> createState() =>
+      _BookNoteDetailScreenState();
 }
 
-class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
+class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
   late final TextEditingController _titleController;
   late final FocusNode _titleFocusNode;
   late final ScrollController _scrollController;
-  late final BookMemoDetailArgs _args;
+  late final BookNoteDetailArgs _args;
   bool _titleInitialized = false;
   bool _importantOnly = false;
-  bool _isSavingItem = false;
+  bool _isSavingMemo = false;
   bool _allowPop = false;
   bool _isClosing = false;
   bool _scrolledToInitialPosition = false;
@@ -52,15 +52,15 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _args = BookMemoDetailArgs(
+    _args = BookNoteDetailArgs(
       ownerUserId: widget.ownerUserId,
       userBookId: widget.userBookId,
-      memoId: widget.memoId,
+      noteId: widget.noteId,
     );
     _titleController = TextEditingController();
     _titleFocusNode = FocusNode()..addListener(_onTitleFocusChanged);
     _scrollController = ScrollController();
-    if (widget.memoId == null) _titleInitialized = true;
+    if (widget.noteId == null) _titleInitialized = true;
   }
 
   @override
@@ -74,10 +74,10 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final asyncDetail = ref.watch(bookMemoDetailProvider(_args));
+    final asyncDetail = ref.watch(bookNoteDetailProvider(_args));
     final detail = asyncDetail.valueOrNull;
-    if (detail?.memo != null) {
-      final syncedTitle = detail!.memo!.title ?? '';
+    if (detail?.note != null) {
+      final syncedTitle = detail!.note!.title ?? '';
       if (!_titleInitialized ||
           (!_titleFocusNode.hasFocus && _titleController.text != syncedTitle)) {
         _titleController.text = syncedTitle;
@@ -102,12 +102,12 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
           elevation: 0,
           actions: [
             if (switch (asyncDetail) {
-              AsyncData(:final value) => value.memo != null,
+              AsyncData(:final value) => value.note != null,
               _ => false,
             })
               IconButton(
-                onPressed: _isSavingItem ? null : _deleteMemo,
-                tooltip: '메모 삭제',
+                onPressed: _isSavingMemo ? null : _deleteNote,
+                tooltip: '노트 삭제',
                 icon: const Icon(PhosphorIconsRegular.trash),
               ),
           ],
@@ -116,17 +116,17 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
           children: [
             switch (asyncDetail) {
               AsyncData(:final value) =>
-                widget.memoId != null && value.memo == null
-                    ? const _MemoNotFound()
+                widget.noteId != null && value.note == null
+                    ? const _NoteNotFound()
                     : _buildContent(value),
               AsyncError() => _LoadError(
-                onRetry: () => ref.invalidate(bookMemoDetailProvider(_args)),
+                onRetry: () => ref.invalidate(bookNoteDetailProvider(_args)),
               ),
               _ => const Center(child: CircularProgressIndicator()),
             },
             if (switch (asyncDetail) {
               AsyncData(:final value) =>
-                widget.memoId == null || value.memo != null,
+                widget.noteId == null || value.note != null,
               _ => false,
             })
               Positioned(
@@ -143,7 +143,7 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
                         ? AppColors.textStrong
                         : AppColors.textMuted,
                   ),
-                  label: const Text('강조 조각만'),
+                  label: const Text('강조 메모만'),
                   selectedColor: AppColors.highlightGoldSurface,
                   backgroundColor: AppColors.surface,
                   side: const BorderSide(color: AppColors.border),
@@ -159,16 +159,16 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
         ),
         floatingActionButton: switch (asyncDetail) {
           AsyncData(:final value)
-              when widget.memoId == null || value.memo != null =>
+              when widget.noteId == null || value.note != null =>
             FloatingActionButton(
-              onPressed: _isSavingItem ? null : _addItem,
-              tooltip: '메모 조각 빠르게 추가',
+              onPressed: _isSavingMemo ? null : _addMemo,
+              tooltip: '메모 빠르게 추가',
               shape: const CircleBorder(),
-              backgroundColor: _isSavingItem
+              backgroundColor: _isSavingMemo
                   ? AppColors.surfaceSubtle
                   : AppColors.accentFill,
               foregroundColor: AppColors.textStrong,
-              child: _isSavingItem
+              child: _isSavingMemo
                   ? const SizedBox.square(
                       dimension: 20,
                       child: CircularProgressIndicator(
@@ -184,12 +184,12 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     );
   }
 
-  Widget _buildContent(BookMemoDetail detail) {
+  Widget _buildContent(BookNoteDetail detail) {
     _scheduleInitialScrollToBottom();
-    final visibleItems = _importantOnly
-        ? detail.items.where((item) => item.isImportant).toList(growable: false)
-        : detail.items;
-    return BookMemoRefreshIndicator(
+    final visibleMemos = _importantOnly
+        ? detail.memos.where((memo) => memo.isImportant).toList(growable: false)
+        : detail.memos;
+    return BookNoteRefreshIndicator(
       child: CustomScrollView(
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
@@ -217,31 +217,31 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
               ],
             ),
           ),
-          if (visibleItems.isEmpty)
+          if (visibleMemos.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
-              child: _EmptyItems(importantOnly: _importantOnly),
+              child: _EmptyMemos(importantOnly: _importantOnly),
             )
           else
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
               sliver: SliverList.builder(
-                itemCount: visibleItems.length,
+                itemCount: visibleMemos.length,
                 itemBuilder: (context, index) {
-                  final item = visibleItems[index];
-                  return _MemoTimelineItem(
-                    item: item,
-                    showDivider: index < visibleItems.length - 1,
+                  final memo = visibleMemos[index];
+                  return _NoteMemoTimelineItem(
+                    memo: memo,
+                    showDivider: index < visibleMemos.length - 1,
                     onTap:
-                        item.type == BookMemoItemType.photo &&
-                            item.imageUrl != null
-                        ? () => _showPhotoItem(
-                            item,
-                            totalItemCount: detail.items.length,
+                        memo.type == BookNoteMemoType.photo &&
+                            memo.imageUrl != null
+                        ? () => _showPhotoMemo(
+                            memo,
+                            totalMemoCount: detail.memos.length,
                           )
-                        : () => _showItemActions(
-                            item,
-                            totalItemCount: detail.items.length,
+                        : () => _showMemoActions(
+                            memo,
+                            totalMemoCount: detail.memos.length,
                           ),
                   );
                 },
@@ -261,9 +261,9 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     });
   }
 
-  /// 새 조각은 목록 맨 아래(최신)에 추가되므로, 추가 직후 자연스럽게
-  /// 아래까지 스크롤해 방금 추가한 조각이 바로 보이게 한다.
-  void _scrollToNewestItem() {
+  /// 새 메모는 목록 맨 아래(최신)에 추가되므로, 추가 직후 자연스럽게
+  /// 아래까지 스크롤해 방금 추가한 메모가 바로 보이게 한다.
+  void _scrollToNewestMemo() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
       _scrollController.animateTo(
@@ -280,8 +280,8 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
 
   Future<void> _closeScreen() async {
     if (_isClosing) return;
-    if (_isSavingItem) {
-      AppSnackBar.info(context, '메모 조각을 저장하고 있습니다.');
+    if (_isSavingMemo) {
+      AppSnackBar.info(context, '메모를 저장하고 있습니다.');
       return;
     }
     _isClosing = true;
@@ -306,16 +306,16 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     required bool createWhenEmpty,
   }) async {
     if (!mounted) return false;
-    final currentMemo = ref
-        .read(bookMemoDetailProvider(_args))
+    final currentNote = ref
+        .read(bookNoteDetailProvider(_args))
         .valueOrNull
-        ?.memo;
-    if (title.isEmpty && currentMemo == null && !createWhenEmpty) {
+        ?.note;
+    if (title.isEmpty && currentNote == null && !createWhenEmpty) {
       return false;
     }
     try {
       await ref
-          .read(bookMemoDetailProvider(_args).notifier)
+          .read(bookNoteDetailProvider(_args).notifier)
           .saveTitle(title.isEmpty ? null : title);
       return true;
     } catch (_) {
@@ -323,82 +323,84 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     }
   }
 
-  Future<void> _addItem() async {
-    final draft = await showBookMemoQuickComposer(context);
+  Future<void> _addMemo() async {
+    final draft = await showBookNoteMemoQuickComposer(context);
     if (draft == null || !mounted) return;
     if (!await _saveTitle(createWhenEmpty: true)) {
-      if (mounted) AppSnackBar.error(context, '메모를 준비하지 못했습니다.');
+      if (mounted) AppSnackBar.error(context, '노트를 준비하지 못했습니다.');
       return;
     }
     if (!mounted) return;
-    await _saveItem(() {
-      return ref.read(bookMemoDetailProvider(_args).notifier).createItem(draft);
-    });
-    _scrollToNewestItem();
-  }
-
-  Future<void> _editItem(BookMemoItem item) async {
-    final draft = await showBookMemoItemEditor(context, initialItem: item);
-    if (draft == null || !mounted) return;
-    await _saveItem(() {
+    await _saveMemo(() {
       return ref
-          .read(bookMemoDetailProvider(_args).notifier)
-          .updateItem(item.id, draft);
+          .read(bookNoteDetailProvider(_args).notifier)
+          .createNoteMemo(draft);
+    });
+    _scrollToNewestMemo();
+  }
+
+  Future<void> _editMemo(BookNoteMemo memo) async {
+    final draft = await showBookNoteMemoEditor(context, initialMemo: memo);
+    if (draft == null || !mounted) return;
+    await _saveMemo(() {
+      return ref
+          .read(bookNoteDetailProvider(_args).notifier)
+          .updateNoteMemo(memo.id, draft);
     });
   }
 
-  Future<void> _showItemActions(
-    BookMemoItem item, {
-    required int totalItemCount,
+  Future<void> _showMemoActions(
+    BookNoteMemo memo, {
+    required int totalMemoCount,
   }) async {
-    if (_isSavingItem) {
-      AppSnackBar.info(context, '메모 조각을 저장하고 있습니다.');
+    if (_isSavingMemo) {
+      AppSnackBar.info(context, '메모를 저장하고 있습니다.');
       return;
     }
-    final action = await showModalBottomSheet<_MemoItemAction>(
+    final action = await showModalBottomSheet<_NoteMemoAction>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const _MemoItemActionSheet(),
+      builder: (context) => const _NoteMemoActionSheet(),
     );
     if (!mounted || action == null) return;
     switch (action) {
-      case _MemoItemAction.edit:
-        await _editItem(item);
-      case _MemoItemAction.copy:
-        await _copyItem(item);
-      case _MemoItemAction.delete:
-        await _deleteItem(item, totalItemCount: totalItemCount);
+      case _NoteMemoAction.edit:
+        await _editMemo(memo);
+      case _NoteMemoAction.copy:
+        await _copyMemo(memo);
+      case _NoteMemoAction.delete:
+        await _deleteMemo(memo, totalMemoCount: totalMemoCount);
     }
   }
 
-  Future<void> _showPhotoItem(
-    BookMemoItem item, {
-    required int totalItemCount,
+  Future<void> _showPhotoMemo(
+    BookNoteMemo memo, {
+    required int totalMemoCount,
   }) async {
-    if (_isSavingItem) {
-      AppSnackBar.info(context, '메모 조각을 저장하고 있습니다.');
+    if (_isSavingMemo) {
+      AppSnackBar.info(context, '메모를 저장하고 있습니다.');
       return;
     }
-    final action = await showDialog<_PhotoItemAction>(
+    final action = await showDialog<_PhotoMemoAction>(
       context: context,
       useSafeArea: false,
-      builder: (context) => _PhotoItemViewer(imageUrl: item.imageUrl!),
+      builder: (context) => _PhotoMemoViewer(imageUrl: memo.imageUrl!),
     );
     if (!mounted || action == null) return;
     switch (action) {
-      case _PhotoItemAction.edit:
-        await _editItem(item);
-      case _PhotoItemAction.delete:
-        await _deleteItem(item, totalItemCount: totalItemCount);
+      case _PhotoMemoAction.edit:
+        await _editMemo(memo);
+      case _PhotoMemoAction.delete:
+        await _deleteMemo(memo, totalMemoCount: totalMemoCount);
     }
   }
 
-  Future<void> _copyItem(BookMemoItem item) async {
+  Future<void> _copyMemo(BookNoteMemo memo) async {
     // 화면(_MemoRichText)은 앞뒤 공백·줄바꿈을 그대로 표시하므로, 복사
     // 가능 여부 판단에만 trim()을 쓰고 실제로 복사하는 값은 마크업만
     // 제거한 원문을 그대로 둔다.
-    final content = stripMemoHighlightMarkup(item.content);
+    final content = stripMemoHighlightMarkup(memo.content);
     if (content.trim().isEmpty) {
       AppSnackBar.info(context, '복사할 내용이 없습니다.');
       return;
@@ -406,22 +408,22 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
     try {
       await Clipboard.setData(ClipboardData(text: content));
       developer.log(
-        '[메모 조각 복사] itemId=${item.id} target=clipboard result=SUCCESS',
+        '[메모 복사] noteMemoId=${memo.id} target=clipboard result=SUCCESS',
       );
-      if (mounted) AppSnackBar.success(context, '메모 조각을 복사했습니다.');
+      if (mounted) AppSnackBar.success(context, '메모를 복사했습니다.');
     } catch (error, stackTrace) {
       developer.log(
-        '[메모 조각 복사] itemId=${item.id} target=clipboard '
+        '[메모 복사] noteMemoId=${memo.id} target=clipboard '
         'result=FAIL reason=clipboard_write_error',
         error: error,
         stackTrace: stackTrace,
       );
-      if (mounted) AppSnackBar.error(context, '메모 조각을 복사하지 못했습니다.');
+      if (mounted) AppSnackBar.error(context, '메모를 복사하지 못했습니다.');
     }
   }
 
-  Future<void> _saveItem(Future<void> Function() save) async {
-    setState(() => _isSavingItem = true);
+  Future<void> _saveMemo(Future<void> Function() save) async {
+    setState(() => _isSavingMemo = true);
     try {
       await save();
     } catch (error) {
@@ -432,81 +434,81 @@ class _BookMemoDetailScreenState extends ConsumerState<BookMemoDetailScreen> {
           ? error.message
           : null;
       if (mounted) {
-        AppSnackBar.error(context, reason ?? '메모 조각을 저장하지 못했습니다.');
+        AppSnackBar.error(context, reason ?? '메모를 저장하지 못했습니다.');
       }
     } finally {
-      if (mounted) setState(() => _isSavingItem = false);
+      if (mounted) setState(() => _isSavingMemo = false);
     }
   }
 
-  Future<void> _deleteItem(
-    BookMemoItem item, {
-    required int totalItemCount,
+  Future<void> _deleteMemo(
+    BookNoteMemo memo, {
+    required int totalMemoCount,
   }) async {
-    final isLast = totalItemCount == 1;
+    final isLast = totalMemoCount == 1;
     final confirmed = await AppConfirm.show(
       context,
-      title: '조각 삭제',
+      title: '메모 삭제',
       message: isLast
-          ? '마지막 조각을 삭제하면 이 메모도 함께 사라집니다. 삭제할까요?'
-          : '이 메모 조각을 삭제할까요?',
+          ? '마지막 메모를 삭제하면 이 노트도 함께 사라집니다. 삭제할까요?'
+          : '이 메모를 삭제할까요?',
       confirmText: '삭제',
       destructive: true,
     );
     if (!confirmed || !mounted) return;
     try {
-      final memoWasDeleted = await ref
-          .read(bookMemoDetailProvider(_args).notifier)
-          .deleteItem(item.id);
+      final noteWasDeleted = await ref
+          .read(bookNoteDetailProvider(_args).notifier)
+          .deleteNoteMemo(memo.id);
       if (!mounted) return;
-      if (memoWasDeleted) {
+      if (noteWasDeleted) {
         _isClosing = true;
         setState(() => _allowPop = true);
         await WidgetsBinding.instance.endOfFrame;
         if (mounted) Navigator.of(context).pop();
       } else {
-        AppSnackBar.success(context, '메모 조각을 삭제했습니다.');
+        AppSnackBar.success(context, '메모를 삭제했습니다.');
       }
     } catch (_) {
-      if (mounted) AppSnackBar.error(context, '메모 조각을 삭제하지 못했습니다.');
+      if (mounted) AppSnackBar.error(context, '메모를 삭제하지 못했습니다.');
     }
   }
 
-  Future<void> _deleteMemo() async {
-    if (_isSavingItem) {
-      AppSnackBar.info(context, '메모 조각을 저장하고 있습니다.');
+  Future<void> _deleteNote() async {
+    if (_isSavingMemo) {
+      AppSnackBar.info(context, '메모를 저장하고 있습니다.');
       return;
     }
     final confirmed = await AppConfirm.show(
       context,
-      title: '메모 삭제',
-      message: '이 메모와 모든 조각을 삭제할까요?',
+      title: '노트 삭제',
+      message: '이 노트와 모든 메모를 삭제할까요?',
       confirmText: '삭제',
       destructive: true,
     );
     if (!confirmed || !mounted) return;
-    setState(() => _isSavingItem = true);
+    setState(() => _isSavingMemo = true);
     try {
-      await ref.read(bookMemoDetailProvider(_args).notifier).deleteMemo();
+      await ref.read(bookNoteDetailProvider(_args).notifier).deleteNote();
       if (!mounted) return;
       _isClosing = true;
       setState(() => _allowPop = true);
       await WidgetsBinding.instance.endOfFrame;
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
-      if (mounted) AppSnackBar.error(context, '메모를 삭제하지 못했습니다.');
+      if (mounted) AppSnackBar.error(context, '노트를 삭제하지 못했습니다.');
     } finally {
-      if (mounted) setState(() => _isSavingItem = false);
+      if (mounted) setState(() => _isSavingMemo = false);
     }
   }
 }
 
-enum _MemoItemAction { edit, copy, delete }
+enum _NoteMemoAction { edit, copy, delete }
 
-enum _PhotoItemAction { edit, delete }
+enum _PhotoMemoAction { edit, delete }
 
-class _PhotoItemViewer extends StatelessWidget {
-  const _PhotoItemViewer({required this.imageUrl});
+class _PhotoMemoViewer extends StatelessWidget {
+  const _PhotoMemoViewer({required this.imageUrl});
 
   final String imageUrl;
 
@@ -561,7 +563,7 @@ class _PhotoItemViewer extends StatelessWidget {
                 children: [
                   TextButton.icon(
                     onPressed: () =>
-                        Navigator.of(context).pop(_PhotoItemAction.edit),
+                        Navigator.of(context).pop(_PhotoMemoAction.edit),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.surface,
                       minimumSize: const Size(96, 48),
@@ -572,7 +574,7 @@ class _PhotoItemViewer extends StatelessWidget {
                   const SizedBox(width: 20),
                   TextButton.icon(
                     onPressed: () =>
-                        Navigator.of(context).pop(_PhotoItemAction.delete),
+                        Navigator.of(context).pop(_PhotoMemoAction.delete),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.error,
                       minimumSize: const Size(96, 48),
@@ -590,33 +592,33 @@ class _PhotoItemViewer extends StatelessWidget {
   }
 }
 
-class _MemoItemActionSheet extends StatelessWidget {
-  const _MemoItemActionSheet();
+class _NoteMemoActionSheet extends StatelessWidget {
+  const _NoteMemoActionSheet();
 
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      title: '메모 조각',
+      title: '메모',
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _MemoItemActionTile(
+          _NoteMemoActionTile(
             icon: PhosphorIconsRegular.copy,
             label: '복사',
-            onTap: () => Navigator.of(context).pop(_MemoItemAction.copy),
+            onTap: () => Navigator.of(context).pop(_NoteMemoAction.copy),
           ),
           const SizedBox(height: 8),
-          _MemoItemActionTile(
+          _NoteMemoActionTile(
             icon: PhosphorIconsRegular.pencil,
             label: '수정',
-            onTap: () => Navigator.of(context).pop(_MemoItemAction.edit),
+            onTap: () => Navigator.of(context).pop(_NoteMemoAction.edit),
           ),
           const SizedBox(height: 8),
-          _MemoItemActionTile(
+          _NoteMemoActionTile(
             icon: PhosphorIconsRegular.trash,
             label: '삭제',
             destructive: true,
-            onTap: () => Navigator.of(context).pop(_MemoItemAction.delete),
+            onTap: () => Navigator.of(context).pop(_NoteMemoAction.delete),
           ),
         ],
       ),
@@ -624,8 +626,8 @@ class _MemoItemActionSheet extends StatelessWidget {
   }
 }
 
-class _MemoItemActionTile extends StatelessWidget {
-  const _MemoItemActionTile({
+class _NoteMemoActionTile extends StatelessWidget {
+  const _NoteMemoActionTile({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -668,20 +670,20 @@ class _MemoItemActionTile extends StatelessWidget {
   }
 }
 
-class _MemoTimelineItem extends StatelessWidget {
-  const _MemoTimelineItem({
-    required this.item,
+class _NoteMemoTimelineItem extends StatelessWidget {
+  const _NoteMemoTimelineItem({
+    required this.memo,
     required this.showDivider,
     required this.onTap,
   });
 
-  final BookMemoItem item;
+  final BookNoteMemo memo;
   final bool showDivider;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final typeStyle = _MemoTypeStyle.of(item.type);
+    final typeStyle = _NoteMemoTypeStyle.of(memo.type);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -690,7 +692,7 @@ class _MemoTimelineItem extends StatelessWidget {
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              if (item.type != BookMemoItemType.quote)
+              if (memo.type != BookNoteMemoType.quote)
                 Positioned(
                   left: 0,
                   top: 4,
@@ -730,7 +732,7 @@ class _MemoTimelineItem extends StatelessWidget {
                               const SizedBox(width: 5),
                               Flexible(
                                 child: Text(
-                                  item.type.label,
+                                  memo.type.label,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -740,7 +742,7 @@ class _MemoTimelineItem extends StatelessWidget {
                                   ),
                                 ),
                               ),
-                              if (item.isImportant) ...[
+                              if (memo.isImportant) ...[
                                 const SizedBox(width: 7),
                                 const Icon(
                                   PhosphorIconsRegular.highlighter,
@@ -748,11 +750,11 @@ class _MemoTimelineItem extends StatelessWidget {
                                   color: AppColors.highlightGold,
                                 ),
                               ],
-                              if (item.pageLabel != null) ...[
+                              if (memo.pageLabel != null) ...[
                                 const SizedBox(width: 16),
                                 Flexible(
                                   child: Text(
-                                    item.pageLabel!,
+                                    memo.pageLabel!,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -769,7 +771,7 @@ class _MemoTimelineItem extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.only(left: 8, right: 12),
                           child: Text(
-                            _formatDateTime(item.createdAt),
+                            _formatDateTime(memo.createdAt),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -787,18 +789,18 @@ class _MemoTimelineItem extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          if (item.type == BookMemoItemType.photo &&
-                              item.imageUrl != null)
-                            _PhotoContent(imageUrl: item.imageUrl!),
-                          if (item.content != null &&
-                              item.content!.isNotEmpty) ...[
-                            if (item.type == BookMemoItemType.photo &&
-                                item.imageUrl != null)
+                          if (memo.type == BookNoteMemoType.photo &&
+                              memo.imageUrl != null)
+                            _PhotoContent(imageUrl: memo.imageUrl!),
+                          if (memo.content != null &&
+                              memo.content!.isNotEmpty) ...[
+                            if (memo.type == BookNoteMemoType.photo &&
+                                memo.imageUrl != null)
                               const SizedBox(height: 10),
-                            if (item.type == BookMemoItemType.quote)
-                              _QuoteContent(item.content!)
+                            if (memo.type == BookNoteMemoType.quote)
+                              _QuoteContent(memo.content!)
                             else
-                              _MemoRichText(item.content!, italic: false),
+                              _MemoRichText(memo.content!, italic: false),
                           ],
                         ],
                       ),
@@ -847,8 +849,8 @@ class _MemoTimelineItem extends StatelessWidget {
   }
 }
 
-class _MemoTypeStyle {
-  const _MemoTypeStyle({
+class _NoteMemoTypeStyle {
+  const _NoteMemoTypeStyle({
     required this.icon,
     required this.foreground,
     required this.background,
@@ -860,23 +862,23 @@ class _MemoTypeStyle {
 
   Color get sidebar => Color.lerp(background, foreground, 0.32)!;
 
-  static _MemoTypeStyle of(BookMemoItemType type) => switch (type) {
-    BookMemoItemType.summary => const _MemoTypeStyle(
+  static _NoteMemoTypeStyle of(BookNoteMemoType type) => switch (type) {
+    BookNoteMemoType.summary => const _NoteMemoTypeStyle(
       icon: PhosphorIconsRegular.notePencil,
       foreground: AppColors.memoSummaryForeground,
       background: AppColors.memoSummarySurface,
     ),
-    BookMemoItemType.quote => const _MemoTypeStyle(
+    BookNoteMemoType.quote => const _NoteMemoTypeStyle(
       icon: PhosphorIconsRegular.quotes,
       foreground: AppColors.memoQuoteForeground,
       background: AppColors.memoQuoteSurface,
     ),
-    BookMemoItemType.thought => const _MemoTypeStyle(
+    BookNoteMemoType.thought => const _NoteMemoTypeStyle(
       icon: PhosphorIconsRegular.lightbulb,
       foreground: AppColors.memoThoughtForeground,
       background: AppColors.memoThoughtSurface,
     ),
-    BookMemoItemType.photo => const _MemoTypeStyle(
+    BookNoteMemoType.photo => const _NoteMemoTypeStyle(
       icon: PhosphorIconsRegular.imageSquare,
       foreground: AppColors.memoPhotoForeground,
       background: AppColors.memoPhotoSurface,
@@ -1013,8 +1015,8 @@ class _BrokenImage extends StatelessWidget {
   }
 }
 
-class _EmptyItems extends StatelessWidget {
-  const _EmptyItems({required this.importantOnly});
+class _EmptyMemos extends StatelessWidget {
+  const _EmptyMemos({required this.importantOnly});
 
   final bool importantOnly;
 
@@ -1035,7 +1037,7 @@ class _EmptyItems extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              importantOnly ? '강조 조각이 없습니다.' : '아직 조각이 없습니다.',
+              importantOnly ? '강조 메모가 없습니다.' : '아직 메모가 없습니다.',
               style: const TextStyle(
                 color: AppColors.textStrong,
                 fontWeight: FontWeight.bold,
@@ -1057,14 +1059,14 @@ class _EmptyItems extends StatelessWidget {
   }
 }
 
-class _MemoNotFound extends StatelessWidget {
-  const _MemoNotFound();
+class _NoteNotFound extends StatelessWidget {
+  const _NoteNotFound();
 
   @override
   Widget build(BuildContext context) {
     return const Center(
       child: Text(
-        '메모를 찾을 수 없습니다.',
+        '노트를 찾을 수 없습니다.',
         style: TextStyle(color: AppColors.textMuted),
       ),
     );
@@ -1083,7 +1085,7 @@ class _LoadError extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            '메모를 불러오지 못했습니다.',
+            '노트를 불러오지 못했습니다.',
             style: TextStyle(color: AppColors.textMuted),
           ),
           const SizedBox(height: 8),

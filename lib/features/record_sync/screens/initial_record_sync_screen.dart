@@ -84,7 +84,7 @@ class _InitialRecordSyncScreen extends StatelessWidget {
                   Text(
                     failed
                         ? '네트워크 상태를 확인한 뒤 다시 시도해 주세요.'
-                        : '저장된 메모와 독후감을 안전하게 정리하고 있어요.\n잠시만 기다려 주세요.',
+                        : '저장된 노트와 독후감을 안전하게 정리하고 있어요.\n잠시만 기다려 주세요.',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: AppColors.textMuted,

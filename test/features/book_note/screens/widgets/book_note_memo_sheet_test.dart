@@ -1,5 +1,5 @@
-import 'package:bbbook/features/book_memo/screens/widgets/book_memo_item_sheet.dart';
-import 'package:bbbook/features/book_memo/screens/widgets/highlight_text_field.dart';
+import 'package:bbbook/features/book_note/screens/widgets/book_note_memo_sheet.dart';
+import 'package:bbbook/features/book_note/screens/widgets/highlight_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,7 +11,7 @@ void main() {
           builder: (context) => Scaffold(
             body: Center(
               child: TextButton(
-                onPressed: () => showBookMemoItemEditor(context),
+                onPressed: () => showBookNoteMemoEditor(context),
                 child: const Text('open'),
               ),
             ),
@@ -23,7 +23,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    final contentField = find.byKey(const Key('book_memo_content_field'));
+    final contentField = find.byKey(const Key('book_note_memo_content_field'));
     expect(contentField, findsOneWidget);
     await tester.enterText(contentField, 'hello world');
     await tester.pump();

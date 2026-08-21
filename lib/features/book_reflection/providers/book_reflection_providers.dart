@@ -32,7 +32,7 @@ final bookReflectionRepositoryProvider = Provider<BookReflectionRepository>((
 
 /// 동기화로 로컬 DB가 실제로 바뀌었을 때만 값을 올려 독후감 목록/상세
 /// Provider를 무효화한다(변경 없는 증분 동기화는 재조회를 생략) —
-/// `bookMemoSyncVersionProvider`와 같은 역할.
+/// `bookNoteSyncVersionProvider`와 같은 역할.
 final bookReflectionSyncVersionProvider = StateProvider<int>((ref) => 0);
 
 /// 독후감 동기화 실행/상태 관리(최초엔 전체 동기화, 이후엔 증분 동기화).

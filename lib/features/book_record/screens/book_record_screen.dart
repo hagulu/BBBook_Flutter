@@ -7,7 +7,7 @@ import '../../../core/utils/author_display.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
-import '../../book_memo/screens/book_memo_list.dart';
+import '../../book_note/screens/book_note_list.dart';
 import '../../book_reflection/screens/book_reflection_list.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/models/book_status.dart';
@@ -141,7 +141,7 @@ class _BookRecordBody extends ConsumerWidget {
               child: TabBar(
                 tabs: const [
                   Tab(text: '정보'),
-                  Tab(text: '메모'),
+                  Tab(text: '노트'),
                   Tab(text: '독후감'),
                 ],
                 labelColor: AppColors.textStrong,
@@ -295,7 +295,7 @@ class _BookRecordBody extends ConsumerWidget {
                 ),
               ],
             ),
-            BookMemoList(userBookId: userBookId, bookTitle: book.title),
+            BookNoteList(userBookId: userBookId, bookTitle: book.title),
             BookReflectionList(userBookId: userBookId, bookTitle: book.title),
           ],
         ),

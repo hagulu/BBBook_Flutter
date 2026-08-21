@@ -7,7 +7,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_alert.dart';
 import '../../../../shared/widgets/app_loading.dart';
-import '../../services/book_memo_ocr_service.dart';
+import '../../services/book_note_memo_ocr_service.dart';
 import '../memo_ocr_camera_screen.dart';
 
 /// 카메라 촬영부터 단어 드래그 선택까지 진행하고 발췌문을 반환한다.
@@ -25,10 +25,10 @@ Future<String?> captureMemoQuoteWithOcr(BuildContext context) async {
   }
 
   try {
-    BookMemoOcrAnalysis? analysis;
+    BookNoteMemoOcrAnalysis? analysis;
     AppLoading.show(context);
     try {
-      analysis = await const BookMemoOcrService().analyzeImage(capturedPath);
+      analysis = await const BookNoteMemoOcrService().analyzeImage(capturedPath);
     } catch (_) {
       analysis = null;
     } finally {
@@ -83,7 +83,7 @@ class _MemoOcrSelectionScreen extends StatefulWidget {
   });
 
   final String imagePath;
-  final BookMemoOcrAnalysis analysis;
+  final BookNoteMemoOcrAnalysis analysis;
 
   @override
   State<_MemoOcrSelectionScreen> createState() =>
@@ -270,10 +270,10 @@ class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
 
   String _selectedText() {
     final selected = _selectedIndexes.toList()..sort();
-    final lines = <int, List<BookMemoOcrWord>>{};
+    final lines = <int, List<BookNoteMemoOcrWord>>{};
     for (final index in selected) {
       final word = widget.analysis.words[index];
-      lines.putIfAbsent(word.lineOrder, () => <BookMemoOcrWord>[]).add(word);
+      lines.putIfAbsent(word.lineOrder, () => <BookNoteMemoOcrWord>[]).add(word);
     }
     final orderedLines = lines.entries.toList()
       ..sort((left, right) => left.key.compareTo(right.key));
@@ -297,7 +297,7 @@ class _OcrPhotoCanvas extends StatefulWidget {
   });
 
   final String imagePath;
-  final BookMemoOcrAnalysis analysis;
+  final BookNoteMemoOcrAnalysis analysis;
   final Set<int> selectedIndexes;
   final ValueChanged<Set<int>> onSelectionChanged;
 
@@ -488,7 +488,7 @@ class _OcrWordSelectionPainter extends CustomPainter {
     required this.fitScale,
   });
 
-  final List<BookMemoOcrWord> words;
+  final List<BookNoteMemoOcrWord> words;
   final Set<int> selectedIndexes;
   final double fitScale;
 

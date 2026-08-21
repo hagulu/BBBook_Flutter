@@ -1,4 +1,4 @@
-import 'package:bbbook/features/book_memo/utils/memo_highlight.dart';
+import 'package:bbbook/features/book_note/utils/memo_highlight.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,24 +1,24 @@
-enum BookMemoItemType {
+enum BookNoteMemoType {
   summary('SUMMARY', '요약'),
   quote('QUOTE', '발췌'),
   thought('THOUGHT', '생각'),
   photo('PHOTO', '사진');
 
-  const BookMemoItemType(this.dbValue, this.label);
+  const BookNoteMemoType(this.dbValue, this.label);
 
   final String dbValue;
   final String label;
 
-  static BookMemoItemType fromDb(String value) {
-    return BookMemoItemType.values.firstWhere(
+  static BookNoteMemoType fromDb(String value) {
+    return BookNoteMemoType.values.firstWhere(
       (type) => type.dbValue == value,
-      orElse: () => throw FormatException('Unknown memo item type: $value'),
+      orElse: () => throw FormatException('Unknown note memo type: $value'),
     );
   }
 }
 
-class BookMemo {
-  const BookMemo({
+class BookNote {
+  const BookNote({
     required this.id,
     required this.serverId,
     required this.userBookId,
@@ -31,7 +31,7 @@ class BookMemo {
 
   final int id;
 
-  /// 서버에 반영된 뒤 서버가 내려준 실제 메모 ID. null이면 아직 서버에 한
+  /// 서버에 반영된 뒤 서버가 내려준 실제 노트 ID. null이면 아직 서버에 한
   /// 번도 반영되지 못한 로컬 전용 행이라는 뜻이다(`id`는 오프라인 임시
   /// 음수값). PATCH/DELETE 등 서버 호출은 반드시 이 값을 써야 한다.
   /// `id`와 다른 별도 컬럼인 이유는 `BookshelfDatabase._createRecordTables`
@@ -45,12 +45,12 @@ class BookMemo {
   final bool isDirty;
 }
 
-class BookMemoItem {
-  const BookMemoItem({
+class BookNoteMemo {
+  const BookNoteMemo({
     required this.id,
     required this.serverId,
     required this.clientRequestId,
-    required this.memoId,
+    required this.noteId,
     required this.type,
     required this.startPage,
     required this.endPage,
@@ -66,15 +66,15 @@ class BookMemoItem {
 
   final int id;
 
-  /// 서버 조각 ID. null이면 아직 서버에 반영되지 못한 로컬 전용 조각이다.
-  /// [BookMemo.serverId] 참고.
+  /// 서버 메모 ID. null이면 아직 서버에 반영되지 못한 로컬 전용 메모다.
+  /// [BookNote.serverId] 참고.
   final int? serverId;
 
   /// 로컬 CREATE 시 한 번 생성해 저장하는 멱등 UUID. 기존 로컬/서버 동기화
   /// 데이터는 null일 수 있으며 UPDATE에는 새 값을 만들거나 전송하지 않는다.
   final String? clientRequestId;
-  final int memoId;
-  final BookMemoItemType type;
+  final int noteId;
+  final BookNoteMemoType type;
   final int? startPage;
   final int? endPage;
   final String? content;
@@ -94,16 +94,16 @@ class BookMemoItem {
   }
 }
 
-class BookMemoSummary {
-  const BookMemoSummary({
-    required this.memo,
-    required this.itemCount,
+class BookNoteSummary {
+  const BookNoteSummary({
+    required this.note,
+    required this.memoCount,
     required this.firstPage,
     required this.lastPage,
   });
 
-  final BookMemo memo;
-  final int itemCount;
+  final BookNote note;
+  final int memoCount;
   final int? firstPage;
   final int? lastPage;
 
@@ -115,21 +115,21 @@ class BookMemoSummary {
   }
 }
 
-class BookMemoDetail {
-  const BookMemoDetail({required this.memo, required this.items});
+class BookNoteDetail {
+  const BookNoteDetail({required this.note, required this.memos});
 
-  const BookMemoDetail.empty() : memo = null, items = const [];
+  const BookNoteDetail.empty() : note = null, memos = const [];
 
-  final BookMemo? memo;
-  final List<BookMemoItem> items;
+  final BookNote? note;
+  final List<BookNoteMemo> memos;
 
-  BookMemoDetail copyWith({BookMemo? memo, List<BookMemoItem>? items}) {
-    return BookMemoDetail(memo: memo ?? this.memo, items: items ?? this.items);
+  BookNoteDetail copyWith({BookNote? note, List<BookNoteMemo>? memos}) {
+    return BookNoteDetail(note: note ?? this.note, memos: memos ?? this.memos);
   }
 }
 
-class BookMemoItemDraft {
-  const BookMemoItemDraft({
+class BookNoteMemoDraft {
+  const BookNoteMemoDraft({
     required this.type,
     this.startPage,
     this.endPage,
@@ -139,20 +139,20 @@ class BookMemoItemDraft {
     this.isImportant = false,
   });
 
-  final BookMemoItemType type;
+  final BookNoteMemoType type;
   final int? startPage;
   final int? endPage;
   final String? content;
   final String? imageUrl;
 
   /// 새로 선택한 이미지의 임시 경로. Repository가 앱 지원 디렉터리로 복사한
-  /// 뒤 영속 경로만 `book_memo_item.image_url`에 저장한다.
+  /// 뒤 영속 경로만 `book_note_memo.image_url`에 저장한다.
   final String? pickedImagePath;
   final bool isImportant;
 }
 
-class DeleteMemoItemResult {
-  const DeleteMemoItemResult({required this.memoWasDeleted});
+class DeleteNoteMemoResult {
+  const DeleteNoteMemoResult({required this.noteWasDeleted});
 
-  final bool memoWasDeleted;
+  final bool noteWasDeleted;
 }

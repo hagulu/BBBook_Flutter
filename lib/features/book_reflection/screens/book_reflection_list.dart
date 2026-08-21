@@ -12,7 +12,7 @@ import 'widgets/book_reflection_refresh_indicator.dart';
 /// 책 기록 상세의 독후감 탭. [bookReflectionListProvider]가 로컬 DB만
 /// 조회한다. 서버와의 동기화(전체/증분 새로고침)는 당겨서 새로고침
 /// ([BookReflectionRefreshIndicator])으로만 일어난다 —
-/// [BookMemoList]와 같은 원칙.
+/// [BookNoteList]와 같은 원칙.
 ///
 /// 작성/수정/삭제(에디터)는 아직 붙이지 않아 목록에 추가 버튼이 없다 —
 /// 웹의 "독후감 추가" 버튼에 대응하는 진입점은 에디터 구현 시 추가한다.

@@ -9,7 +9,7 @@ import '../models/book_reflection.dart';
 
 /// 독후감 로컬 DB 쿼리/쓰기 전담.
 ///
-/// [BookMemoDao]와 달리 `book_reflection.id`는 지금은 항상 서버 ID와 같다
+/// [BookNoteDao]와 달리 `book_reflection.id`는 지금은 항상 서버 ID와 같다
 /// (로컬 전용 오프라인 생성 경로가 아직 없다 — 편집기 기능 붙일 때 `server_id`
 /// 컬럼 분리 여부를 다시 검토해야 한다). 그래서 이 DAO는 조회와 서버 조회
 /// 결과 반영(전체/증분 동기화)만 담당하고, `is_dirty`를 세우는 로컬 쓰기
@@ -79,7 +79,7 @@ class BookReflectionDao {
   /// 행은 upsert, 서버에 없는(로컬에만 남은) 비-dirty 행은 삭제.
   ///
   /// [activeUserBookIds]는 같은 `/api/me/records` 응답의 `books` 배열이다.
-  /// [BookMemoDao.reconcileFullMemo]와 같은 이유로, "책은 그대로 있는데
+  /// [BookNoteDao.reconcileFullNotes]와 같은 이유로, "책은 그대로 있는데
   /// 독후감만 없어졌을 때만" 삭제 대상으로 본다 — 소프트 삭제된 책장
   /// 항목의 독후감은 이번 응답에 아예 포함되지 않으므로("서버에서
   /// 삭제됨"으로 오인하면 안 됨).
@@ -117,7 +117,7 @@ class BookReflectionDao {
   }
 
   /// `/api/me/reflections/sync/changes` 증분 동기화 결과를 반영한다.
-  /// [BookMemoDao.applyMemoChanges]와 같은 구조 — 부모(user_book)를 로컬에서
+  /// [BookNoteDao.applyNoteChanges]와 같은 구조 — 부모(user_book)를 로컬에서
   /// 찾지 못한 독후감(orphan)이 있으면 기준값을 앞으로 당기지 않고 지워
   /// 다음 [BookReflectionRepository.sync] 호출이 전체 동기화로 대체되게 한다.
   Future<void> applyReflectionChanges({

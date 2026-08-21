@@ -5,48 +5,49 @@ import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../../record_sync/models/record_sync_payload.dart';
-import '../models/book_memo.dart';
-import '../models/book_memo_sync_changes_result.dart';
+import '../models/book_note.dart';
+import '../models/book_note_sync_changes_result.dart';
 
-/// 메모/메모 조각 저장·수정·삭제 및 동기화 API 호출.
+/// 노트/메모 저장·수정·삭제 및 동기화 API 호출.
 ///
-/// 문서: ../../../../../api-doc/api-me-books-userBookId-memos-title-put.md,
-/// api-me-books-userBookId-memos-items-post.md,
-/// api-me-books-userBookId-memos-items-photo-post.md,
-/// api-me-books-userBookId-memos-items-itemId-patch.md,
-/// api-me-books-userBookId-memos-items-itemId-delete.md,
-/// api-me-books-userBookId-memos-memoId-delete.md,
-/// api-memos-memoId-images-post.md, api-me-memos-sync-changes-get.md
+/// 문서: ../../../../../api-doc/api-me-books-userBookId-notes-title-put.md,
+/// api-me-books-userBookId-notes-memos-post.md,
+/// api-me-books-userBookId-notes-memos-photo-post.md,
+/// api-me-books-userBookId-notes-memos-noteMemoId-patch.md,
+/// api-me-books-userBookId-notes-memos-noteMemoId-delete.md,
+/// api-me-books-userBookId-notes-noteId-delete.md,
+/// api-notes-noteId-images-post.md, api-me-notes-sync-changes-get.md
 ///
-/// PHOTO 조각 생성은 [postPhotoItem](사진 파일 + memoId=null/기존 memoId를
-/// 한 요청으로 처리) 전용이고, [postItem]은 SUMMARY/QUOTE/THOUGHT만
-/// 지원한다 — PHOTO를 이 API로 만들 수 없다. [uploadImage]는 이미
-/// 존재하는 PHOTO 조각의 사진을 교체할 때만 쓴다([patchItem]과 짝).
+/// PHOTO 메모 생성은 [postPhotoNoteMemo](사진 파일 + noteId=null/기존
+/// noteId를 한 요청으로 처리) 전용이고, [postNoteMemo]는
+/// SUMMARY/QUOTE/THOUGHT만 지원한다 — PHOTO를 이 API로 만들 수 없다.
+/// [uploadImage]는 이미 존재하는 PHOTO 메모의 사진을 교체할 때만 쓴다
+/// ([patchNoteMemo]과 짝).
 ///
 /// 인증 필요 요청이므로 401 시 1회 재시도 후 실패하면 로그아웃 처리하는
 /// [ApiClient]를 통해서만 호출한다(CLAUDE.md 인증 API 호출 규칙).
-class BookMemoApi {
-  BookMemoApi({required this._apiClient});
+class BookNoteApi {
+  BookNoteApi({required this._apiClient});
 
   final ApiClient _apiClient;
 
-  /// PUT /api/me/books/{userBookId}/memos/title
+  /// PUT /api/me/books/{userBookId}/notes/title
   ///
-  /// memoId가 null이고 title이 있으면 새 메모를 생성한다. memoId도 title도
-  /// 없으면 서버는 아무것도 생성하지 않고 `data.memoId`가 null로 내려온다
+  /// noteId가 null이고 title이 있으면 새 노트를 생성한다. noteId도 title도
+  /// 없으면 서버는 아무것도 생성하지 않고 `data.noteId`가 null로 내려온다
   /// (호출부가 이 경우를 걸러야 한다).
-  Future<({int? memoId, String? title})> putTitle({
+  Future<({int? noteId, String? title})> putTitle({
     required int userBookId,
-    required int? memoId,
+    required int? noteId,
     required String? title,
   }) async {
     try {
       final response = await _apiClient.dio.put<Map<String, dynamic>>(
-        '/api/me/books/$userBookId/memos/title',
-        data: {'memoId': memoId, 'title': title},
+        '/api/me/books/$userBookId/notes/title',
+        data: {'noteId': noteId, 'title': title},
       );
       final data = _unwrapMap(response);
-      return (memoId: data['memoId'] as int?, title: data['title'] as String?);
+      return (noteId: data['noteId'] as int?, title: data['title'] as String?);
     } on DioException catch (e) {
       throw _mapError(e);
     } on ApiException {
@@ -56,14 +57,14 @@ class BookMemoApi {
     }
   }
 
-  /// POST /api/me/books/{userBookId}/memos/items
+  /// POST /api/me/books/{userBookId}/notes/memos
   ///
   /// SUMMARY/QUOTE/THOUGHT 전용이다(PHOTO는 이 API로 만들 수 없다 —
-  /// [postPhotoItem] 참고). memoId가 null이면 새 메모를 함께 생성한다.
-  Future<ServerBookMemoItem> postItem({
+  /// [postPhotoNoteMemo] 참고). noteId가 null이면 새 노트를 함께 생성한다.
+  Future<ServerBookNoteMemo> postNoteMemo({
     required int userBookId,
-    required int? memoId,
-    required BookMemoItemType itemType,
+    required int? noteId,
+    required BookNoteMemoType memoType,
     required int? startPage,
     required int? endPage,
     required String? content,
@@ -72,10 +73,10 @@ class BookMemoApi {
   }) async {
     try {
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
-        '/api/me/books/$userBookId/memos/items',
+        '/api/me/books/$userBookId/notes/memos',
         data: {
-          'memoId': memoId,
-          'itemType': itemType.dbValue,
+          'noteId': noteId,
+          'memoType': memoType.dbValue,
           'startPage': startPage,
           'endPage': endPage,
           'content': content,
@@ -84,7 +85,7 @@ class BookMemoApi {
         },
       );
       final data = _unwrapMap(response);
-      return ServerBookMemoItem.fromJson(data);
+      return ServerBookNoteMemo.fromJson(data);
     } on DioException catch (e) {
       throw _mapError(e);
     } on ApiException {
@@ -94,15 +95,15 @@ class BookMemoApi {
     }
   }
 
-  /// POST /api/me/books/{userBookId}/memos/items/photo
+  /// POST /api/me/books/{userBookId}/notes/memos/photo
   ///
-  /// PHOTO 조각을 사진 파일과 함께 한 번에 생성한다(별도 이미지 선업로드
-  /// 불필요). memoId가 null이면 새 메모를 함께 만든다 — 제목 없는 새
-  /// 메모에서도 이 한 번의 호출로 메모+사진 조각이 완성되므로, 중간에
-  /// 실패해도 서버에 반쪽짜리(다른 타입) 조각이 남지 않는다.
-  Future<ServerBookMemoItem> postPhotoItem({
+  /// PHOTO 메모를 사진 파일과 함께 한 번에 생성한다(별도 이미지 선업로드
+  /// 불필요). noteId가 null이면 새 노트를 함께 만든다 — 제목 없는 새
+  /// 노트에서도 이 한 번의 호출로 노트+사진 메모가 완성되므로, 중간에
+  /// 실패해도 서버에 반쪽짜리(다른 타입) 메모가 남지 않는다.
+  Future<ServerBookNoteMemo> postPhotoNoteMemo({
     required int userBookId,
-    required int? memoId,
+    required int? noteId,
     required int? startPage,
     required int? endPage,
     required String? content,
@@ -113,7 +114,7 @@ class BookMemoApi {
     try {
       final fileName = file.path.split(Platform.pathSeparator).last;
       final formData = FormData.fromMap({
-        if (memoId != null) 'memoId': memoId.toString(),
+        if (noteId != null) 'noteId': noteId.toString(),
         if (startPage != null) 'startPage': startPage.toString(),
         if (endPage != null) 'endPage': endPage.toString(),
         'content': ?content,
@@ -122,11 +123,11 @@ class BookMemoApi {
         'file': await MultipartFile.fromFile(file.path, filename: fileName),
       });
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
-        '/api/me/books/$userBookId/memos/items/photo',
+        '/api/me/books/$userBookId/notes/memos/photo',
         data: formData,
       );
       final data = _unwrapMap(response);
-      return ServerBookMemoItem.fromJson(data);
+      return ServerBookNoteMemo.fromJson(data);
     } on DioException catch (e) {
       throw _mapError(e);
     } on ApiException {
@@ -136,16 +137,16 @@ class BookMemoApi {
     }
   }
 
-  /// PATCH /api/me/books/{userBookId}/memos/items/{itemId}
+  /// PATCH /api/me/books/{userBookId}/notes/memos/{noteMemoId}
   ///
   /// body에 담긴 필드만 변경된다("미전달 시 변경 없음"). [imageUrl]을
   /// 전달하지 않으려면(사진을 바꾸지 않는 PHOTO 수정) [includeImageUrl]을
   /// false로 둔다 — 이미 서버 R2 키가 아닌 전체 URL을 그대로 되돌려보내면
   /// 안 되므로, 새로 업로드해 R2 키를 새로 받았을 때만 true로 넘긴다.
-  Future<ServerBookMemoItem> patchItem({
+  Future<ServerBookNoteMemo> patchNoteMemo({
     required int userBookId,
-    required int itemId,
-    required BookMemoItemType itemType,
+    required int noteMemoId,
+    required BookNoteMemoType memoType,
     required int? startPage,
     required int? endPage,
     required String? content,
@@ -155,9 +156,9 @@ class BookMemoApi {
   }) async {
     try {
       final response = await _apiClient.dio.patch<Map<String, dynamic>>(
-        '/api/me/books/$userBookId/memos/items/$itemId',
+        '/api/me/books/$userBookId/notes/memos/$noteMemoId',
         data: {
-          'itemType': itemType.dbValue,
+          'memoType': memoType.dbValue,
           'startPage': startPage,
           'endPage': endPage,
           'content': content,
@@ -166,7 +167,7 @@ class BookMemoApi {
         },
       );
       final data = _unwrapMap(response);
-      return ServerBookMemoItem.fromJson(data);
+      return ServerBookNoteMemo.fromJson(data);
     } on DioException catch (e) {
       throw _mapError(e);
     } on ApiException {
@@ -176,14 +177,14 @@ class BookMemoApi {
     }
   }
 
-  /// DELETE /api/me/books/{userBookId}/memos/items/{itemId}
-  Future<void> deleteItem({
+  /// DELETE /api/me/books/{userBookId}/notes/memos/{noteMemoId}
+  Future<void> deleteNoteMemo({
     required int userBookId,
-    required int itemId,
+    required int noteMemoId,
   }) async {
     try {
       await _apiClient.dio.delete<Map<String, dynamic>>(
-        '/api/me/books/$userBookId/memos/items/$itemId',
+        '/api/me/books/$userBookId/notes/memos/$noteMemoId',
       );
     } on DioException catch (e) {
       // 이미 서버에서 지워진 뒤 재시도로 다시 호출된 경우(직전 시도의 응답만
@@ -194,38 +195,38 @@ class BookMemoApi {
     }
   }
 
-  /// DELETE /api/me/books/{userBookId}/memos/{memoId}
+  /// DELETE /api/me/books/{userBookId}/notes/{noteId}
   ///
-  /// 메모와 그 소속 조각을 모두 함께 soft delete한다.
-  Future<void> deleteMemo({
+  /// 노트와 그 소속 메모를 모두 함께 soft delete한다.
+  Future<void> deleteNote({
     required int userBookId,
-    required int memoId,
+    required int noteId,
   }) async {
     try {
       await _apiClient.dio.delete<Map<String, dynamic>>(
-        '/api/me/books/$userBookId/memos/$memoId',
+        '/api/me/books/$userBookId/notes/$noteId',
       );
     } on DioException catch (e) {
       // 이미 서버에서 지워진 뒤 재시도로 다시 호출된 경우도 "지우려는
-      // 목표는 달성됨"으로 취급한다([deleteItem]과 같은 이유).
+      // 목표는 달성됨"으로 취급한다([deleteNoteMemo]와 같은 이유).
       if (e.response?.statusCode == 404) return;
       throw _mapError(e);
     }
   }
 
-  /// POST /api/memos/{memoId}/images — 이미지 업로드 후 R2 키 반환.
+  /// POST /api/notes/{noteId}/images — 이미지 업로드 후 R2 키 반환.
   ///
-  /// **기존 PHOTO 조각의 사진 교체 전용**이다([patchItem]과 짝) — 새 PHOTO
-  /// 조각 생성(신규든 기존 메모든)은 [postPhotoItem] 하나로 끝나므로 이
-  /// API를 거치지 않는다.
-  Future<String> uploadImage({required int memoId, required File file}) async {
+  /// **기존 PHOTO 메모의 사진 교체 전용**이다([patchNoteMemo]과 짝) — 새
+  /// PHOTO 메모 생성(신규든 기존 노트든)은 [postPhotoNoteMemo] 하나로
+  /// 끝나므로 이 API를 거치지 않는다.
+  Future<String> uploadImage({required int noteId, required File file}) async {
     try {
       final fileName = file.path.split(Platform.pathSeparator).last;
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(file.path, filename: fileName),
       });
       final response = await _apiClient.dio.post<Map<String, dynamic>>(
-        '/api/memos/$memoId/images',
+        '/api/notes/$noteId/images',
         data: formData,
       );
       final data = _unwrapMap(response);
@@ -239,17 +240,17 @@ class BookMemoApi {
     }
   }
 
-  /// GET /api/me/memos/sync/changes — since 이후 변경분만 조회하는 증분 동기화.
-  Future<BookMemoSyncChangesResult> getSyncChanges({
+  /// GET /api/me/notes/sync/changes — since 이후 변경분만 조회하는 증분 동기화.
+  Future<BookNoteSyncChangesResult> getSyncChanges({
     required DateTime since,
   }) async {
     try {
       final response = await _apiClient.dio.get<Map<String, dynamic>>(
-        '/api/me/memos/sync/changes',
+        '/api/me/notes/sync/changes',
         queryParameters: {'since': since.toUtc().toIso8601String()},
       );
       final data = _unwrapMap(response);
-      return BookMemoSyncChangesResult.fromJson(data);
+      return BookNoteSyncChangesResult.fromJson(data);
     } on DioException catch (e) {
       throw _mapError(e);
     } on ApiException {

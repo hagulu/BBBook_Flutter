@@ -54,19 +54,19 @@
 - `lib/features/book_record/screens/widgets/book_thumbnail_field.dart` — 책 표지 이미지 선택/미리보기 공용 위젯(책 정보 수정·직접 등록에서 공유)
 - `lib/features/book_record/screens/widgets/book_category_field.dart` — 카테고리 선택 필드 + 선택 팝업 공용 위젯(책 정보 수정·직접 등록에서 공유)
 
-## features/book_memo
+## features/book_note
 
-- `lib/features/book_memo/screens/book_memo_list.dart` — 책 기록 상세의 메모 목록 탭(메모 추가·상세 진입, 당겨서 새로고침)
-- `lib/features/book_memo/screens/book_memo_detail_screen.dart` — 메모 제목 자동 저장과 타입별 조각 타임라인·로컬 CRUD 화면
-- `lib/features/book_memo/screens/memo_ocr_camera_screen.dart` — 발췌 OCR용 카메라 미리보기·수평 가이드 및 갤러리 이미지 선택 화면
-- `lib/features/book_memo/screens/memo_photo_camera_screen.dart` — 메모 사진 조각용 카메라 미리보기(좌하단 갤러리 아이콘으로 갤러리 선택 겸용) 화면
-- `lib/features/book_memo/data/book_memo_api.dart` — 메모 제목 PUT, 조각 생성/수정/삭제, 사진 업로드, 증분 동기화 조회 API 호출
-- `lib/features/book_memo/data/book_memo_dao.dart` — 로컬 DB 쿼리·dirty push 확정·전체/증분 reconcile(dirty 행 보호, 로컬 PK와 server_id 분리)
-- `lib/features/book_memo/data/book_memo_repository.dart` — 메모 화면 source of truth, 로컬 우선 CRUD 직후 조용히 서버 push하고 실패 시 dirty 유지, 최초엔 전체(`/api/me/records`)·이후엔 증분(`/api/me/memos/sync/changes`) 동기화
-- `lib/features/book_memo/providers/book_memo_providers.dart` — 책별 메모 목록·상세 상태 및 메모 동기화 컨트롤러 Riverpod provider
-- `lib/features/book_memo/services/book_memo_ocr_service.dart` — 촬영 이미지에서 한국어 단어와 선택용 좌표를 추출하는 온디바이스 OCR 서비스
-- `lib/features/book_memo/utils/memo_highlight.dart` — 웹과 동일한 `::hl[[]]` 강조 마크업 파싱/직렬화, `isImportant` 파생 기준(`hasMemoHighlight`)
-- `lib/features/book_memo/screens/widgets/highlight_text_field.dart` — 강조(::hl[[]]) 편집을 지원하는 `MemoHighlightController`(TextEditingController), 커서/선택 기반 토글·타이핑 상속·range 이동
+- `lib/features/book_note/screens/book_note_list.dart` — 책 기록 상세의 노트 목록 탭(노트 추가·상세 진입, 당겨서 새로고침)
+- `lib/features/book_note/screens/book_note_detail_screen.dart` — 노트 제목 자동 저장과 타입별 메모 타임라인·로컬 CRUD 화면
+- `lib/features/book_note/screens/memo_ocr_camera_screen.dart` — 발췌 OCR용 카메라 미리보기·수평 가이드 및 갤러리 이미지 선택 화면
+- `lib/features/book_note/screens/memo_photo_camera_screen.dart` — 메모 사진용 카메라 미리보기(좌하단 갤러리 아이콘으로 갤러리 선택 겸용) 화면
+- `lib/features/book_note/data/book_note_api.dart` — 노트 제목 PUT, 메모 생성/수정/삭제, 사진 업로드, 증분 동기화 조회 API 호출
+- `lib/features/book_note/data/book_note_dao.dart` — 로컬 DB 쿼리·dirty push 확정·전체/증분 reconcile(dirty 행 보호, 로컬 PK와 server_id 분리)
+- `lib/features/book_note/data/book_note_repository.dart` — 노트 화면 source of truth, 로컬 우선 CRUD 직후 조용히 서버 push하고 실패 시 dirty 유지, 최초엔 전체(`/api/me/records`)·이후엔 증분(`/api/me/notes/sync/changes`) 동기화
+- `lib/features/book_note/providers/book_note_providers.dart` — 책별 노트 목록·상세 상태 및 노트 동기화 컨트롤러 Riverpod provider
+- `lib/features/book_note/services/book_note_memo_ocr_service.dart` — 촬영 이미지에서 한국어 단어와 선택용 좌표를 추출하는 온디바이스 OCR 서비스
+- `lib/features/book_note/utils/memo_highlight.dart` — 웹과 동일한 `::hl[[]]` 강조 마크업 파싱/직렬화, `isImportant` 파생 기준(`hasMemoHighlight`)
+- `lib/features/book_note/screens/widgets/highlight_text_field.dart` — 강조(::hl[[]]) 편집을 지원하는 `MemoHighlightController`(TextEditingController), 커서/선택 기반 토글·타이핑 상속·range 이동
 - `docs/policies/memo-highlight-toggle.md` — 강조 토글 버튼 정책 문서(상태 판단·경계 공백 삽입·IME 조합 세션 고정), 다른 화면/플랫폼에 재구현할 때 참고
 
 ## features/book_reflection
@@ -145,3 +145,4 @@
 - `docs/review/20260820-161749-book-record-collapsing-header-review.md` — 책 기록 접이식 헤더의 탭 탐색 유지·상태 최신성·텍스트 배율 대응 리뷰
 - `docs/review/20260820-194536-memo-photo-and-camera-orientation-review.md` — 메모 사진 작성·보기와 카메라 방향 잠금의 비동기·센서 생명주기 리뷰
 - `docs/review/20260820-195133-memo-photo-camera-orientation-rereview.md` — 메모 사진·카메라 방향 변경의 초기화 경합과 플랫폼 회전 제한 재리뷰
+- `docs/review/20260821-150209-note-domain-rename-review.md` — 신규 설치 전제의 노트/메모 도메인 명칭 전환 및 API 정합성 리뷰

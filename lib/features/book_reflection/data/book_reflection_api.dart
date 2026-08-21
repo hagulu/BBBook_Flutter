@@ -10,7 +10,7 @@ import '../models/book_reflection_sync_changes_result.dart';
 ///
 /// 전체 동기화는 별도 API가 없다 — `record_sync` 기능의
 /// `GET /api/me/records`(전체 책장/메모/독후감 통합 조회)를 그대로
-/// 재사용한다([BookMemoApi]와 같은 구조).
+/// 재사용한다([BookNoteApi]와 같은 구조).
 ///
 /// 인증 필요 요청이므로 401 시 1회 재시도 후 실패하면 로그아웃 처리하는
 /// [ApiClient]를 통해서만 호출한다(CLAUDE.md 인증 API 호출 규칙).

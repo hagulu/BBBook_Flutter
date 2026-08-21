@@ -37,7 +37,7 @@ class MemoPhotoCameraScreen extends StatefulWidget {
 
 class _MemoPhotoCameraScreenState extends State<MemoPhotoCameraScreen>
     with WidgetsBindingObserver {
-  // BookMemoRepository._maxImageBytes와 같은 값으로 맞춘다 — 저장 계층의
+  // BookNoteRepository._maxImageBytes와 같은 값으로 맞춘다 — 저장 계층의
   // 허용치와 어긋나면 여기 통과한 사진이 결국 저장 시점에 거절된다.
   static const _maxPhotoBytes = 5 * 1024 * 1024;
 
@@ -242,7 +242,7 @@ class _MemoPhotoCameraScreenState extends State<MemoPhotoCameraScreen>
     try {
       final file = await controller.takePicture();
       // iOS는 세션 프리셋과 무관하게 정지 사진을 센서 원본 해상도로
-      // 찍어, 저장 계층(BookMemoRepository._maxImageBytes와 동일한 값)의
+      // 찍어, 저장 계층(BookNoteRepository._maxImageBytes와 동일한 값)의
       // 5MB 제한을 넘기는 경우가 드물지 않다 — 여기서 걸러야 사용자가
       // 메모 내용까지 다 쓴 뒤에야 저장 실패로 알게 되는 일을 막는다.
       final sizeBytes = await File(file.path).length();
@@ -286,7 +286,7 @@ class _MemoPhotoCameraScreenState extends State<MemoPhotoCameraScreen>
     setState(() => _isPickingImage = true);
     String? pickedPath;
     try {
-      // 원본을 그대로 반환하면 저장 계층(BookMemoRepository._resolveImageUrl)의
+      // 원본을 그대로 반환하면 저장 계층(BookNoteRepository._resolveImageUrl)의
       // jpg/jpeg/png/webp·5MB 제한을 넘기거나(고해상도 원본), iOS 갤러리의
       // 기본 형식(HEIC)이라 형식 자체가 거절될 수 있다 — imageQuality를
       // 지정해 image_picker가 JPEG로 재인코딩하며 크기도 줄이게 한다.

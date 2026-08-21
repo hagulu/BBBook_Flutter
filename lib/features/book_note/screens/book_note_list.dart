@@ -4,17 +4,17 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../auth/providers/auth_notifier.dart';
-import '../models/book_memo.dart';
-import '../providers/book_memo_providers.dart';
-import 'book_memo_detail_screen.dart';
-import 'widgets/book_memo_refresh_indicator.dart';
+import '../models/book_note.dart';
+import '../providers/book_note_providers.dart';
+import 'book_note_detail_screen.dart';
+import 'widgets/book_note_refresh_indicator.dart';
 
-/// 책 기록 상세의 메모 탭. [bookMemoListProvider]가 로컬 DB만 조회하고,
+/// 책 기록 상세의 노트 탭. [bookNoteListProvider]가 로컬 DB만 조회하고,
 /// 상세 화면에서 돌아오면 로컬 목록을 다시 읽는다. 서버와의 동기화(dirty
-/// push + 전체/증분 새로고침)는 당겨서 새로고침([BookMemoRefreshIndicator])
+/// push + 전체/증분 새로고침)는 당겨서 새로고침([BookNoteRefreshIndicator])
 /// 또는 앱 저장/수정/삭제 직후의 백그라운드 push로만 일어난다.
-class BookMemoList extends ConsumerWidget {
-  const BookMemoList({
+class BookNoteList extends ConsumerWidget {
+  const BookNoteList({
     super.key,
     required this.userBookId,
     required this.bookTitle,
@@ -28,11 +28,11 @@ class BookMemoList extends ConsumerWidget {
     final ownerUserId = ref.watch(
       authNotifierProvider.select((auth) => auth.user?.id),
     );
-    final asyncMemos = ref.watch(bookMemoListProvider(userBookId));
+    final asyncNotes = ref.watch(bookNoteListProvider(userBookId));
 
-    return BookMemoRefreshIndicator(
+    return BookNoteRefreshIndicator(
       child: CustomScrollView(
-        key: const PageStorageKey('book-memo-list'),
+        key: const PageStorageKey('book-note-list'),
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
           SliverPadding(
@@ -42,7 +42,7 @@ class BookMemoList extends ConsumerWidget {
                 children: [
                   const Expanded(
                     child: Text(
-                      '개인 메모',
+                      '개인 노트',
                       style: TextStyle(
                         color: AppColors.textStrong,
                         fontSize: 18,
@@ -54,7 +54,7 @@ class BookMemoList extends ConsumerWidget {
                     onPressed: ownerUserId == null
                         ? null
                         : () =>
-                              _openMemo(context, ref, ownerUserId: ownerUserId),
+                              _openNote(context, ref, ownerUserId: ownerUserId),
                     style: ElevatedButton.styleFrom(
                       minimumSize: const Size(0, 36),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -64,17 +64,17 @@ class BookMemoList extends ConsumerWidget {
                       ),
                     ),
                     icon: const Icon(PhosphorIconsRegular.plus, size: 15),
-                    label: const Text('메모 추가'),
+                    label: const Text('노트 추가'),
                   ),
                 ],
               ),
             ),
           ),
-          switch (asyncMemos) {
+          switch (asyncNotes) {
             AsyncData(:final value) when value.isEmpty =>
               const SliverFillRemaining(
                 hasScrollBody: false,
-                child: _EmptyMemos(),
+                child: _EmptyNotes(),
               ),
             AsyncData(:final value) => SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
@@ -83,18 +83,18 @@ class BookMemoList extends ConsumerWidget {
                 separatorBuilder: (_, _) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final summary = value[index];
-                  return _MemoCard(
+                  return _NoteCard(
                     summary: summary,
                     // 목록은 최신순(updated_at DESC)이므로, 오래된 항목일수록
                     // 작은 번호가 붙도록 뒤에서부터 센다.
-                    memoNumber: value.length - index,
+                    noteNumber: value.length - index,
                     onTap: ownerUserId == null
                         ? null
-                        : () => _openMemo(
+                        : () => _openNote(
                             context,
                             ref,
                             ownerUserId: ownerUserId,
-                            memoId: summary.memo.id,
+                            noteId: summary.note.id,
                           ),
                   );
                 },
@@ -102,8 +102,8 @@ class BookMemoList extends ConsumerWidget {
             ),
             AsyncError() => SliverFillRemaining(
               hasScrollBody: false,
-              child: _MemoLoadError(
-                onRetry: () => ref.invalidate(bookMemoListProvider(userBookId)),
+              child: _NoteLoadError(
+                onRetry: () => ref.invalidate(bookNoteListProvider(userBookId)),
               ),
             ),
             _ => const SliverFillRemaining(
@@ -116,40 +116,40 @@ class BookMemoList extends ConsumerWidget {
     );
   }
 
-  Future<void> _openMemo(
+  Future<void> _openNote(
     BuildContext context,
     WidgetRef ref, {
     required int ownerUserId,
-    int? memoId,
+    int? noteId,
   }) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
-        builder: (_) => BookMemoDetailScreen(
+        builder: (_) => BookNoteDetailScreen(
           ownerUserId: ownerUserId,
           userBookId: userBookId,
           bookTitle: bookTitle,
-          memoId: memoId,
+          noteId: noteId,
         ),
       ),
     );
-    ref.invalidate(bookMemoListProvider(userBookId));
+    ref.invalidate(bookNoteListProvider(userBookId));
   }
 }
 
-class _MemoCard extends StatelessWidget {
-  const _MemoCard({
+class _NoteCard extends StatelessWidget {
+  const _NoteCard({
     required this.summary,
-    required this.memoNumber,
+    required this.noteNumber,
     required this.onTap,
   });
 
-  final BookMemoSummary summary;
-  final int memoNumber;
+  final BookNoteSummary summary;
+  final int noteNumber;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final title = summary.memo.title?.trim();
+    final title = summary.note.title?.trim();
     return Material(
       color: AppColors.surface,
       borderRadius: BorderRadius.circular(16),
@@ -181,7 +181,7 @@ class _MemoCard extends StatelessWidget {
                         Flexible(
                           child: Text(
                             title == null || title.isEmpty
-                                ? '#$memoNumber'
+                                ? '#$noteNumber'
                                 : title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -206,8 +206,8 @@ class _MemoCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 7),
                     Text(
-                      '${_formatDate(summary.memo.updatedAt)} · '
-                      '조각 ${summary.itemCount}개',
+                      '${_formatDate(summary.note.updatedAt)} · '
+                      '메모 ${summary.memoCount}개',
                       style: const TextStyle(
                         color: AppColors.textMuted,
                         fontSize: 12,
@@ -235,8 +235,8 @@ class _MemoCard extends StatelessWidget {
   }
 }
 
-class _EmptyMemos extends StatelessWidget {
-  const _EmptyMemos();
+class _EmptyNotes extends StatelessWidget {
+  const _EmptyNotes();
 
   @override
   Widget build(BuildContext context) {
@@ -253,7 +253,7 @@ class _EmptyMemos extends StatelessWidget {
             ),
             SizedBox(height: 14),
             Text(
-              '아직 메모가 없습니다.',
+              '아직 노트가 없습니다.',
               style: TextStyle(
                 color: AppColors.textStrong,
                 fontSize: 16,
@@ -273,8 +273,8 @@ class _EmptyMemos extends StatelessWidget {
   }
 }
 
-class _MemoLoadError extends StatelessWidget {
-  const _MemoLoadError({required this.onRetry});
+class _NoteLoadError extends StatelessWidget {
+  const _NoteLoadError({required this.onRetry});
 
   final VoidCallback onRetry;
 
@@ -285,7 +285,7 @@ class _MemoLoadError extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            '메모를 불러오지 못했습니다.',
+            '노트를 불러오지 못했습니다.',
             style: TextStyle(color: AppColors.textMuted),
           ),
           const SizedBox(height: 8),

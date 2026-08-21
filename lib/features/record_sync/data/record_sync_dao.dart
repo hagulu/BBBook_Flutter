@@ -59,12 +59,12 @@ class RecordSyncDao {
       );
 
       await txn.delete(
-        'book_memo_item',
-        where: 'memo_id IN (SELECT id FROM book_memo WHERE owner_user_id = ?)',
+        'book_note_memo',
+        where: 'note_id IN (SELECT id FROM book_note WHERE owner_user_id = ?)',
         whereArgs: [userId],
       );
       await txn.delete(
-        'book_memo',
+        'book_note',
         where: 'owner_user_id = ?',
         whereArgs: [userId],
       );
@@ -74,40 +74,40 @@ class RecordSyncDao {
         whereArgs: [userId],
       );
 
-      for (final memo in payload.memos) {
-        await txn.insert('book_memo', {
-          'id': memo.id,
+      for (final note in payload.notes) {
+        await txn.insert('book_note', {
+          'id': note.id,
           // 최초 동기화로 받은 행은 서버에 이미 존재하는 행이므로 server_id를
-          // id와 동일하게 채운다 — BookMemoRepository.sync()의 dirty push가
+          // id와 동일하게 채운다 — BookNoteRepository.sync()의 dirty push가
           // "server_id == null"을 "아직 서버에 없는 로컬 전용 행"으로
           // 판별하는 기준이 되므로 비워두면 안 된다.
-          'server_id': memo.id,
+          'server_id': note.id,
           'owner_user_id': userId,
-          'user_book_id': memo.userBookId,
-          'title': memo.title,
+          'user_book_id': note.userBookId,
+          'title': note.title,
           'deleted_at': null,
-          'created_at': _date(memo.createdAt),
-          'updated_at': _date(memo.updatedAt),
+          'created_at': _date(note.createdAt),
+          'updated_at': _date(note.updatedAt),
           'is_dirty': 0,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
         onProgress(++saved, total);
       }
 
-      for (final item in payload.items) {
-        await txn.insert('book_memo_item', {
-          'id': item.id,
-          'server_id': item.id,
-          'memo_id': item.memoId,
-          'item_type': item.itemType,
-          'start_page': item.startPage,
-          'end_page': item.endPage,
-          'content': item.content,
-          'image_url': item.imageUrl,
-          'is_important': item.isImportant ? 1 : 0,
-          'sort_order': item.sortOrder,
+      for (final memo in payload.noteMemos) {
+        await txn.insert('book_note_memo', {
+          'id': memo.id,
+          'server_id': memo.id,
+          'note_id': memo.noteId,
+          'memo_type': memo.memoType,
+          'start_page': memo.startPage,
+          'end_page': memo.endPage,
+          'content': memo.content,
+          'image_url': memo.imageUrl,
+          'is_important': memo.isImportant ? 1 : 0,
+          'sort_order': memo.sortOrder,
           'deleted_at': null,
-          'created_at': _date(item.createdAt),
-          'updated_at': _date(item.updatedAt),
+          'created_at': _date(memo.createdAt),
+          'updated_at': _date(memo.updatedAt),
           'is_dirty': 0,
         }, conflictAlgorithm: ConflictAlgorithm.replace);
         onProgress(++saved, total);
@@ -146,11 +146,11 @@ class RecordSyncDao {
         'key': _completionKey(userId),
         'value': DateTime.now().toUtc().toIso8601String(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
-      // 메모 동기화 기준값(BookMemoRepository.sync()가 쓰는 since)도 이번
+      // 노트 동기화 기준값(BookNoteRepository.sync()가 쓰는 since)도 이번
       // 요청 시각으로 함께 시딩한다 — 그러지 않으면 최초 동기화 직후의 첫
-      // 메모 sync()가 방금 다 받은 데이터를 또 전체 조회로 중복 요청한다.
+      // 노트 sync()가 방금 다 받은 데이터를 또 전체 조회로 중복 요청한다.
       await txn.insert('sync_meta', {
-        'key': 'last_synced_at_memo',
+        'key': 'last_synced_at_note',
         'value': requestedAt.toUtc().toIso8601String(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
       // 독후감 동기화 기준값(BookReflectionRepository.sync()가 쓰는 since)도

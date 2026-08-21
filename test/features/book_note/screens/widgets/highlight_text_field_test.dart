@@ -1,5 +1,5 @@
 import 'package:bbbook/core/theme/app_theme.dart';
-import 'package:bbbook/features/book_memo/screens/widgets/highlight_text_field.dart';
+import 'package:bbbook/features/book_note/screens/widgets/highlight_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

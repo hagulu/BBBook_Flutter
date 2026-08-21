@@ -4,8 +4,8 @@ import 'dart:typed_data';
 import 'package:bbbook/core/network/api_client.dart';
 import 'package:bbbook/core/network/api_exception.dart';
 import 'package:bbbook/features/book_detail/data/book_detail_api.dart';
-import 'package:bbbook/features/book_memo/data/book_memo_dao.dart';
-import 'package:bbbook/features/book_memo/models/book_memo.dart';
+import 'package:bbbook/features/book_note/data/book_note_dao.dart';
+import 'package:bbbook/features/book_note/models/book_note.dart';
 import 'package:bbbook/features/book_record/data/book_record_api.dart';
 import 'package:bbbook/features/book_search/data/book_search_api.dart';
 import 'package:bbbook/features/bookshelf/data/bookshelf_api.dart';
@@ -37,8 +37,8 @@ void main() {
   setUp(() async {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
-      await txn.delete('book_memo_item');
-      await txn.delete('book_memo');
+      await txn.delete('book_note_memo');
+      await txn.delete('book_note');
       await txn.delete('user_book_tag');
       await txn.delete('user_book');
       await txn.delete('sync_meta');
@@ -99,29 +99,29 @@ void main() {
     expect(await dao.getDirtyRecord(local.userBookId), isNull);
   });
 
-  test('일반/PHOTO 메모 조각은 로컬 생성 UUID를 dirty 재조회 후에도 유지한다', () async {
-    const dao = BookMemoDao();
-    final memo = await dao.createMemo(
+  test('일반/PHOTO 메모는 로컬 생성 UUID를 dirty 재조회 후에도 유지한다', () async {
+    const dao = BookNoteDao();
+    final note = await dao.createNote(
       ownerUserId: 3,
       userBookId: 10,
       title: null,
     );
-    final summary = await dao.createItem(
+    final summary = await dao.createNoteMemo(
       ownerUserId: 3,
       userBookId: 10,
-      memoId: memo.id,
-      draft: const BookMemoItemDraft(
-        type: BookMemoItemType.summary,
+      noteId: note.id,
+      draft: const BookNoteMemoDraft(
+        type: BookNoteMemoType.summary,
         content: '요약',
       ),
       imageUrl: null,
     );
-    final photo = await dao.createItem(
+    final photo = await dao.createNoteMemo(
       ownerUserId: 3,
       userBookId: 10,
-      memoId: memo.id,
-      draft: const BookMemoItemDraft(
-        type: BookMemoItemType.photo,
+      noteId: note.id,
+      draft: const BookNoteMemoDraft(
+        type: BookNoteMemoType.photo,
         content: '사진',
       ),
       imageUrl: '/tmp/photo.jpg',
@@ -131,18 +131,18 @@ void main() {
     expect(photo.clientRequestId, matches(_uuidPattern));
     expect(photo.clientRequestId, isNot(summary.clientRequestId));
 
-    final firstRetry = await dao.getDirtyItemsForMemo(memo.id);
-    final secondRetry = await dao.getDirtyItemsForMemo(memo.id);
+    final firstRetry = await dao.getDirtyMemosForNote(note.id);
+    final secondRetry = await dao.getDirtyMemosForNote(note.id);
     expect(
-      firstRetry.map((item) => item.clientRequestId),
-      secondRetry.map((item) => item.clientRequestId),
+      firstRetry.map((memo) => memo.clientRequestId),
+      secondRetry.map((memo) => memo.clientRequestId),
     );
 
-    await dao.confirmItemSynced(
+    await dao.confirmNoteMemoSynced(
       localId: summary.id,
       serverId: 101,
       capturedUpdatedAt: summary.updatedAt,
-      itemType: summary.type,
+      memoType: summary.type,
       startPage: summary.startPage,
       endPage: summary.endPage,
       content: summary.content,
@@ -150,11 +150,11 @@ void main() {
       isImportant: summary.isImportant,
       sortOrder: 0,
     );
-    await dao.confirmItemSynced(
+    await dao.confirmNoteMemoSynced(
       localId: photo.id,
       serverId: 102,
       capturedUpdatedAt: photo.updatedAt,
-      itemType: photo.type,
+      memoType: photo.type,
       startPage: photo.startPage,
       endPage: photo.endPage,
       content: photo.content,
@@ -166,10 +166,10 @@ void main() {
     final detail = await dao.findDetail(
       ownerUserId: 3,
       userBookId: 10,
-      memoId: memo.id,
+      noteId: note.id,
     );
     final confirmedByLocalId = {
-      for (final item in detail!.items) item.id: item,
+      for (final memo in detail!.memos) memo.id: memo,
     };
     expect(
       confirmedByLocalId[summary.id]?.clientRequestId,
@@ -181,7 +181,7 @@ void main() {
       photo.clientRequestId,
     );
     expect(confirmedByLocalId[photo.id]?.serverId, 102);
-    expect(await dao.getDirtyItemsForMemo(memo.id), isEmpty);
+    expect(await dao.getDirtyMemosForNote(note.id), isEmpty);
   });
 
   test('user_book CREATE 응답 유실 재시도는 DB에 저장된 같은 UUID를 전송한다', () async {

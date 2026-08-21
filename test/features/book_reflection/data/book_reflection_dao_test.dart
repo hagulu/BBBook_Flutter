@@ -10,7 +10,7 @@ import 'package:path/path.dart' as path;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// [BookReflectionDao]의 전체/증분 동기화 반영 로직 테스트.
-/// [BookMemoDao]와 같은 원칙(서버에 없는 항목 정리, orphan 시 기준값 초기화)이
+/// [BookNoteDao]와 같은 원칙(서버에 없는 항목 정리, orphan 시 기준값 초기화)이
 /// 독후감에도 그대로 적용되는지 확인한다.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -30,8 +30,8 @@ void main() {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
       await txn.delete('book_reflection');
-      await txn.delete('book_memo_item');
-      await txn.delete('book_memo');
+      await txn.delete('book_note_memo');
+      await txn.delete('book_note');
       await txn.delete('user_book_tag');
       await txn.delete('user_book');
       await txn.delete('sync_meta');
