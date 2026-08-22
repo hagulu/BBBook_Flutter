@@ -35,7 +35,7 @@ class BookshelfDatabase {
     final path = join(dbPath, 'bookshelf.db');
     return openDatabase(
       path,
-      version: 10,
+      version: 11,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -167,6 +167,26 @@ class BookshelfDatabase {
         // 맞춘다. 이 앱은 아직 배포 전이라 기존 로컬 데이터 보존이 필요
         // 없어(재설치로 대응) 별도 업그레이드 블록을 두지 않는다 — 새
         // 스키마는 `onCreate`/`_createRecordTables`에만 반영한다.
+        if (oldVersion < 11 &&
+            await _hasTable(db, 'book_reflection') &&
+            !await _hasColumn(db, 'book_reflection', 'server_id')) {
+          // 독후감 작성/수정을 로컬 우선으로 전환한다. 로컬 PK는 화면이
+          // 계속 참조하므로 유지하고 서버 PK와 CREATE 멱등 키를 분리한다.
+          await db.execute(
+            'ALTER TABLE book_reflection ADD COLUMN server_id INTEGER',
+          );
+          await db.execute(
+            'ALTER TABLE book_reflection ADD COLUMN client_request_id TEXT',
+          );
+          await db.execute(
+            'UPDATE book_reflection SET server_id = id WHERE id > 0',
+          );
+          await db.execute(
+            'CREATE UNIQUE INDEX IF NOT EXISTS '
+            'idx_book_reflection_server_id '
+            'ON book_reflection(server_id) WHERE server_id IS NOT NULL',
+          );
+        }
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -347,6 +367,8 @@ class BookshelfDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS book_reflection (
         id INTEGER PRIMARY KEY,
+        server_id INTEGER,
+        client_request_id TEXT,
         owner_user_id INTEGER NOT NULL,
         user_book_id INTEGER NOT NULL,
         reflection_type TEXT NOT NULL,
@@ -364,6 +386,10 @@ class BookshelfDatabase {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_book_reflection_owner_user_book '
       'ON book_reflection(owner_user_id, user_book_id)',
+    );
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_book_reflection_server_id '
+      'ON book_reflection(server_id) WHERE server_id IS NOT NULL',
     );
   }
 

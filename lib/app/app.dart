@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
@@ -21,7 +22,10 @@ class BBBookApp extends ConsumerWidget {
       // 한글 표시와 스크린 리더 안내(요일·월 포맷)가 서로 달라진다.
       locale: const Locale('ko', 'KR'),
       supportedLocales: const [Locale('ko', 'KR')],
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      localizationsDelegates: [
+        ...GlobalMaterialLocalizations.delegates,
+        FlutterQuillLocalizations.delegate,
+      ],
       routerConfig: router,
     );
   }

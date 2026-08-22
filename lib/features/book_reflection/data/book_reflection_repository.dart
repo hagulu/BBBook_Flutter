@@ -1,4 +1,12 @@
+import 'dart:async';
+import 'dart:developer' as developer;
+import 'dart:io';
+
+import 'package:path/path.dart' as path;
+
+import '../../../core/network/api_exception.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
+import '../../bookshelf/data/bookshelf_repository.dart';
 import '../../record_sync/data/record_sync_api.dart';
 import '../models/book_reflection.dart';
 import 'book_reflection_api.dart';
@@ -6,27 +14,30 @@ import 'book_reflection_dao.dart';
 
 /// 독후감 화면의 source of truth.
 ///
-/// 화면은 항상 이 Repository를 통해 로컬 DB만 읽는다([BookNoteRepository]와
-/// 같은 원칙). 아직 로컬 생성/수정/삭제(편집기) 기능이 없어 dirty push
-/// 경로는 없고, [sync]는 서버 조회 결과를 로컬에 반영하는 읽기 전용
-/// 동기화만 수행한다 — 편집기를 붙일 때 [BookNoteRepository]의 dirty push
-/// 패턴을 그대로 이식하면 된다.
+/// 화면은 항상 이 Repository를 통해 로컬 DB를 읽고 쓴다. 작성/수정은 로컬에
+/// 즉시 반영한 뒤 dirty push하고, 실패한 행은 다음 [sync]에서 재시도한다.
 class BookReflectionRepository {
   BookReflectionRepository({
     required this._api,
     required this._recordSyncApi,
+    required this._bookshelfRepository,
     this._dao = const BookReflectionDao(),
   });
 
   final BookReflectionApi _api;
   final RecordSyncApi _recordSyncApi;
+  final BookshelfRepository _bookshelfRepository;
   final BookReflectionDao _dao;
+  final Map<int, Future<void>> _dirtyPushChains = {};
 
   Future<List<BookReflection>> findByUserBook({
     required int ownerUserId,
     required int userBookId,
   }) {
-    return _dao.findByUserBook(ownerUserId: ownerUserId, userBookId: userBookId);
+    return _dao.findByUserBook(
+      ownerUserId: ownerUserId,
+      userBookId: userBookId,
+    );
   }
 
   Future<BookReflection?> findDetail({
@@ -41,6 +52,129 @@ class BookReflectionRepository {
     );
   }
 
+  Future<BookReflection> save({
+    required int ownerUserId,
+    required int userBookId,
+    required int? reflectionId,
+    required BookReflectionDraft draft,
+  }) async {
+    final operation = reflectionId == null ? '독후감 생성' : '독후감 수정';
+    try {
+      final reflection = reflectionId == null
+          ? await _dao.createLocal(
+              ownerUserId: ownerUserId,
+              userBookId: userBookId,
+              draft: draft,
+            )
+          : await _dao.updateLocal(
+              ownerUserId: ownerUserId,
+              userBookId: userBookId,
+              reflectionId: reflectionId,
+              draft: draft,
+            );
+      developer.log(
+        '[$operation] userId=$ownerUserId bookId=$userBookId '
+        'reflectionId=${reflection.id} result=SUCCESS',
+      );
+      unawaited(pushReflection(reflection.id));
+      return reflection;
+    } catch (_) {
+      developer.log(
+        '[$operation] userId=$ownerUserId bookId=$userBookId '
+        'reflectionId=${reflectionId ?? 'new'} '
+        'result=FAIL reason=local_storage_error',
+      );
+      rethrow;
+    }
+  }
+
+  Future<BookReflection> setPublic({
+    required int ownerUserId,
+    required int userBookId,
+    required int reflectionId,
+    required bool isPublic,
+  }) async {
+    try {
+      final current = await _dao.getByLocalId(reflectionId);
+      if (current == null || current.deletedAt != null) {
+        throw StateError('Reflection not found');
+      }
+      if (current.serverId != null) {
+        await _api.updateVisibility(
+          reflectionId: current.serverId!,
+          isPublic: isPublic,
+        );
+      }
+      final reflection = await _dao.updateVisibilityLocal(
+        ownerUserId: ownerUserId,
+        userBookId: userBookId,
+        reflectionId: reflectionId,
+        isPublic: isPublic,
+      );
+      developer.log(
+        '[독후감 공개 설정] userId=$ownerUserId bookId=$userBookId '
+        'reflectionId=$reflectionId result=SUCCESS',
+      );
+      return reflection;
+    } catch (error) {
+      developer.log(
+        '[독후감 공개 설정] userId=$ownerUserId bookId=$userBookId '
+        'reflectionId=$reflectionId result=FAIL reason=${_reasonOf(error)}',
+      );
+      rethrow;
+    }
+  }
+
+  Future<void> delete({
+    required int ownerUserId,
+    required int userBookId,
+    required int reflectionId,
+  }) async {
+    try {
+      final reflection = await _dao.markDeletedLocal(
+        ownerUserId: ownerUserId,
+        userBookId: userBookId,
+        reflectionId: reflectionId,
+      );
+      developer.log(
+        '[독후감 삭제] userId=$ownerUserId bookId=$userBookId '
+        'reflectionId=$reflectionId result=SUCCESS',
+      );
+      unawaited(pushReflection(reflection.id));
+    } catch (error) {
+      developer.log(
+        '[독후감 삭제] userId=$ownerUserId bookId=$userBookId '
+        'reflectionId=$reflectionId result=FAIL reason=${_reasonOf(error)}',
+      );
+      rethrow;
+    }
+  }
+
+  Future<String> uploadImage(String filePath) async {
+    final file = File(filePath);
+    final extension = path
+        .extension(filePath)
+        .replaceFirst('.', '')
+        .toLowerCase();
+    if (!const {'jpg', 'jpeg', 'png', 'webp'}.contains(extension)) {
+      throw const ApiException('JPEG, PNG, WEBP 이미지만 첨부할 수 있습니다.');
+    }
+    if (!await file.exists()) {
+      throw const ApiException('선택한 이미지를 찾을 수 없습니다.');
+    }
+    if (await file.length() > 5 * 1024 * 1024) {
+      throw const ApiException('이미지는 5MB 이하만 첨부할 수 있습니다.');
+    }
+    try {
+      final url = await _api.uploadTempImage(file);
+      developer.log('[독후감 이미지 업로드] result=SUCCESS');
+      return url;
+    } catch (error) {
+      developer.log('[독후감 이미지 업로드] result=FAIL reason=${_reasonOf(error)}');
+      rethrow;
+    }
+  }
+
   // ---------------------------------------------------------------------
   // 서버 동기화
   // ---------------------------------------------------------------------
@@ -50,11 +184,16 @@ class BookReflectionRepository {
 
   /// since가 없으면 전체 동기화, 있으면 증분 동기화 → 증분 응답이
   /// fullSyncRequired면 전체 동기화로 대체. [BookNoteRepository.sync]와
-  /// 같은 구조(단, dirty push 단계가 없다).
+  /// 같은 구조다.
   ///
   /// 반환값은 실제로 로컬 DB가 바뀌었는지 여부.
   Future<bool> sync({required int ownerUserId}) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
+
+    await pushAllDirty();
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+      return false;
+    }
 
     final since = await _dao.getLastSyncedAtReflection();
     if (since == null) {
@@ -108,5 +247,121 @@ class BookReflectionRepository {
       requestedAt: requestedAt,
     );
     return true;
+  }
+
+  Future<void> pushAllDirty() async {
+    final expectedGeneration = BookshelfDatabase.sessionGeneration;
+    for (final reflection in await _dao.getDirty()) {
+      if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+      await pushReflection(reflection.id);
+    }
+  }
+
+  Future<void> pushReflection(int localReflectionId) {
+    final previous =
+        _dirtyPushChains[localReflectionId] ?? Future<void>.value();
+    final chained = previous
+        .then((_) => _pushOne(localReflectionId))
+        .catchError((_, _) {});
+    _dirtyPushChains[localReflectionId] = chained;
+    return chained;
+  }
+
+  Future<void> _pushOne(int localReflectionId) async {
+    final expectedGeneration = BookshelfDatabase.sessionGeneration;
+    final reflection = await _dao.getByLocalId(localReflectionId);
+    if (reflection == null || !reflection.isDirty) return;
+    if (reflection.deletedAt != null) {
+      try {
+        if (reflection.serverId != null) {
+          await _api.delete(reflection.serverId!);
+        }
+        if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+        await _dao.confirmDelete(
+          localId: localReflectionId,
+          capturedUpdatedAt: reflection.updatedAt,
+        );
+        developer.log(
+          '[독후감 삭제 push] reflectionId=$localReflectionId result=SUCCESS',
+        );
+      } on ApiException catch (error) {
+        if (error.statusCode == 404) {
+          if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+          await _dao.confirmDelete(
+            localId: localReflectionId,
+            capturedUpdatedAt: reflection.updatedAt,
+          );
+          developer.log(
+            '[독후감 삭제 push] reflectionId=$localReflectionId '
+            'result=SUCCESS reason=already_deleted',
+          );
+          return;
+        }
+        developer.log(
+          '[독후감 삭제 push] reflectionId=$localReflectionId '
+          'result=FAIL reason=${_reasonOf(error)}',
+        );
+      } catch (error) {
+        developer.log(
+          '[독후감 삭제 push] reflectionId=$localReflectionId '
+          'result=FAIL reason=${_reasonOf(error)}',
+        );
+      }
+      return;
+    }
+    final book = await _bookshelfRepository.getById(reflection.userBookId);
+    final serverUserBookId = book?.serverId;
+    if (serverUserBookId == null) {
+      developer.log(
+        '[독후감 더티 push] reflectionId=$localReflectionId '
+        'result=FAIL reason=book_create_pending',
+      );
+      return;
+    }
+    final title = reflection.title;
+    final contentJson = reflection.contentJson;
+    final contentText = reflection.contentText;
+    if (title == null || contentJson == null || contentText == null) return;
+    final draft = BookReflectionDraft(
+      title: title,
+      contentJson: contentJson,
+      contentText: contentText,
+      isPublic: reflection.isPublic,
+    );
+    try {
+      final result = reflection.serverId == null
+          ? await _api.create(
+              userBookId: serverUserBookId,
+              draft: draft,
+              clientRequestId: reflection.clientRequestId,
+            )
+          : await _api.update(reflectionId: reflection.serverId!, draft: draft);
+      if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+      await _dao.confirmPush(
+        localId: localReflectionId,
+        capturedUpdatedAt: reflection.updatedAt,
+        result: result,
+      );
+      developer.log(
+        '[독후감 더티 push] reflectionId=$localReflectionId result=SUCCESS',
+      );
+    } catch (error) {
+      developer.log(
+        '[독후감 더티 push] reflectionId=$localReflectionId '
+        'result=FAIL reason=${_reasonOf(error)}',
+      );
+    }
+  }
+
+  String _reasonOf(Object error) {
+    if (error is ApiException) {
+      return switch (error.statusCode) {
+        400 => 'validation_failed',
+        401 => 'unauthorized',
+        404 => 'not_found',
+        _ => 'network_or_server_error',
+      };
+    }
+    return 'unexpected_error';
   }
 }

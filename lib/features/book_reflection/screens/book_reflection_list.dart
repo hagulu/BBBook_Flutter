@@ -7,6 +7,7 @@ import '../../auth/providers/auth_notifier.dart';
 import '../models/book_reflection.dart';
 import '../providers/book_reflection_providers.dart';
 import 'book_reflection_detail_screen.dart';
+import 'book_reflection_editor_screen.dart';
 import 'widgets/book_reflection_refresh_indicator.dart';
 
 /// 책 기록 상세의 독후감 탭. [bookReflectionListProvider]가 로컬 DB만
@@ -14,8 +15,8 @@ import 'widgets/book_reflection_refresh_indicator.dart';
 /// ([BookReflectionRefreshIndicator])으로만 일어난다 —
 /// [BookNoteList]와 같은 원칙.
 ///
-/// 작성/수정/삭제(에디터)는 아직 붙이지 않아 목록에 추가 버튼이 없다 —
-/// 웹의 "독후감 추가" 버튼에 대응하는 진입점은 에디터 구현 시 추가한다.
+/// 상단 추가 버튼은 새 에디터로, 각 카드는 리치 텍스트 상세·수정 흐름으로
+/// 연결된다.
 class BookReflectionList extends ConsumerWidget {
   const BookReflectionList({
     super.key,
@@ -38,16 +39,29 @@ class BookReflectionList extends ConsumerWidget {
         key: const PageStorageKey('book-reflection-list'),
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
-          const SliverPadding(
+          SliverPadding(
             padding: EdgeInsets.fromLTRB(16, 18, 16, 12),
             sliver: SliverToBoxAdapter(
-              child: Text(
-                '독후감',
-                style: TextStyle(
-                  color: AppColors.textStrong,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      '독후감',
+                      style: TextStyle(
+                        color: AppColors.textStrong,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: ownerUserId == null
+                        ? null
+                        : () => _openEditor(context, ownerUserId: ownerUserId),
+                    tooltip: '독후감 작성',
+                    icon: const Icon(PhosphorIconsRegular.plus),
+                  ),
+                ],
               ),
             ),
           ),
@@ -106,6 +120,18 @@ class BookReflectionList extends ConsumerWidget {
           userBookId: userBookId,
           bookTitle: bookTitle,
           reflectionId: reflectionId,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openEditor(BuildContext context, {required int ownerUserId}) {
+    return Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => BookReflectionEditorScreen(
+          ownerUserId: ownerUserId,
+          userBookId: userBookId,
+          bookTitle: bookTitle,
         ),
       ),
     );
@@ -196,7 +222,7 @@ class _ReflectionCard extends StatelessWidget {
                     ],
                     const SizedBox(height: 7),
                     Text(
-                      _formatDate(reflection.updatedAt),
+                      _formatDate(reflection.createdAt),
                       style: const TextStyle(
                         color: AppColors.textMuted,
                         fontSize: 12,
@@ -204,12 +230,6 @@ class _ReflectionCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 10),
-              const Icon(
-                PhosphorIconsRegular.caretRight,
-                color: AppColors.controlInactive,
-                size: 18,
               ),
             ],
           ),

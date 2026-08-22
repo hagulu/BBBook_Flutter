@@ -38,7 +38,7 @@
 
 - `lib/features/bookshelf/screens/bookshelf_screen.dart` — 책장 탭 콘텐츠(읽고 싶음/읽는 중/완독/중단 4탭, 기본은 읽는 중)
 - `lib/features/bookshelf/data/bookshelf_api.dart` — 책장 API 호출(전체 동기화, 증분 동기화, 완독 공개 설정 조회/수정, 카테고리 목록 GET)
-- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타, v9)
+- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타, v11)
 - `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호)
 - `lib/features/bookshelf/data/book_category_dao.dart` — 카테고리 마스터 목록 로컬 캐시 DAO(계정 무관, 로그아웃 시에도 유지)
 - `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화, 카테고리는 로컬 캐시 우선 조회
@@ -71,11 +71,12 @@
 
 ## features/book_reflection
 
-- `lib/features/book_reflection/screens/book_reflection_list.dart` — 책 기록 상세의 독후감 탭(로컬 목록, 당겨서 새로고침), 상세 진입점. 작성/수정/삭제(에디터)는 미구현
-- `lib/features/book_reflection/screens/book_reflection_detail_screen.dart` — 독후감 상세(읽기 전용). `content_json`(Tiptap) 리치 텍스트 렌더링은 미구현이라 `content_text`만 표시
-- `lib/features/book_reflection/data/book_reflection_api.dart` — 독후감 증분 동기화 API 호출(`GET /api/me/reflections/sync/changes`)
-- `lib/features/book_reflection/data/book_reflection_dao.dart` — 로컬 DB 쿼리·전체/증분 동기화 반영(로컬 편집 dirty push 경로는 아직 없음)
-- `lib/features/book_reflection/data/book_reflection_repository.dart` — 독후감 화면 source of truth(로컬 조회 전용), 최초엔 전체(`/api/me/records`)·이후엔 증분(`/api/me/reflections/sync/changes`) 동기화
+- `lib/features/book_reflection/screens/book_reflection_list.dart` — 책 기록 상세의 독후감 탭(로컬 목록, 당겨서 새로고침), 작성·상세 진입점
+- `lib/features/book_reflection/screens/book_reflection_detail_screen.dart` — 독후감 상세(Quill Delta·레거시 Tiptap 리치 텍스트/이미지 읽기 및 수정 진입)
+- `lib/features/book_reflection/screens/book_reflection_editor_screen.dart` — Flutter Quill 기반 독후감 작성/수정 화면(순환형 제목·목록 툴바, 본문 이미지 크기·삭제 메뉴)
+- `lib/features/book_reflection/data/book_reflection_api.dart` — 독후감 작성·수정·본문 이미지 업로드·증분 동기화 API 호출
+- `lib/features/book_reflection/data/book_reflection_dao.dart` — 독후감 로컬 우선 CRUD·dirty push 확정·전체/증분 동기화 반영
+- `lib/features/book_reflection/data/book_reflection_repository.dart` — 독후감 화면 source of truth(로컬 우선 작성/수정 후 조용히 push, dirty 재시도, 전체/증분 동기화)
 - `lib/features/book_reflection/providers/book_reflection_providers.dart` — 독후감 목록·상세 조회 및 동기화 컨트롤러 Riverpod provider
 
 ## features/record_sync

@@ -54,6 +54,8 @@ dependencies:
   url_launcher: ^6.3.1
   mobile_scanner: ^7.1.2
   calendar_date_picker2: ^3.0.0
+  flutter_quill: ^11.5.1
+  flutter_quill_extensions: ^11.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

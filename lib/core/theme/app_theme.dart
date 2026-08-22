@@ -53,6 +53,21 @@ class AppColors {
   static const memoPhotoForeground = Color(0xFFA34062);
   static const memoPhotoSurface = Color(0xFFFBE2EB);
 
+  // --- 독후감 리치 텍스트 에디터 팔레트 ---
+  static const reflectionTextBlue = Color(0xFF0061A3);
+  static const reflectionTextSky = Color(0xFF0EA5E9);
+  static const reflectionTextGreen = Color(0xFF16A34A);
+  static const reflectionTextOrange = Color(0xFFEA580C);
+  static const reflectionTextRed = Color(0xFFE03C3C);
+  static const reflectionTextGray = Color(0xFF94A3B8);
+  static const reflectionHighlightYellow = Color(0xFFFEF08A);
+  static const reflectionHighlightOrange = Color(0xFFFED7AA);
+  static const reflectionHighlightPink = Color(0xFFFECDD3);
+  static const reflectionHighlightSky = Color(0xFFBAE6FD);
+  static const reflectionHighlightGreen = Color(0xFFBBF7D0);
+  static const reflectionHighlightPurple = Color(0xFFE9D5FF);
+  static const reflectionQuoteText = Color(0xFF64748B);
+
   // --- 텍스트 ---
   /// 제목·강조 텍스트.
   static const textStrong = Color(0xFF27311F);

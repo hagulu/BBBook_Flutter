@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_notifier.dart';
 import '../../auth/providers/auth_providers.dart';
+import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../record_sync/providers/record_sync_providers.dart';
 import '../data/book_reflection_api.dart';
 import '../data/book_reflection_dao.dart';
@@ -26,6 +27,7 @@ final bookReflectionRepositoryProvider = Provider<BookReflectionRepository>((
     // 최초 기록 전체 조회(`/api/me/records`)를 독후감 전체 동기화에도
     // 그대로 재사용한다(record_sync 기능이 이미 그 API를 감싸고 있다).
     recordSyncApi: ref.watch(recordSyncApiProvider),
+    bookshelfRepository: ref.watch(bookshelfRepositoryProvider),
     dao: ref.watch(bookReflectionDaoProvider),
   );
 });

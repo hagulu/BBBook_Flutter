@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../bookshelf/data/bookshelf_database.dart';
 import '../../record_sync/models/record_sync_payload.dart';
@@ -9,11 +10,9 @@ import '../models/book_reflection.dart';
 
 /// 독후감 로컬 DB 쿼리/쓰기 전담.
 ///
-/// [BookNoteDao]와 달리 `book_reflection.id`는 지금은 항상 서버 ID와 같다
-/// (로컬 전용 오프라인 생성 경로가 아직 없다 — 편집기 기능 붙일 때 `server_id`
-/// 컬럼 분리 여부를 다시 검토해야 한다). 그래서 이 DAO는 조회와 서버 조회
-/// 결과 반영(전체/증분 동기화)만 담당하고, `is_dirty`를 세우는 로컬 쓰기
-/// 경로는 아직 없다.
+/// `id`는 화면이 계속 참조하는 로컬 PK이고 오프라인 생성 시 음수일 수 있다.
+/// 서버 PK는 `server_id`, CREATE 멱등 키는 `client_request_id`에 분리해
+/// 노트와 같은 로컬 우선 + dirty push 구조를 유지한다.
 class BookReflectionDao {
   const BookReflectionDao();
 
@@ -32,12 +31,10 @@ class BookReflectionDao {
     final db = await BookshelfDatabase.instance();
     final rows = await db.query(
       'book_reflection',
-      where:
-          'owner_user_id = ? AND user_book_id = ? AND deleted_at IS NULL',
+      where: 'owner_user_id = ? AND user_book_id = ? AND deleted_at IS NULL',
       whereArgs: [ownerUserId, userBookId],
-      // 서버 목록 API(`GET /api/me/books/{userBookId}/reflections`)와 같은
-      // 정렬(최신순 id DESC) — `id`가 곧 서버 ID이므로 그대로 일치한다.
-      orderBy: 'id DESC',
+      // 로컬 신규 행은 음수 PK라 id만으로 정렬하지 않고 생성 시각을 기준으로 한다.
+      orderBy: 'created_at DESC, id DESC',
     );
     return rows.map(_reflectionFromRow).toList(growable: false);
   }
@@ -58,6 +55,200 @@ class BookReflectionDao {
     );
     if (rows.isEmpty) return null;
     return _reflectionFromRow(rows.single);
+  }
+
+  Future<BookReflection> createLocal({
+    required int ownerUserId,
+    required int userBookId,
+    required BookReflectionDraft draft,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    return db.transaction((txn) async {
+      final id = await _nextLocalId(txn);
+      final now = DateTime.now().toUtc().toIso8601String();
+      final values = <String, Object?>{
+        'id': id,
+        'server_id': null,
+        'client_request_id': const Uuid().v4(),
+        'owner_user_id': ownerUserId,
+        'user_book_id': userBookId,
+        'reflection_type': 'USER_WRITTEN',
+        'title': draft.title,
+        'content_json': jsonEncode(draft.contentJson),
+        'content_text': draft.contentText,
+        'is_public': draft.isPublic ? 1 : 0,
+        'is_hidden': 0,
+        'deleted_at': null,
+        'created_at': now,
+        'updated_at': now,
+        'is_dirty': 1,
+      };
+      await txn.insert('book_reflection', values);
+      return _reflectionFromRow(values);
+    });
+  }
+
+  Future<BookReflection> updateLocal({
+    required int ownerUserId,
+    required int userBookId,
+    required int reflectionId,
+    required BookReflectionDraft draft,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    final now = DateTime.now().toUtc().toIso8601String();
+    final count = await db.update(
+      'book_reflection',
+      {
+        'title': draft.title,
+        'content_json': jsonEncode(draft.contentJson),
+        'content_text': draft.contentText,
+        'is_public': draft.isPublic ? 1 : 0,
+        'updated_at': now,
+        'is_dirty': 1,
+      },
+      where:
+          'id = ? AND owner_user_id = ? AND user_book_id = ? '
+          'AND deleted_at IS NULL AND is_hidden = 0',
+      whereArgs: [reflectionId, ownerUserId, userBookId],
+    );
+    if (count != 1) throw StateError('Reflection not found');
+    final rows = await db.query(
+      'book_reflection',
+      where: 'id = ?',
+      whereArgs: [reflectionId],
+      limit: 1,
+    );
+    return _reflectionFromRow(rows.single);
+  }
+
+  Future<BookReflection> updateVisibilityLocal({
+    required int ownerUserId,
+    required int userBookId,
+    required int reflectionId,
+    required bool isPublic,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    final now = DateTime.now().toUtc().toIso8601String();
+    final count = await db.update(
+      'book_reflection',
+      {'is_public': isPublic ? 1 : 0, 'updated_at': now},
+      where:
+          'id = ? AND owner_user_id = ? AND user_book_id = ? '
+          'AND deleted_at IS NULL AND is_hidden = 0',
+      whereArgs: [reflectionId, ownerUserId, userBookId],
+    );
+    if (count != 1) throw StateError('Reflection not found');
+    final rows = await db.query(
+      'book_reflection',
+      where: 'id = ?',
+      whereArgs: [reflectionId],
+      limit: 1,
+    );
+    return _reflectionFromRow(rows.single);
+  }
+
+  Future<BookReflection> markDeletedLocal({
+    required int ownerUserId,
+    required int userBookId,
+    required int reflectionId,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    final now = DateTime.now().toUtc().toIso8601String();
+    final count = await db.update(
+      'book_reflection',
+      {'deleted_at': now, 'updated_at': now, 'is_dirty': 1},
+      where:
+          'id = ? AND owner_user_id = ? AND user_book_id = ? '
+          'AND deleted_at IS NULL',
+      whereArgs: [reflectionId, ownerUserId, userBookId],
+    );
+    if (count != 1) throw StateError('Reflection not found');
+    final rows = await db.query(
+      'book_reflection',
+      where: 'id = ?',
+      whereArgs: [reflectionId],
+      limit: 1,
+    );
+    return _reflectionFromRow(rows.single);
+  }
+
+  Future<List<BookReflection>> getDirty() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'book_reflection',
+      where: 'is_dirty = 1',
+      orderBy: 'updated_at ASC, id ASC',
+    );
+    return rows.map(_reflectionFromRow).toList(growable: false);
+  }
+
+  Future<BookReflection?> getByLocalId(int reflectionId) async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'book_reflection',
+      where: 'id = ?',
+      whereArgs: [reflectionId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : _reflectionFromRow(rows.single);
+  }
+
+  Future<void> confirmDelete({
+    required int localId,
+    required DateTime capturedUpdatedAt,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    await db.delete(
+      'book_reflection',
+      where: 'id = ? AND updated_at = ? AND deleted_at IS NOT NULL',
+      whereArgs: [localId, capturedUpdatedAt.toUtc().toIso8601String()],
+    );
+  }
+
+  Future<void> confirmPush({
+    required int localId,
+    required DateTime capturedUpdatedAt,
+    required BookReflectionServerResult result,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    await db.transaction((txn) async {
+      final rows = await txn.query(
+        'book_reflection',
+        where: 'id = ?',
+        whereArgs: [localId],
+        limit: 1,
+      );
+      if (rows.isEmpty) return;
+      final currentUpdatedAt = DateTime.parse(
+        rows.single['updated_at'] as String,
+      );
+      if (!currentUpdatedAt.isAtSameMomentAs(capturedUpdatedAt)) {
+        await txn.update(
+          'book_reflection',
+          {'server_id': result.id},
+          where: 'id = ?',
+          whereArgs: [localId],
+        );
+        return;
+      }
+      await txn.update(
+        'book_reflection',
+        {
+          'server_id': result.id,
+          'reflection_type':
+              result.reflectionType ?? rows.single['reflection_type'],
+          'title': result.title,
+          'content_json': jsonEncode(result.contentJson),
+          'content_text': result.contentText,
+          'is_public': result.isPublic ? 1 : 0,
+          'created_at': result.createdAt.toUtc().toIso8601String(),
+          'updated_at': result.updatedAt.toUtc().toIso8601String(),
+          'is_dirty': 0,
+        },
+        where: 'id = ?',
+        whereArgs: [localId],
+      );
+    });
   }
 
   // ---------------------------------------------------------------------
@@ -153,7 +344,7 @@ class BookReflectionDao {
         ).join(', ');
         await txn.delete(
           'book_reflection',
-          where: 'id IN ($placeholders) AND is_dirty = 0',
+          where: 'server_id IN ($placeholders) AND is_dirty = 0',
           whereArgs: deletedReflectionIds,
         );
       }
@@ -184,17 +375,20 @@ class BookReflectionDao {
     final existing = await txn.query(
       'book_reflection',
       columns: ['id', 'is_dirty'],
-      where: 'id = ?',
-      whereArgs: [reflection.id],
+      where: 'server_id = ? OR (server_id IS NULL AND id = ?)',
+      whereArgs: [reflection.id, reflection.id],
       limit: 1,
     );
     if (existing.isNotEmpty && existing.single['is_dirty'] == 1) {
-      // 아직 로컬 편집 push 기능이 없어 실제로는 항상 false지만, 미래의
-      // 로컬 편집 기능과의 정합성을 위해 dirty 행은 그대로 보호한다.
       return;
     }
+    final localId = existing.isEmpty
+        ? reflection.id
+        : existing.single['id'] as int;
     await txn.insert('book_reflection', {
-      'id': reflection.id,
+      'id': localId,
+      'server_id': reflection.id,
+      'client_request_id': null,
       'owner_user_id': ownerUserId,
       'user_book_id': localUserBookId,
       'reflection_type': reflection.reflectionType,
@@ -274,7 +468,8 @@ class BookReflectionDao {
     await txn.delete(
       'book_reflection',
       where:
-          'owner_user_id = ? AND id NOT IN ($reflectionPlaceholders) '
+          'owner_user_id = ? '
+          'AND (server_id IS NULL OR server_id NOT IN ($reflectionPlaceholders)) '
           'AND is_dirty = 0 AND user_book_id IN ($bookPlaceholders)',
       whereArgs: [ownerUserId, ...serverReflectionIds, ...activeUserBookIds],
     );
@@ -284,6 +479,8 @@ class BookReflectionDao {
     final contentJson = row['content_json'] as String?;
     return BookReflection(
       id: row['id'] as int,
+      serverId: row['server_id'] as int?,
+      clientRequestId: row['client_request_id'] as String?,
       userBookId: row['user_book_id'] as int,
       reflectionType: row['reflection_type'] as String,
       title: row['title'] as String?,
@@ -302,4 +499,12 @@ class BookReflectionDao {
 
   static DateTime? _parseNullable(String? value) =>
       value == null ? null : DateTime.parse(value);
+
+  Future<int> _nextLocalId(Transaction txn) async {
+    final rows = await txn.rawQuery(
+      'SELECT MIN(id) AS min_id FROM book_reflection',
+    );
+    final current = rows.single['min_id'] as int?;
+    return current != null && current <= 0 ? current - 1 : -1;
+  }
 }

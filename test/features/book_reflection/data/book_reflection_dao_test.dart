@@ -1,4 +1,5 @@
 import 'package:bbbook/features/book_reflection/data/book_reflection_dao.dart';
+import 'package:bbbook/features/book_reflection/models/book_reflection.dart';
 import 'package:bbbook/features/bookshelf/data/bookshelf_dao.dart';
 import 'package:bbbook/features/bookshelf/data/bookshelf_database.dart';
 import 'package:bbbook/features/bookshelf/models/book_item.dart';
@@ -93,10 +94,7 @@ void main() {
       userBookId: 501,
       reflectionType: 'USER_WRITTEN',
       title: '첫 독후감',
-      contentJson: const {
-        'type': 'doc',
-        'content': [],
-      },
+      contentJson: const {'type': 'doc', 'content': []},
       contentText: '본문 A',
       isPublic: true,
       isHidden: false,
@@ -135,10 +133,7 @@ void main() {
       reflectionId: 1001,
     );
     expect(detail?.title, '첫 독후감');
-    expect(detail?.contentJson, {
-      'type': 'doc',
-      'content': [],
-    });
+    expect(detail?.contentJson, {'type': 'doc', 'content': []});
     expect(detail?.contentText, '본문 A');
     expect(await reflectionDao.getLastSyncedAtReflection(), now);
 
@@ -157,6 +152,113 @@ void main() {
     );
     expect(afterPrune.map((r) => r.id), [1001]);
     expect(await reflectionDao.getLastSyncedAtReflection(), later);
+  });
+
+  test('신규 독후감은 로컬 우선 저장 후 서버 ID를 확정해도 로컬 PK를 유지한다', () async {
+    const reflectionDao = BookReflectionDao();
+    final localUserBookId = await createSyncedBook(
+      clientRequestId: '10000000-0000-4000-8000-000000000004',
+      isbn13: '9780000000004',
+      serverUserBookId: 504,
+    );
+    const draft = BookReflectionDraft(
+      title: '로컬 독후감',
+      contentJson: {
+        'ops': [
+          {'insert': '로컬 본문\n'},
+        ],
+      },
+      contentText: '로컬 본문',
+      isPublic: false,
+    );
+
+    final local = await reflectionDao.createLocal(
+      ownerUserId: 9,
+      userBookId: localUserBookId,
+      draft: draft,
+    );
+
+    expect(local.id, lessThan(0));
+    expect(local.serverId, isNull);
+    expect(local.clientRequestId, isNotEmpty);
+    expect(local.isDirty, isTrue);
+
+    final serverResult = BookReflectionServerResult(
+      id: 4001,
+      userBookId: 504,
+      reflectionType: 'USER_WRITTEN',
+      title: draft.title,
+      contentJson: draft.contentJson,
+      contentText: draft.contentText,
+      isPublic: draft.isPublic,
+      createdAt: local.createdAt.add(const Duration(seconds: 1)),
+      updatedAt: local.updatedAt.add(const Duration(seconds: 1)),
+    );
+    await reflectionDao.confirmPush(
+      localId: local.id,
+      capturedUpdatedAt: local.updatedAt,
+      result: serverResult,
+    );
+
+    final confirmed = await reflectionDao.findDetail(
+      ownerUserId: 9,
+      userBookId: localUserBookId,
+      reflectionId: local.id,
+    );
+    expect(confirmed?.id, local.id);
+    expect(confirmed?.serverId, 4001);
+    expect(confirmed?.isDirty, isFalse);
+
+    final visibilityChanged = await reflectionDao.updateVisibilityLocal(
+      ownerUserId: 9,
+      userBookId: localUserBookId,
+      reflectionId: local.id,
+      isPublic: true,
+    );
+    expect(visibilityChanged.isPublic, isTrue);
+    expect(visibilityChanged.isDirty, isFalse);
+
+    final edited = await reflectionDao.updateLocal(
+      ownerUserId: 9,
+      userBookId: localUserBookId,
+      reflectionId: local.id,
+      draft: const BookReflectionDraft(
+        title: '수정된 독후감',
+        contentJson: {
+          'ops': [
+            {'insert': '수정 본문\n'},
+          ],
+        },
+        contentText: '수정 본문',
+        isPublic: true,
+      ),
+    );
+    expect(edited.serverId, 4001);
+    expect(edited.isDirty, isTrue);
+    expect(edited.contentText, '수정 본문');
+
+    final deleted = await reflectionDao.markDeletedLocal(
+      ownerUserId: 9,
+      userBookId: localUserBookId,
+      reflectionId: local.id,
+    );
+    expect(deleted.deletedAt, isNotNull);
+    expect(deleted.isDirty, isTrue);
+    expect(
+      await reflectionDao.findDetail(
+        ownerUserId: 9,
+        userBookId: localUserBookId,
+        reflectionId: local.id,
+      ),
+      isNull,
+    );
+    expect((await reflectionDao.getDirty()).single.id, local.id);
+
+    await reflectionDao.confirmDelete(
+      localId: local.id,
+      capturedUpdatedAt: deleted.updatedAt,
+    );
+    expect(await reflectionDao.getByLocalId(local.id), isNull);
   });
 
   test('증분 동기화는 upsert/삭제를 반영한다', () async {

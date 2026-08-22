@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_confirm.dart';
+import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/record_dialog_shell.dart';
 import '../models/book_reflection.dart';
 import '../providers/book_reflection_providers.dart';
+import '../services/book_reflection_content_adapter.dart';
+import 'book_reflection_editor_screen.dart';
+import 'widgets/reflection_image_embed_builder.dart';
+import 'widgets/reflection_title_body_divider.dart';
 
-/// 독후감 상세(읽기 전용 흐름만 우선 구현).
-///
-/// `content_json`(Tiptap/ProseMirror JSON)을 리치 텍스트로 렌더링하는 기능은
-/// 아직 붙이지 않았다 — 웹과 손실 없이 호환되는 에디터/렌더러 구현 방식은
-/// 별도로 결정하기로 했다(reflection-editor.md 참고). 그때까지는 미리보기용
-/// 순수 텍스트인 [BookReflection.contentText]만 보여준다. 수정/삭제/공개
-/// 전환/좋아요 등도 에디터와 함께 붙일 예정이라 이 화면에는 아직 없다.
+/// 독후감 상세. 현재 Quill Delta와 레거시 Tiptap JSON을 같은 어댑터로
+/// 읽어 서식·이미지를 표시하고, 본인 로컬 데이터의 수정 화면으로 연결한다.
 class BookReflectionDetailScreen extends ConsumerWidget {
   const BookReflectionDetailScreen({
     super.key,
@@ -44,9 +47,13 @@ class BookReflectionDetailScreen extends ConsumerWidget {
         elevation: 0,
       ),
       body: switch (asyncReflection) {
-        AsyncData(:final value) => value == null
-            ? const _ReflectionNotFound()
-            : _ReflectionBody(reflection: value),
+        AsyncData(:final value) =>
+          value == null
+              ? const _ReflectionNotFound()
+              : _ReflectionBody(
+                  reflection: value,
+                  onMore: () => _openActions(context, ref, value, args),
+                ),
         AsyncError() => _ReflectionLoadError(
           onRetry: () => ref.invalidate(bookReflectionDetailProvider(args)),
         ),
@@ -54,12 +61,159 @@ class BookReflectionDetailScreen extends ConsumerWidget {
       },
     );
   }
+
+  Future<void> _openEditor(
+    BuildContext context,
+    WidgetRef ref,
+    BookReflection reflection,
+    BookReflectionDetailArgs args,
+  ) async {
+    await Navigator.of(context).push<int>(
+      MaterialPageRoute(
+        builder: (_) => BookReflectionEditorScreen(
+          ownerUserId: ownerUserId,
+          userBookId: userBookId,
+          bookTitle: bookTitle,
+          reflection: reflection,
+        ),
+      ),
+    );
+    ref.invalidate(bookReflectionDetailProvider(args));
+  }
+
+  Future<void> _openActions(
+    BuildContext context,
+    WidgetRef ref,
+    BookReflection reflection,
+    BookReflectionDetailArgs args,
+  ) async {
+    final action = await showModalBottomSheet<_ReflectionAction>(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => RecordDialogShell(
+        title: '독후감 관리',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: reflection.isPublic,
+              onChanged: (_) =>
+                  Navigator.of(sheetContext).pop(_ReflectionAction.visibility),
+              secondary: Icon(
+                reflection.isPublic
+                    ? PhosphorIconsRegular.globe
+                    : PhosphorIconsRegular.lock,
+              ),
+              title: const Text('공개 여부'),
+              subtitle: Text(reflection.isPublic ? '공개' : '비공개'),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(PhosphorIconsRegular.pencil),
+              title: const Text('수정'),
+              onTap: () =>
+                  Navigator.of(sheetContext).pop(_ReflectionAction.edit),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(
+                PhosphorIconsRegular.trash,
+                color: AppColors.error,
+              ),
+              title: const Text('삭제', style: TextStyle(color: AppColors.error)),
+              onTap: () =>
+                  Navigator.of(sheetContext).pop(_ReflectionAction.delete),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == null || !context.mounted) return;
+
+    switch (action) {
+      case _ReflectionAction.visibility:
+        await _setPublic(context, ref, reflection, args);
+        return;
+      case _ReflectionAction.edit:
+        await _openEditor(context, ref, reflection, args);
+        return;
+      case _ReflectionAction.delete:
+        await _delete(context, ref, reflection);
+        return;
+    }
+  }
+
+  Future<void> _setPublic(
+    BuildContext context,
+    WidgetRef ref,
+    BookReflection reflection,
+    BookReflectionDetailArgs args,
+  ) async {
+    try {
+      await ref
+          .read(bookReflectionRepositoryProvider)
+          .setPublic(
+            ownerUserId: ownerUserId,
+            userBookId: userBookId,
+            reflectionId: reflection.id,
+            isPublic: !reflection.isPublic,
+          );
+      ref.read(bookReflectionSyncVersionProvider.notifier).state++;
+      ref.invalidate(bookReflectionDetailProvider(args));
+      if (context.mounted) {
+        AppSnackBar.success(
+          context,
+          reflection.isPublic ? '비공개로 변경했습니다.' : '공개로 변경했습니다.',
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        AppSnackBar.error(context, '공개 여부를 변경하지 못했습니다.');
+      }
+    }
+  }
+
+  Future<void> _delete(
+    BuildContext context,
+    WidgetRef ref,
+    BookReflection reflection,
+  ) async {
+    final confirmed = await AppConfirm.show(
+      context,
+      title: '독후감 삭제',
+      message: '이 독후감을 삭제할까요?',
+      confirmText: '삭제',
+      destructive: true,
+    );
+    if (!confirmed || !context.mounted) return;
+    try {
+      await ref
+          .read(bookReflectionRepositoryProvider)
+          .delete(
+            ownerUserId: ownerUserId,
+            userBookId: userBookId,
+            reflectionId: reflection.id,
+          );
+      ref.read(bookReflectionSyncVersionProvider.notifier).state++;
+      if (context.mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (context.mounted) {
+        AppSnackBar.error(context, '독후감을 삭제하지 못했습니다.');
+      }
+    }
+  }
 }
 
+enum _ReflectionAction { visibility, edit, delete }
+
 class _ReflectionBody extends StatelessWidget {
-  const _ReflectionBody({required this.reflection});
+  const _ReflectionBody({required this.reflection, required this.onMore});
 
   final BookReflection reflection;
+  final VoidCallback onMore;
 
   @override
   Widget build(BuildContext context) {
@@ -77,52 +231,77 @@ class _ReflectionBody extends StatelessWidget {
 
     final title = reflection.title?.trim();
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title == null || title.isEmpty ? '제목 없음' : title,
-                  style: const TextStyle(
-                    color: AppColors.textStrong,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+      padding: const EdgeInsets.fromLTRB(10, 16, 10, 40),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+          boxShadow: const [
+            BoxShadow(
+              color: AppColors.shadowSoft,
+              blurRadius: 4,
+              offset: Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title == null || title.isEmpty ? '제목 없음' : title,
+                    style: const TextStyle(
+                      color: AppColors.textStrong,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Semantics(
-                label: reflection.isPublic ? '공개 독후감' : '비공개 독후감',
-                child: Icon(
-                  reflection.isPublic
-                      ? PhosphorIconsRegular.globe
-                      : PhosphorIconsRegular.lock,
-                  size: 18,
-                  color: AppColors.textMuted,
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _formatDate(reflection.updatedAt),
+                    style: const TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: onMore,
+                  tooltip: '독후감 관리',
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(PhosphorIconsRegular.dotsThree, size: 22),
+                ),
+              ],
+            ),
+            const ReflectionTitleBodyDivider(horizontalInset: 0),
+            if (reflection.contentJson != null)
+              _ReflectionRichContent(
+                key: ValueKey(reflection.updatedAt),
+                contentJson: reflection.contentJson!,
+              )
+            else
+              Text(
+                reflection.contentText?.trim().isNotEmpty == true
+                    ? reflection.contentText!.trim()
+                    : '내용이 없습니다.',
+                style: const TextStyle(
+                  color: AppColors.textBody,
+                  fontSize: 15,
+                  height: 1.6,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            _formatDate(reflection.updatedAt),
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            reflection.contentText?.trim().isNotEmpty == true
-                ? reflection.contentText!.trim()
-                : '내용이 없습니다.',
-            style: const TextStyle(
-              color: AppColors.textBody,
-              fontSize: 15,
-              height: 1.6,
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -130,6 +309,58 @@ class _ReflectionBody extends StatelessWidget {
   static String _formatDate(DateTime value) {
     final local = value.toLocal();
     return '${local.year}.${local.month}.${local.day}';
+  }
+}
+
+class _ReflectionRichContent extends StatefulWidget {
+  const _ReflectionRichContent({super.key, required this.contentJson});
+
+  final Map<String, dynamic> contentJson;
+
+  @override
+  State<_ReflectionRichContent> createState() => _ReflectionRichContentState();
+}
+
+class _ReflectionRichContentState extends State<_ReflectionRichContent> {
+  static const _adapter = BookReflectionContentAdapter();
+  late final QuillController _controller;
+  final FocusNode _focusNode = FocusNode();
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = QuillController(
+      document: _adapter.fromServerJson(widget.contentJson),
+      selection: const TextSelection.collapsed(offset: 0),
+      readOnly: true,
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ReflectionQuillEditor(
+      controller: _controller,
+      focusNode: _focusNode,
+      scrollController: _scrollController,
+      config: QuillEditorConfig(
+        scrollable: false,
+        padding: EdgeInsets.zero,
+        enableInteractiveSelection: true,
+        showCursor: false,
+        customStyles: bookReflectionQuillStyles,
+        textSpanBuilder: reflectionTextSpanBuilder,
+        embedBuilders: const [ReflectionImageEmbedBuilder()],
+      ),
+    );
   }
 }
 

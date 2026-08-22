@@ -229,7 +229,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
                 itemCount: visibleMemos.length,
                 itemBuilder: (context, index) {
                   final memo = visibleMemos[index];
-                  return _NoteMemoTimelineItem(
+                  return BookNoteMemoTimelineItem(
                     memo: memo,
                     showDivider: index < visibleMemos.length - 1,
                     onTap:
@@ -449,9 +449,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
     final confirmed = await AppConfirm.show(
       context,
       title: '메모 삭제',
-      message: isLast
-          ? '마지막 메모를 삭제하면 이 노트도 함께 사라집니다. 삭제할까요?'
-          : '이 메모를 삭제할까요?',
+      message: isLast ? '마지막 메모를 삭제하면 이 노트도 함께 사라집니다. 삭제할까요?' : '이 메모를 삭제할까요?',
       confirmText: '삭제',
       destructive: true,
     );
@@ -670,8 +668,9 @@ class _NoteMemoActionTile extends StatelessWidget {
   }
 }
 
-class _NoteMemoTimelineItem extends StatelessWidget {
-  const _NoteMemoTimelineItem({
+class BookNoteMemoTimelineItem extends StatelessWidget {
+  const BookNoteMemoTimelineItem({
+    super.key,
     required this.memo,
     required this.showDivider,
     required this.onTap,
@@ -679,7 +678,7 @@ class _NoteMemoTimelineItem extends StatelessWidget {
 
   final BookNoteMemo memo;
   final bool showDivider;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
