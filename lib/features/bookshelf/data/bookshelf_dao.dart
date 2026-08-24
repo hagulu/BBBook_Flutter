@@ -287,9 +287,42 @@ class BookshelfDao {
   /// ISBN 일괄 연결 "제외" 기록(있다면)도 함께 지운다(`dismissed_isbn_link`는
   /// `user_book`을 외래 키로 참조하지 않아 자동으로 정리되지 않는다 —
   /// bookshelf_database.dart의 `_createDismissedIsbnLinkTable` 문서 참고).
+  /// 책 한 권과 그 아래 기록(노트·메모·독후감·이미지 매칭·제외 표시)을
+  /// 한 트랜잭션에서 모두 지운다.
+  ///
+  /// `book_note`/`book_reflection`은 일부러 `user_book` 외래 키를 걸지 않아
+  /// (동기화가 `INSERT OR REPLACE`를 쓰기 때문 —
+  /// `BookshelfDatabase._createRecordTables` 참고) CASCADE가 없다. 여기서
+  /// 직접 지우지 않으면 하위 기록이 남고, 로컬 신규 책 ID는
+  /// [_nextLocalUserBookId]가 `MIN(user_book_id) - 1`로 발급하므로 지운 책이
+  /// 가장 작은 음수였다면 그 ID가 다음 책에 재사용되면서 남은 노트·독후감이
+  /// 엉뚱한 책에 다시 붙는다.
   Future<void> deleteOne(int userBookId) async {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
+      await txn.delete(
+        'book_note_memo',
+        where: 'note_id IN (SELECT id FROM book_note WHERE user_book_id = ?)',
+        whereArgs: [userBookId],
+      );
+      await txn.delete(
+        'book_note',
+        where: 'user_book_id = ?',
+        whereArgs: [userBookId],
+      );
+      await txn.delete(
+        'reflection_image_local',
+        where:
+            'reflection_id IN '
+            '(SELECT id FROM book_reflection WHERE user_book_id = ?)',
+        whereArgs: [userBookId],
+      );
+      await txn.delete(
+        'book_reflection',
+        where: 'user_book_id = ?',
+        whereArgs: [userBookId],
+      );
+      // user_book_tag는 ON DELETE CASCADE가 걸려 있어 아래 삭제로 함께 정리된다.
       await txn.delete(
         'user_book',
         where: 'user_book_id = ?',
@@ -301,6 +334,42 @@ class BookshelfDao {
         whereArgs: [userBookId],
       );
     });
+  }
+
+  /// [deleteOne] 전에 호출해, 이 책과 함께 지워야 할 로컬 이미지 파일의
+  /// 상대 경로를 모은다(행을 지우면 어떤 파일이 딸려 있었는지 알 수 없다).
+  Future<BookLocalImagePaths> findLocalImagePathsForBook(int userBookId) async {
+    final db = await BookshelfDatabase.instance();
+    final memoRows = await db.rawQuery(
+      'SELECT m.local_image_path AS path FROM book_note_memo m '
+      'JOIN book_note n ON n.id = m.note_id '
+      'WHERE n.user_book_id = ? AND m.local_image_path IS NOT NULL',
+      [userBookId],
+    );
+    final reflectionRows = await db.rawQuery(
+      'SELECT l.local_image_path AS path FROM reflection_image_local l '
+      'JOIN book_reflection r ON r.id = l.reflection_id '
+      'WHERE r.user_book_id = ?',
+      [userBookId],
+    );
+    final coverRows = await db.query(
+      'user_book',
+      columns: ['cover_image_url'],
+      where: 'user_book_id = ?',
+      whereArgs: [userBookId],
+      limit: 1,
+    );
+    return BookLocalImagePaths(
+      memoImages: memoRows
+          .map((row) => row['path'] as String)
+          .toList(growable: false),
+      reflectionImages: reflectionRows
+          .map((row) => row['path'] as String)
+          .toList(growable: false),
+      coverImage: coverRows.isEmpty
+          ? null
+          : coverRows.single['cover_image_url'] as String?,
+    );
   }
 
   /// [reconcile]/[applyChanges]가 실제로 `user_book` 행을 지운 뒤 호출한다.

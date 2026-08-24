@@ -1,10 +1,16 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/storage/local_image_store.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../data/finished_cover_cache_manager.dart';
+import '../../services/book_cover_image_store.dart';
 
 /// 책 표지 썸네일. 이미지가 없거나 로드 실패 시 그라디언트 + 제목으로 대체한다.
+///
+/// [imageUrl]은 서버 URL이 보통이지만, 로컬 저장 모드에서 사용자가 직접 고른
+/// 표지는 로컬 파일 경로(`book_covers/...`)다([bookCoverImageStore]) — 그
+/// 경우 네트워크 대신 로컬 파일에서 읽는다.
 class BookCover extends StatelessWidget {
   const BookCover({
     super.key,
@@ -26,12 +32,22 @@ class BookCover extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final url = imageUrl;
+    final localFile = url == null || LocalImageStore.isRemote(url)
+        ? null
+        : bookCoverImageStore.resolveSync(url);
     return AspectRatio(
       aspectRatio: 2 / 3,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: url == null || url.isEmpty
             ? _CoverPlaceholder(title: title)
+            : localFile != null
+            ? Image.file(
+                localFile,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    _CoverPlaceholder(title: title),
+              )
             : LayoutBuilder(
                 builder: (context, constraints) {
                   // 화면엔 그리드 셀 크기(대략 3열 썸네일)로만 표시되는데 서버

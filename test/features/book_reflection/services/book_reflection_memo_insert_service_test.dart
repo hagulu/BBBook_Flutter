@@ -81,6 +81,7 @@ BookNoteMemo _memo({required BookNoteMemoType type, required String content}) {
     endPage: null,
     content: content,
     imageUrl: null,
+    localImagePath: null,
     isImportant: content.contains('::hl[['),
     sortOrder: 0,
     deletedAt: null,

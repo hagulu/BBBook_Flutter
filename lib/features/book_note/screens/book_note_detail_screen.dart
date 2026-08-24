@@ -13,6 +13,7 @@ import '../../../shared/widgets/record_dialog_shell.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../models/book_note.dart';
 import '../providers/book_note_providers.dart';
+import '../services/note_memo_image_store.dart';
 import '../utils/memo_highlight.dart';
 import 'widgets/book_note_memo_sheet.dart';
 import 'widgets/book_note_refresh_indicator.dart';
@@ -232,9 +233,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
                   return BookNoteMemoTimelineItem(
                     memo: memo,
                     showDivider: index < visibleMemos.length - 1,
-                    onTap:
-                        memo.type == BookNoteMemoType.photo &&
-                            memo.imageUrl != null
+                    onTap: memo.type == BookNoteMemoType.photo && memo.hasImage
                         ? () => _showPhotoMemo(
                             memo,
                             totalMemoCount: detail.memos.length,
@@ -385,7 +384,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
     final action = await showDialog<_PhotoMemoAction>(
       context: context,
       useSafeArea: false,
-      builder: (context) => _PhotoMemoViewer(imageUrl: memo.imageUrl!),
+      builder: (context) => _PhotoMemoViewer(memo: memo),
     );
     if (!mounted || action == null) return;
     switch (action) {
@@ -506,9 +505,9 @@ enum _NoteMemoAction { edit, copy, delete }
 enum _PhotoMemoAction { edit, delete }
 
 class _PhotoMemoViewer extends StatelessWidget {
-  const _PhotoMemoViewer({required this.imageUrl});
+  const _PhotoMemoViewer({required this.memo});
 
-  final String imageUrl;
+  final BookNoteMemo memo;
 
   @override
   Widget build(BuildContext context) {
@@ -525,10 +524,7 @@ class _PhotoMemoViewer extends StatelessWidget {
                 minScale: 0.8,
                 maxScale: 4,
                 child: Center(
-                  child: _MemoPhotoImage(
-                    imageUrl: imageUrl,
-                    fit: BoxFit.contain,
-                  ),
+                  child: _MemoPhotoImage(memo: memo, fit: BoxFit.contain),
                 ),
               ),
             ),
@@ -789,12 +785,12 @@ class BookNoteMemoTimelineItem extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (memo.type == BookNoteMemoType.photo &&
-                              memo.imageUrl != null)
-                            _PhotoContent(imageUrl: memo.imageUrl!),
+                              memo.hasImage)
+                            _PhotoContent(memo: memo),
                           if (memo.content != null &&
                               memo.content!.isNotEmpty) ...[
                             if (memo.type == BookNoteMemoType.photo &&
-                                memo.imageUrl != null)
+                                memo.hasImage)
                               const SizedBox(height: 10),
                             if (memo.type == BookNoteMemoType.quote)
                               _QuoteContent(memo.content!)
@@ -954,9 +950,9 @@ class _MemoRichText extends StatelessWidget {
 }
 
 class _PhotoContent extends StatelessWidget {
-  const _PhotoContent({required this.imageUrl});
+  const _PhotoContent({required this.memo});
 
-  final String imageUrl;
+  final BookNoteMemo memo;
 
   @override
   Widget build(BuildContext context) {
@@ -964,32 +960,39 @@ class _PhotoContent extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       child: AspectRatio(
         aspectRatio: 16 / 9,
-        child: _MemoPhotoImage(imageUrl: imageUrl, fit: BoxFit.cover),
+        child: _MemoPhotoImage(memo: memo, fit: BoxFit.cover),
       ),
     );
   }
 }
 
+/// 사진은 로컬 사본을 먼저 쓴다(오프라인에서도 보이고 네트워크도 아낀다).
+/// 아직 내려받지 못했거나 파일이 없으면 서버 URL로 대체한다.
 class _MemoPhotoImage extends StatelessWidget {
-  const _MemoPhotoImage({required this.imageUrl, required this.fit});
+  const _MemoPhotoImage({required this.memo, required this.fit});
 
-  final String imageUrl;
+  final BookNoteMemo memo;
   final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      return Image.network(
-        imageUrl,
-        fit: fit,
-        errorBuilder: (_, _, _) => const _BrokenImage(),
-      );
-    }
-    final filePath = imageUrl.startsWith('file://')
-        ? Uri.parse(imageUrl).toFilePath()
-        : imageUrl;
+    final localFile = noteMemoImageStore.resolveSync(memo.localImagePath);
+    if (localFile == null) return _remote();
     return Image.file(
-      File(filePath),
+      localFile,
+      fit: fit,
+      errorBuilder: (_, _, _) => _remote(),
+    );
+  }
+
+  Widget _remote() {
+    final imageUrl = memo.imageUrl;
+    if (imageUrl == null ||
+        !(imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+      return const _BrokenImage();
+    }
+    return Image.network(
+      imageUrl,
       fit: fit,
       errorBuilder: (_, _, _) => const _BrokenImage(),
     );

@@ -158,20 +158,22 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
   /// 연결 PATCH 응답까지 기다린 뒤 닫는다 — 그러지 않으면 평소처럼 고른
   /// isbn만 바로 돌려주고, 책 정보 수정 시트가 필드를 채워 사용자가
   /// 검토·저장하게 한다.
-  Future<void> _handlePick(String isbn) async {
+  Future<void> _handlePick(BookSearchItem item) async {
     if (widget.userBookId != null && (widget.immediateSave?.value ?? false)) {
-      await _saveDirectly(isbn);
+      await _saveDirectly(item);
       return;
     }
-    Navigator.of(context).pop(IsbnSearchResult.picked(isbn));
+    Navigator.of(context).pop(IsbnSearchResult.picked(item.isbn));
   }
 
-  Future<void> _saveDirectly(String isbn) async {
+  Future<void> _saveDirectly(BookSearchItem item) async {
     AppLoading.show(context);
     try {
       await ref
           .read(bookRecordControllerProvider(widget.userBookId!).notifier)
-          .linkBook(isbn13: isbn);
+          // 로컬 저장 모드에서는 연결 응답이 없으므로 고른 책의 표시 정보를
+          // 함께 넘겨야 제목·표지가 갱신된다.
+          .linkBook(isbn13: item.isbn, linkedBook: item);
       if (mounted) {
         Navigator.of(context).pop(const IsbnSearchResult.savedDirectly());
       }
@@ -193,7 +195,8 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
   /// 둬서 다시 시도할 수 있게 한다. [_isSkipping]으로 처리 중 중복 탭도 막는다.
   Future<void> _handleSkip() async {
     if (_isSkipping) return;
-    if (!(widget.userBookId != null && (widget.excludeFromList?.value ?? false))) {
+    if (!(widget.userBookId != null &&
+        (widget.excludeFromList?.value ?? false))) {
       Navigator.of(context).pop(const IsbnSearchResult.skip());
       return;
     }
@@ -407,10 +410,7 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
           children: [
             for (final item in _items) ...[
-              SearchResultCard(
-                item: item,
-                onTap: () => _handlePick(item.isbn),
-              ),
+              SearchResultCard(item: item, onTap: () => _handlePick(item)),
               const SizedBox(height: 10),
             ],
             if (_totalPages > 1) ...[

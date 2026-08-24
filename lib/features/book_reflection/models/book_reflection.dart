@@ -104,3 +104,21 @@ class BookReflectionServerResult {
     );
   }
 }
+
+/// 독후감 본문 이미지 하나의 "서버 URL ↔ 로컬 사본" 짝
+/// (`reflection_image_local` 한 행). 서버에는 존재하지 않는 로컬 전용
+/// 정보이며, 실제 파일은 `reflectionImageStore`가 관리한다.
+class ReflectionImageLink {
+  const ReflectionImageLink({
+    required this.reflectionId,
+    required this.remoteImageUrl,
+    required this.localImagePath,
+  });
+
+  /// 로컬 PK(`book_reflection.id`).
+  final int reflectionId;
+  final String remoteImageUrl;
+
+  /// `reflection_images/<파일명>` 상대 경로.
+  final String localImagePath;
+}

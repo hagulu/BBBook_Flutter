@@ -205,20 +205,25 @@ class BookReflectionDao {
     );
   }
 
-  Future<void> confirmPush({
+  /// 반환값은 서버 응답이 로컬 행에 실제로 반영됐는지 여부. push가 오가는
+  /// 동안 새 편집이 들어왔으면 `server_id`만 채우고 본문은 그대로 둔다 —
+  /// 그 경우 로컬 본문은 아직 업로드 전 이미지 경로를 들고 있으므로,
+  /// 호출부(`BookReflectionRepository`)가 이 값을 보고 이미지 매칭 기록을
+  /// 건너뛰어야 한다.
+  Future<bool> confirmPush({
     required int localId,
     required DateTime capturedUpdatedAt,
     required BookReflectionServerResult result,
   }) async {
     final db = await BookshelfDatabase.instance();
-    await db.transaction((txn) async {
+    return db.transaction((txn) async {
       final rows = await txn.query(
         'book_reflection',
         where: 'id = ?',
         whereArgs: [localId],
         limit: 1,
       );
-      if (rows.isEmpty) return;
+      if (rows.isEmpty) return false;
       final currentUpdatedAt = DateTime.parse(
         rows.single['updated_at'] as String,
       );
@@ -229,7 +234,7 @@ class BookReflectionDao {
           where: 'id = ?',
           whereArgs: [localId],
         );
-        return;
+        return false;
       }
       await txn.update(
         'book_reflection',
@@ -248,7 +253,115 @@ class BookReflectionDao {
         where: 'id = ?',
         whereArgs: [localId],
       );
+      return true;
     });
+  }
+
+  // ---------------------------------------------------------------------
+  // 본문 이미지 로컬 사본 매칭(reflection_image_local)
+  // ---------------------------------------------------------------------
+
+  /// 한 독후감의 "서버 이미지 URL → 로컬 사본 상대 경로" 매칭.
+  /// 화면은 이 값으로 본문 이미지를 로컬 파일로 바꿔 표시한다.
+  Future<Map<String, String>> findLocalImagePaths(int reflectionId) async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'reflection_image_local',
+      columns: ['remote_image_url', 'local_image_path'],
+      where: 'reflection_id = ?',
+      whereArgs: [reflectionId],
+    );
+    return {
+      for (final row in rows)
+        row['remote_image_url'] as String: row['local_image_path'] as String,
+    };
+  }
+
+  /// 한 독후감의 매칭을 [mappings] 내용으로 맞춘다(없는 URL 행은 삭제).
+  /// 본문에서 지워진 이미지의 매칭이 남아 로컬 파일이 영영 정리되지 않는
+  /// 것을 막는다.
+  Future<void> replaceLocalImages({
+    required int reflectionId,
+    required Map<String, String> mappings,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    final now = DateTime.now().toUtc().toIso8601String();
+    await db.transaction((txn) async {
+      if (mappings.isEmpty) {
+        await txn.delete(
+          'reflection_image_local',
+          where: 'reflection_id = ?',
+          whereArgs: [reflectionId],
+        );
+        return;
+      }
+      final placeholders = List.filled(mappings.length, '?').join(', ');
+      await txn.delete(
+        'reflection_image_local',
+        where: 'reflection_id = ? AND remote_image_url NOT IN ($placeholders)',
+        whereArgs: [reflectionId, ...mappings.keys],
+      );
+      for (final entry in mappings.entries) {
+        await txn.insert('reflection_image_local', {
+          'reflection_id': reflectionId,
+          'remote_image_url': entry.key,
+          'local_image_path': entry.value,
+          'created_at': now,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    });
+  }
+
+  Future<void> deleteLocalImagesFor(int reflectionId) async {
+    final db = await BookshelfDatabase.instance();
+    await db.delete(
+      'reflection_image_local',
+      where: 'reflection_id = ?',
+      whereArgs: [reflectionId],
+    );
+  }
+
+  /// 매칭 전체(orphan 정리·유실 확인용).
+  Future<List<ReflectionImageLink>> getAllLocalImages() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query('reflection_image_local');
+    return rows
+        .map(
+          (row) => ReflectionImageLink(
+            reflectionId: row['reflection_id'] as int,
+            remoteImageUrl: row['remote_image_url'] as String,
+            localImagePath: row['local_image_path'] as String,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  /// 독후감 행이 사라졌는데 남아 있는 매칭을 지운다.
+  ///
+  /// `reflection_image_local`은 일부러 외래 키를 걸지 않으므로
+  /// (`BookshelfDatabase._createReflectionImageLocalTable` 참고) 동기화가
+  /// 독후감을 지워도 매칭은 남는다. 그대로 두면 orphan 정리가 그 매칭을
+  /// "아직 쓰는 파일"로 보고 로컬 파일을 영원히 남긴다.
+  Future<void> deleteOrphanLocalImages() async {
+    final db = await BookshelfDatabase.instance();
+    await db.delete(
+      'reflection_image_local',
+      where:
+          'NOT EXISTS (SELECT 1 FROM book_reflection '
+          'WHERE book_reflection.id = reflection_image_local.reflection_id '
+          'AND book_reflection.deleted_at IS NULL)',
+    );
+  }
+
+  /// 이미지 hydration이 훑을 대상(삭제되지 않은 독후감 전체).
+  Future<List<BookReflection>> getAllActive() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'book_reflection',
+      where: 'deleted_at IS NULL',
+      orderBy: 'updated_at DESC, id DESC',
+    );
+    return rows.map(_reflectionFromRow).toList(growable: false);
   }
 
   // ---------------------------------------------------------------------

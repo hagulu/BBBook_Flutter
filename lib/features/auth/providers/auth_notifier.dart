@@ -9,6 +9,7 @@ import '../../book_note/providers/book_note_providers.dart';
 import '../../book_record/providers/book_record_providers.dart';
 import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
+import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../data/auth_api.dart' show SocialProvider;
 import '../data/auth_repository.dart';
 import 'auth_providers.dart';
@@ -47,7 +48,7 @@ class AuthNotifier extends Notifier<AuthState> {
         // refresh token이 없거나(최초 설치) 무효화된 경우 모두 포함한다. 후자를
         // 놓치면 이전 세션의 책장이 로컬 DB에 남은 채로 다음 로그인 사용자에게
         // 노출될 수 있어(계정 데이터 격리), 로그아웃과 동일하게 비운다.
-        await _clearLocalBookshelf();
+        await _clearLocalBookshelfUnlessLocalMode();
         state = const AuthState(status: AuthStatus.unauthenticated);
         return;
       }
@@ -63,6 +64,7 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> _loadCurrentUser(String accessToken) async {
     try {
       final user = await _repository.fetchCurrentUser();
+      await _resetLocalDataIfOwnerChanged(user.id);
       state = AuthState(
         status: AuthStatus.authenticated,
         user: user,
@@ -88,6 +90,7 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> _login(SocialProvider provider) async {
     try {
       final session = await _repository.loginWithProvider(provider);
+      await _resetLocalDataIfOwnerChanged(session.user.id);
       state = AuthState(
         status: AuthStatus.authenticated,
         user: session.user,
@@ -144,9 +147,33 @@ class AuthNotifier extends Notifier<AuthState> {
     try {
       await _repository.clearLocalSession();
     } finally {
-      await _clearLocalBookshelf();
+      await _clearLocalBookshelfUnlessLocalMode();
       state = const AuthState(status: AuthStatus.unauthenticated);
     }
+  }
+
+  /// 사용자가 선택하지 않은 로그아웃(토큰 만료·refresh 실패)에서는 로컬
+  /// 저장 모드의 데이터를 지우지 않는다 — 그 데이터는 서버에 사본이 없는
+  /// 유일본이라, 확인도 없이 사라지면 복구할 방법이 없다. 계정 격리는
+  /// 다음 로그인 시점에 [_resetLocalDataIfOwnerChanged]가 맡는다.
+  Future<void> _clearLocalBookshelfUnlessLocalMode() async {
+    if (await ref.read(storageModeStoreProvider).isLocal()) {
+      developer.log('[로컬 DB 초기화] result=SKIP reason=local_storage_mode');
+      return;
+    }
+    await _clearLocalBookshelf();
+  }
+
+  /// 로컬 저장 모드의 데이터를 만든 계정이 아닌 다른 계정이 로그인하면
+  /// 그 데이터를 비운다(로컬 데이터는 계정 구분 없이 한 벌만 존재한다).
+  Future<void> _resetLocalDataIfOwnerChanged(int userId) async {
+    final store = ref.read(storageModeStoreProvider);
+    if (!await store.isLocal()) return;
+    if (await store.ownerUserId() == userId) return;
+    developer.log('[로컬 DB 초기화] reason=owner_changed userId=$userId');
+    await _clearLocalBookshelf();
+    await store.resetToServer();
+    ref.invalidate(storageModeProvider);
   }
 
   /// 다음 로그인 사용자에게 이전 계정의 책장이 남아있지 않도록 로그아웃 시

@@ -130,7 +130,10 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
             status: status,
           );
       ref.read(bookshelfSyncVersionProvider.notifier).state++;
-      if (mounted && result.serverId != null) {
+      // 서버 반영 여부(serverId)와 무관하게 "서재에 담겼다"는 사실은 로컬
+      // 저장 시점에 확정된다 — 오프라인이나 로컬 저장 모드에서는 serverId가
+      // 계속 null이라, 이 조건을 걸면 연속 스캔 화면에 아무 피드백이 없다.
+      if (mounted) {
         AppSnackBar.success(
           context,
           '\'${result.title}\' 책 등록완료 (${status.label})',

@@ -136,4 +136,119 @@ void main() {
 
     expect(adapter.toContentText(document), '첫 줄\n둘째 줄');
   });
+
+  group('본문 이미지 추출·치환', () {
+    test('Delta 본문의 이미지를 등장 순서대로 모은다', () {
+      final sources = adapter.imageSources({
+        'ops': [
+          {'insert': '앞 문장'},
+          {
+            'insert': {'image': 'reflection_images/local_1.jpg'},
+            'attributes': {'width': '280.0'},
+          },
+          {'insert': '\n'},
+          {
+            'insert': {'image': 'https://cdn.example.com/r/a.jpg'},
+          },
+          {'insert': '\n'},
+        ],
+      });
+
+      expect(sources, [
+        'reflection_images/local_1.jpg',
+        'https://cdn.example.com/r/a.jpg',
+      ]);
+    });
+
+    test('레거시 Tiptap 본문의 중첩된 이미지도 찾는다', () {
+      final sources = adapter.imageSources({
+        'type': 'doc',
+        'content': [
+          {
+            'type': 'paragraph',
+            'content': [
+              {
+                'type': 'image',
+                'attrs': {'src': 'https://cdn.example.com/r/inline.jpg'},
+              },
+            ],
+          },
+          {
+            'type': 'image',
+            'attrs': {'src': 'reflection_images/local_2.png'},
+          },
+        ],
+      });
+
+      expect(sources, [
+        'https://cdn.example.com/r/inline.jpg',
+        'reflection_images/local_2.png',
+      ]);
+    });
+
+    test('이미지 출처만 바꾸고 크기 같은 속성은 유지한다', () {
+      final replaced = adapter.replaceImageSources(
+        {
+          'ops': [
+            {
+              'insert': {'image': 'reflection_images/local_1.jpg'},
+              'attributes': {'width': '280.0'},
+            },
+            {
+              'insert': {'image': 'https://cdn.example.com/r/keep.jpg'},
+            },
+            {'insert': '\n'},
+          ],
+        },
+        {'reflection_images/local_1.jpg': 'https://cdn.example.com/temp/1.jpg'},
+      );
+
+      final ops = replaced['ops'] as List<dynamic>;
+      expect((ops.first as Map)['insert'], {
+        'image': 'https://cdn.example.com/temp/1.jpg',
+      });
+      expect((ops.first as Map)['attributes'], {'width': '280.0'});
+      // 치환 대상이 아닌 이미지는 그대로다.
+      expect((ops[1] as Map)['insert'], {
+        'image': 'https://cdn.example.com/r/keep.jpg',
+      });
+      expect(adapter.imageSources(replaced), [
+        'https://cdn.example.com/temp/1.jpg',
+        'https://cdn.example.com/r/keep.jpg',
+      ]);
+    });
+
+    test('Tiptap 본문 치환도 다른 attrs를 지우지 않는다', () {
+      final replaced = adapter.replaceImageSources(
+        {
+          'type': 'doc',
+          'content': [
+            {
+              'type': 'image',
+              'attrs': {'src': 'reflection_images/local_2.png', 'width': 320},
+            },
+          ],
+        },
+        {'reflection_images/local_2.png': 'https://cdn.example.com/temp/2.png'},
+      );
+
+      final node = (replaced['content'] as List<dynamic>).single as Map;
+      expect(node['attrs'], {
+        'src': 'https://cdn.example.com/temp/2.png',
+        'width': 320,
+      });
+    });
+
+    test('치환할 항목이 없으면 본문을 그대로 둔다', () {
+      final json = {
+        'ops': [
+          {'insert': '이미지 없음\n'},
+        ],
+      };
+
+      expect(adapter.replaceImageSources(json, const {}), same(json));
+      expect(adapter.imageSources(json), isEmpty);
+      expect(adapter.imageSources(null), isEmpty);
+    });
+  });
 }

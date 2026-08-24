@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'dart:io';
+
 import 'package:bbbook/core/network/api_client.dart';
 import 'package:bbbook/core/network/api_exception.dart';
 import 'package:bbbook/features/book_detail/data/book_detail_api.dart';
@@ -26,10 +28,13 @@ void main() {
   setUpAll(() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
-    final databasePath = path.join(
-      await databaseFactory.getDatabasesPath(),
-      'bookshelf.db',
+    // 테스트 파일은 병렬 실행되므로 파일마다 별도 DB 경로를 쓴다(같은
+    // `bookshelf.db`를 공유하면 서로의 setUp이 남의 데이터를 지운다).
+    final databaseDirectory = await Directory.systemTemp.createTemp(
+      'bookshelf_test',
     );
+    await databaseFactory.setDatabasesPath(databaseDirectory.path);
+    final databasePath = path.join(databaseDirectory.path, 'bookshelf.db');
     await databaseFactory.deleteDatabase(databasePath);
     await BookshelfDatabase.instance();
   });
@@ -114,7 +119,7 @@ void main() {
         type: BookNoteMemoType.summary,
         content: '요약',
       ),
-      imageUrl: null,
+      localImagePath: null,
     );
     final photo = await dao.createNoteMemo(
       ownerUserId: 3,
@@ -124,7 +129,7 @@ void main() {
         type: BookNoteMemoType.photo,
         content: '사진',
       ),
-      imageUrl: '/tmp/photo.jpg',
+      localImagePath: 'memo_images/photo.jpg',
     );
 
     expect(summary.clientRequestId, matches(_uuidPattern));

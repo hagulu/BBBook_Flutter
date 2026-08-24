@@ -10,6 +10,7 @@ import '../../../../shared/widgets/app_alert.dart';
 import '../../../../shared/widgets/app_confirm.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../models/book_note.dart';
+import '../../services/note_memo_image_store.dart';
 import '../memo_photo_camera_screen.dart';
 import 'highlight_text_field.dart';
 import 'memo_ocr_capture.dart';
@@ -31,9 +32,7 @@ Future<BookNoteMemoDraft?> showBookNoteMemoEditor(
   );
 }
 
-Future<BookNoteMemoDraft?> showBookNoteMemoQuickComposer(
-  BuildContext context,
-) {
+Future<BookNoteMemoDraft?> showBookNoteMemoQuickComposer(BuildContext context) {
   return showModalBottomSheet<BookNoteMemoDraft>(
     context: context,
     isScrollControlled: true,
@@ -270,8 +269,15 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
   /// PHOTO 타입 전용 메모 전체 강조 토글. 텍스트 타입은 [_contentController]의
   /// 강조(::hl[[]]) 존재 여부로 강조가 결정되므로 이 값을 쓰지 않는다.
   late bool _photoImportant;
-  String? _imageUrl;
+
+  /// 새로 고른 사진의 임시 경로(아직 저장소로 복사되기 전). null이면
+  /// 사진을 바꾸지 않았다는 뜻이다.
   String? _pickedImagePath;
+
+  /// 기존 사진을 지웠는지 여부. 사진 값 자체는 [widget.initialMemo]에만
+  /// 있고 이 화면은 "그대로 둠/교체/제거" 의사만 [BookNoteMemoDraft]로
+  /// 돌려준다([MemoImageChange]).
+  bool _imageRemoved = false;
   String? _errorText;
 
   @override
@@ -297,7 +303,6 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
     _photoImportant = _type == BookNoteMemoType.photo
         ? (memo?.isImportant ?? draft?.isImportant ?? false)
         : false;
-    _imageUrl = memo?.imageUrl ?? draft?.imageUrl;
     _pickedImagePath = draft?.pickedImagePath;
     if (_type == BookNoteMemoType.photo) _contentController.clearHighlights();
   }
@@ -377,12 +382,12 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _PhotoPicker(
-                      imageUrl: _imageUrl,
+                      memo: _imageRemoved ? null : widget.initialMemo,
                       pickedImagePath: _pickedImagePath,
                       onPick: _pickPhoto,
                       onRemove: () => setState(() {
-                        _imageUrl = null;
                         _pickedImagePath = null;
+                        _imageRemoved = true;
                       }),
                     ),
                     const SizedBox(height: 16),
@@ -501,6 +506,7 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
     if (path == null || !mounted) return;
     setState(() {
       _pickedImagePath = path;
+      _imageRemoved = false;
       _errorText = null;
     });
   }
@@ -512,6 +518,21 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
     _insertTextAtSelection(_contentController, text);
     setState(() => _errorText = null);
     _contentFocusNode.requestFocus();
+  }
+
+  bool get _hasPhoto {
+    if (_pickedImagePath != null) return true;
+    return !_imageRemoved && (widget.initialMemo?.hasImage ?? false);
+  }
+
+  /// 사진 값을 통째로 되돌려 보내는 대신 "무엇을 바꿨는지"만 알린다 —
+  /// 그대로 둔 경우 Repository/DAO가 사진 컬럼을 아예 건드리지 않는다.
+  MemoImageChange _imageChangeOf(bool isPhoto) {
+    // PHOTO가 아닌 타입으로 저장하면(사진 메모를 글 메모로 바꾼 경우 포함)
+    // 사진은 남겨 둘 자리가 없다.
+    if (!isPhoto || _imageRemoved) return MemoImageChange.cleared;
+    if (_pickedImagePath != null) return MemoImageChange.replaced;
+    return MemoImageChange.unchanged;
   }
 
   void _submit() {
@@ -531,9 +552,7 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
       setState(() => _errorText = '내용을 입력해 주세요.');
       return;
     }
-    if (isPhoto &&
-        _pickedImagePath == null &&
-        (_imageUrl == null || _imageUrl!.isEmpty)) {
+    if (isPhoto && !_hasPhoto) {
       AppSnackBar.error(context, '사진을 선택해 주세요.');
       return;
     }
@@ -547,8 +566,8 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
         startPage: startPage,
         endPage: endPage,
         content: content.isEmpty ? null : content,
-        imageUrl: isPhoto ? _imageUrl : null,
         pickedImagePath: isPhoto ? _pickedImagePath : null,
+        imageChange: _imageChangeOf(isPhoto),
         isImportant: isPhoto
             ? _photoImportant
             : _contentController.hasHighlight,
@@ -976,13 +995,15 @@ class _NoteMemoTypeChoiceStyle {
 
 class _PhotoPicker extends StatefulWidget {
   const _PhotoPicker({
-    required this.imageUrl,
+    required this.memo,
     required this.pickedImagePath,
     required this.onPick,
     required this.onRemove,
   });
 
-  final String? imageUrl;
+  /// 이미 저장된 사진의 출처(로컬 사본 우선). 사진을 지웠거나 새로 만드는
+  /// 메모면 null이다.
+  final BookNoteMemo? memo;
   final String? pickedImagePath;
   final VoidCallback onPick;
   final VoidCallback onRemove;
@@ -997,8 +1018,7 @@ class _PhotoPickerState extends State<_PhotoPicker> {
   @override
   Widget build(BuildContext context) {
     final hasImage =
-        widget.pickedImagePath != null ||
-        (widget.imageUrl != null && widget.imageUrl!.isNotEmpty);
+        widget.pickedImagePath != null || (widget.memo?.hasImage ?? false);
     if (!hasImage) {
       return SizedBox(
         width: double.infinity,
@@ -1036,7 +1056,7 @@ class _PhotoPickerState extends State<_PhotoPicker> {
               children: [
                 const ColoredBox(color: AppColors.mediaBackdrop),
                 _MemoImage(
-                  imageUrl: widget.imageUrl,
+                  memo: widget.memo,
                   pickedImagePath: widget.pickedImagePath,
                 ),
                 AnimatedSwitcher(
@@ -1137,36 +1157,46 @@ class _PhotoOverlayAction extends StatelessWidget {
   }
 }
 
+/// 표시 우선순위: 방금 고른 사진 → 로컬 사본 → 서버 URL.
 class _MemoImage extends StatelessWidget {
-  const _MemoImage({required this.imageUrl, required this.pickedImagePath});
+  const _MemoImage({required this.memo, required this.pickedImagePath});
 
-  final String? imageUrl;
+  final BookNoteMemo? memo;
   final String? pickedImagePath;
 
   @override
   Widget build(BuildContext context) {
-    final localPath =
-        pickedImagePath ??
-        ((imageUrl != null && !_isRemote(imageUrl!)) ? imageUrl : null);
-    if (localPath != null) {
+    final picked = pickedImagePath;
+    if (picked != null) {
       return Image.file(
-        File(_asFilePath(localPath)),
+        File(picked),
         fit: BoxFit.contain,
         errorBuilder: (_, _, _) => const _ImageError(),
       );
     }
+    final localFile = noteMemoImageStore.resolveSync(memo?.localImagePath);
+    if (localFile != null) {
+      return Image.file(
+        localFile,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => _remote(),
+      );
+    }
+    return _remote();
+  }
+
+  Widget _remote() {
+    final imageUrl = memo?.imageUrl;
+    if (imageUrl == null ||
+        !(imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+      return const _ImageError();
+    }
     return Image.network(
-      imageUrl!,
+      imageUrl,
       fit: BoxFit.contain,
       errorBuilder: (_, _, _) => const _ImageError(),
     );
   }
-
-  static bool _isRemote(String value) =>
-      value.startsWith('http://') || value.startsWith('https://');
-
-  static String _asFilePath(String value) =>
-      value.startsWith('file://') ? Uri.parse(value).toFilePath() : value;
 }
 
 class _ImageError extends StatelessWidget {

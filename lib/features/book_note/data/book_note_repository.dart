@@ -2,15 +2,15 @@ import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:io';
 
-import 'package:path/path.dart' as path;
-import 'package:path_provider/path_provider.dart';
-
 import '../../../core/network/api_exception.dart';
+import '../../../core/storage/local_image_store.dart';
 import '../../bookshelf/data/bookshelf_repository.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
 import '../../record_sync/data/record_sync_api.dart';
 import '../../record_sync/models/record_sync_payload.dart';
 import '../models/book_note.dart';
+import '../../storage_mode/data/storage_mode_store.dart';
+import '../services/note_memo_image_store.dart';
 import '../utils/memo_highlight.dart';
 import 'book_note_api.dart';
 import 'book_note_dao.dart';
@@ -25,18 +25,41 @@ import 'book_note_dao.dart';
 ///
 /// [sync]는 dirty push를 먼저 처리한 뒤, 로컬에 동기화 기준값(마지막 since)이
 /// 없으면(최초 로그인 등) 전체 동기화를, 있으면 증분 동기화를 수행한다.
+///
+/// 사진(PHOTO 메모)도 같은 원칙을 따른다. 고른 사진은 서버 업로드 전에 먼저
+/// `noteMemoImageStore`에 복사해 `local_image_path`로 관리하고, `image_url`은
+/// 서버 값 전용으로 둔다(null = 아직 업로드 못 함). 업로드가 끝나도 로컬
+/// 파일은 지우지 않으며, 서버 사진은 그 노트를 실제로 열 때
+/// [ensureImagesForNote]가 내려받아 이후에는 로컬 파일이 우선 표시된다.
 class BookNoteRepository {
   BookNoteRepository({
     required this._api,
     required this._recordSyncApi,
     required this._bookshelfRepository,
     this._dao = const BookNoteDao(),
-  });
+    LocalImageStore? imageStore,
+    StorageModeStore? storageMode,
+  }) : _imageStore = imageStore ?? noteMemoImageStore,
+       _storageMode = storageMode ?? storageModeStore;
 
   final BookNoteApi _api;
   final RecordSyncApi _recordSyncApi;
   final BookshelfRepository _bookshelfRepository;
   final BookNoteDao _dao;
+  final LocalImageStore _imageStore;
+  final StorageModeStore _storageMode;
+
+  /// 세션 동안 기억할 "서버에 없는 사진" URL 상한([_rememberUnavailable]).
+  static const _maxUnavailableImageUrls = 200;
+
+  /// 이 횟수만큼 연달아 일시적 실패가 나면 네트워크 자체가 끊긴 것으로 보고
+  /// 이번 회차를 접는다.
+  static const _maxConsecutiveDownloadFailures = 3;
+
+  Future<void>? _sweepInFlight;
+
+  final Set<String> _unavailableImageUrls = {};
+  int? _unavailableSessionGeneration;
 
   /// [pushNote] 호출을 노트별로 순서대로 실행시키는 체인.
   /// [BookshelfRepository._dirtyPushChains]와 같은 이유로 필요하다: 서버에
@@ -109,15 +132,15 @@ class BookNoteRepository {
     required BookNoteMemoDraft draft,
   }) async {
     draft = _normalizeDraftImportance(draft);
-    String? imageUrl;
+    String? localImagePath;
     try {
-      imageUrl = await _resolveImageUrl(draft);
+      localImagePath = await _saveDraftImage(draft);
       final memo = await _dao.createNoteMemo(
         ownerUserId: ownerUserId,
         userBookId: userBookId,
         noteId: noteId,
         draft: draft,
-        imageUrl: imageUrl,
+        localImagePath: localImagePath,
       );
       developer.log(
         '[메모 생성] userId=$ownerUserId bookId=$userBookId '
@@ -126,9 +149,7 @@ class BookNoteRepository {
       unawaited(pushNote(noteId));
       return memo;
     } catch (error) {
-      if (draft.pickedImagePath != null) {
-        await _deleteManagedImage(imageUrl);
-      }
+      await _imageStore.delete(localImagePath);
       developer.log(
         '[메모 생성] userId=$ownerUserId bookId=$userBookId '
         'noteId=$noteId result=FAIL reason=local_storage_error',
@@ -143,21 +164,28 @@ class BookNoteRepository {
     required int noteId,
     required int noteMemoId,
     required BookNoteMemoDraft draft,
-    required String? previousImageUrl,
+    required String? previousLocalImagePath,
   }) async {
     draft = _normalizeDraftImportance(draft);
-    String? imageUrl;
+    String? localImagePath;
     try {
-      imageUrl = await _resolveImageUrl(draft);
+      localImagePath = await _saveDraftImage(draft);
       final memo = await _dao.updateNoteMemo(
         ownerUserId: ownerUserId,
         userBookId: userBookId,
         noteId: noteId,
         noteMemoId: noteMemoId,
         draft: draft,
-        imageUrl: imageUrl,
+        localImagePath: localImagePath,
       );
-      await _deleteManagedImage(previousImageUrl, except: imageUrl);
+      // 사진을 실제로 바꾸거나 지웠을 때만 이전 파일을 정리한다(그대로 둔
+      // 경우 `previousLocalImagePath`가 여전히 이 메모의 사진이다).
+      if (draft.imageChange != MemoImageChange.unchanged) {
+        await _imageStore.delete(
+          previousLocalImagePath,
+          except: localImagePath,
+        );
+      }
       developer.log(
         '[메모 수정] userId=$ownerUserId bookId=$userBookId '
         'noteId=$noteId noteMemoId=$noteMemoId result=SUCCESS',
@@ -165,9 +193,7 @@ class BookNoteRepository {
       unawaited(pushNote(noteId));
       return memo;
     } catch (error) {
-      if (draft.pickedImagePath != null) {
-        await _deleteManagedImage(imageUrl);
-      }
+      await _imageStore.delete(localImagePath);
       developer.log(
         '[메모 수정] userId=$ownerUserId bookId=$userBookId '
         'noteId=$noteId noteMemoId=$noteMemoId result=FAIL '
@@ -192,8 +218,8 @@ class BookNoteRepository {
       startPage: draft.startPage,
       endPage: draft.endPage,
       content: draft.content,
-      imageUrl: draft.imageUrl,
       pickedImagePath: draft.pickedImagePath,
+      imageChange: draft.imageChange,
       isImportant: derived,
     );
   }
@@ -203,7 +229,7 @@ class BookNoteRepository {
     required int userBookId,
     required int noteId,
     required int noteMemoId,
-    required String? previousImageUrl,
+    required String? previousLocalImagePath,
   }) async {
     try {
       final result = await _dao.deleteNoteMemo(
@@ -212,7 +238,17 @@ class BookNoteRepository {
         noteId: noteId,
         noteMemoId: noteMemoId,
       );
-      await _deleteManagedImage(previousImageUrl);
+      // 삭제 push는 서버 메모 ID만 쓰므로 파일이 더는 필요 없다.
+      await _imageStore.delete(previousLocalImagePath);
+      // 로컬 저장 모드에서는 서버에 알릴 삭제가 없다 — soft delete 행을
+      // 남겨 둘 이유도 없으므로 바로 정리한다(push가 하던 일).
+      if (await _storageMode.isLocal()) {
+        if (result.noteWasDeleted) {
+          await _dao.purgeNoteAndMemos(noteId);
+        } else {
+          await _dao.purgeMemo(noteMemoId);
+        }
+      }
       developer.log(
         '[메모 삭제] userId=$ownerUserId bookId=$userBookId '
         'noteId=$noteId noteMemoId=$noteMemoId result=SUCCESS',
@@ -240,6 +276,12 @@ class BookNoteRepository {
         userBookId: userBookId,
         noteId: noteId,
       );
+      if (await _storageMode.isLocal()) {
+        for (final memo in await _dao.getAllMemosForNote(noteId)) {
+          await _imageStore.delete(memo.localImagePath);
+        }
+        await _dao.purgeNoteAndMemos(noteId);
+      }
       developer.log(
         '[노트 삭제] userId=$ownerUserId bookId=$userBookId '
         'noteId=$noteId result=SUCCESS',
@@ -266,6 +308,12 @@ class BookNoteRepository {
   ///
   /// 반환값은 실제로 로컬 DB가 바뀌었는지 여부.
   Future<bool> sync({required int ownerUserId}) async {
+    // 로컬 저장 모드에서는 서버와 주고받지 않는다. 로컬 파일 정리(네트워크
+    // 없음)는 계속 해야 하므로 그것만 실행한다.
+    if (await _storageMode.isLocal()) {
+      unawaited(sweepLocalImages());
+      return false;
+    }
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
 
     await pushAllDirty();
@@ -275,7 +323,9 @@ class BookNoteRepository {
 
     final since = await _dao.getLastSyncedAtNote();
     if (since == null) {
-      return _fullSync(ownerUserId, expectedGeneration);
+      final changed = await _fullSync(ownerUserId, expectedGeneration);
+      unawaited(sweepLocalImages());
+      return changed;
     }
 
     final result = await _api.getSyncChanges(since: since);
@@ -283,11 +333,13 @@ class BookNoteRepository {
       // 증분 응답의 syncedAt(서버 시각)을 기준값으로 쓴다 — 클라이언트
       // now()를 쓰면 기기 시계가 서버보다 앞서 있을 때 그 오차만큼 이후
       // 서버 변경을 영구히 놓칠 수 있다.
-      return _fullSync(
+      final changed = await _fullSync(
         ownerUserId,
         expectedGeneration,
         baseline: result.syncedAt,
       );
+      unawaited(sweepLocalImages());
+      return changed;
     }
     if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
       return false;
@@ -301,6 +353,7 @@ class BookNoteRepository {
       deletedNoteMemoIds: result.deletedNoteMemoIds,
       syncedAt: result.syncedAt,
     );
+    unawaited(sweepLocalImages());
     return result.upsertedNotes.isNotEmpty ||
         result.deletedNoteIds.isNotEmpty ||
         result.upsertedNoteMemos.isNotEmpty ||
@@ -366,6 +419,7 @@ class BookNoteRepository {
   }
 
   Future<void> _pushOneNote(int localNoteId) async {
+    if (await _storageMode.isLocal()) return;
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final note = await _dao.getNoteByLocalId(localNoteId);
     if (note == null) return; // 이미 로컬에서 정리됨
@@ -478,7 +532,7 @@ class BookNoteRepository {
       _checkSession(expectedGeneration);
       final memos = await _dao.getAllMemosForNote(note.id);
       for (final memo in memos) {
-        await _deleteManagedImage(memo.imageUrl);
+        await _imageStore.delete(memo.localImagePath);
       }
       await _dao.purgeNoteAndMemos(note.id);
       developer.log(
@@ -616,7 +670,6 @@ class BookNoteRepository {
   ) async {
     final ServerBookNoteMemo created;
     if (memo.type == BookNoteMemoType.photo) {
-      final rawPath = _resolveLocalFilePath(memo.imageUrl);
       created = await _api.postPhotoNoteMemo(
         userBookId: userBookId,
         noteId: serverNoteId,
@@ -624,7 +677,7 @@ class BookNoteRepository {
         endPage: memo.endPage,
         content: memo.content,
         isImportant: memo.isImportant,
-        file: File(rawPath),
+        file: await _requireLocalImageFile(memo),
         clientRequestId: memo.clientRequestId,
       );
     } else {
@@ -644,18 +697,24 @@ class BookNoteRepository {
     if (serverNoteId == null) {
       await _confirmNoteBootstrapped(localNoteId, newNoteId, noteUpdatedAt);
     }
-    await _confirmMemoAndCleanupImage(memo, created);
+    await _confirmMemoSynced(memo, created);
     return newNoteId;
   }
 
+  /// PHOTO 메모에 로컬 사본만 있고 서버 URL이 없으면(새 사진으로 교체한
+  /// 뒤 아직 못 올린 상태) 사진을 먼저 업로드해 받은 R2 키를 PATCH로
+  /// 넘긴다. 그 밖에는 사진을 건드리지 않는 일반 PATCH다.
   Future<void> _updateMemoOnServer(
     int userBookId,
     int serverNoteId,
     BookNoteMemo memo,
     int expectedGeneration,
   ) async {
-    if (memo.type == BookNoteMemoType.photo && _isLocalImage(memo.imageUrl)) {
-      final r2Key = await _uploadLocalImage(serverNoteId, memo.imageUrl);
+    if (memo.type == BookNoteMemoType.photo &&
+        memo.imageUrl == null &&
+        memo.localImagePath != null) {
+      final file = await _requireLocalImageFile(memo);
+      final r2Key = await _api.uploadImage(noteId: serverNoteId, file: file);
       _checkSession(expectedGeneration);
       final patched = await _api.patchNoteMemo(
         userBookId: userBookId,
@@ -669,7 +728,7 @@ class BookNoteRepository {
         includeImageUrl: true,
       );
       _checkSession(expectedGeneration);
-      await _confirmMemoAndCleanupImage(memo, patched);
+      await _confirmMemoSynced(memo, patched);
       return;
     }
     final patched = await _api.patchNoteMemo(
@@ -682,7 +741,7 @@ class BookNoteRepository {
       isImportant: memo.isImportant,
     );
     _checkSession(expectedGeneration);
-    await _confirmMemoAndCleanupImage(memo, patched);
+    await _confirmMemoSynced(memo, patched);
   }
 
   /// [expectedGeneration]이 이 push를 시작한 시점의 세션과 다르면(그 사이
@@ -716,11 +775,14 @@ class BookNoteRepository {
     );
   }
 
-  Future<void> _confirmMemoAndCleanupImage(
+  /// 업로드가 끝나도 로컬 사본은 지우지 않는다 — 이제 `image_url`(서버)과
+  /// `local_image_path`(로컬)가 같은 사진을 각각 가리키고, 화면과 오프라인
+  /// 조회는 계속 로컬 파일을 먼저 쓴다.
+  Future<void> _confirmMemoSynced(
     BookNoteMemo localMemo,
     ServerBookNoteMemo response,
   ) async {
-    final applied = await _dao.confirmNoteMemoSynced(
+    await _dao.confirmNoteMemoSynced(
       localId: localMemo.id,
       serverId: response.id,
       capturedUpdatedAt: localMemo.updatedAt,
@@ -732,39 +794,6 @@ class BookNoteRepository {
       isImportant: response.isImportant,
       sortOrder: response.sortOrder,
     );
-    // [applied]가 false면(네트워크가 오가는 동안 이 메모가 또 편집돼
-    // "변경 없음" 판정에 실패) DB의 image_url은 이 응답 값으로 덮이지
-    // 않고 옛 로컬 경로를 그대로 들고 있다 — 그런데도 여기서 파일을
-    // 지우면 DB는 이제 존재하지 않는 파일을 계속 가리키게 된다. 실제로
-    // DB가 새 원격 URL로 갱신됐을 때만(=이 로컬 파일이 더 이상 어디서도
-    // 참조되지 않을 때만) 지운다.
-    if (applied &&
-        _isLocalImage(localMemo.imageUrl) &&
-        localMemo.imageUrl != response.imageUrl) {
-      await _deleteManagedImage(localMemo.imageUrl);
-    }
-  }
-
-  /// 기존 PHOTO 메모의 사진을 교체할 때만 쓴다([_updateMemoOnServer]) —
-  /// 새 메모 생성은 [_createMemoOnServer]가 [BookNoteApi.postPhotoNoteMemo]로
-  /// 한 번에 처리하므로 이 경로를 타지 않는다.
-  Future<String> _uploadLocalImage(int serverNoteId, String? imageUrl) async {
-    final rawPath = _resolveLocalFilePath(imageUrl);
-    return _api.uploadImage(noteId: serverNoteId, file: File(rawPath));
-  }
-
-  String _resolveLocalFilePath(String? imageUrl) {
-    if (imageUrl == null) {
-      throw const ApiException('업로드할 사진이 없습니다.');
-    }
-    return imageUrl.startsWith('file://')
-        ? Uri.parse(imageUrl).toFilePath()
-        : imageUrl;
-  }
-
-  bool _isLocalImage(String? url) {
-    if (url == null || url.isEmpty) return false;
-    return !url.startsWith('http://') && !url.startsWith('https://');
   }
 
   String _reasonOf(Object error) {
@@ -773,57 +802,198 @@ class BookNoteRepository {
     return 'unknown';
   }
 
-  /// 서버(POST .../notes/memos/photo, POST /api/notes/{noteId}/images)가
-  /// jpg/jpeg/png/webp·5MB 이하만 허용하므로, 여기서 걸러내지 않으면
-  /// 로컬 저장은 성공한 뒤 push가 영원히 400으로 실패하는 메모가 남는다.
-  static const _allowedImageExtensions = {'.jpg', '.jpeg', '.png', '.webp'};
-  static const _maxImageBytes = 5 * 1024 * 1024;
+  // ---------------------------------------------------------------------
+  // 로컬 사진 관리
+  // ---------------------------------------------------------------------
 
-  Future<String?> _resolveImageUrl(BookNoteMemoDraft draft) async {
+  /// 새로 고른 사진을 로컬 저장소로 복사하고 DB에 넣을 상대 경로를 반환한다.
+  /// 사진을 바꾸지 않았거나(PHOTO가 아니거나) 지웠으면 null이다 — 어느
+  /// 컬럼을 실제로 바꿀지는 [BookNoteMemoDraft.imageChange]가 정한다.
+  Future<String?> _saveDraftImage(BookNoteMemoDraft draft) async {
     if (draft.type != BookNoteMemoType.photo) return null;
+    if (draft.imageChange != MemoImageChange.replaced) return null;
     final pickedPath = draft.pickedImagePath;
-    if (pickedPath == null) return draft.imageUrl;
-
-    final source = File(pickedPath);
-    if (!await source.exists()) throw const FileSystemException();
-    final extension = path.extension(pickedPath).toLowerCase();
-    if (!_allowedImageExtensions.contains(extension)) {
-      throw FileSystemException('지원하지 않는 사진 형식입니다.', pickedPath);
-    }
-    if (await source.length() > _maxImageBytes) {
-      throw FileSystemException('사진 용량은 5MB 이하만 가능합니다.', pickedPath);
-    }
-    final root = await getApplicationSupportDirectory();
-    final directory = Directory(path.join(root.path, 'memo_images'));
-    await directory.create(recursive: true);
-    final fileName = 'memo_${DateTime.now().microsecondsSinceEpoch}$extension';
-    return source
-        .copy(path.join(directory.path, fileName))
-        .then((file) => file.path);
+    if (pickedPath == null) return null;
+    return _imageStore.saveSelected(pickedPath);
   }
 
-  Future<void> _deleteManagedImage(String? imageUrl, {String? except}) async {
-    if (imageUrl == null || imageUrl.isEmpty || imageUrl == except) return;
-    if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-      return;
+  Future<File> _requireLocalImageFile(BookNoteMemo memo) async {
+    final file = await _imageStore.resolve(memo.localImagePath);
+    if (file == null || !await file.exists()) {
+      throw const ApiException('업로드할 사진이 없습니다.');
     }
+    return file;
+  }
 
-    try {
-      final root = await getApplicationSupportDirectory();
-      final managedDirectory = path.normalize(
-        path.absolute(path.join(root.path, 'memo_images')),
+  /// 서버 사진을 **필요한 시점에만** 로컬로 내려받는다(노트 상세 진입 등).
+  ///
+  /// 최초 로그인 전체 동기화에서 모든 사진을 미리 받지 않는 이유는, 기록이
+  /// 많은 사용자의 첫 진입이 그만큼 느려지고 쓰지도 않을 사진까지 받게 되기
+  /// 때문이다. 한 번 받은 사진은 계속 로컬 파일을 쓰므로 재다운로드는 없다.
+  ///
+  /// 반환값은 실제로 새로 받은 사진이 있었는지 여부(화면 갱신 판단용).
+  Future<bool> ensureImagesForNote(int localNoteId) async {
+    if (await _storageMode.isLocal()) return false;
+    final expectedGeneration = BookshelfDatabase.sessionGeneration;
+    _resetUnavailableIfSessionChanged(expectedGeneration);
+    final memos = await _dao.findPhotoMemosMissingLocalImage(
+      noteId: localNoteId,
+      excludeImageUrls: _unavailableImageUrls.toList(growable: false),
+    );
+    if (memos.isEmpty) return false;
+    final report = await _downloadMemoImages(memos, expectedGeneration);
+    return report.stored > 0;
+  }
+
+  /// 서버에 있는 모든 메모 사진을 로컬로 내려받는다. 로컬 저장 모드 전환
+  /// 이전([LocalStorageMigrationService]) 전용 경로다 — 평소에는
+  /// [ensureImagesForNote]로 필요한 것만 받는다.
+  Future<LocalImageSyncReport> downloadAllImages({
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final expectedGeneration = BookshelfDatabase.sessionGeneration;
+    _resetUnavailableIfSessionChanged(expectedGeneration);
+    final memos = await _dao.findPhotoMemosMissingLocalImage();
+    return _downloadMemoImages(
+      memos,
+      expectedGeneration,
+      onProgress: onProgress,
+      // 이전은 "빠짐없이 확보"가 목적이라 일시적 실패를 만나도 남은 사진을
+      // 끝까지 시도하고, 실패 건수를 그대로 보고한다.
+      stopOnConsecutiveFailures: false,
+    );
+  }
+
+  Future<LocalImageSyncReport> _downloadMemoImages(
+    List<BookNoteMemo> memos,
+    int expectedGeneration, {
+    void Function(int done, int total)? onProgress,
+    bool stopOnConsecutiveFailures = true,
+  }) async {
+    var stored = 0;
+    var unavailable = 0;
+    var failed = 0;
+    var consecutiveFailures = 0;
+    var done = 0;
+    onProgress?.call(0, memos.length);
+    for (final memo in memos) {
+      if (BookshelfDatabase.sessionGeneration != expectedGeneration) break;
+      final imageUrl = memo.imageUrl;
+      if (imageUrl == null) continue;
+      final result = await _imageStore.ensureDownloaded(imageUrl);
+      switch (result.status) {
+        case LocalImageDownloadStatus.failed:
+          failed++;
+          // 오프라인이면 앞선 몇 건이 연달아 실패한다 — 남은 대상까지
+          // 하나씩 타임아웃을 태우지 않는다. 특정 사진 하나만 계속 실패하는
+          // 경우에는 그 뒤의 사진까지 막지 않도록 건너뛰기만 한다.
+          if (stopOnConsecutiveFailures &&
+              ++consecutiveFailures >= _maxConsecutiveDownloadFailures) {
+            return LocalImageSyncReport(
+              stored: stored,
+              unavailable: unavailable,
+              failed: failed + (memos.length - done - 1),
+            );
+          }
+        case LocalImageDownloadStatus.unavailable:
+          consecutiveFailures = 0;
+          unavailable++;
+          _rememberUnavailable(imageUrl);
+        case LocalImageDownloadStatus.stored:
+          consecutiveFailures = 0;
+          // 다운로드 도중 로그아웃됐다면 다른 계정 데이터를 되살리지 않도록
+          // 여기서 멈춘다(내려받은 파일은 clearAll이 폴더째 지운다).
+          if (BookshelfDatabase.sessionGeneration != expectedGeneration) break;
+          await _dao.setLocalImagePath(
+            localId: memo.id,
+            localImagePath: result.localImagePath!,
+            expectedImageUrl: imageUrl,
+          );
+          stored++;
+      }
+      onProgress?.call(++done, memos.length);
+    }
+    if (stored > 0 || failed > 0) {
+      developer.log(
+        '[메모 사진 로컬 저장] stored=$stored unavailable=$unavailable '
+        'failed=$failed',
       );
-      final rawPath = imageUrl.startsWith('file://')
-          ? Uri.parse(imageUrl).toFilePath()
-          : imageUrl;
-      final targetPath = path.normalize(path.absolute(rawPath));
-      if (!path.isWithin(managedDirectory, targetPath)) return;
-
-      final file = File(targetPath);
-      if (await file.exists()) await file.delete();
-    } catch (_) {
-      developer.log('[메모 사진 정리] result=FAIL reason=local_file_error');
     }
+    return LocalImageSyncReport(
+      stored: stored,
+      unavailable: unavailable,
+      failed: failed,
+    );
+  }
+
+  /// 아직 로컬에 확보하지 못한 서버 사진 수(다시 시도하면 받을 수 있는
+  /// 것만). 로컬 저장 모드 전환 전 검증에 쓴다 — 서버가 더 이상 주지 않는
+  /// 사진은 재시도해도 소용없으므로 제외한다.
+  Future<int> countImagesPendingDownload() async {
+    final memos = await _dao.findPhotoMemosMissingLocalImage(
+      excludeImageUrls: _unavailableImageUrls.toList(growable: false),
+    );
+    return memos.length;
+  }
+
+  /// 네트워크를 타지 않는 로컬 파일 정리. 파일이 사라진 참조를 끊고(다음
+  /// 조회 때 다시 받는다) 어느 메모도 참조하지 않는 파일을 지운다.
+  /// 동기화 직후처럼 값이 바뀌었을 만한 시점에 실행한다.
+  Future<void> sweepLocalImages() {
+    return _sweepInFlight ??= _runSweep().whenComplete(
+      () => _sweepInFlight = null,
+    );
+  }
+
+  Future<void> _runSweep() async {
+    final expectedGeneration = BookshelfDatabase.sessionGeneration;
+    try {
+      final storedPaths = await _dao.getAllLocalImagePaths();
+      final fileNames = await _imageStore.listFileNames();
+      final missing = storedPaths
+          .where(
+            (stored) => !fileNames.contains(_imageStore.fileNameOf(stored)),
+          )
+          .toList(growable: false);
+      if (missing.isNotEmpty) {
+        if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+        await _dao.clearLocalImagePaths(missing);
+      }
+      if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+      await _pruneOrphanImages();
+    } catch (e) {
+      developer.log('[메모 사진 정리] result=FAIL reason=${_reasonOf(e)}');
+    }
+  }
+
+  /// 어느 메모도 참조하지 않는 사진 파일을 지운다.
+  ///
+  /// 아직 사본과 연결되지 않은 PHOTO 메모의 서버 URL도 "지켜야 할 파일"에
+  /// 넣는다 — 사본을 이미 내려받았지만(같은 사진은 항상 같은 파일명)
+  /// 연결 전에 끊긴 경우, 그 파일을 지우면 똑같은 사진을 다시 받아야 한다.
+  Future<void> _pruneOrphanImages() async {
+    final pendingUrls = await _dao.getPendingPhotoImageUrls();
+    await _imageStore.pruneOrphans([
+      ...await _dao.getAllLocalImagePaths(),
+      ...pendingUrls.map(_imageStore.remoteFileNameOf).whereType<String>(),
+    ]);
+  }
+
+  void _resetUnavailableIfSessionChanged(int generation) {
+    if (_unavailableSessionGeneration == generation) return;
+    // 계정이 바뀌었으면 이전 계정에서 실패한 URL 기록은 의미가 없다.
+    _unavailableImageUrls.clear();
+    _unavailableSessionGeneration = generation;
+  }
+
+  /// 서버가 더 이상 주지 않는 사진은 이 세션 동안 내려받기 대상에서
+  /// 제외해, 같은 실패를 화면 진입마다 반복하지 않는다. 앱을 다시 켜면
+  /// 초기화되므로 서버 쪽에서 복구된 사진은 다시 시도된다.
+  void _rememberUnavailable(String imageUrl) {
+    // 쿼리 파라미터가 무한정 늘어나지 않도록 상한을 둔다(이 정도로 많이
+    // 실패하면 사진 자체가 아니라 서버/계정 쪽 문제다).
+    if (_unavailableImageUrls.length >= _maxUnavailableImageUrls) return;
+    _unavailableImageUrls.add(imageUrl);
   }
 }
 

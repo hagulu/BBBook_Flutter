@@ -135,3 +135,26 @@ final bookReflectionDetailProvider = FutureProvider.autoDispose
             reflectionId: args.reflectionId,
           );
     });
+
+/// 독후감 본문 이미지의 "서버 URL → 로컬 사본 상대 경로" 매칭.
+///
+/// 조회/편집 화면이 이 값으로 서버 이미지 대신 로컬 파일을 먼저 보여준다.
+/// 아직 내려받지 못한 이미지는 매칭이 없어 서버 URL로 표시되고, 동기화
+/// 이후 `BookReflectionRepository.hydrateLocalImages()`가 사본을 만들면
+/// 다음 조회부터 로컬 파일을 쓴다.
+final reflectionLocalImagesProvider = FutureProvider.autoDispose
+    .family<Map<String, String>, int>((ref, reflectionId) async {
+      ref.watch(bookReflectionSyncVersionProvider);
+      final repository = ref.watch(bookReflectionRepositoryProvider);
+      var disposed = false;
+      ref.onDispose(() => disposed = true);
+      // 이 독후감의 이미지만 지금 확보한다(전체 일괄 다운로드는 하지 않는다).
+      // 받는 동안에는 서버 URL로 보이고, 받고 나면 매칭을 다시 읽어 로컬
+      // 파일로 바뀐다.
+      unawaited(
+        repository.ensureImagesForReflection(reflectionId).then((downloaded) {
+          if (downloaded && !disposed) ref.invalidateSelf();
+        }),
+      );
+      return repository.findLocalImagePaths(reflectionId);
+    });

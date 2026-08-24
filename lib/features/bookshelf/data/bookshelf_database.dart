@@ -5,6 +5,11 @@ import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../../book_note/services/note_memo_image_store.dart';
+import '../../book_reflection/services/reflection_image_store.dart';
+import '../../storage_mode/data/storage_mode_store.dart';
+import '../services/book_cover_image_store.dart';
+
 /// 책장 로컬 DB(sqflite) 스키마.
 ///
 /// `user_book.is_dirty`는 책 기록 화면의 필드 수정이 "로컬 우선 반영 → dirty
@@ -35,7 +40,7 @@ class BookshelfDatabase {
     final path = join(dbPath, 'bookshelf.db');
     return openDatabase(
       path,
-      version: 11,
+      version: 15,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -187,6 +192,40 @@ class BookshelfDatabase {
             'ON book_reflection(server_id) WHERE server_id IS NOT NULL',
           );
         }
+        if (oldVersion < 12 &&
+            await _hasTable(db, 'book_note_memo') &&
+            !await _hasColumn(db, 'book_note_memo', 'local_image_path')) {
+          // 메모 사진을 로컬 우선으로 전환한다. `image_url`은 서버 값
+          // 전용으로 되돌리고(= null이면 "아직 서버에 올리지 못한 사진"),
+          // 로컬 파일은 새 컬럼이 따로 관리한다(`noteMemoImageStore`).
+          await db.execute(
+            'ALTER TABLE book_note_memo ADD COLUMN local_image_path TEXT',
+          );
+          // v11까지는 업로드 전 사진의 로컬 경로를 `image_url`에 그대로
+          // 담아 뒀다(업로드가 끝나면 서버 URL로 덮어썼다). 그 값들을 새
+          // 컬럼으로 옮겨야 push가 "올릴 파일"을 계속 찾을 수 있다.
+          await db.execute(
+            "UPDATE book_note_memo "
+            "SET local_image_path = image_url, image_url = NULL "
+            "WHERE image_url IS NOT NULL "
+            "AND image_url NOT LIKE 'http://%' "
+            "AND image_url NOT LIKE 'https://%'",
+          );
+        }
+        if (oldVersion < 13) {
+          await _createReflectionImageLocalTable(db);
+        }
+        if (oldVersion < 14) {
+          await _createStorageModeTable(db);
+        }
+        if (oldVersion < 15 &&
+            await _hasTable(db, 'storage_mode') &&
+            !await _hasColumn(db, 'storage_mode', 'server_delete_pending')) {
+          await db.execute(
+            'ALTER TABLE storage_mode '
+            'ADD COLUMN server_delete_pending INTEGER NOT NULL DEFAULT 0',
+          );
+        }
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -252,6 +291,8 @@ class BookshelfDatabase {
         await _createBookCategoryTable(db);
         await _createDismissedIsbnLinkTable(db);
         await _createRecordTables(db);
+        await _createReflectionImageLocalTable(db);
+        await _createStorageModeTable(db);
       },
     );
   }
@@ -306,6 +347,50 @@ class BookshelfDatabase {
     ''');
   }
 
+  /// 저장 모드(서버/로컬)를 담는 한 행짜리 로컬 테이블([StorageModeStore]).
+  ///
+  /// `server_delete_pending`은 "로컬 모드로 전환은 됐지만 서버 기록 정리가
+  /// 아직 안 끝남"을 앱 재시작 뒤에도 기억하기 위한 값이다 — 이 값이 없으면
+  /// 전환 직후 삭제가 실패했을 때 다시 시도할 방법이 사라진다.
+  ///
+  /// 행이 없으면 기본값인 서버 저장 모드다 — 자발적 로그아웃이 실행하는
+  /// [clearAll]이 이 행을 지우므로, 로컬 데이터가 사라지는 순간 모드도 함께
+  /// 초기화된다.
+  static Future<void> _createStorageModeTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS storage_mode (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        mode TEXT NOT NULL,
+        owner_user_id INTEGER,
+        server_delete_pending INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+  }
+
+  /// 독후감 본문 이미지의 "서버 URL ↔ 로컬 사본" 짝을 담는 로컬 전용 테이블.
+  ///
+  /// 서버 `book_reflection.content_json`은 이미지 URL만 갖고 기기 로컬 경로는
+  /// 모른다. 그래서 화면이 로컬 파일을 우선 표시하려면 이 매칭이 따로
+  /// 필요하다(`reflectionImageStore`가 실제 파일을 관리한다).
+  ///
+  /// 일부러 `book_reflection`을 참조하는 외래 키를 걸지 않는다 — 독후감 행은
+  /// 동기화 반영 때 `INSERT OR REPLACE`로 갱신되는데(REPLACE는 기존 행을 지운
+  /// 뒤 다시 넣는다) ON DELETE CASCADE를 걸면 동기화 한 번에 매칭이 통째로
+  /// 사라진다(v5 `dismissed_isbn_link`와 같은 함정). 독후감이 실제로 사라졌을
+  /// 때의 정리는 `BookReflectionRepository.hydrateLocalImages()`가 직접 한다.
+  static Future<void> _createReflectionImageLocalTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS reflection_image_local (
+        reflection_id INTEGER NOT NULL,
+        remote_image_url TEXT NOT NULL,
+        local_image_path TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (reflection_id, remote_image_url)
+      )
+    ''');
+  }
+
   /// 전체 기록 조회(`/api/me/records`) 결과를 저장하는 로컬 테이블.
   ///
   /// `owner_user_id`는 API 응답 필드가 아닌 로컬 계정 격리용 값이다. 서버에서
@@ -322,6 +407,12 @@ class BookshelfDatabase {
   /// 깨지고, 상세 화면이 들고 있는 noteId 캐시도 함께 무효화된다. PATCH/DELETE
   /// 등 서버 호출은 항상 `server_id`를 쓰고, `server_id IS NULL`이면 "아직
   /// 서버에 한 번도 반영되지 못한 로컬 전용 행"이라는 뜻이다.
+  ///
+  /// `book_note_memo`의 사진은 두 컬럼으로 나뉜다. `image_url`은 서버가
+  /// 내려준 전체 URL 전용이고(null이면 "아직 서버에 올리지 못한 사진"),
+  /// `local_image_path`는 서버에 없는 로컬 전용 정보로 앱 지원 디렉터리
+  /// 기준 상대 경로를 담는다(`noteMemoImageStore`). 화면은 로컬 파일을
+  /// 먼저 쓰고 없을 때만 `image_url`로 대체한다.
   static Future<void> _createRecordTables(Database db) async {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS book_note (
@@ -351,6 +442,7 @@ class BookshelfDatabase {
         end_page INTEGER,
         content TEXT,
         image_url TEXT,
+        local_image_path TEXT,
         is_important INTEGER NOT NULL DEFAULT 0,
         sort_order INTEGER NOT NULL DEFAULT 0,
         deleted_at TEXT,
@@ -402,24 +494,19 @@ class BookshelfDatabase {
     await db.transaction((txn) async {
       await txn.delete('book_note_memo');
       await txn.delete('book_note');
+      await txn.delete('reflection_image_local');
       await txn.delete('book_reflection');
       await txn.delete('user_book_tag');
       await txn.delete('dismissed_isbn_link');
       await txn.delete('user_book');
       await txn.delete('sync_meta');
+      await txn.delete('storage_mode');
     });
-    await _clearMemoImages();
+    storageModeStore.invalidateCache();
+    await noteMemoImageStore.clear();
+    await reflectionImageStore.clear();
+    await bookCoverImageStore.clear();
     await _clearPendingBookThumbnails();
-  }
-
-  static Future<void> _clearMemoImages() async {
-    try {
-      final root = await getApplicationSupportDirectory();
-      final directory = Directory(join(root.path, 'memo_images'));
-      if (await directory.exists()) await directory.delete(recursive: true);
-    } catch (_) {
-      developer.log('[메모 사진 전체 정리] result=FAIL reason=local_file_error');
-    }
   }
 
   static Future<void> _clearPendingBookThumbnails() async {

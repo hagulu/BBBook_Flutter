@@ -72,9 +72,9 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
       ref
           .read(bookDetailControllerProvider(widget.isbn).notifier)
           .markAddedToShelf(result.userBookId);
-      if (result.serverId != null) {
-        AppSnackBar.success(context, '서재에 추가되었습니다.');
-      }
+      // serverId는 서버 반영 여부일 뿐이라 로컬 저장 모드·오프라인에서는
+      // 계속 null이다. 담기 자체는 로컬 저장으로 확정된다.
+      AppSnackBar.success(context, '서재에 추가되었습니다.');
     } on ApiException catch (e) {
       if (e.statusCode == 409) {
         ref.invalidate(bookDetailControllerProvider(widget.isbn));

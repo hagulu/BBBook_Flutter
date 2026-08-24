@@ -103,6 +103,9 @@ class RecordSyncDao {
           'end_page': memo.endPage,
           'content': memo.content,
           'image_url': memo.imageUrl,
+          // 최초 다운로드 직후라 사진 로컬 사본은 아직 없다. 이후
+          // `BookNoteRepository.hydrateLocalImages()`가 내려받아 채운다.
+          'local_image_path': null,
           'is_important': memo.isImportant ? 1 : 0,
           'sort_order': memo.sortOrder,
           'deleted_at': null,

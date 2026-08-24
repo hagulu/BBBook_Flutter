@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import '../../../core/network/api_exception.dart';
+import '../../book_search/models/book_search_item.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
 import '../../bookshelf/data/bookshelf_repository.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/models/book_tag.dart';
+import '../../bookshelf/services/book_cover_image_store.dart';
+import '../../storage_mode/data/storage_mode_store.dart';
 import 'book_record_api.dart';
 
 /// 책 기록 상세 화면의 source of truth. 조회는 [BookshelfRepository]의 로컬
@@ -17,7 +21,9 @@ import 'book_record_api.dart';
 /// (`BookshelfRepository.sync()`)가 일괄 재시도하게 한다. 그 외
 /// [updateBookInfo]/[linkBook]/[addTag]/[removeTag]/[deleteBook]은 여전히 서버 PATCH가
 /// 성공한 뒤에만 로컬에 반영한다(서버가 최종 진실 소스 — 서버 실패 시
-/// 로컬은 건드리지 않고 예외를 던져 화면이 에러를 처리하게 한다).
+/// 로컬은 건드리지 않고 예외를 던져 화면이 에러를 처리하게 한다). 로컬 저장
+/// 모드에서는 그 서버 의존 기능들을 [_requireServerId]가 안내와 함께 막고,
+/// [deleteBook]만 로컬 삭제로 대신한다.
 ///
 /// 각 쓰기 메서드는 API 호출 *전* [BookshelfDatabase.sessionGeneration]을
 /// 기억해 뒀다가, 응답을 받은 뒤 값이 바뀌었으면(그사이 로그아웃 등으로
@@ -29,10 +35,12 @@ class BookRecordRepository {
   BookRecordRepository({
     required this._api,
     required this._bookshelfRepository,
-  });
+    StorageModeStore? storageMode,
+  }) : _storageMode = storageMode ?? storageModeStore;
 
   final BookRecordApi _api;
   final BookshelfRepository _bookshelfRepository;
+  final StorageModeStore _storageMode;
 
   Future<BookItem?> getLocal(int userBookId) =>
       _bookshelfRepository.getById(userBookId);
@@ -131,6 +139,19 @@ class BookRecordRepository {
   }) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final current = await _requireLocal(userBookId);
+    // 날짜 해제는 로컬 컬럼만 비우면 되는 작업이라 로컬 저장 모드에서도
+    // 그대로 쓸 수 있다(서버 호출만 건너뛴다).
+    if (await _storageMode.isLocal()) {
+      await _bookshelfRepository.clearReadingDateLocal(
+        userBookId,
+        isStartedAt: isStartedAt,
+      );
+      return current.copyWithRecord(
+        startedAt: isStartedAt ? '' : null,
+        finishedAt: isStartedAt ? null : '',
+        updatedAt: current.updatedAt,
+      );
+    }
     final serverUserBookId = await _requireServerId(current);
     await _api.patchRecord(
       userBookId: serverUserBookId,
@@ -163,6 +184,19 @@ class BookRecordRepository {
   }) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final current = await _requireLocal(userBookId);
+    if (await _storageMode.isLocal()) {
+      return _updateBookInfoLocally(
+        current,
+        title: title,
+        author: author,
+        publisher: publisher,
+        totalPages: totalPages,
+        categoryId: categoryId,
+        coverImageUrl: coverImageUrl,
+        thumbnailFile: thumbnailFile,
+        removeThumbnail: removeThumbnail,
+      );
+    }
     final serverUserBookId = await _requireServerId(current);
     final data = await _api.patchBookInfo(
       userBookId: serverUserBookId,
@@ -183,9 +217,16 @@ class BookRecordRepository {
   /// 카테고리)가 새로 연결한 책 기준으로 갱신돼 돌아오고, 해제([isbn13]이
   /// null)면 그 필드들은 기존값을 유지한 채 isbn13/bookId만 null이 된다
   /// (api-doc 기준) — 어느 쪽이든 응답을 그대로 로컬에 반영하면 된다.
-  Future<BookItem> linkBook(int userBookId, {required String? isbn13}) async {
+  Future<BookItem> linkBook(
+    int userBookId, {
+    required String? isbn13,
+    BookSearchItem? linkedBook,
+  }) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final current = await _requireLocal(userBookId);
+    if (await _storageMode.isLocal()) {
+      return _linkBookLocally(current, isbn13: isbn13, linkedBook: linkedBook);
+    }
     final serverUserBookId = await _requireServerId(current);
     final data = await _api.patchLink(
       userBookId: serverUserBookId,
@@ -242,10 +283,106 @@ class BookRecordRepository {
   Future<void> deleteBook(int userBookId) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final current = await _requireLocal(userBookId);
+    // 로컬 저장 모드에서는 서버에 지울 기록이 없다 — 로컬에서만 지운다.
+    if (await _storageMode.isLocal()) {
+      await _bookshelfRepository.deleteLocal(userBookId);
+      return;
+    }
     final serverUserBookId = await _requireServerId(current);
     await _api.deleteUserBook(serverUserBookId);
     if (BookshelfDatabase.sessionGeneration == expectedGeneration) {
       await _bookshelfRepository.deleteLocal(userBookId);
+    }
+  }
+
+  /// 로컬 저장 모드의 책 정보 수정. 서버 스냅샷이 아니라 사용자가 입력한
+  /// 값이 그대로 원본이므로 로컬에 바로 반영한다. 새로 고른 표지 파일은
+  /// [bookCoverImageStore]에 보관하고 그 상대 경로를 표지 값으로 쓴다
+  /// (서버로 나가는 경로는 로컬 모드에서 모두 막혀 있다).
+  Future<BookItem> _updateBookInfoLocally(
+    BookItem current, {
+    required String title,
+    String? author,
+    String? publisher,
+    int? totalPages,
+    int? categoryId,
+    String? coverImageUrl,
+    File? thumbnailFile,
+    bool removeThumbnail = false,
+  }) async {
+    final previousCover = current.coverImageUrl;
+    final String? nextCover;
+    if (removeThumbnail) {
+      nextCover = null;
+    } else if (thumbnailFile != null) {
+      nextCover = await _saveLocalCover(thumbnailFile);
+    } else {
+      nextCover = coverImageUrl ?? previousCover;
+    }
+
+    final updated = current.copyWithBookInfo(
+      title: title,
+      author: author,
+      publisher: publisher,
+      totalPages: totalPages,
+      displayCategoryId: categoryId,
+      // 카테고리 이름은 서버 응답으로만 오던 값이라, 선택이 바뀌면 이름은
+      // 비워 두고 ID만 남긴다(화면은 ID로 마스터 목록에서 이름을 찾는다).
+      category: categoryId == current.displayCategoryId
+          ? current.category
+          : null,
+      coverImageUrl: nextCover,
+      isbn13: current.isbn13,
+      bookId: current.bookId,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await _bookshelfRepository.applyLocalEdit(updated);
+    // 더 이상 쓰지 않는 이전 로컬 표지 파일을 정리한다(서버 URL이면 무시).
+    if (previousCover != nextCover) {
+      await bookCoverImageStore.delete(previousCover, except: nextCover);
+    }
+    developer.log(
+      '[책 정보 수정] userBookId=${current.userBookId} '
+      'result=SUCCESS mode=local',
+    );
+    return updated;
+  }
+
+  /// 로컬 저장 모드의 ISBN 연결/해제. 연결할 책의 표시 정보([linkedBook])를
+  /// 함께 받으면 제목·저자 등도 그 책 기준으로 갱신한다 — 서버 `bookId`는
+  /// 알 수 없으므로 비운다(로컬에서는 쓰지 않는 값이다).
+  Future<BookItem> _linkBookLocally(
+    BookItem current, {
+    required String? isbn13,
+    BookSearchItem? linkedBook,
+  }) async {
+    final updated = current.copyWithBookInfo(
+      title: linkedBook?.title ?? current.title,
+      author: linkedBook?.author ?? current.author,
+      publisher: linkedBook?.publisher ?? current.publisher,
+      totalPages: current.totalPages,
+      displayCategoryId: current.displayCategoryId,
+      category: current.category,
+      coverImageUrl: linkedBook?.coverUrl ?? current.coverImageUrl,
+      isbn13: isbn13,
+      bookId: null,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    await _bookshelfRepository.applyLocalEdit(updated);
+    developer.log(
+      '[ISBN 연결] userBookId=${current.userBookId} '
+      'result=SUCCESS mode=local isbn13=${isbn13 ?? 'unlinked'}',
+    );
+    return updated;
+  }
+
+  Future<String?> _saveLocalCover(File file) async {
+    try {
+      return await bookCoverImageStore.saveSelected(file.path);
+    } on FileSystemException catch (error) {
+      throw ApiException(
+        error.message.isEmpty ? '선택한 이미지를 찾을 수 없습니다.' : error.message,
+      );
     }
   }
 
@@ -260,7 +397,13 @@ class BookRecordRepository {
     return item;
   }
 
+  /// 서버 호출이 필요한 기능(책 정보 수정·ISBN 연결·태그·삭제)의 공통
+  /// 관문. 로컬 저장 모드에서는 서버 기록이 이미 정리돼 있어 어떤 요청도
+  /// 의미가 없으므로, 404 대신 이유를 알려주고 막는다.
   Future<int> _requireServerId(BookItem item) async {
+    if (await _storageMode.isLocal()) {
+      throw const ApiException('로컬 저장 모드에서는 서버가 필요한 기능을 쓸 수 없습니다.');
+    }
     if (item.serverId != null) return item.serverId!;
     await _bookshelfRepository.pushDirtyRecord(item.userBookId);
     final latest = await _bookshelfRepository.getById(item.userBookId);

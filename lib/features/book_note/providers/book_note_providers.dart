@@ -123,9 +123,14 @@ class BookNoteDetailController
     extends AutoDisposeFamilyAsyncNotifier<BookNoteDetail, BookNoteDetailArgs> {
   late BookNoteRepository _repository;
   int? _noteId;
+  bool _disposed = false;
 
   @override
   FutureOr<BookNoteDetail> build(BookNoteDetailArgs args) async {
+    // 재빌드마다 새로 등록한다 — 화면을 벗어난(또는 다시 만들어진) 뒤
+    // 늦게 끝난 사진 다운로드가 state를 건드리지 않게 하기 위한 표시다.
+    _disposed = false;
+    ref.onDispose(() => _disposed = true);
     ref.watch(bookNoteSyncVersionProvider);
     final currentUserId = ref.watch(
       authNotifierProvider.select((auth) => auth.user?.id),
@@ -136,12 +141,33 @@ class BookNoteDetailController
     _repository = ref.watch(bookNoteRepositoryProvider);
     _noteId = args.noteId;
     if (_noteId == null) return const BookNoteDetail.empty();
-    return await _repository.findDetail(
+    final detail =
+        await _repository.findDetail(
           ownerUserId: args.ownerUserId,
           userBookId: args.userBookId,
           noteId: _noteId!,
         ) ??
         const BookNoteDetail.empty();
+    // 이 노트의 사진만 지금 확보한다(전체 일괄 다운로드는 하지 않는다).
+    // 새로 받은 사진이 있으면 로컬 경로가 채워진 최신 상태로 다시 읽는다.
+    unawaited(_ensureImages(args));
+    return detail;
+  }
+
+  /// 사진 다운로드는 화면 표시를 막지 않는다 — 받는 동안에는 서버 URL로
+  /// 보이고, 다 받으면 로컬 경로가 반영된 상태로 다시 그린다.
+  Future<void> _ensureImages(BookNoteDetailArgs args) async {
+    final noteId = _noteId;
+    if (noteId == null) return;
+    final downloaded = await _repository.ensureImagesForNote(noteId);
+    if (!downloaded || _disposed) return;
+    final refreshed = await _repository.findDetail(
+      ownerUserId: args.ownerUserId,
+      userBookId: args.userBookId,
+      noteId: noteId,
+    );
+    if (refreshed == null || _disposed) return;
+    state = AsyncValue.data(refreshed);
   }
 
   Future<BookNote> saveTitle(String? title) async {
@@ -189,7 +215,7 @@ class BookNoteDetailController
       noteId: noteId,
       noteMemoId: noteMemoId,
       draft: draft,
-      previousImageUrl: previousMemo.imageUrl,
+      previousLocalImagePath: previousMemo.localImagePath,
     );
     final current = state.value ?? beforeSave;
     state = AsyncValue.data(
@@ -212,7 +238,7 @@ class BookNoteDetailController
       userBookId: arg.userBookId,
       noteId: noteId,
       noteMemoId: noteMemoId,
-      previousImageUrl: previousMemo.imageUrl,
+      previousLocalImagePath: previousMemo.localImagePath,
     );
     if (result.noteWasDeleted) {
       state = const AsyncValue.data(BookNoteDetail.empty());

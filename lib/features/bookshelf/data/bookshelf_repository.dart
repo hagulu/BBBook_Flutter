@@ -15,6 +15,10 @@ import '../models/book_status.dart';
 import '../models/book_tag.dart';
 import '../models/finished_filter.dart';
 import 'book_category_dao.dart';
+import '../../book_note/services/note_memo_image_store.dart';
+import '../../book_reflection/services/reflection_image_store.dart';
+import '../../storage_mode/data/storage_mode_store.dart';
+import '../services/book_cover_image_store.dart';
 import 'bookshelf_api.dart';
 import 'bookshelf_dao.dart';
 import 'bookshelf_database.dart';
@@ -30,7 +34,8 @@ class BookshelfRepository {
     this._dao = const BookshelfDao(),
     this._categoryDao = const BookCategoryDao(),
     this._uuid = const Uuid(),
-  });
+    StorageModeStore? storageMode,
+  }) : _storageMode = storageMode ?? storageModeStore;
 
   final BookshelfApi _api;
   final BookRecordApi _recordApi;
@@ -39,6 +44,7 @@ class BookshelfRepository {
   final BookshelfDao _dao;
   final BookCategoryDao _categoryDao;
   final Uuid _uuid;
+  final StorageModeStore _storageMode;
 
   /// [pushDirtyRecord] 호출을 책별로 순서대로 실행시키는 체인. 겹치는 호출이
   /// 동시에 같은 baseline으로 push를 보내면 서버가 뒤에 도착한 요청을 (실제
@@ -60,6 +66,9 @@ class BookshelfRepository {
   /// 실행됨) 결과를 로컬 DB에 쓰지 않고 버린다. 그러지 않으면 이전 세션의
   /// 응답이 clear 이후 되살아나 다음 로그인 사용자에게 노출될 수 있다.
   Future<bool> sync() async {
+    // 로컬 저장 모드에서는 로컬이 원본이다 — 올리지도, 서버 변경을 받지도
+    // 않는다(서버 기록은 이전 완료 시점에 소프트 삭제됐다).
+    if (await _storageMode.isLocal()) return false;
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
 
     await _pushDirtyRecords(expectedGeneration);
@@ -163,6 +172,9 @@ class BookshelfRepository {
     int userBookId, {
     required bool reportPermanentCreateFailure,
   }) async {
+    // 로컬 저장 모드에서는 dirty 행을 그대로 로컬에 남겨 둔다(서버로 올리지
+    // 않는 것이 정상 상태다).
+    if (await _storageMode.isLocal()) return;
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final dirty = await _dao.getDirtyRecord(userBookId);
     if (dirty == null) return;
@@ -419,10 +431,16 @@ class BookshelfRepository {
     String? finishedAt,
   }) async {
     final clientRequestId = _uuid.v4();
-    final thumbnailPath = await _persistPendingThumbnail(
-      thumbnailFile,
-      clientRequestId,
-    );
+    // 로컬 저장 모드에서는 CREATE push가 없어 서버 재시도용 임시 표지
+    // (`create_thumbnail_path`)를 만들어 봐야 올라가지도, 정리되지도 않는다.
+    // 고른 표지를 곧바로 표지 저장소에 넣고 그 경로를 표지 값으로 쓴다.
+    final isLocalMode = await _storageMode.isLocal();
+    final localCoverPath = isLocalMode && thumbnailFile != null
+        ? await bookCoverImageStore.saveSelected(thumbnailFile.path)
+        : null;
+    final thumbnailPath = isLocalMode
+        ? null
+        : await _persistPendingThumbnail(thumbnailFile, clientRequestId);
     final now = DateTime.now().toUtc();
     late final BookItem local;
     try {
@@ -431,6 +449,7 @@ class BookshelfRepository {
           userBookId: 0,
           clientRequestId: clientRequestId,
           createThumbnailPath: thumbnailPath,
+          coverImageUrl: localCoverPath,
           title: title,
           author: author,
           publisher: publisher,
@@ -452,6 +471,7 @@ class BookshelfRepository {
       );
     } catch (_) {
       await _deleteManagedPendingThumbnail(thumbnailPath);
+      await bookCoverImageStore.delete(localCoverPath);
       rethrow;
     }
     await pushDirtyRecord(local.userBookId, reportPermanentCreateFailure: true);
@@ -509,8 +529,20 @@ class BookshelfRepository {
     required bool isStartedAt,
   }) => _dao.clearReadingDateColumn(userBookId, isStartedAt: isStartedAt);
 
-  /// 서재에서 책을 삭제(DELETE API 성공)한 뒤 로컬 행을 제거한다.
-  Future<void> deleteLocal(int userBookId) => _dao.deleteOne(userBookId);
+  /// 서재에서 책을 삭제한 뒤(서버 DELETE 성공 또는 로컬 저장 모드) 로컬
+  /// 행과 그 아래 기록·이미지 파일까지 정리한다. 파일 경로는 행을 지우면
+  /// 알 수 없으므로 먼저 모은다.
+  Future<void> deleteLocal(int userBookId) async {
+    final images = await _dao.findLocalImagePathsForBook(userBookId);
+    await _dao.deleteOne(userBookId);
+    for (final path in images.memoImages) {
+      await noteMemoImageStore.delete(path);
+    }
+    for (final path in images.reflectionImages) {
+      await reflectionImageStore.delete(path);
+    }
+    await bookCoverImageStore.delete(images.coverImage);
+  }
 
   /// 책 기록 화면의 필드 수정을 로컬에 즉시 반영하고 dirty로 표시한다.
   /// 서버 반영은 호출부가 이어서 [pushDirtyRecord]로 트리거한다.

@@ -84,6 +84,56 @@ class BookItem {
     return (currentPage / total).clamp(0.0, 1.0);
   }
 
+  /// 책 정보(제목/저자/출판사/총쪽수/카테고리/표지)와 ISBN 연결만 바꾼
+  /// 사본을 만든다. 서버 응답 없이 로컬에서 직접 반영하는 경로(로컬 저장
+  /// 모드의 책 정보 수정·ISBN 연결)가 쓴다 — 넘긴 값이 그대로 새 값이므로
+  /// 바뀌지 않는 필드는 호출부가 현재 값을 그대로 넘긴다.
+  BookItem copyWithBookInfo({
+    required String title,
+    required String? author,
+    required String? publisher,
+    required int? totalPages,
+    required int? displayCategoryId,
+    required String? category,
+    required String? coverImageUrl,
+    required String? isbn13,
+    required int? bookId,
+    required DateTime updatedAt,
+  }) {
+    return BookItem(
+      userBookId: userBookId,
+      serverId: serverId,
+      clientRequestId: clientRequestId,
+      createThumbnailPath: createThumbnailPath,
+      bookId: bookId,
+      isbn13: isbn13,
+      title: title,
+      author: author,
+      publisher: publisher,
+      totalPages: totalPages,
+      coverImageUrl: coverImageUrl,
+      displayCategoryId: displayCategoryId,
+      category: category,
+      status: status,
+      currentPage: currentPage,
+      myRating: myRating,
+      shortReview: shortReview,
+      isMasterpiece: isMasterpiece,
+      sourceType: sourceType,
+      rereadCount: rereadCount,
+      difficulty: difficulty,
+      startedAt: startedAt,
+      finishedAt: finishedAt,
+      libraryId: libraryId,
+      libraryDueAt: libraryDueAt,
+      platformName: platformName,
+      discoverySource: discoverySource,
+      tags: tags,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
+
   /// [tags]와 [updatedAt]만 다른 사본을 만든다. 태그 추가/삭제 응답이
   /// 태그 정보만 돌려주는 API(POST/DELETE tags)의 결과를 로컬 [BookItem]에
   /// 반영할 때 사용한다.
@@ -256,4 +306,20 @@ class BookItem {
     if (value == null || value.isEmpty) return null;
     return DateTime.parse(value);
   }
+}
+
+/// 책 한 권과 함께 정리해야 할 로컬 이미지 경로 묶음
+/// ([BookshelfDao.findLocalImagePathsForBook]).
+class BookLocalImagePaths {
+  const BookLocalImagePaths({
+    required this.memoImages,
+    required this.reflectionImages,
+    required this.coverImage,
+  });
+
+  final List<String> memoImages;
+  final List<String> reflectionImages;
+
+  /// 로컬 저장 모드에서 사용자가 고른 표지(서버 URL이면 파일이 없다).
+  final String? coverImage;
 }

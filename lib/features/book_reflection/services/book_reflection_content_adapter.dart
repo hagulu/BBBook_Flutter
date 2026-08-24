@@ -24,6 +24,127 @@ class BookReflectionContentAdapter {
     return {'ops': document.toDelta().toJson()};
   }
 
+  /// 본문에 들어 있는 이미지 출처를 등장 순서대로 모두 반환한다(중복 포함).
+  ///
+  /// 서버 URL과 아직 업로드되지 않은 로컬 상대 경로가 섞여 있을 수 있다 —
+  /// 구분은 호출부([BookReflectionRepository])가 한다. 순서를 보존해야
+  /// push 응답의 이미지 순서와 짝지어 로컬 사본 매칭을 이어갈 수 있다.
+  List<String> imageSources(Map<String, dynamic>? json) {
+    final sources = <String>[];
+    switch (json) {
+      case {'ops': final List<dynamic> rawOps}:
+        for (final op in rawOps.whereType<Map>()) {
+          final insert = op['insert'];
+          if (insert is! Map) continue;
+          final source = insert['image'];
+          if (source is String && source.isNotEmpty) sources.add(source);
+        }
+      case {'type': 'doc'}:
+        _collectTiptapImages(json['content'], sources);
+      case _:
+        break;
+    }
+    return sources;
+  }
+
+  /// 이미지 출처만 [replacements]에 따라 바꾼 새 본문을 만든다. 크기
+  /// (`width`) 같은 다른 속성은 그대로 둔다 — 저장 시점에 사용자가 지정한
+  /// 이미지 크기가 사라지면 안 된다.
+  Map<String, dynamic> replaceImageSources(
+    Map<String, dynamic> json,
+    Map<String, String> replacements,
+  ) {
+    if (replacements.isEmpty) return json;
+    switch (json) {
+      case {'ops': final List<dynamic> rawOps}:
+        return {
+          ...json,
+          'ops': [
+            for (final rawOp in rawOps)
+              if (rawOp is Map)
+                _replaceInDeltaOp(rawOp, replacements)
+              else
+                rawOp,
+          ],
+        };
+      case {'type': 'doc'}:
+        return {
+          ...json,
+          if (json['content'] is List)
+            'content': _replaceInTiptapNodes(
+              json['content'] as List<dynamic>,
+              replacements,
+            ),
+        };
+      case _:
+        return json;
+    }
+  }
+
+  Map<String, dynamic> _replaceInDeltaOp(
+    Map<dynamic, dynamic> rawOp,
+    Map<String, String> replacements,
+  ) {
+    final op = Map<String, dynamic>.from(rawOp);
+    final insert = op['insert'];
+    if (insert is! Map) return op;
+    final source = insert['image'];
+    if (source is! String) return op;
+    final replacement = replacements[source];
+    if (replacement == null) return op;
+    return {
+      ...op,
+      'insert': {...Map<String, dynamic>.from(insert), 'image': replacement},
+    };
+  }
+
+  List<dynamic> _replaceInTiptapNodes(
+    List<dynamic> nodes,
+    Map<String, String> replacements,
+  ) {
+    return [
+      for (final rawNode in nodes)
+        if (rawNode is Map)
+          _replaceInTiptapNode(Map<String, dynamic>.from(rawNode), replacements)
+        else
+          rawNode,
+    ];
+  }
+
+  Map<String, dynamic> _replaceInTiptapNode(
+    Map<String, dynamic> node,
+    Map<String, String> replacements,
+  ) {
+    final content = node['content'];
+    final replacedContent = content is List
+        ? _replaceInTiptapNodes(content, replacements)
+        : content;
+    if (node['type'] != 'image') {
+      return {...node, if (content is List) 'content': replacedContent};
+    }
+    final attrs = _map(node['attrs']);
+    final source = attrs?['src'];
+    final replacement = source is String ? replacements[source] : null;
+    if (attrs == null || replacement == null) return node;
+    return {
+      ...node,
+      'attrs': {...attrs, 'src': replacement},
+      if (content is List) 'content': replacedContent,
+    };
+  }
+
+  void _collectTiptapImages(Object? nodes, List<String> sources) {
+    if (nodes is! List) return;
+    for (final rawNode in nodes.whereType<Map>()) {
+      final node = Map<String, dynamic>.from(rawNode);
+      if (node['type'] == 'image') {
+        final source = _map(node['attrs'])?['src'];
+        if (source is String && source.isNotEmpty) sources.add(source);
+      }
+      _collectTiptapImages(node['content'], sources);
+    }
+  }
+
   /// 검색·미리보기용 평문. Quill 문서가 항상 갖는 마지막 개행만 제거한다.
   String toContentText(Document document) {
     final buffer = StringBuffer();

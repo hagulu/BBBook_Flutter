@@ -287,6 +287,7 @@ class _ReflectionBody extends StatelessWidget {
             if (reflection.contentJson != null)
               _ReflectionRichContent(
                 key: ValueKey(reflection.updatedAt),
+                reflectionId: reflection.id,
                 contentJson: reflection.contentJson!,
               )
             else
@@ -312,16 +313,23 @@ class _ReflectionBody extends StatelessWidget {
   }
 }
 
-class _ReflectionRichContent extends StatefulWidget {
-  const _ReflectionRichContent({super.key, required this.contentJson});
+class _ReflectionRichContent extends ConsumerStatefulWidget {
+  const _ReflectionRichContent({
+    super.key,
+    required this.reflectionId,
+    required this.contentJson,
+  });
 
+  final int reflectionId;
   final Map<String, dynamic> contentJson;
 
   @override
-  State<_ReflectionRichContent> createState() => _ReflectionRichContentState();
+  ConsumerState<_ReflectionRichContent> createState() =>
+      _ReflectionRichContentState();
 }
 
-class _ReflectionRichContentState extends State<_ReflectionRichContent> {
+class _ReflectionRichContentState
+    extends ConsumerState<_ReflectionRichContent> {
   static const _adapter = BookReflectionContentAdapter();
   late final QuillController _controller;
   final FocusNode _focusNode = FocusNode();
@@ -347,6 +355,11 @@ class _ReflectionRichContentState extends State<_ReflectionRichContent> {
 
   @override
   Widget build(BuildContext context) {
+    // 본문의 서버 이미지는 로컬 사본이 있으면 그것으로 보여준다(아직
+    // 로드 전이면 서버 URL로 표시하고, 매칭이 도착하면 다시 그린다).
+    final localImagePaths =
+        ref.watch(reflectionLocalImagesProvider(widget.reflectionId)).value ??
+        const <String, String>{};
     return ReflectionQuillEditor(
       controller: _controller,
       focusNode: _focusNode,
@@ -358,7 +371,9 @@ class _ReflectionRichContentState extends State<_ReflectionRichContent> {
         showCursor: false,
         customStyles: bookReflectionQuillStyles,
         textSpanBuilder: reflectionTextSpanBuilder,
-        embedBuilders: const [ReflectionImageEmbedBuilder()],
+        embedBuilders: [
+          ReflectionImageEmbedBuilder(localImagePaths: localImagePaths),
+        ],
       ),
     );
   }

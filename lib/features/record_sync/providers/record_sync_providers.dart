@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_providers.dart';
+import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../data/record_sync_api.dart';
 import '../data/record_sync_dao.dart';
 import '../data/record_sync_repository.dart';
@@ -56,7 +57,10 @@ class InitialRecordSyncController
 
   Future<void> _initialize(int userId) async {
     try {
-      if (await _repository.isInitialSyncCompleted(userId)) {
+      // 로컬 저장 모드에서는 서버에서 내려받을 기록이 없다(전환 시점에
+      // 모두 로컬로 옮기고 서버 기록은 정리했다).
+      if (await ref.read(storageModeStoreProvider).isLocal() ||
+          await _repository.isInitialSyncCompleted(userId)) {
         if (!_disposed) {
           state = const InitialRecordSyncState(
             phase: InitialRecordSyncPhase.completed,

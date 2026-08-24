@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:bbbook/features/book_reflection/data/book_reflection_dao.dart';
 import 'package:bbbook/features/book_reflection/models/book_reflection.dart';
 import 'package:bbbook/features/bookshelf/data/bookshelf_dao.dart';
@@ -19,10 +21,13 @@ void main() {
   setUpAll(() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
-    final databasePath = path.join(
-      await databaseFactory.getDatabasesPath(),
-      'bookshelf.db',
+    // 테스트 파일은 병렬 실행되므로 파일마다 별도 DB 경로를 쓴다(같은
+    // `bookshelf.db`를 공유하면 서로의 setUp이 남의 데이터를 지운다).
+    final databaseDirectory = await Directory.systemTemp.createTemp(
+      'bookshelf_test',
     );
+    await databaseFactory.setDatabasesPath(databaseDirectory.path);
+    final databasePath = path.join(databaseDirectory.path, 'bookshelf.db');
     await databaseFactory.deleteDatabase(databasePath);
     await BookshelfDatabase.instance();
   });

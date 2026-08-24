@@ -8,6 +8,7 @@ import '../../auth/providers/auth_providers.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/models/book_tag.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
+import '../../book_search/models/book_search_item.dart';
 import '../data/book_record_api.dart';
 import '../data/book_record_repository.dart';
 
@@ -173,8 +174,17 @@ class BookRecordController
   /// ISBN 연결/재연결/연결 해제. [isbn13]이 null이면 연결 해제다. 호출부
   /// (책 정보 수정 팝업)가 응답의 최신 display 필드로 입력창을 즉시 다시
   /// 채울 수 있도록 갱신된 [BookItem]을 그대로 반환한다.
-  Future<BookItem> linkBook({required String? isbn13}) {
-    return _mutate(() => _repository.linkBook(arg, isbn13: isbn13));
+  ///
+  /// [linkedBook]은 검색에서 고른 책의 표시 정보다. 서버 저장 모드에서는
+  /// 연결 응답이 같은 정보를 돌려주므로 쓰이지 않지만, 로컬 저장 모드에서는
+  /// 이 값이 없으면 제목·표지를 갱신할 방법이 없다.
+  Future<BookItem> linkBook({
+    required String? isbn13,
+    BookSearchItem? linkedBook,
+  }) {
+    return _mutate(
+      () => _repository.linkBook(arg, isbn13: isbn13, linkedBook: linkedBook),
+    );
   }
 
   Future<BookItem> addTag(String name) =>

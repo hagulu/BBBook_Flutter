@@ -16,6 +16,7 @@
 - `lib/core/network/api_base_options.dart` — API 공통 base URL/timeout 정의(ApiClient·인증 전용 Dio 공유)
 - `lib/core/storage/token_storage.dart` — refreshToken 시큐어 스토리지 래퍼
 - `lib/core/storage/client_id_storage.dart` — X-Client-Id 헤더용 설치 단위 클라이언트 식별자(UUID) 저장/재사용
+- `lib/core/storage/local_image_store.dart` — 기능별 이미지 로컬 파일 저장소(선택 이미지 저장·서버 이미지 내려받기·orphan 정리, DB에는 폴더 기준 상대 경로만 보관)
 
 ## features/auth
 
@@ -32,16 +33,17 @@
 
 ## features/profile
 
-- `lib/features/profile/screens/profile_tab_placeholder.dart` — 프로필 탭 임시 화면(TODO: profile 기능 포팅 후 교체), 로그아웃 진입점
+- `lib/features/profile/screens/profile_tab_placeholder.dart` — 프로필 탭 임시 화면(TODO: profile 기능 포팅 후 교체), 저장 방식 표시·로컬 전환과 로그아웃 진입점
 
 ## features/bookshelf
 
 - `lib/features/bookshelf/screens/bookshelf_screen.dart` — 책장 탭 콘텐츠(읽고 싶음/읽는 중/완독/중단 4탭, 기본은 읽는 중)
 - `lib/features/bookshelf/data/bookshelf_api.dart` — 책장 API 호출(전체 동기화, 증분 동기화, 완독 공개 설정 조회/수정, 카테고리 목록 GET)
-- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타, v11)
+- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타·독후감 이미지 매칭·저장 모드, v15)
 - `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호)
 - `lib/features/bookshelf/data/book_category_dao.dart` — 카테고리 마스터 목록 로컬 캐시 DAO(계정 무관, 로그아웃 시에도 유지)
 - `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화, 카테고리는 로컬 캐시 우선 조회
+- `lib/features/bookshelf/services/book_cover_image_store.dart` — 로컬 저장 모드에서 사용자가 고른 책 표지를 보관하는 `LocalImageStore` 인스턴스(`book_covers/` 폴더)
 - `lib/features/bookshelf/data/finished_cover_cache_manager.dart` — 완독 목록 표지 전용 디스크 캐시(원본 바이트 저장, 디코딩 크기 제한은 `BookCover`의 `ResizeImage`가 담당)
 - `lib/features/bookshelf/providers/bookshelf_providers.dart` — 책장 관련 Riverpod provider(동기화 컨트롤러, 탭별 목록, 완독 필터, 공개 설정, 카테고리 목록)
 
@@ -49,7 +51,7 @@
 
 - `lib/features/book_record/screens/book_record_screen.dart` — 책 기록 상세 화면(자체 AppBar, 책장에서 책 선택 시 진입), 정보/진행률/상태/출처/난이도/태그/삭제 조립
 - `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH, 책 정보 PATCH(카테고리 포함), ISBN 연결/해제 PATCH, 태그 POST/DELETE, 태그 목록/플랫폼 옵션 GET, 삭제 DELETE)
-- `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth(로컬 조회는 bookshelf 레포지토리 재사용, 수정은 서버 PATCH 성공 후 로컬 반영)
+- `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth(로컬 조회는 bookshelf 레포지토리 재사용, 수정은 서버 PATCH 성공 후 로컬 반영), 로컬 저장 모드에서는 책 정보 수정·ISBN 연결·책 삭제를 로컬에만 반영하고 태그 등 서버 전용 기능은 차단
 - `lib/features/book_record/providers/book_record_providers.dart` — 책 기록 관련 Riverpod provider(단일 책 상태 컨트롤러, 태그 자동완성, 플랫폼 옵션)
 - `lib/features/book_record/screens/widgets/book_thumbnail_field.dart` — 책 표지 이미지 선택/미리보기 공용 위젯(책 정보 수정·직접 등록에서 공유)
 - `lib/features/book_record/screens/widgets/book_category_field.dart` — 카테고리 선택 필드 + 선택 팝업 공용 위젯(책 정보 수정·직접 등록에서 공유)
@@ -62,9 +64,10 @@
 - `lib/features/book_note/screens/memo_photo_camera_screen.dart` — 메모 사진용 카메라 미리보기(좌하단 갤러리 아이콘으로 갤러리 선택 겸용) 화면
 - `lib/features/book_note/data/book_note_api.dart` — 노트 제목 PUT, 메모 생성/수정/삭제, 사진 업로드, 증분 동기화 조회 API 호출
 - `lib/features/book_note/data/book_note_dao.dart` — 로컬 DB 쿼리·dirty push 확정·전체/증분 reconcile(dirty 행 보호, 로컬 PK와 server_id 분리)
-- `lib/features/book_note/data/book_note_repository.dart` — 노트 화면 source of truth, 로컬 우선 CRUD 직후 조용히 서버 push하고 실패 시 dirty 유지, 최초엔 전체(`/api/me/records`)·이후엔 증분(`/api/me/notes/sync/changes`) 동기화
+- `lib/features/book_note/data/book_note_repository.dart` — 노트 화면 source of truth, 로컬 우선 CRUD 직후 조용히 서버 push하고 실패 시 dirty 유지, 최초엔 전체(`/api/me/records`)·이후엔 증분(`/api/me/notes/sync/changes`) 동기화, 사진은 로컬 사본 우선(업로드 후에도 유지·서버 사진은 노트를 열 때 내려받기)
 - `lib/features/book_note/providers/book_note_providers.dart` — 책별 노트 목록·상세 상태 및 노트 동기화 컨트롤러 Riverpod provider
 - `lib/features/book_note/services/book_note_memo_ocr_service.dart` — 촬영 이미지에서 한국어 단어와 선택용 좌표를 추출하는 온디바이스 OCR 서비스
+- `lib/features/book_note/services/note_memo_image_store.dart` — 메모 사진 전용 `LocalImageStore` 인스턴스(`memo_images/` 폴더)
 - `lib/features/book_note/utils/memo_highlight.dart` — 웹과 동일한 `::hl[[]]` 강조 마크업 파싱/직렬화, `isImportant` 파생 기준(`hasMemoHighlight`)
 - `lib/features/book_note/screens/widgets/highlight_text_field.dart` — 강조(::hl[[]]) 편집을 지원하는 `MemoHighlightController`(TextEditingController), 커서/선택 기반 토글·타이핑 상속·range 이동
 - `docs/policies/memo-highlight-toggle.md` — 강조 토글 버튼 정책 문서(상태 판단·경계 공백 삽입·IME 조합 세션 고정), 다른 화면/플랫폼에 재구현할 때 참고
@@ -75,15 +78,25 @@
 - `lib/features/book_reflection/screens/book_reflection_detail_screen.dart` — 독후감 상세(Quill Delta·레거시 Tiptap 리치 텍스트/이미지 읽기 및 수정 진입)
 - `lib/features/book_reflection/screens/book_reflection_editor_screen.dart` — Flutter Quill 기반 독후감 작성/수정 화면(순환형 제목·목록 툴바, 본문 이미지 크기·삭제 메뉴)
 - `lib/features/book_reflection/data/book_reflection_api.dart` — 독후감 작성·수정·본문 이미지 업로드·증분 동기화 API 호출
-- `lib/features/book_reflection/data/book_reflection_dao.dart` — 독후감 로컬 우선 CRUD·dirty push 확정·전체/증분 동기화 반영
-- `lib/features/book_reflection/data/book_reflection_repository.dart` — 독후감 화면 source of truth(로컬 우선 작성/수정 후 조용히 push, dirty 재시도, 전체/증분 동기화)
-- `lib/features/book_reflection/providers/book_reflection_providers.dart` — 독후감 목록·상세 조회 및 동기화 컨트롤러 Riverpod provider
+- `lib/features/book_reflection/data/book_reflection_dao.dart` — 독후감 로컬 우선 CRUD·dirty push 확정·전체/증분 동기화 반영·본문 이미지 매칭(`reflection_image_local`) 관리
+- `lib/features/book_reflection/data/book_reflection_repository.dart` — 독후감 화면 source of truth(로컬 우선 작성/수정 후 조용히 push, dirty 재시도, 전체/증분 동기화), 본문 이미지는 로컬 저장 후 push 때 업로드·치환하고 서버 이미지는 독후감을 열 때 내려받기
+- `lib/features/book_reflection/providers/book_reflection_providers.dart` — 독후감 목록·상세 조회, 동기화 컨트롤러, 본문 이미지 로컬 매칭 Riverpod provider
+- `lib/features/book_reflection/services/reflection_image_store.dart` — 독후감 본문 이미지 전용 `LocalImageStore` 인스턴스(`reflection_images/` 폴더)
+- `lib/features/book_reflection/services/reflection_image_mapping.dart` — push 응답과 로컬 사본을 순서로 짝지어 서버 URL↔로컬 경로 매칭을 만드는 순수 함수
+
+## features/storage_mode
+
+- `lib/features/storage_mode/data/storage_mode_store.dart` — 저장 모드(서버/로컬)와 서버 정리 미완료 여부 읽기·쓰기 단일 창구(동기화·push 게이트가 참조, 로그아웃 시 기본값으로 초기화)
+- `lib/features/storage_mode/services/local_storage_migration_service.dart` — 서버 → 로컬 이전 단계 실행(기록 동기화 → 이미지 전체 확보 → 검증 → 모드 전환 → 서버 소프트 삭제 순서 보장)
+- `lib/features/storage_mode/data/local_storage_migration_steps.dart` — 이전 각 단계를 기존 동기화 Repository·API로 구현
+- `lib/features/storage_mode/providers/storage_mode_providers.dart` — 현재 저장 모드 및 이전 진행 상태 Riverpod provider
+- `lib/features/storage_mode/screens/local_storage_migration_screen.dart` — 서버 → 로컬 이전 진행률·결과 화면(진행 중 뒤로 가기 차단)
 
 ## features/record_sync
 
 - `lib/features/record_sync/screens/initial_record_sync_screen.dart` — 인증 후 일반 화면 진입을 막고 최초 기록 다운로드·저장 진행 상태와 재시도를 표시하는 게이트 화면
 - `lib/features/record_sync/providers/record_sync_providers.dart` — 사용자별 최초 기록 동기화 단계·진행률·재시도 상태 관리
-- `lib/features/record_sync/data/record_sync_api.dart` — 전체 책장·기록 조회(`/api/me/records`) API 호출
+- `lib/features/record_sync/data/record_sync_api.dart` — 전체 책장·기록 조회(`/api/me/records`)와 로컬 전환 시 서버 기록 일괄 소프트 삭제(DELETE) API 호출
 - `lib/features/record_sync/data/record_sync_repository.dart` — 전체 책장·기록 조회와 원자적 로컬 저장을 조율하는 초기 동기화 source of truth
 
 ## features/book_search
@@ -147,3 +160,5 @@
 - `docs/review/20260820-194536-memo-photo-and-camera-orientation-review.md` — 메모 사진 작성·보기와 카메라 방향 잠금의 비동기·센서 생명주기 리뷰
 - `docs/review/20260820-195133-memo-photo-camera-orientation-rereview.md` — 메모 사진·카메라 방향 변경의 초기화 경합과 플랫폼 회전 제한 재리뷰
 - `docs/review/20260821-150209-note-domain-rename-review.md` — 신규 설치 전제의 노트/메모 도메인 명칭 전환 및 API 정합성 리뷰
+- `docs/review/20260824-095239-note-memo-local-image-review.md` — 메모 사진 로컬 저장·동기화의 반복 실패 시 다운로드 기아 문제 리뷰
+- `docs/review/20260824-151950-local-storage-mode-review.md` — 서버→로컬 저장 모드 전환의 삭제 정합성·복구·이미지 보존·직접 쓰기 경로 리뷰

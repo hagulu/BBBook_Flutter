@@ -134,12 +134,16 @@ class BookNoteDao {
     return _noteFromRow(rows.single);
   }
 
+  /// [localImagePath]는 `noteMemoImageStore`에 복사해 둔 사진의 상대
+  /// 경로다(사진이 없으면 null). 새로 만든 사진은 아직 서버에 없으므로
+  /// `image_url`은 항상 null로 시작한다 — 그 상태가 곧 "업로드 필요"
+  /// 표식이다([BookNoteRepository]의 push 참고).
   Future<BookNoteMemo> createNoteMemo({
     required int ownerUserId,
     required int userBookId,
     required int noteId,
     required BookNoteMemoDraft draft,
-    required String? imageUrl,
+    required String? localImagePath,
   }) async {
     final db = await BookshelfDatabase.instance();
     return db.transaction((txn) async {
@@ -168,7 +172,8 @@ class BookNoteDao {
         'start_page': draft.startPage,
         'end_page': draft.endPage,
         'content': draft.content,
-        'image_url': imageUrl,
+        'image_url': null,
+        'local_image_path': localImagePath,
         'is_important': draft.isImportant ? 1 : 0,
         'sort_order': (maxOrder ?? -1) + 1,
         'deleted_at': null,
@@ -181,13 +186,17 @@ class BookNoteDao {
     });
   }
 
+  /// 사진 컬럼은 [BookNoteMemoDraft.imageChange]가 요구할 때만 건드린다 —
+  /// `unchanged`면 두 컬럼 모두 update 문에 넣지 않아 기존 값(서버 URL과
+  /// 로컬 사본 경로)이 그대로 유지된다. `replaced`면 새 로컬 사본을 넣고
+  /// `image_url`을 비워 "다시 업로드해야 함"으로 되돌린다.
   Future<BookNoteMemo> updateNoteMemo({
     required int ownerUserId,
     required int userBookId,
     required int noteId,
     required int noteMemoId,
     required BookNoteMemoDraft draft,
-    required String? imageUrl,
+    required String? localImagePath,
   }) async {
     final db = await BookshelfDatabase.instance();
     return db.transaction((txn) async {
@@ -205,7 +214,14 @@ class BookNoteDao {
           'start_page': draft.startPage,
           'end_page': draft.endPage,
           'content': draft.content,
-          'image_url': imageUrl,
+          if (draft.imageChange == MemoImageChange.replaced) ...{
+            'image_url': null,
+            'local_image_path': localImagePath,
+          },
+          if (draft.imageChange == MemoImageChange.cleared) ...{
+            'image_url': null,
+            'local_image_path': null,
+          },
           'is_important': draft.isImportant ? 1 : 0,
           'updated_at': now,
           'is_dirty': 1,
@@ -519,6 +535,115 @@ class BookNoteDao {
     await db.delete('book_note_memo', where: 'id = ?', whereArgs: [localId]);
   }
 
+  // ---------------------------------------------------------------------
+  // 로컬 사진(local_image_path) 전용
+  // ---------------------------------------------------------------------
+
+  /// 서버 사진은 있는데 로컬 사본이 없는 PHOTO 메모(내려받기 대상).
+  ///
+  /// [noteId]를 주면 그 노트의 사진만 돌려준다 — 화면 진입 시점에 필요한
+  /// 사진만 받는 경로([BookNoteRepository.ensureImagesForNote])가 쓴다.
+  /// 생략하면 계정 전체가 대상이며, 로컬 저장 모드 전환 전에 모든 사진을
+  /// 확보할 때 쓴다.
+  ///
+  /// [excludeImageUrls]는 서버가 더 이상 주지 않는다고 확인된 사진이다.
+  /// 제외하지 않으면 화면에 들어올 때마다 같은 실패를 되풀이한다.
+  Future<List<BookNoteMemo>> findPhotoMemosMissingLocalImage({
+    int? noteId,
+    List<String> excludeImageUrls = const [],
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    final excludeClause = excludeImageUrls.isEmpty
+        ? ''
+        : ' AND image_url NOT IN '
+              '(${List.filled(excludeImageUrls.length, '?').join(', ')})';
+    final whereArgs = <Object?>[?noteId, ...excludeImageUrls];
+    final rows = await db.query(
+      'book_note_memo',
+      where:
+          "memo_type = 'PHOTO' AND deleted_at IS NULL "
+          'AND image_url IS NOT NULL AND local_image_path IS NULL'
+          '${noteId == null ? '' : ' AND note_id = ?'}'
+          '$excludeClause',
+      whereArgs: whereArgs.isEmpty ? null : whereArgs,
+      orderBy: 'updated_at DESC, id DESC',
+    );
+    return rows.map(_memoFromRow).toList(growable: false);
+  }
+
+  /// 아직 로컬 사본과 연결되지 않은 PHOTO 메모의 서버 사진 URL 전체.
+  /// orphan 정리가 "이미 내려받았지만 아직 연결되지 못한 사본"까지 지우지
+  /// 않도록 지켜야 할 목록이다.
+  Future<List<String>> getPendingPhotoImageUrls() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'book_note_memo',
+      columns: ['image_url'],
+      where:
+          "memo_type = 'PHOTO' AND deleted_at IS NULL "
+          'AND image_url IS NOT NULL AND local_image_path IS NULL',
+    );
+    return rows
+        .map((row) => row['image_url'] as String)
+        .toList(growable: false);
+  }
+
+  /// DB가 참조 중인 모든 로컬 사진 경로(삭제 대기 중인 메모 포함). 참조되지
+  /// 않는 파일을 지우는 orphan 정리의 기준 목록이다 — 소프트 삭제된 메모도
+  /// 포함해야 아직 push되지 않은 사진을 실수로 지우지 않는다.
+  Future<List<String>> getAllLocalImagePaths() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'book_note_memo',
+      columns: ['local_image_path'],
+      where: 'local_image_path IS NOT NULL',
+    );
+    return rows
+        .map((row) => row['local_image_path'] as String)
+        .toList(growable: false);
+  }
+
+  /// 파일이 실제로는 사라진 로컬 사본 참조를 끊는다. 다음 hydration이
+  /// 서버 URL로 다시 내려받는다.
+  Future<void> clearLocalImagePaths(List<String> localImagePaths) async {
+    if (localImagePaths.isEmpty) return;
+    final db = await BookshelfDatabase.instance();
+    final placeholders = List.filled(localImagePaths.length, '?').join(', ');
+    await db.update(
+      'book_note_memo',
+      {'local_image_path': null},
+      where: 'local_image_path IN ($placeholders)',
+      whereArgs: localImagePaths,
+    );
+  }
+
+  /// 내려받은 사본을 메모에 연결한다. 내려받는 동안 그 메모의 사진이
+  /// 바뀌었을 수 있으므로([expectedImageUrl]과 다르면) 그때는 반영하지
+  /// 않는다 — 엉뚱한 사진을 로컬 우선 표시로 고정해 버리지 않기 위함이다.
+  Future<void> setLocalImagePath({
+    required int localId,
+    required String localImagePath,
+    required String expectedImageUrl,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    await db.update(
+      'book_note_memo',
+      {'local_image_path': localImagePath},
+      where: 'id = ? AND image_url = ?',
+      whereArgs: [localId, expectedImageUrl],
+    );
+  }
+
+  /// 서버 사진이 "같은 사진"인지 비교한다. 호스트나 쿼리 문자열(서명/만료
+  /// 등)이 달라져도 경로가 같으면 같은 사진으로 본다 — 그러지 않으면
+  /// 동기화 때마다 교체로 오인해 로컬 사본을 지우고 다시 받는다.
+  static bool _isSameImage(String? a, String? b) {
+    if (a == null || b == null) return a == b;
+    return _imageIdentityOf(a) == _imageIdentityOf(b);
+  }
+
+  static String _imageIdentityOf(String url) => Uri.tryParse(url)?.path ?? url;
+
   /// `/api/me/records` 전체 조회 결과로 노트/메모 테이블을 맞춘다: 서버에
   /// 있는 행은 upsert, 서버에 없는(로컬에만 남은) 비-dirty 행은 삭제. dirty
   /// 행(및 dirty 메모가 하나라도 남은 노트)은 건드리지 않는다.
@@ -725,6 +850,10 @@ class BookNoteDao {
     return note.id;
   }
 
+  /// 서버 응답으로 메모를 반영한다. 로컬 사본 경로(`local_image_path`)는
+  /// 서버가 모르는 값이므로 그대로 보존하되, 서버 사진 자체가 바뀌었으면
+  /// (다른 기기에서 사진 교체) 옛 사본은 더 이상 이 메모의 사진이 아니므로
+  /// 비운다 — 파일 정리는 [BookNoteRepository]의 orphan 정리가 맡는다.
   Future<void> _upsertServerMemoTxn(
     Transaction txn,
     int localNoteId,
@@ -732,7 +861,7 @@ class BookNoteDao {
   ) async {
     final existing = await txn.query(
       'book_note_memo',
-      columns: ['id', 'is_dirty'],
+      columns: ['id', 'is_dirty', 'image_url'],
       where: 'server_id = ?',
       whereArgs: [memo.id],
       limit: 1,
@@ -741,6 +870,8 @@ class BookNoteDao {
       final localId = existing.single['id'] as int;
       final isDirty = existing.single['is_dirty'] == 1;
       if (!isDirty) {
+        final storedImageUrl = existing.single['image_url'] as String?;
+        final imageReplaced = !_isSameImage(storedImageUrl, memo.imageUrl);
         await txn.update(
           'book_note_memo',
           {
@@ -750,6 +881,7 @@ class BookNoteDao {
             'end_page': memo.endPage,
             'content': memo.content,
             'image_url': memo.imageUrl,
+            if (imageReplaced) 'local_image_path': null,
             'is_important': memo.isImportant ? 1 : 0,
             'sort_order': memo.sortOrder,
             'deleted_at': null,
@@ -770,6 +902,9 @@ class BookNoteDao {
       'end_page': memo.endPage,
       'content': memo.content,
       'image_url': memo.imageUrl,
+      // 처음 보는 메모라 로컬 사본이 아직 없다. 사진은 동기화 이후
+      // hydration([BookNoteRepository.hydrateLocalImages])이 내려받는다.
+      'local_image_path': null,
       'is_important': memo.isImportant ? 1 : 0,
       'sort_order': memo.sortOrder,
       'deleted_at': null,
@@ -947,6 +1082,7 @@ class BookNoteDao {
       endPage: row['end_page'] as int?,
       content: row['content'] as String?,
       imageUrl: row['image_url'] as String?,
+      localImagePath: row['local_image_path'] as String?,
       isImportant: (row['is_important'] as int) == 1,
       sortOrder: row['sort_order'] as int,
       deletedAt: _parseNullable(row['deleted_at'] as String?),

@@ -339,7 +339,10 @@ class _BookReflectionEditorScreenState
     }
   }
 
-  Future<String?> _pickAndUploadImage(BuildContext context) async {
+  /// 고른 이미지를 로컬 저장소에만 넣고 그 상대 경로를 본문에 꽂는다.
+  /// 서버 업로드는 저장 후 push가 맡으므로(오프라인에서도 이미지 첨부가
+  /// 가능해야 한다) 여기서는 네트워크를 타지 않는다.
+  Future<String?> _pickAndSaveImage(BuildContext context) async {
     final picked = await ImagePicker().pickImage(
       source: ImageSource.gallery,
       imageQuality: 85,
@@ -350,7 +353,7 @@ class _BookReflectionEditorScreenState
     try {
       return await ref
           .read(bookReflectionRepositoryProvider)
-          .uploadImage(picked.path);
+          .saveLocalImage(picked.path);
     } on ApiException catch (error) {
       if (context.mounted) AppSnackBar.error(context, error.message);
       return null;
@@ -364,12 +367,15 @@ class _BookReflectionEditorScreenState
     }
   }
 
-  Future<void> _insertImage(String imageUrl, QuillController controller) async {
+  Future<void> _insertImage(
+    String imageSource,
+    QuillController controller,
+  ) async {
     final index = controller.selection.start;
     final selectedLength = controller.selection.end - index;
     controller
       ..skipRequestKeyboard = true
-      ..replaceText(index, selectedLength, BlockEmbed.image(imageUrl), null)
+      ..replaceText(index, selectedLength, BlockEmbed.image(imageSource), null)
       ..formatText(
         index,
         1,
@@ -425,6 +431,13 @@ class _BookReflectionEditorScreenState
   @override
   Widget build(BuildContext context) {
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final reflectionId = widget.reflection?.id;
+    // 이미 저장된 독후감이면 본문의 서버 이미지를 로컬 사본으로 바꿔
+    // 보여준다(아직 로드 전이거나 신규 작성이면 서버 URL로 표시).
+    final localImagePaths = reflectionId == null
+        ? const <String, String>{}
+        : ref.watch(reflectionLocalImagesProvider(reflectionId)).value ??
+              const <String, String>{};
     return PopScope<int>(
       canPop: _allowPop,
       onPopInvokedWithResult: (didPop, _) => _handlePopAttempt(didPop),
@@ -525,8 +538,10 @@ class _BookReflectionEditorScreenState
                                 customStyles: bookReflectionQuillStyles,
                                 textSpanBuilder: reflectionTextSpanBuilder,
                                 scrollBottomInset: keyboardInset,
-                                embedBuilders: const [
-                                  ReflectionImageEmbedBuilder(),
+                                embedBuilders: [
+                                  ReflectionImageEmbedBuilder(
+                                    localImagePaths: localImagePaths,
+                                  ),
                                 ],
                               ),
                             );
@@ -541,7 +556,7 @@ class _BookReflectionEditorScreenState
               _ReflectionToolbar(
                 controller: _quillController,
                 editorFocusNode: _editorFocusNode,
-                onRequestPickImage: _pickAndUploadImage,
+                onRequestPickImage: _pickAndSaveImage,
                 onImageInsert: _insertImage,
                 onPickMemo: _insertMemo,
               ),
