@@ -7,6 +7,7 @@ import '../../../core/network/api_exception.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/models/book_tag.dart';
+import '../../bookshelf/models/record_patch.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../book_search/models/book_search_item.dart';
 import '../data/book_record_api.dart';
@@ -59,40 +60,16 @@ class BookRecordController
   /// 시도한다 — 성공·실패와 무관하게 로딩 상태를 세우거나 예외를 던지지
   /// 않는다(실패하면 dirty로 남아 다음 동기화 때 일괄 재시도됨).
   ///
+  /// [patch]에 담기지 않은 필드는 서버 요청에서도 빠져 기존 값이 유지되고,
+  /// `PatchField.clear()`로 담은 필드만 명시적 `null`(삭제)로 나간다
+  /// ([RecordPatch] 참고).
+  ///
   /// 같은 책에 대한 연속 호출은 [_editChain]으로 순서를 강제한다 — 그러지
   /// 않으면 겹치는 호출의 로컬 read-modify-write(현재 값 조회 → 병합 →
   /// 저장)가 서로의 수정을 덮어쓸 수 있다.
-  Future<void> updateRecord({
-    String? status,
-    int? currentPage,
-    double? myRating,
-    String? shortReview,
-    bool? isMasterpiece,
-    String? sourceType,
-    int? rereadCount,
-    String? difficulty,
-    String? startedAt,
-    String? finishedAt,
-    String? platformName,
-    String? discoverySource,
-  }) {
+  Future<void> updateRecord(RecordPatch patch) {
     final chained = _editChain
-        .then(
-          (_) => _applyRecordEdit(
-            status: status,
-            currentPage: currentPage,
-            myRating: myRating,
-            shortReview: shortReview,
-            isMasterpiece: isMasterpiece,
-            sourceType: sourceType,
-            rereadCount: rereadCount,
-            difficulty: difficulty,
-            startedAt: startedAt,
-            finishedAt: finishedAt,
-            platformName: platformName,
-            discoverySource: discoverySource,
-          ),
-        )
+        .then((_) => _applyRecordEdit(patch))
         // 체인에 쌓인 Future가 에러로 완료되면 그 뒤에 이어붙는 .then들이
         // 전부 건너뛰어지며 에러가 그대로 전파된다 — 여기서 삼켜 체인이
         // 끊기지 않게 한다(어차피 이 메서드는 에러를 밖으로 보고하지 않음).
@@ -101,49 +78,12 @@ class BookRecordController
     return chained;
   }
 
-  Future<void> _applyRecordEdit({
-    String? status,
-    int? currentPage,
-    double? myRating,
-    String? shortReview,
-    bool? isMasterpiece,
-    String? sourceType,
-    int? rereadCount,
-    String? difficulty,
-    String? startedAt,
-    String? finishedAt,
-    String? platformName,
-    String? discoverySource,
-  }) async {
-    final updated = await _repository.updateRecord(
-      arg,
-      status: status,
-      currentPage: currentPage,
-      myRating: myRating,
-      shortReview: shortReview,
-      isMasterpiece: isMasterpiece,
-      sourceType: sourceType,
-      rereadCount: rereadCount,
-      difficulty: difficulty,
-      startedAt: startedAt,
-      finishedAt: finishedAt,
-      platformName: platformName,
-      discoverySource: discoverySource,
-    );
+  Future<void> _applyRecordEdit(RecordPatch patch) async {
+    final updated = await _repository.updateRecord(arg, patch);
     if (updated != null) {
       state = AsyncValue.data(updated);
       ref.read(bookshelfSyncVersionProvider.notifier).state++;
     }
-  }
-
-  /// 시작일/완독일 "선택 해제". [updateRecord]와 달리 서버 PATCH 성공을
-  /// 기다린 뒤에만 상태를 갱신한다([BookRecordRepository.clearReadingDate]
-  /// 참고 — 로컬 우선 경로로는 "명시적으로 지움"이라는 의도가 유지되지
-  /// 않는다).
-  Future<void> clearReadingDate({required bool isStartedAt}) {
-    return _mutate(
-      () => _repository.clearReadingDate(arg, isStartedAt: isStartedAt),
-    );
   }
 
   Future<BookItem> updateBookInfo({

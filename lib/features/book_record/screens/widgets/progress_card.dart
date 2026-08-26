@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../bookshelf/models/book_item.dart';
+import '../../../bookshelf/models/record_patch.dart';
 import '../../providers/book_record_providers.dart';
 import 'record_section_card.dart';
 
@@ -109,7 +110,7 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
   Future<void> _save(int page) {
     return ref
         .read(bookRecordControllerProvider(widget.userBookId).notifier)
-        .updateRecord(currentPage: page);
+        .updateRecord(RecordPatch(currentPage: page));
   }
 
   @override

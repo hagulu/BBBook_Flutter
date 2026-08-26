@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/patch_field.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/author_display.dart';
 import '../../../shared/widgets/app_confirm.dart';
@@ -11,6 +12,7 @@ import '../../book_note/screens/book_note_list.dart';
 import '../../book_reflection/screens/book_reflection_list.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/models/book_status.dart';
+import '../../bookshelf/models/record_patch.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../bookshelf/screens/widgets/book_cover.dart';
 import '../models/record_labels.dart';
@@ -362,7 +364,9 @@ class _BookRecordBody extends ConsumerWidget {
     BuildContext context,
     BookRecordController controller,
   ) {
-    return controller.updateRecord(isMasterpiece: !book.isMasterpiece);
+    return controller.updateRecord(
+      RecordPatch(isMasterpiece: !book.isMasterpiece),
+    );
   }
 
   Future<void> _onStatusTap(
@@ -383,29 +387,30 @@ class _BookRecordBody extends ConsumerWidget {
         switch (result) {
           case RereadCountUpdated(:final count):
             await controller.updateRecord(
-              // 이미 완독 상태면 status를 다시 보내지 않는다 — status가
-              // FINISHED인데 finishedAt을 안 보내면 서버가 완독일을 오늘
-              // 날짜로 새로 설정해버려(api-doc), 횟수만 고치려던 사용자의
-              // 완독일이 의도치 않게 바뀐다. 완독이 아닌 상태(읽는 중 등)에서
-              // 재독을 완료하는 경우에만 상태를 FINISHED로 바꿔 완독일이
-              // 오늘로 새로 기록되게 한다.
-              status: book.status == BookStatus.finished
-                  ? null
-                  : tapped.apiValue,
-              rereadCount: count,
-              // totalPages를 아는 책은 마지막 쪽으로 진행률을 맞춘다(실제
-              // 웹 클라이언트와 동일 — 완독인데 진행률이 중간에 멈춰 있는
-              // 모순 방지). 재독 팝업은 완독 상태가 아닌 책에서도 열릴 수
-              // 있어 이 값이 항상 이미 반영돼 있지는 않다.
-              currentPage: book.totalPages,
+              RecordPatch(
+                // 이미 완독 상태면 status를 다시 보내지 않는다 — status가
+                // FINISHED인데 finishedAt을 안 보내면 서버가 완독일을 오늘
+                // 날짜로 새로 설정해버려(api-doc), 횟수만 고치려던 사용자의
+                // 완독일이 의도치 않게 바뀐다. 완독이 아닌 상태(읽는 중 등)
+                // 에서 재독을 완료하는 경우에만 상태를 FINISHED로 바꿔
+                // 완독일이 오늘로 새로 기록되게 한다.
+                status: book.status == BookStatus.finished
+                    ? null
+                    : tapped.apiValue,
+                rereadCount: count,
+                // totalPages를 아는 책은 마지막 쪽으로 진행률을 맞춘다(실제
+                // 웹 클라이언트와 동일 — 완독인데 진행률이 중간에 멈춰 있는
+                // 모순 방지). 재독 팝업은 완독 상태가 아닌 책에서도 열릴 수
+                // 있어 이 값이 항상 이미 반영돼 있지는 않다.
+                currentPage: book.totalPages,
+              ),
             );
           case RereadFinishCancelled():
             // 실제 웹 클라이언트(BookRecordPage.tsx)도 완독 취소 시 재독
             // 횟수를 0으로 되돌린다 — 다음에 다시 완독 처리하면 재독
             // 횟수가 이전 값에서 이어지지 않고 새로 시작해야 자연스럽다.
             await controller.updateRecord(
-              status: BookStatus.reading.apiValue,
-              rereadCount: 0,
+              RecordPatch(status: BookStatus.reading.apiValue, rereadCount: 0),
             );
         }
         return;
@@ -414,20 +419,24 @@ class _BookRecordBody extends ConsumerWidget {
       final result = await showFinishConfirmDialog(context);
       if (result == null) return;
       await controller.updateRecord(
-        status: tapped.apiValue,
-        // totalPages를 아는 책은 마지막 쪽으로 진행률을 맞춘다(실제 웹
-        // 클라이언트와 동일 — 완독인데 진행률이 중간에 멈춰 있는 모순 방지).
-        currentPage: book.totalPages,
-        difficulty: result.difficulty,
-        myRating: result.myRating,
-        shortReview: result.shortReview,
+        RecordPatch(
+          status: tapped.apiValue,
+          // totalPages를 아는 책은 마지막 쪽으로 진행률을 맞춘다(실제 웹
+          // 클라이언트와 동일 — 완독인데 진행률이 중간에 멈춰 있는 모순 방지).
+          currentPage: book.totalPages,
+          // 완독 팝업에서 입력하지 않은 항목은 아예 보내지 않는다(기존 값
+          // 유지) — 빈 값을 지움 신호로 쓰지 않는다.
+          difficulty: patchIfPresent(result.difficulty),
+          myRating: patchIfPresent(result.myRating),
+          shortReview: patchIfPresent(result.shortReview),
+        ),
       );
       return;
     }
 
     if (tapped == book.status) return;
 
-    await controller.updateRecord(status: tapped.apiValue);
+    await controller.updateRecord(RecordPatch(status: tapped.apiValue));
   }
 
   Future<void> _openSourceDialog(
@@ -452,8 +461,10 @@ class _BookRecordBody extends ConsumerWidget {
     if (result == null) return;
 
     await controller.updateRecord(
-      sourceType: result.sourceType.apiValue,
-      platformName: result.platformName,
+      RecordPatch(
+        sourceType: PatchField.value(result.sourceType.apiValue),
+        platformName: result.platformName,
+      ),
     );
   }
 
@@ -466,7 +477,9 @@ class _BookRecordBody extends ConsumerWidget {
       initialDifficulty: book.difficulty,
     );
     if (value == null) return;
-    await controller.updateRecord(difficulty: value);
+    await controller.updateRecord(
+      RecordPatch(difficulty: PatchField.value(value)),
+    );
   }
 
   Future<void> _pickDate(
@@ -481,25 +494,24 @@ class _BookRecordBody extends ConsumerWidget {
       initialDate: current,
       lastDate: now,
       isStartedAt: isStartedAt,
+      // 완독 상태에서는 완독일을 지울 수 없다 — 서버가 삭제를 무시하고 기존
+      // 값(없으면 오늘)을 유지한다(api-doc). 날짜를 없애려면 상태를 먼저
+      // 바꿔야 한다.
+      canClear:
+          isStartedAt || book.status != BookStatus.finished,
     );
     if (result == null) return;
-    if (result.cleared) {
-      // "선택 해제"는 로컬 우선 updateRecord로 보내면 안 된다 — 빈
-      // 문자열이 로컬 반영 시점에 바로 null로 바뀌어 버려, 뒤에서 조용히
-      // 나가는 dirty push가 "명시적으로 지움"과 "원래 미설정"을 구분하지
-      // 못하고 서버 값을 그대로 남긴다(book_record_repository.dart의
-      // clearReadingDate 문서 참고). 그래서 이 경로만 서버 응답을 기다린다.
-      try {
-        await controller.clearReadingDate(isStartedAt: isStartedAt);
-      } on ApiException catch (e) {
-        if (context.mounted) AppSnackBar.error(context, e.message);
-      }
-      return;
-    }
-    final formatted = _formatApiDate(result.date!);
+    // "선택 해제"는 명시적 null(삭제), 날짜 선택은 그 값으로 수정이다.
+    // 고르지 않은 쪽(시작일/완독일 중 다른 하나)은 아예 담지 않아 요청에서
+    // 빠진다(기존 값 유지).
+    final picked = result.cleared
+        ? const PatchField<String>.clear()
+        : PatchField.value(_formatApiDate(result.date!));
     await controller.updateRecord(
-      startedAt: isStartedAt ? formatted : null,
-      finishedAt: isStartedAt ? null : formatted,
+      RecordPatch(
+        startedAt: isStartedAt ? picked : null,
+        finishedAt: isStartedAt ? null : picked,
+      ),
     );
   }
 
@@ -519,7 +531,15 @@ class _BookRecordBody extends ConsumerWidget {
       initialValue: book.discoverySource,
     );
     if (value == null) return;
-    await controller.updateRecord(discoverySource: value);
+    await controller.updateRecord(
+      RecordPatch(
+        // 입력을 비운 채 저장했으면 "지움"(명시적 null)이다 — 빈 문자열은
+        // 서버가 삭제가 아니라 값으로 저장하므로 그대로 보내면 안 된다.
+        discoverySource: value.isEmpty
+            ? const PatchField.clear()
+            : PatchField.value(value),
+      ),
+    );
   }
 }
 

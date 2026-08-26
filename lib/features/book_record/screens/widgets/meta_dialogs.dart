@@ -1,6 +1,7 @@
 import 'package:calendar_date_picker2/calendar_date_picker2.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/network/patch_field.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../bookshelf/models/book_status.dart';
 import '../../models/record_labels.dart';
@@ -106,13 +107,13 @@ class _StatusCard extends StatelessWidget {
 }
 
 /// [showSourcePlatformDialog] 결과. [platformName]이 null이면 요청에서
-/// 생략한다(실물책 선택 시 서버가 platformName을 자동으로 null 처리하므로
-/// 별도 전송이 필요 없다).
+/// 생략하고(실물책 선택 시 서버가 platformName을 자동으로 null 처리하므로
+/// 별도 전송이 필요 없다), `PatchField.clear()`면 명시적 null로 지운다.
 class SourcePlatformResult {
   const SourcePlatformResult({required this.sourceType, this.platformName});
 
   final BookSourceType sourceType;
-  final String? platformName;
+  final PatchField<String>? platformName;
 }
 
 /// 출처(실물책/전자책/오디오북) 및 플랫폼 선택 팝업.
@@ -201,22 +202,25 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
     final source = _source;
     if (source == null) return;
 
-    String? platformName;
+    PatchField<String>? platformName;
     if (source.platformOptionsKey != null) {
       if (_selectedPlatform == _kUnsetPlatformLabel) {
-        // '미설정' 선택: 문서상 빈 문자열을 보내야 null로 저장된다(명시적
-        // 삭제). null을 그대로 보내면 "변경 없음"으로 해석돼 기존 값이 남는다.
-        platformName = '';
+        // '미설정' 선택: 명시적 null을 보내야 기존 값이 지워진다. 아무것도
+        // 보내지 않으면(생략) "변경 없음"으로 해석돼 기존 값이 남고, 빈
+        // 문자열을 보내면 삭제가 아니라 빈 값이 저장된다(api-doc).
+        platformName = const PatchField.clear();
       } else if (_isCustomSelected) {
         final custom = _customController.text.trim();
-        platformName = custom.isEmpty ? null : custom;
+        // 직접 입력을 비운 채 저장하면 "지움"으로 본다.
+        platformName = custom.isEmpty
+            ? const PatchField.clear()
+            : PatchField.value(custom);
       } else if (_selectedPlatform != null) {
-        platformName = _selectedPlatform;
+        platformName = PatchField.value(_selectedPlatform!);
       } else if (source != widget.initialSource) {
-        // 출처를 바꿨는데 새 플랫폼을 아직 고르지 않았다: platformName을
-        // null(=변경 없음)로 보내면 이전 출처의 플랫폼명이 그대로 남는다.
-        // 빈 문자열을 보내 명시적으로 지운다(문서 기준 빈 문자열 → null 저장).
-        platformName = '';
+        // 출처를 바꿨는데 새 플랫폼을 아직 고르지 않았다: 생략하면 이전
+        // 출처의 플랫폼명이 그대로 남으므로 명시적으로 지운다.
+        platformName = const PatchField.clear();
       }
     }
     Navigator.of(
@@ -341,8 +345,9 @@ Future<String?> showDifficultyDialog(
 }
 
 /// 알게 된 경로(자유 텍스트, 최대 50자) 입력 팝업. 저장을 누르면 trim된
-/// 텍스트를 반환하고, 비어 있으면 취소와 동일하게 null을 반환한다(빈
-/// 문자열로 지우고 싶다면 지운 채로 저장 — 서버가 빈 문자열을 null로 저장).
+/// 텍스트를, 취소/배경 닫기면 null을 반환한다. 입력을 비운 채 저장하면 빈
+/// 문자열이 돌아오고, 호출부가 그것을 "지움"(명시적 null)으로 옮긴다 —
+/// 빈 문자열을 그대로 보내면 서버는 삭제가 아니라 빈 값으로 저장한다.
 Future<String?> showDiscoverySourceDialog(
   BuildContext context, {
   required String? initialValue,
@@ -371,11 +376,17 @@ class ReadingDateResult {
 /// 시작일/완독일 선택 팝업. `calendar_date_picker2`로 달력을 바텀시트 안에
 /// 그려서, 플랫폼 기본 `showDatePicker`의 별도 다이얼로그 대신 다른 선택
 /// 팝업들과 같은 바텀시트 톤을 유지한다.
+///
+/// [canClear]가 false면 "선택 해제"를 노출하지 않는다 — 완독 상태의 완독일이
+/// 그렇다. 서버는 수정 결과 status가 FINISHED이면 완독일 삭제를 무시하고
+/// 기존 값(없으면 오늘)을 유지하므로(api-doc), 지울 수 있는 것처럼 보여주면
+/// 눌러도 되돌아오는 조작이 된다.
 Future<ReadingDateResult?> showReadingDateDialog(
   BuildContext context, {
   required DateTime? initialDate,
   required DateTime lastDate,
   required bool isStartedAt,
+  bool canClear = true,
 }) {
   return showModalBottomSheet<ReadingDateResult>(
     context: context,
@@ -385,6 +396,7 @@ Future<ReadingDateResult?> showReadingDateDialog(
       title: isStartedAt ? '시작일 선택' : '완독일 선택',
       initialDate: initialDate,
       lastDate: lastDate,
+      canClear: canClear,
     ),
   );
 }
@@ -398,11 +410,13 @@ class _ReadingDateDialog extends StatelessWidget {
     required this.title,
     required this.initialDate,
     required this.lastDate,
+    required this.canClear,
   });
 
   final String title;
   final DateTime? initialDate;
   final DateTime lastDate;
+  final bool canClear;
 
   @override
   Widget build(BuildContext context) {
@@ -411,7 +425,7 @@ class _ReadingDateDialog extends StatelessWidget {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (initialDate != null) ...[
+          if (initialDate != null && canClear) ...[
             Align(
               alignment: Alignment.centerRight,
               child: PillOption(

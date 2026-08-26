@@ -14,6 +14,7 @@
 - `lib/core/theme/app_theme.dart` — 역할 기반 색상 토큰(AppColors: "햇빛 드는 밝은 숲" 그린 팔레트)/브랜드 고정색(AppBrandColors)/ThemeData 정의(app·feature가 공통 참조, 색상은 여기 외에 하드코딩 금지)
 - `lib/core/network/api_client.dart` — 공통 API 클라이언트, 401 시 refresh 1회 재시도 후 실패하면 로그아웃 처리
 - `lib/core/network/api_base_options.dart` — API 공통 base URL/timeout 정의(ApiClient·인증 전용 Dio 공유)
+- `lib/core/network/patch_field.dart` — PATCH 필드 3-상태(생략=유지 / PatchField.value=수정 / PatchField.clear=명시적 null 삭제) 표현
 - `lib/core/storage/token_storage.dart` — refreshToken 시큐어 스토리지 래퍼
 - `lib/core/storage/client_id_storage.dart` — X-Client-Id 헤더용 설치 단위 클라이언트 식별자(UUID) 저장/재사용
 - `lib/core/storage/local_image_store.dart` — 기능별 이미지 로컬 파일 저장소(선택 이미지 저장·서버 이미지 내려받기·orphan 정리, DB에는 폴더 기준 상대 경로만 보관)
@@ -39,19 +40,20 @@
 
 - `lib/features/bookshelf/screens/bookshelf_screen.dart` — 책장 탭 콘텐츠(읽고 싶음/읽는 중/완독/중단 4탭, 기본은 읽는 중)
 - `lib/features/bookshelf/data/bookshelf_api.dart` — 책장 API 호출(전체 동기화, 증분 동기화, 완독 공개 설정 조회/수정, 카테고리 목록 GET)
-- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타·독후감 이미지 매칭·저장 모드, v15)
+- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타·독후감 이미지 매칭·저장 모드, v16)
 - `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호)
 - `lib/features/bookshelf/data/book_category_dao.dart` — 카테고리 마스터 목록 로컬 캐시 DAO(계정 무관, 로그아웃 시에도 유지)
 - `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화, 카테고리는 로컬 캐시 우선 조회
 - `lib/features/bookshelf/services/book_cover_image_store.dart` — 로컬 저장 모드에서 사용자가 고른 책 표지를 보관하는 `LocalImageStore` 인스턴스(`book_covers/` 폴더)
 - `lib/features/bookshelf/data/finished_cover_cache_manager.dart` — 완독 목록 표지 전용 디스크 캐시(원본 바이트 저장, 디코딩 크기 제한은 `BookCover`의 `ResizeImage`가 담당)
 - `lib/features/bookshelf/providers/bookshelf_providers.dart` — 책장 관련 Riverpod provider(동기화 컨트롤러, 탭별 목록, 완독 필터, 공개 설정, 카테고리 목록)
+- `lib/features/bookshelf/models/record_patch.dart` — 책 기록 PATCH 요청 필드 묶음(바꾼 필드만 담는 요청 body 생성, dirty 스냅샷 → 요청 변환)
 
 ## features/book_record
 
 - `lib/features/book_record/screens/book_record_screen.dart` — 책 기록 상세 화면(자체 AppBar, 책장에서 책 선택 시 진입), 정보/진행률/상태/출처/난이도/태그/삭제 조립
-- `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH, 책 정보 PATCH(카테고리 포함), ISBN 연결/해제 PATCH, 태그 POST/DELETE, 태그 목록/플랫폼 옵션 GET, 삭제 DELETE)
-- `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth(로컬 조회는 bookshelf 레포지토리 재사용, 수정은 서버 PATCH 성공 후 로컬 반영), 로컬 저장 모드에서는 책 정보 수정·ISBN 연결·책 삭제를 로컬에만 반영하고 태그 등 서버 전용 기능은 차단
+- `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH(RecordPatch 기준 부분 수정), 책 정보 PATCH(카테고리 포함), ISBN 연결/해제 PATCH, 태그 POST/DELETE, 태그 목록/플랫폼 옵션 GET, 삭제 DELETE)
+- `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth(로컬 조회는 bookshelf 레포지토리 재사용, 기록 필드 수정은 로컬 우선 + 바꾼 필드만 뒤에서 재전송, 그 외는 서버 PATCH 성공 후 로컬 반영), 로컬 저장 모드에서는 책 정보 수정·ISBN 연결·책 삭제를 로컬에만 반영하고 태그 등 서버 전용 기능은 차단
 - `lib/features/book_record/providers/book_record_providers.dart` — 책 기록 관련 Riverpod provider(단일 책 상태 컨트롤러, 태그 자동완성, 플랫폼 옵션)
 - `lib/features/book_record/screens/widgets/book_thumbnail_field.dart` — 책 표지 이미지 선택/미리보기 공용 위젯(책 정보 수정·직접 등록에서 공유)
 - `lib/features/book_record/screens/widgets/book_category_field.dart` — 카테고리 선택 필드 + 선택 팝업 공용 위젯(책 정보 수정·직접 등록에서 공유)
@@ -162,3 +164,4 @@
 - `docs/review/20260821-150209-note-domain-rename-review.md` — 신규 설치 전제의 노트/메모 도메인 명칭 전환 및 API 정합성 리뷰
 - `docs/review/20260824-095239-note-memo-local-image-review.md` — 메모 사진 로컬 저장·동기화의 반복 실패 시 다운로드 기아 문제 리뷰
 - `docs/review/20260824-151950-local-storage-mode-review.md` — 서버→로컬 저장 모드 전환의 삭제 정합성·복구·이미지 보존·직접 쓰기 경로 리뷰
+- `docs/review/20260826-124257-record-patch-dirty-fields-review.md` — 책 기록 PATCH 3-상태·dirty 필드 추적의 완독일 계약 및 push 확정 경합 리뷰

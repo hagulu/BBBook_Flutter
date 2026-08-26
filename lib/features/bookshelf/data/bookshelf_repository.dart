@@ -14,6 +14,7 @@ import '../models/book_item.dart';
 import '../models/book_status.dart';
 import '../models/book_tag.dart';
 import '../models/finished_filter.dart';
+import '../models/record_patch.dart';
 import 'book_category_dao.dart';
 import '../../book_note/services/note_memo_image_store.dart';
 import '../../book_reflection/services/reflection_image_store.dart';
@@ -127,9 +128,9 @@ class BookshelfRepository {
   /// 재시도된다.
   Future<void> _pushDirtyRecords(int expectedGeneration) async {
     final dirty = await _dao.getDirtyRecords();
-    for (final (item, _) in dirty) {
+    for (final record in dirty) {
       if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
-      await pushDirtyRecord(item.userBookId);
+      await pushDirtyRecord(record.item.userBookId);
     }
   }
 
@@ -180,41 +181,36 @@ class BookshelfRepository {
     if (dirty == null) return;
     if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
     await _pushDirtyItem(
-      dirty.$1,
-      dirty.$2,
+      dirty,
       expectedGeneration,
       reportPermanentCreateFailure: reportPermanentCreateFailure,
     );
   }
 
-  /// dirty 행 한 건을 서버로 push한다. 이 행이 현재 로컬에 들고 있는 필드
-  /// 전체를 스냅샷으로 보낸다(어떤 필드가 바뀌었는지 별도로 추적하지 않음)
-  /// — null이면 "변경 없음"인 API 의미상 안전하다(로컬 null은 원래 미설정
-  /// 상태이므로 그대로 보내면 "변경 없음"과 같은 뜻이 된다).
-  /// platformName/discoverySource도 로컬 null을 그대로 보낸다: 빈 문자열로
-  /// 바꿔 보내면 "미설정 상태를 유지"가 아니라 "명시적으로 지움"이 되어,
-  /// 애초에 값이 없던 행까지 서버 값을 지워버릴 수 있다(예: sourceType이
-  /// EBOOK인데 platformName을 아직 한 번도 설정하지 않은 행). status가
-  /// FINISHED인데 finishedAt을 모르면, status까지 같이 보낼 때 서버가
-  /// 완독일을 오늘 날짜로 새로 잡아버린다 — 그 조합일 때만 status를
-  /// 생략한다([BookItem.copyWithRecord]가 최초 완독 전환 시 로컬에도 곧바로
-  /// 오늘 날짜를 채워 두므로 정상 흐름에서는 이 조합 자체가 드물다).
+  /// dirty 행 한 건을 서버로 push한다. 요청 body는 이 행에 쌓인 로컬 편집이
+  /// 실제로 건드린 필드([DirtyRecord.changedFields])만으로 만든다
+  /// ([RecordPatch.fromSnapshot]) — 건드리지 않은 필드는 키 자체가 빠져
+  /// 서버 값이 유지되고, 사용자가 지운 필드는 명시적 `null`로 나가 실제로
+  /// 삭제된다(api-doc의 PATCH 필드 처리 규칙).
   ///
   /// 성공하면 이 push를 보낸 뒤로 로컬 행이 더 바뀌지 않았을 때만(요청을
-  /// 만들 때 읽은 [item.updatedAt]과 현재 로컬 값이 같을 때만) 응답으로
+  /// 만들 때 읽은 [BookItem.updatedAt]과 현재 로컬 값이 같을 때만) 응답으로
   /// 확정 반영하고 dirty를 해제한다. 그 사이 새 로컬 편집이 쌓였으면(이
   /// 네트워크 요청이 오가는 동안 사용자가 같은 책을 또 편집하는 경우 — 같은
   /// 책에 대한 push 자체는 [pushDirtyRecord]의 큐로 직렬화되지만, 로컬 편집
   /// 자체는 그 큐를 기다리지 않고 즉시 반영되므로 이 창구는 여전히 남는다)
   /// 그 편집을 덮어쓰면 안 되므로 필드는 그대로 두고 충돌 검사 기준값만
   /// 이번 응답의 서버 updated_at으로 갱신한다 — dirty는 남아 다음 push가
-  /// 최신 상태를 다시 보낸다.
+  /// 최신 상태를 다시 보낸다. 그 확인과 쓰기는 [BookshelfDao.confirmPush]가
+  /// 한 트랜잭션에서 처리한다(여기서 먼저 읽고 뒤이어 쓰면 그 사이에 새
+  /// 편집이 끼어들 수 있다). 409로 거부된 경우도 같은 이유로
+  /// [BookshelfDao.resolveConflict]에 같은 기준값을 넘긴다.
   Future<void> _pushDirtyItem(
-    BookItem item,
-    DateTime? baseUpdatedAt,
+    DirtyRecord record,
     int expectedGeneration, {
     required bool reportPermanentCreateFailure,
   }) async {
+    final item = record.item;
     try {
       if (item.serverId == null) {
         await _createDirtyItem(item, expectedGeneration);
@@ -222,30 +218,13 @@ class BookshelfRepository {
       }
       final data = await _recordApi.patchRecord(
         userBookId: item.serverId!,
-        status: (item.status == BookStatus.finished && item.finishedAt == null)
-            ? null
-            : item.status.apiValue,
-        currentPage: item.currentPage,
-        myRating: item.myRating,
-        shortReview: item.shortReview,
-        isMasterpiece: item.isMasterpiece,
-        sourceType: item.sourceType,
-        rereadCount: item.rereadCount,
-        difficulty: item.difficulty,
-        startedAt: _formatDate(item.startedAt),
-        finishedAt: _formatDate(item.finishedAt),
-        platformName: item.platformName,
-        discoverySource: item.discoverySource,
-        updatedAt: baseUpdatedAt,
+        patch: RecordPatch.fromSnapshot(
+          item,
+          changedFields: record.changedFields,
+        ),
+        updatedAt: record.baseUpdatedAt,
       );
       if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
-
-      final latest = await _dao.getById(item.userBookId);
-      if (latest == null) {
-        // push가 오가는 사이 이 책이 로컬에서 사라졌다(동시 삭제 등) —
-        // 확정 반영을 건너뛴다(이미 지워진 책을 되살리지 않도록).
-        return;
-      }
 
       final serverItem = BookItem.fromDetailJson(
         data,
@@ -254,16 +233,13 @@ class BookshelfRepository {
         clientRequestId: item.clientRequestId,
         createThumbnailPath: item.createThumbnailPath,
       );
-      if (latest.updatedAt == item.updatedAt) {
-        await _dao.confirmPush(serverItem);
-      } else {
-        await _dao.refreshSyncedUpdatedAt(
-          item.userBookId,
-          serverItem.updatedAt,
-        );
-      }
+      final applied = await _dao.confirmPush(
+        serverItem,
+        capturedUpdatedAt: item.updatedAt,
+      );
       developer.log(
-        '[책 기록 더티 push] userBookId=${item.userBookId} result=SUCCESS',
+        '[책 기록 더티 push] userBookId=${item.userBookId} result=SUCCESS '
+        'applied=$applied',
       );
     } on ApiException catch (e) {
       if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
@@ -276,9 +252,13 @@ class BookshelfRepository {
         );
         if (reportPermanentCreateFailure) rethrow;
       } else if (e.statusCode == 409 && item.serverId != null) {
-        await _dao.resolveConflict(item.userBookId);
+        final reverted = await _dao.resolveConflict(
+          item.userBookId,
+          capturedUpdatedAt: item.updatedAt,
+        );
         developer.log(
-          '[책 기록 더티 push] userBookId=${item.userBookId} result=FAIL reason=conflict',
+          '[책 기록 더티 push] userBookId=${item.userBookId} '
+          'result=FAIL reason=conflict reverted=$reverted',
         );
       } else {
         developer.log(
@@ -522,13 +502,6 @@ class BookshelfRepository {
   Future<void> upsertLocal(BookItem item, {DateTime? syncedUpdatedAt}) =>
       _dao.upsertOne(item, syncedUpdatedAt: syncedUpdatedAt);
 
-  /// [BookRecordRepository.clearReadingDate] 전용 — [BookshelfDao.
-  /// clearReadingDateColumn] 참고.
-  Future<void> clearReadingDateLocal(
-    int userBookId, {
-    required bool isStartedAt,
-  }) => _dao.clearReadingDateColumn(userBookId, isStartedAt: isStartedAt);
-
   /// 서재에서 책을 삭제한 뒤(서버 DELETE 성공 또는 로컬 저장 모드) 로컬
   /// 행과 그 아래 기록·이미지 파일까지 정리한다. 파일 경로는 행을 지우면
   /// 알 수 없으므로 먼저 모은다.
@@ -545,8 +518,14 @@ class BookshelfRepository {
   }
 
   /// 책 기록 화면의 필드 수정을 로컬에 즉시 반영하고 dirty로 표시한다.
-  /// 서버 반영은 호출부가 이어서 [pushDirtyRecord]로 트리거한다.
-  Future<void> applyLocalEdit(BookItem item) => _dao.applyLocalEdit(item);
+  /// [changedFields]는 이번 수정이 건드린 PATCH 필드 이름
+  /// ([RecordPatch.changedFields])으로, 나중에 push할 요청이 그 필드만
+  /// 담도록 로컬에 함께 남긴다. 서버 반영은 호출부가 이어서
+  /// [pushDirtyRecord]로 트리거한다.
+  Future<void> applyLocalEdit(
+    BookItem item, {
+    required Set<String> changedFields,
+  }) => _dao.applyLocalEdit(item, changedFields: changedFields);
 
   Future<List<BookItem>> getGridTab(BookStatus status) => _dao.getGrid(status);
 

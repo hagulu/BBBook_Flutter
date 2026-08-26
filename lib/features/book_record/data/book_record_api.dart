@@ -7,6 +7,7 @@ import 'package:http_parser/http_parser.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../../bookshelf/models/book_tag.dart';
+import '../../bookshelf/models/record_patch.dart';
 
 /// 책 기록 상세 화면의 API 호출.
 ///
@@ -33,12 +34,13 @@ class BookRecordApi {
 
   /// PATCH /api/me/books/:userBookId — 독서 상태/진행률/평가 등 기본 기록 필드 수정.
   ///
-  /// 각 파라미터는 null이면 요청 본문에서 생략된다(서버 쪽에서도 null은
-  /// "변경 없음"으로 해석되므로 동일하다). [platformName]/[discoverySource]는
-  /// 빈 문자열을 보내면 서버가 null로 저장한다(문서 기준). [startedAt]/
-  /// [finishedAt]은 `yyyy-MM-dd` 형식 문자열이어야 한다.
+  /// 어떤 필드를 어떻게 바꿀지는 [RecordPatch]가 전부 담는다 — 요청 body에
+  /// 들어가는 키는 [RecordPatch.toJson]이 만든 것뿐이라, 사용자가 건드리지
+  /// 않은 필드는 애초에 전송되지 않는다(서버는 "기존 값 유지"로 처리).
+  /// 값 삭제는 `PatchField.clear()`로 표현한 명시적 `null`로만 가능하며,
+  /// 빈 문자열은 삭제가 아니라 그대로 저장되는 값이다(문서 기준).
   ///
-  /// status를 FINISHED로 보낼 때 [finishedAt]을 생략하면, 서버가
+  /// status를 FINISHED로 보낼 때 `finishedAt`을 생략하면, 서버가
   /// `X-Timezone` 헤더로 오늘 날짜를 계산해 자동 설정한다. 이 앱은 한국어
   /// 전용 서비스라 타임존 판별 플러그인 없이 'Asia/Seoul'을 고정으로 보낸다.
   ///
@@ -48,33 +50,11 @@ class BookRecordApi {
   /// 충돌 검사 없이 무조건 수정된다.
   Future<Map<String, dynamic>> patchRecord({
     required int userBookId,
-    String? status,
-    int? currentPage,
-    double? myRating,
-    String? shortReview,
-    bool? isMasterpiece,
-    String? sourceType,
-    int? rereadCount,
-    String? difficulty,
-    String? startedAt,
-    String? finishedAt,
-    String? platformName,
-    String? discoverySource,
+    required RecordPatch patch,
     DateTime? updatedAt,
   }) async {
     final body = <String, dynamic>{
-      'status': ?status,
-      'currentPage': ?currentPage,
-      'myRating': ?myRating,
-      'shortReview': ?shortReview,
-      'isMasterpiece': ?isMasterpiece,
-      'sourceType': ?sourceType,
-      'rereadCount': ?rereadCount,
-      'difficulty': ?difficulty,
-      'startedAt': ?startedAt,
-      'finishedAt': ?finishedAt,
-      'platformName': ?platformName,
-      'discoverySource': ?discoverySource,
+      ...patch.toJson(),
       'updatedAt': ?updatedAt?.toUtc().toIso8601String(),
     };
 

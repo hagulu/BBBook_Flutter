@@ -4,8 +4,21 @@ import '../models/book_item.dart';
 import '../models/book_status.dart';
 import '../models/book_tag.dart';
 import '../models/finished_filter.dart';
+import '../models/record_patch.dart';
 import '../models/user_book_create_result.dart';
 import 'bookshelf_database.dart';
+
+/// 아직 서버에 반영되지 못한 로컬 편집 한 건.
+///
+/// [baseUpdatedAt]은 이 편집이 기준으로 삼은 서버 `updated_at`(낙관적 동시성
+/// 검사용, 모르면 null)이고, [changedFields]는 편집이 실제로 건드린 PATCH
+/// 필드 이름이다 — null이면 `dirty_fields` 컬럼이 없던 시절(DB v15 이하)에
+/// 쌓인 행이라 무엇을 바꿨는지 알 수 없다([RecordPatch.fromSnapshot] 참고).
+typedef DirtyRecord = ({
+  BookItem item,
+  DateTime? baseUpdatedAt,
+  Set<String>? changedFields,
+});
 
 /// 책장 로컬 DB 쿼리/쓰기 전담.
 ///
@@ -245,27 +258,6 @@ class BookshelfDao {
     });
   }
 
-  /// [BookRecordRepository.clearReadingDate](시작일/완독일 "선택 해제")
-  /// 전용 좁은 갱신. 서버가 이미 그 필드를 지운 뒤 호출되므로, 다른 필드가
-  /// 아직 dirty로 남아 있어도([_upsertItemTxn]의 "dirty 행 보호"를 적용하면
-  /// 이 컬럼까지 함께 건너뛰어져 서버에서는 지워졌는데 로컬만 옛 날짜를
-  /// 계속 들고 있게 된다) 이 컬럼만은 반영돼야 한다. 그래서 `is_dirty`나
-  /// 다른 컬럼은 전혀 건드리지 않고 `started_at`/`finished_at` 딱 하나만
-  /// 직접 갱신한다 — 동시에 진행 중일 수 있는 다른 필드의 로컬 우선 편집을
-  /// 덮어쓰지 않기 위함이다.
-  Future<void> clearReadingDateColumn(
-    int userBookId, {
-    required bool isStartedAt,
-  }) async {
-    final db = await BookshelfDatabase.instance();
-    await db.update(
-      'user_book',
-      {isStartedAt ? 'started_at' : 'finished_at': null},
-      where: 'user_book_id = ?',
-      whereArgs: [userBookId],
-    );
-  }
-
   /// 책 기록 화면에서 서버 PATCH가 성공한 뒤 그 결과 한 건만 로컬에 반영할 때
   /// 쓴다. [reconcile]/[applyChanges]와 동일하게 dirty 행은 덮어쓰지 않고,
   /// `sync_meta.last_synced_at`은 건드리지 않는다(다음 증분 동기화가 이
@@ -392,14 +384,35 @@ class BookshelfDao {
   /// 유지한다 — 이 값은 서버 GET 응답으로만 갱신되어야 하며, 연속된 로컬
   /// 편집마다 새로 잡으면 첫 오프라인 편집 이전의 서버 상태를 기준으로 한
   /// 충돌 검사가 불가능해진다.
-  Future<void> applyLocalEdit(BookItem item) async {
+  ///
+  /// [changedFields]는 이번 편집이 실제로 건드린 PATCH 필드 이름
+  /// ([RecordPatch.changedFields])이고, 아직 push되지 못한 이전 편집의
+  /// 목록과 합집합으로 누적한다(`dirty_fields`). 나중에 push할 때 이 목록에
+  /// 있는 필드만 요청 body에 실어야 사용자가 건드리지 않은 필드는 서버 값이
+  /// 유지되고, 사용자가 지운 필드는 명시적 null(삭제)로 나간다.
+  ///
+  /// 이미 dirty인데 목록이 없는 행은 `dirty_fields` 컬럼이 없던 시절(DB v15
+  /// 이하)에 쌓인 레거시 편집이다 — 그 행이 지금까지 보내던 것과 같은 집합
+  /// ([RecordPatch.nonNullFieldsOf])을 출발점으로 삼아, 아직 못 올린 이전
+  /// 편집이 이번 목록 밖으로 떨어져 나가지 않게 한다.
+  Future<void> applyLocalEdit(
+    BookItem item, {
+    required Set<String> changedFields,
+  }) async {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
-      final syncedUpdatedAt = await _readSyncedUpdatedAt(txn, item.userBookId);
+      final existing = await _readDirtyState(txn, item.userBookId);
+      final pendingFields = existing.isDirty
+          ? (existing.dirtyFields ?? RecordPatch.nonNullFieldsOf(item))
+          : const <String>{};
       await txn.insert('user_book', {
         ..._bookItemToRow(item),
         'is_dirty': 1,
-        'synced_updated_at': syncedUpdatedAt,
+        'synced_updated_at': existing.syncedUpdatedAt,
+        'dirty_fields': _encodeDirtyFields({
+          ...pendingFields,
+          ...changedFields,
+        }),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
       await _writeTagsTxn(txn, item);
     });
@@ -418,6 +431,10 @@ class BookshelfDao {
         'server_id': null,
         'is_dirty': 1,
         'synced_updated_at': null,
+        // CREATE는 필드 전체를 한 번에 올리므로 추적 목록이 필요 없다. 이
+        // 행에 로컬 편집이 겹치면 그때부터 [applyLocalEdit]가 목록을 쌓고,
+        // CREATE가 확정된 뒤의 재시도는 그 목록으로 PATCH한다.
+        'dirty_fields': null,
       };
       await txn.insert('user_book', values);
       return _rowToBookItem(values, const []);
@@ -460,6 +477,7 @@ class BookshelfDao {
             'cover_image_url': response.coverImageUrl,
             'status': response.status,
             'is_dirty': 0,
+            'dirty_fields': null,
           },
         },
         where: 'user_book_id = ?',
@@ -475,15 +493,51 @@ class BookshelfDao {
   /// `synced_updated_at`은 [item.updatedAt](PATCH 응답의 실제 서버
   /// `updated_at`, api-doc 기준)으로 갱신한다 — 다음 push가 이 값을 충돌
   /// 검사 기준으로 즉시 쓸 수 있어, 다음 동기화(GET)를 기다릴 필요가 없다.
-  Future<void> confirmPush(BookItem item) async {
+  ///
+  /// [capturedUpdatedAt]은 이 push 요청을 만들 때 읽은 로컬 `updated_at`이다.
+  /// 네트워크 왕복 동안 사용자가 같은 책을 또 편집했으면(로컬 편집은 push
+  /// 큐를 기다리지 않고 즉시 반영된다) 그 값과 달라지는데, 그때 서버 응답을
+  /// 덮어쓰면 방금 한 편집과 아직 보내지 못한 [DirtyRecord.changedFields]가
+  /// 통째로 사라진다. 그래서 확인과 쓰기를 한 트랜잭션에서 처리하고(중간에
+  /// 다른 쓰기가 끼어들 수 없다), 값이 달라졌으면 필드와 dirty 상태는 그대로
+  /// 둔 채 다음 push의 충돌 검사 기준값만 갱신한다.
+  ///
+  /// 반환값은 서버 응답이 실제로 반영됐는지 여부(행이 사라졌으면 false).
+  Future<bool> confirmPush(
+    BookItem item, {
+    required DateTime capturedUpdatedAt,
+  }) async {
     final db = await BookshelfDatabase.instance();
-    await db.transaction((txn) async {
+    return db.transaction((txn) async {
+      final rows = await txn.query(
+        'user_book',
+        columns: ['updated_at'],
+        where: 'user_book_id = ?',
+        whereArgs: [item.userBookId],
+        limit: 1,
+      );
+      // push가 오가는 사이 이 책이 로컬에서 사라졌다(동시 삭제 등) — 이미
+      // 지워진 책을 응답으로 되살리지 않는다.
+      if (rows.isEmpty) return false;
+      final syncedUpdatedAt = item.updatedAt.toUtc().toIso8601String();
+      final current = DateTime.parse(rows.single['updated_at'] as String);
+      if (!current.isAtSameMomentAs(capturedUpdatedAt)) {
+        await txn.update(
+          'user_book',
+          {'synced_updated_at': syncedUpdatedAt},
+          where: 'user_book_id = ?',
+          whereArgs: [item.userBookId],
+        );
+        return false;
+      }
       await txn.insert('user_book', {
         ..._bookItemToRow(item),
         'is_dirty': 0,
-        'synced_updated_at': item.updatedAt.toUtc().toIso8601String(),
+        'synced_updated_at': syncedUpdatedAt,
+        'dirty_fields': null,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
       await _writeTagsTxn(txn, item);
+      return true;
     });
   }
 
@@ -494,47 +548,77 @@ class BookshelfDao {
   /// 이 행(과 그 사이 놓쳤을 수 있는 다른 변경)을 다시 받아오게 한다 —
   /// 이미 지난 since 이후로 넘어간 증분 동기화는 이 행을 다시 내려주지
   /// 않을 수 있다(단건 조회 API가 없어 전체 동기화가 유일한 복구 수단).
-  Future<void> resolveConflict(int userBookId) async {
+  ///
+  /// 단, 거부된 요청이 오가는 사이 사용자가 새로 편집했으면([capturedUpdatedAt]
+  /// 과 현재 로컬 값이 다르면) dirty와 바꾼 필드 목록을 그대로 남긴다 —
+  /// 서버가 거부한 것은 그 이전 스냅샷이지 방금 한 편집이 아니라서, 여기서
+  /// dirty를 풀면 이어질 전체 동기화가 아직 보내지도 못한 편집을 조용히
+  /// 덮어쓴다. 이 경우 기준값(`synced_updated_at`)만 비워 다음 push가 충돌
+  /// 검사 없이(=사용자의 최신 편집을 우선해서) 나가게 한다.
+  ///
+  /// 반환값은 로컬 편집을 실제로 되돌렸는지 여부.
+  Future<bool> resolveConflict(
+    int userBookId, {
+    required DateTime capturedUpdatedAt,
+  }) async {
     final db = await BookshelfDatabase.instance();
-    await db.transaction((txn) async {
-      await txn.update(
+    return db.transaction((txn) async {
+      final rows = await txn.query(
         'user_book',
-        {'is_dirty': 0, 'synced_updated_at': null},
+        columns: ['updated_at'],
         where: 'user_book_id = ?',
         whereArgs: [userBookId],
+        limit: 1,
       );
+      final current = rows.isEmpty
+          ? null
+          : DateTime.parse(rows.single['updated_at'] as String);
+      final unchanged =
+          current != null && current.isAtSameMomentAs(capturedUpdatedAt);
+      if (current != null) {
+        await txn.update(
+          'user_book',
+          unchanged
+              ? {'is_dirty': 0, 'synced_updated_at': null, 'dirty_fields': null}
+              : {'synced_updated_at': null},
+          where: 'user_book_id = ?',
+          whereArgs: [userBookId],
+        );
+      }
       await txn.delete(
         'sync_meta',
         where: 'key = ?',
         whereArgs: ['last_synced_at'],
       );
+      return unchanged;
     });
   }
 
   /// 아직 서버에 반영되지 못한(is_dirty = 1) 행 전체를 push 기준값과 함께
   /// 반환한다. `BookshelfRepository.sync()`가 매 동기화 전에 일괄 재시도할
   /// 때 쓴다.
-  Future<List<(BookItem, DateTime?)>> getDirtyRecords() async {
+  Future<List<DirtyRecord>> getDirtyRecords() async {
     final db = await BookshelfDatabase.instance();
     final rows = await db.query('user_book', where: 'is_dirty = 1');
     if (rows.isEmpty) return const [];
     final items = await _attachTags(db, rows);
-    final baselineById = {
-      for (final row in rows)
-        row['user_book_id'] as int: row['synced_updated_at'] as String?,
-    };
-    return items
-        .map(
-          (item) =>
-              (item, DateTime.tryParse(baselineById[item.userBookId] ?? '')),
-        )
-        .toList();
+    final rowById = {for (final row in rows) row['user_book_id'] as int: row};
+    return items.map((item) {
+      final row = rowById[item.userBookId];
+      return (
+        item: item,
+        baseUpdatedAt: DateTime.tryParse(
+          row?['synced_updated_at'] as String? ?? '',
+        ),
+        changedFields: _decodeDirtyFields(row?['dirty_fields'] as String?),
+      );
+    }).toList();
   }
 
   /// 특정 책이 dirty(is_dirty = 1)면 그 행과 push 기준값을 반환하고, 아니면
   /// (이미 push가 끝났거나 애초에 편집이 없었으면) null을 반환한다. 책 기록
   /// 화면이 편집 직후 시도하는 단건 즉시 push가 쓴다.
-  Future<(BookItem, DateTime?)?> getDirtyRecord(int userBookId) async {
+  Future<DirtyRecord?> getDirtyRecord(int userBookId) async {
     final db = await BookshelfDatabase.instance();
     final rows = await db.query(
       'user_book',
@@ -543,38 +627,50 @@ class BookshelfDao {
     );
     if (rows.isEmpty) return null;
     final items = await _attachTags(db, rows);
-    final baseUpdatedAt = DateTime.tryParse(
-      rows.first['synced_updated_at'] as String? ?? '',
-    );
-    return (items.first, baseUpdatedAt);
-  }
-
-  /// push는 성공했지만 그 사이 새 로컬 편집이 쌓여 필드 값은 덮어쓸 수 없을
-  /// 때, 충돌 검사 기준값만 이번 push로 서버가 확인해 준 최신 updated_at으로
-  /// 갱신한다. `is_dirty`와 다른 컬럼은 그대로 둔다 — 새 편집은 여전히 push가
-  /// 필요하므로.
-  Future<void> refreshSyncedUpdatedAt(
-    int userBookId,
-    DateTime updatedAt,
-  ) async {
-    final db = await BookshelfDatabase.instance();
-    await db.update(
-      'user_book',
-      {'synced_updated_at': updatedAt.toUtc().toIso8601String()},
-      where: 'user_book_id = ?',
-      whereArgs: [userBookId],
+    return (
+      item: items.first,
+      baseUpdatedAt: DateTime.tryParse(
+        rows.first['synced_updated_at'] as String? ?? '',
+      ),
+      changedFields: _decodeDirtyFields(rows.first['dirty_fields'] as String?),
     );
   }
 
-  Future<String?> _readSyncedUpdatedAt(Transaction txn, int userBookId) async {
+  /// 로컬 우선 편집을 덮어쓰기 전에 필요한 기존 행의 상태(충돌 검사 기준값과
+  /// 아직 push되지 못한 편집 목록). 행이 없으면 모두 비어 있는 상태다.
+  Future<
+    ({bool isDirty, String? syncedUpdatedAt, Set<String>? dirtyFields})
+  >
+  _readDirtyState(Transaction txn, int userBookId) async {
     final existing = await txn.query(
       'user_book',
-      columns: ['synced_updated_at'],
+      columns: ['is_dirty', 'synced_updated_at', 'dirty_fields'],
       where: 'user_book_id = ?',
       whereArgs: [userBookId],
+      limit: 1,
     );
-    if (existing.isEmpty) return null;
-    return existing.first['synced_updated_at'] as String?;
+    if (existing.isEmpty) {
+      return (isDirty: false, syncedUpdatedAt: null, dirtyFields: null);
+    }
+    return (
+      isDirty: existing.first['is_dirty'] == 1,
+      syncedUpdatedAt: existing.first['synced_updated_at'] as String?,
+      dirtyFields: _decodeDirtyFields(existing.first['dirty_fields'] as String?),
+    );
+  }
+
+  /// `dirty_fields`는 PATCH 필드 이름(영문/숫자)만 담으므로 쉼표로 잇는다.
+  /// 빈 목록은 NULL로 저장한다 — 기록 필드를 하나도 건드리지 않은 로컬
+  /// 편집(로컬 저장 모드의 책 정보 수정 등)이라 추적할 것이 없고,
+  /// [RecordPatch.fromSnapshot]도 NULL과 빈 목록을 같게(레거시 스냅샷)
+  /// 취급한다.
+  static String? _encodeDirtyFields(Set<String> fields) =>
+      fields.isEmpty ? null : fields.join(',');
+
+  static Set<String>? _decodeDirtyFields(String? value) {
+    if (value == null) return null;
+    if (value.isEmpty) return const <String>{};
+    return value.split(',').toSet();
   }
 
   Future<void> _upsertItemTxn(

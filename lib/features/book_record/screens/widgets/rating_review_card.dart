@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/network/patch_field.dart';
 import '../../../bookshelf/models/book_item.dart';
+import '../../../bookshelf/models/record_patch.dart';
 import '../../providers/book_record_providers.dart';
 import 'record_section_card.dart';
 import 'star_rating.dart';
@@ -56,10 +58,18 @@ class _RatingReviewCardState extends ConsumerState<RatingReviewCard> {
     super.dispose();
   }
 
+  /// 별점 입력은 같은 별을 다시 탭하면 0(평가 취소)이 된다 — 그건 "0점"이
+  /// 아니라 "평가를 지웠다"는 뜻이라 명시적 null로 삭제한다.
   Future<void> _saveRating(double rating) {
     return ref
         .read(bookRecordControllerProvider(widget.userBookId).notifier)
-        .updateRecord(myRating: rating);
+        .updateRecord(
+          RecordPatch(
+            myRating: rating == 0
+                ? const PatchField.clear()
+                : PatchField.value(rating),
+          ),
+        );
   }
 
   Future<void> _saveReview() {
@@ -67,7 +77,15 @@ class _RatingReviewCardState extends ConsumerState<RatingReviewCard> {
     if (trimmed == (widget.book.shortReview ?? '')) return Future.value();
     return ref
         .read(bookRecordControllerProvider(widget.userBookId).notifier)
-        .updateRecord(shortReview: trimmed);
+        .updateRecord(
+          RecordPatch(
+            // 입력을 비웠으면 "지움"(명시적 null)이다 — 빈 문자열을 그대로
+            // 보내면 서버가 삭제가 아니라 빈 값으로 저장한다.
+            shortReview: trimmed.isEmpty
+                ? const PatchField.clear()
+                : PatchField.value(trimmed),
+          ),
+        );
   }
 
   @override

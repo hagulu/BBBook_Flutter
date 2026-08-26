@@ -76,8 +76,8 @@ void main() {
     expect(local.clientRequestId, clientRequestId);
     final firstRetry = await dao.getDirtyRecord(local.userBookId);
     final secondRetry = await dao.getDirtyRecord(local.userBookId);
-    expect(firstRetry?.$1.clientRequestId, clientRequestId);
-    expect(secondRetry?.$1.clientRequestId, clientRequestId);
+    expect(firstRetry?.item.clientRequestId, clientRequestId);
+    expect(secondRetry?.item.clientRequestId, clientRequestId);
 
     await dao.confirmCreate(
       localId: local.userBookId,

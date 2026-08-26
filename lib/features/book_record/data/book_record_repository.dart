@@ -8,6 +8,7 @@ import '../../bookshelf/data/bookshelf_database.dart';
 import '../../bookshelf/data/bookshelf_repository.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/models/book_tag.dart';
+import '../../bookshelf/models/record_patch.dart';
 import '../../bookshelf/services/book_cover_image_store.dart';
 import '../../storage_mode/data/storage_mode_store.dart';
 import 'book_record_api.dart';
@@ -58,117 +59,28 @@ class BookRecordRepository {
   /// 로컬 행이 없으면(다른 기기에서 이미 삭제됨 등) 아무 것도 하지 않고
   /// null을 반환한다 — 존재하지 않는 책을 오프라인 편집으로 되살릴 수는
   /// 없다.
-  Future<BookItem?> updateRecord(
-    int userBookId, {
-    String? status,
-    int? currentPage,
-    double? myRating,
-    String? shortReview,
-    bool? isMasterpiece,
-    String? sourceType,
-    int? rereadCount,
-    String? difficulty,
-    String? startedAt,
-    String? finishedAt,
-    String? platformName,
-    String? discoverySource,
-  }) async {
+  Future<BookItem?> updateRecord(int userBookId, RecordPatch patch) async {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final current = await _bookshelfRepository.getById(userBookId);
     if (current == null) return null;
+    if (patch.isEmpty) return current;
 
     final merged = current.copyWithRecord(
-      status: status,
-      currentPage: currentPage,
-      myRating: myRating,
-      shortReview: shortReview,
-      isMasterpiece: isMasterpiece,
-      sourceType: sourceType,
-      rereadCount: rereadCount,
-      difficulty: difficulty,
-      startedAt: startedAt,
-      finishedAt: finishedAt,
-      platformName: platformName,
-      discoverySource: discoverySource,
+      patch,
       updatedAt: DateTime.now().toUtc(),
     );
 
     if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
       return null;
     }
-    await _bookshelfRepository.applyLocalEdit(merged);
+    await _bookshelfRepository.applyLocalEdit(
+      merged,
+      changedFields: patch.changedFields,
+    );
 
     unawaited(_bookshelfRepository.pushDirtyRecord(userBookId));
 
     return merged;
-  }
-
-  /// 시작일/완독일 "선택 해제"(명시적으로 지움). [updateRecord]와 달리 서버
-  /// PATCH 성공을 기다린 뒤에만 로컬에 반영한다 — [updateRecord]는 로컬
-  /// 우선이라 빈 문자열(서버 기준 "지움" 신호)을 [BookItem.copyWithRecord]가
-  /// 즉시 `null`로 파싱해 버리는데, dirty push([BookshelfRepository.
-  /// _pushDirtyItem])는 그 로컬 스냅샷만 보고 요청을 다시 만들기 때문에
-  /// `null`(생략 = "변경 없음")과 "명시적으로 지움"을 더는 구분하지 못해
-  /// 서버 값이 그대로 남는다. 이 메서드는 그 경로를 거치지 않고 빈 문자열을
-  /// 곧바로 API에 실어 보낸다.
-  ///
-  /// `updatedAt` 충돌 검사는 생략한다(무조건 수정) — [BookItem.updatedAt]은
-  /// 아직 서버에 반영되지 않은 로컬 우선 편집으로도 매번 새로 채워지는
-  /// 값이라, 그걸 그대로 보내면 실제로는 충돌이 아닌데도(단지 이전 편집이
-  /// 아직 push 중일 뿐인데도) 서버의 진짜 updated_at과 달라 409로
-  /// 거부될 수 있다. [updateBookInfo]도 같은 이유로 충돌 검사를 하지 않는다.
-  ///
-  /// 로컬 반영도 [_persist](전체 행을 서버 응답으로 덮어씀)를 쓰지 않는다.
-  /// 이 화면의 다른 필드(난이도·출처 등)는 [updateRecord]로 로컬 우선
-  /// 수정되고 dirty push가 아직 안 끝났을 수 있는데, 전체 행을 덮어쓰면
-  /// (a) [BookshelfDao]가 dirty 행이면 아예 반영을 건너뛰어(dirty 보호)
-  /// 방금 지운 날짜가 로컬에는 다시 옛 값으로 남거나, (b) dirty 보호를
-  /// 무시하고 강제로 덮어쓰면 이 응답에 실려 있지 않은(우리가 보내지 않은)
-  /// 그 필드들이 서버의 옛 값으로 되돌아간다. 그래서 서버 확인 후
-  /// [BookshelfRepository.clearReadingDateLocal]로 `started_at`/
-  /// `finished_at` 컬럼 하나만 직접 갱신하고, 반환값도 로컬 스냅샷에
-  /// [BookItem.copyWithRecord]로 그 필드만 지워 만든다.
-  ///
-  /// 남는 한계: 진행 중인 dirty push가 이 해제와 겹치면(그 요청은 해제 전
-  /// 스냅샷의 옛 날짜를 싣고 있다) 응답이 늦게 도착해 서버 값이 되돌아갈 수
-  /// 있다 — 사용자가 다시 "선택 해제"를 누르면 된다. 완전히 막으려면 "지움"
-  /// 의도를 DB에 별도 컬럼으로 남겨야 해서 범위를 벗어난다.
-  Future<BookItem> clearReadingDate(
-    int userBookId, {
-    required bool isStartedAt,
-  }) async {
-    final expectedGeneration = BookshelfDatabase.sessionGeneration;
-    final current = await _requireLocal(userBookId);
-    // 날짜 해제는 로컬 컬럼만 비우면 되는 작업이라 로컬 저장 모드에서도
-    // 그대로 쓸 수 있다(서버 호출만 건너뛴다).
-    if (await _storageMode.isLocal()) {
-      await _bookshelfRepository.clearReadingDateLocal(
-        userBookId,
-        isStartedAt: isStartedAt,
-      );
-      return current.copyWithRecord(
-        startedAt: isStartedAt ? '' : null,
-        finishedAt: isStartedAt ? null : '',
-        updatedAt: current.updatedAt,
-      );
-    }
-    final serverUserBookId = await _requireServerId(current);
-    await _api.patchRecord(
-      userBookId: serverUserBookId,
-      startedAt: isStartedAt ? '' : null,
-      finishedAt: isStartedAt ? null : '',
-    );
-    if (BookshelfDatabase.sessionGeneration == expectedGeneration) {
-      await _bookshelfRepository.clearReadingDateLocal(
-        userBookId,
-        isStartedAt: isStartedAt,
-      );
-    }
-    return current.copyWithRecord(
-      startedAt: isStartedAt ? '' : null,
-      finishedAt: isStartedAt ? null : '',
-      updatedAt: current.updatedAt,
-    );
   }
 
   Future<BookItem> updateBookInfo(
@@ -336,7 +248,8 @@ class BookRecordRepository {
       bookId: current.bookId,
       updatedAt: DateTime.now().toUtc(),
     );
-    await _bookshelfRepository.applyLocalEdit(updated);
+    // 기록 필드(PATCH 대상)는 건드리지 않는 편집이라 추적 목록은 비운다.
+    await _bookshelfRepository.applyLocalEdit(updated, changedFields: const {});
     // 더 이상 쓰지 않는 이전 로컬 표지 파일을 정리한다(서버 URL이면 무시).
     if (previousCover != nextCover) {
       await bookCoverImageStore.delete(previousCover, except: nextCover);
@@ -368,7 +281,7 @@ class BookRecordRepository {
       bookId: null,
       updatedAt: DateTime.now().toUtc(),
     );
-    await _bookshelfRepository.applyLocalEdit(updated);
+    await _bookshelfRepository.applyLocalEdit(updated, changedFields: const {});
     developer.log(
       '[ISBN 연결] userBookId=${current.userBookId} '
       'result=SUCCESS mode=local isbn13=${isbn13 ?? 'unlinked'}',

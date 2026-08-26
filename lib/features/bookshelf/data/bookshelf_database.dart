@@ -40,7 +40,7 @@ class BookshelfDatabase {
     final path = join(dbPath, 'bookshelf.db');
     return openDatabase(
       path,
-      version: 15,
+      version: 16,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -226,6 +226,19 @@ class BookshelfDatabase {
             'ADD COLUMN server_delete_pending INTEGER NOT NULL DEFAULT 0',
           );
         }
+        if (oldVersion < 16 &&
+            await _hasTable(db, 'user_book') &&
+            !await _hasColumn(db, 'user_book', 'dirty_fields')) {
+          // 로컬 우선 편집이 "어떤 필드를 바꿨는지"를 함께 기록한다. 이
+          // 목록이 있어야 재시도 push가 바꾼 필드만 PATCH body에 싣고
+          // (나머지는 서버 값 유지), 사용자가 지운 필드를 명시적 null로
+          // 보내 실제로 삭제할 수 있다(api-me-books-userBookId-patch.md).
+          // 이 컬럼이 없던 시절에 쌓인 dirty 행은 NULL로 남아
+          // `RecordPatch.fromSnapshot`이 예전 방식(값이 있는 필드만 전송)
+          // 으로 처리한다 — 무엇을 지웠는지 알 수 없으므로 삭제는 보내지
+          // 않는다.
+          await db.execute('ALTER TABLE user_book ADD COLUMN dirty_fields TEXT');
+        }
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -259,6 +272,7 @@ class BookshelfDatabase {
             updated_at TEXT NOT NULL,
             is_dirty INTEGER NOT NULL DEFAULT 0,
             synced_updated_at TEXT,
+            dirty_fields TEXT,
             client_request_id TEXT,
             create_thumbnail_path TEXT
           )
