@@ -13,6 +13,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../book_note/models/book_note.dart';
 import '../models/book_reflection.dart';
 import '../providers/book_reflection_providers.dart';
 import '../services/book_reflection_content_adapter.dart';
@@ -371,17 +372,11 @@ class _BookReflectionEditorScreenState
     String imageSource,
     QuillController controller,
   ) async {
-    final index = controller.selection.start;
-    final selectedLength = controller.selection.end - index;
-    controller
-      ..skipRequestKeyboard = true
-      ..replaceText(index, selectedLength, BlockEmbed.image(imageSource), null)
-      ..formatText(
-        index,
-        1,
-        WidthAttribute(_editorBodyWidth.toStringAsFixed(1)),
-      )
-      ..moveCursorToPosition(index + 1);
+    _memoInsertService.insertImageBlock(
+      controller,
+      imageSource,
+      bodyWidth: _editorBodyWidth,
+    );
   }
 
   Future<void> _insertMemo() async {
@@ -394,7 +389,35 @@ class _BookReflectionEditorScreenState
     );
     if (memo == null || !mounted) return;
 
+    if (memo.type == BookNoteMemoType.photo) {
+      await _insertPhotoMemo(memo, selection);
+      return;
+    }
     _memoInsertService.insert(_quillController, memo, selection: selection);
+  }
+
+  /// 사진 확보(네트워크/파일 I/O)가 끝난 뒤에야 [mounted]를 다시 확인하고
+  /// 문서를 바꾼다 — 대기 중 화면이 닫혀 [_quillController]가 이미 폐기된
+  /// 채로 건드리는 일을 막기 위해서다.
+  Future<void> _insertPhotoMemo(BookNoteMemo memo, TextSelection selection) async {
+    AppLoading.show(context);
+    String? imageSource;
+    try {
+      imageSource = await _memoInsertService.resolvePhotoSource(memo);
+    } finally {
+      AppLoading.hide();
+    }
+    if (!mounted) return;
+    final inserted =
+        imageSource != null &&
+        _memoInsertService.insertPhoto(
+          _quillController,
+          memo,
+          imageSource,
+          selection: selection,
+          bodyWidth: _editorBodyWidth,
+        );
+    if (!inserted) AppSnackBar.error(context, '사진 메모를 불러오지 못했습니다.');
   }
 
   bool get _hasUnsavedChanges =>
@@ -430,7 +453,6 @@ class _BookReflectionEditorScreenState
 
   @override
   Widget build(BuildContext context) {
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final reflectionId = widget.reflection?.id;
     // 이미 저장된 독후감이면 본문의 서버 이미지를 로컬 사본으로 바꿔
     // 보여준다(아직 로드 전이거나 신규 작성이면 서버 URL로 표시).
@@ -487,68 +509,105 @@ class _BookReflectionEditorScreenState
                     ],
                   ),
                   clipBehavior: Clip.antiAlias,
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-                        child: TextField(
-                          controller: _titleController,
-                          maxLength: 255,
-                          textInputAction: TextInputAction.next,
-                          onSubmitted: (_) => _editorFocusNode.requestFocus(),
-                          style: const TextStyle(
-                            color: AppColors.textStrong,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      _editorBodyWidth = (constraints.maxWidth - 36).clamp(
+                        1,
+                        double.infinity,
+                      );
+                      // 제목을 화면에 고정하지 않고 본문과 함께 스크롤되게
+                      // 하기 위해, Quill 편집기는 자체 스크롤을 끄고
+                      // (scrollable: false) 제목·구분선과 한 스크롤뷰를
+                      // 공유한다. 커서를 따라가는 자동 스크롤(flutter_quill의
+                      // showCaretOnScreen)도 이 공유 컨트롤러가 붙은
+                      // 스크롤뷰를 기준으로 동작한다. 편집기 자체 스크롤이
+                      // 없어져 Scaffold의 키보드 회피와 중복이던
+                      // scrollBottomInset 설정도 함께 제거했다.
+                      return SingleChildScrollView(
+                        controller: _editorScrollController,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
                           ),
-                          decoration: const InputDecoration(
-                            hintText: '이 기록에 제목을 붙여보세요',
-                            hintStyle: TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 20,
-                              fontWeight: FontWeight.normal,
-                            ),
-                            counterText: '',
-                            filled: false,
-                            contentPadding: EdgeInsets.zero,
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                          ),
-                        ),
-                      ),
-                      const ReflectionTitleBodyDivider(horizontalInset: 18),
-                      Expanded(
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            _editorBodyWidth = (constraints.maxWidth - 36)
-                                .clamp(1, double.infinity);
-                            return ReflectionQuillEditor(
-                              controller: _quillController,
-                              focusNode: _editorFocusNode,
-                              scrollController: _editorScrollController,
-                              config: QuillEditorConfig(
-                                padding: const EdgeInsets.fromLTRB(
-                                  18,
-                                  0,
-                                  18,
-                                  16,
-                                ),
-                                placeholder: '책을 읽고 느낀 점을 기록해 보세요.',
-                                customStyles: bookReflectionQuillStyles,
-                                textSpanBuilder: reflectionTextSpanBuilder,
-                                scrollBottomInset: keyboardInset,
-                                embedBuilders: [
-                                  ReflectionImageEmbedBuilder(
-                                    localImagePaths: localImagePaths,
+                          // 본문이 짧아도 카드 남은 영역 전체를 눌러 편집기에
+                          // 포커스를 줄 수 있게 한다(예전 Expanded 채움과
+                          // 같은 동작 유지).
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.translucent,
+                            onTap: () {
+                              if (!_editorFocusNode.hasFocus) {
+                                _editorFocusNode.requestFocus();
+                              }
+                            },
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    18,
+                                    12,
+                                    18,
+                                    0,
                                   ),
-                                ],
-                              ),
-                            );
-                          },
+                                  child: TextField(
+                                    controller: _titleController,
+                                    maxLength: 255,
+                                    textInputAction: TextInputAction.next,
+                                    onSubmitted: (_) =>
+                                        _editorFocusNode.requestFocus(),
+                                    style: const TextStyle(
+                                      color: AppColors.textStrong,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    decoration: const InputDecoration(
+                                      hintText: '이 기록에 제목을 붙여보세요',
+                                      hintStyle: TextStyle(
+                                        color: AppColors.textMuted,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.normal,
+                                      ),
+                                      counterText: '',
+                                      filled: false,
+                                      contentPadding: EdgeInsets.zero,
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                    ),
+                                  ),
+                                ),
+                                const ReflectionTitleBodyDivider(
+                                  horizontalInset: 18,
+                                ),
+                                ReflectionQuillEditor(
+                                  controller: _quillController,
+                                  focusNode: _editorFocusNode,
+                                  scrollController: _editorScrollController,
+                                  config: QuillEditorConfig(
+                                    scrollable: false,
+                                    padding: const EdgeInsets.fromLTRB(
+                                      18,
+                                      0,
+                                      18,
+                                      16,
+                                    ),
+                                    placeholder: '책을 읽고 느낀 점을 기록해 보세요.',
+                                    customStyles: bookReflectionQuillStyles,
+                                    textSpanBuilder: reflectionTextSpanBuilder,
+                                    embedBuilders: [
+                                      ReflectionImageEmbedBuilder(
+                                        localImagePaths: localImagePaths,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                 ),
               ),

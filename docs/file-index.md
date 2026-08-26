@@ -165,3 +165,4 @@
 - `docs/review/20260824-095239-note-memo-local-image-review.md` — 메모 사진 로컬 저장·동기화의 반복 실패 시 다운로드 기아 문제 리뷰
 - `docs/review/20260824-151950-local-storage-mode-review.md` — 서버→로컬 저장 모드 전환의 삭제 정합성·복구·이미지 보존·직접 쓰기 경로 리뷰
 - `docs/review/20260826-124257-record-patch-dirty-fields-review.md` — 책 기록 PATCH 3-상태·dirty 필드 추적의 완독일 계약 및 push 확정 경합 리뷰
+- `docs/review/20260826-132019-reflection-photo-memo-insert-review.md` — 사진 메모 독후감 삽입의 이미지 독립성·비동기 생명주기·테스트 계약 리뷰

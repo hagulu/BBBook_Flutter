@@ -288,13 +288,12 @@ class _MemoList extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox.shrink(),
       itemBuilder: (context, index) {
         final memo = memos[index];
-        final content = stripMemoHighlightMarkup(memo.content);
+        final hasContent = stripMemoHighlightMarkup(memo.content).trim().isNotEmpty;
+        final isSelectable = memo.hasImage || hasContent;
         return BookNoteMemoTimelineItem(
           memo: memo,
           showDivider: index < memos.length - 1,
-          onTap: content.trim().isEmpty
-              ? null
-              : () => Navigator.of(context).pop(memo),
+          onTap: isSelectable ? () => Navigator.of(context).pop(memo) : null,
         );
       },
     );
