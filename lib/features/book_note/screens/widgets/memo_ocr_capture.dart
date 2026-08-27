@@ -36,7 +36,7 @@ class _HorizontalGuide extends StatelessWidget {
     return Container(
       height: 2,
       decoration: BoxDecoration(
-        color: AppColors.highlightGold,
+        color: AppColors.accentFill,
         boxShadow: [
           BoxShadow(
             color: AppColors.shadowStrong,
@@ -147,9 +147,10 @@ class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.mediaBackdrop,
       appBar: AppBar(
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.mediaBackdrop,
+        foregroundColor: AppColors.surface,
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
           tooltip: '닫기',
@@ -165,8 +166,10 @@ class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
                 ? null
                 : () => setState(() => _selectedIndexes = <int>{}),
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.textStrong,
-              disabledForegroundColor: AppColors.controlInactive,
+              foregroundColor: AppColors.surface,
+              disabledForegroundColor: AppColors.surface.withValues(
+                alpha: 0.4,
+              ),
             ),
             child: const Text('선택 취소'),
           ),
@@ -175,12 +178,17 @@ class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
                 ? null
                 : () => Navigator.of(context).pop(_selectedText()),
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.textStrong,
-              disabledForegroundColor: AppColors.controlInactive,
+              foregroundColor: AppColors.surface,
+              disabledForegroundColor: AppColors.surface.withValues(
+                alpha: 0.4,
+              ),
             ),
-            child: const Text('완료'),
+            child: const Text(
+              '완료',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
         ],
       ),
       body: Column(
@@ -197,40 +205,26 @@ class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
           ),
           Container(
             width: double.infinity,
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              border: Border(top: BorderSide(color: AppColors.border)),
-            ),
+            color: AppColors.mediaBackdrop,
             child: SafeArea(
               top: false,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
-                  vertical: 8,
+                  vertical: 12,
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Semantics(
-                        liveRegion: true,
-                        child: Text(
-                          _selectedIndexes.isEmpty
-                              ? '발췌할 단어를 드래그해 주세요.'
-                              : '${_selectedIndexes.length}개 단어가 선택되었습니다.',
-                          style: const TextStyle(
-                            color: AppColors.textBody,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    _selectedIndexes.isEmpty
+                        ? '발췌할 단어를 드래그해 주세요.'
+                        : '${_selectedIndexes.length}개 단어가 선택되었습니다.',
+                    style: TextStyle(
+                      color: AppColors.surface.withValues(alpha: 0.84),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     ),
-                    TextButton.icon(
-                      onPressed: _showWordPicker,
-                      icon: const Icon(PhosphorIconsRegular.listChecks),
-                      label: const Text('목록 선택'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -238,85 +232,6 @@ class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _showWordPicker() async {
-    final selected = Set<int>.of(_selectedIndexes);
-    final result = await showModalBottomSheet<Set<int>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => FractionallySizedBox(
-          heightFactor: 0.82,
-          child: SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 8, 6),
-                  child: Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          '인식된 단어 선택',
-                          style: TextStyle(
-                            color: AppColors.textStrong,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: selected.isEmpty
-                            ? null
-                            : () => setSheetState(selected.clear),
-                        child: const Text('전체 해제'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(
-                          sheetContext,
-                        ).pop(Set<int>.of(selected)),
-                        child: const Text('적용'),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1, color: AppColors.border),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: widget.analysis.words.length,
-                    itemBuilder: (context, index) {
-                      final word = widget.analysis.words[index];
-                      final isSelected = selected.contains(index);
-                      return CheckboxListTile(
-                        value: isSelected,
-                        onChanged: (value) {
-                          setSheetState(() {
-                            if (value ?? false) {
-                              selected.add(index);
-                            } else {
-                              selected.remove(index);
-                            }
-                          });
-                        },
-                        controlAffinity: ListTileControlAffinity.leading,
-                        dense: true,
-                        title: Text(
-                          word.text,
-                          style: const TextStyle(color: AppColors.textBody),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    if (result == null || !mounted) return;
-    setState(() => _selectedIndexes = result);
   }
 
   String _selectedText() {
@@ -373,7 +288,7 @@ class _OcrPhotoCanvasState extends State<_OcrPhotoCanvas> {
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: AppColors.textStrong,
+      color: AppColors.mediaBackdrop,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final viewportSize = Size(

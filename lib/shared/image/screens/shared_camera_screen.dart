@@ -528,7 +528,7 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
                       foregroundColor: AppColors.textStrong,
                       disabledBackgroundColor: AppColors.surfaceSubtle,
                       side: const BorderSide(
-                        color: AppColors.highlightGold,
+                        color: AppColors.accentFill,
                         width: 4,
                       ),
                       shape: const CircleBorder(),
