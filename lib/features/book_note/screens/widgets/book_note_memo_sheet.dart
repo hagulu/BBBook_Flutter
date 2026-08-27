@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/image/screens/shared_image_editor_screen.dart';
 import '../../../../shared/widgets/app_alert.dart';
 import '../../../../shared/widgets/app_confirm.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
@@ -502,10 +503,16 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
 
   Future<void> _pickPhoto() async {
     _contentFocusNode.unfocus();
-    final path = await captureMemoPhoto(context);
-    if (path == null || !mounted) return;
+    final capturedPath = await captureMemoPhoto(context);
+    if (capturedPath == null || !mounted) return;
+    final editedPath = await openSharedImageEditor(
+      context,
+      imagePath: capturedPath,
+      profile: SharedImageEditorProfile.general,
+    );
+    if (editedPath == null || !mounted) return;
     setState(() {
-      _pickedImagePath = path;
+      _pickedImagePath = editedPath;
       _imageRemoved = false;
       _errorText = null;
     });

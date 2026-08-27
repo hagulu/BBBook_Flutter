@@ -150,7 +150,11 @@ class LocalImageStore {
     if (!allowedExtensions.contains(extension)) {
       throw FileSystemException('지원하지 않는 이미지 형식입니다.', pickedPath);
     }
-    if (await source.length() > maxBytes) {
+    final sizeBytes = await source.length();
+    if (sizeBytes == 0) {
+      throw FileSystemException('이미지 파일이 손상되었습니다.', pickedPath);
+    }
+    if (sizeBytes > maxBytes) {
       throw FileSystemException('이미지 용량은 5MB 이하만 가능합니다.', pickedPath);
     }
     final directory = await ensureDirectory();

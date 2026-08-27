@@ -5,11 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_quill_extensions/flutter_quill_extensions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/image/screens/shared_image_editor_screen.dart';
+import '../../../shared/image/services/image_gallery_picker.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_snackbar.dart';
@@ -204,6 +205,7 @@ class _ReflectionQuillEditorState extends State<ReflectionQuillEditor> {
   Widget build(BuildContext context) {
     return Stack(
       key: _stackKey,
+      clipBehavior: Clip.none,
       children: [
         QuillEditor(
           controller: widget.controller,
@@ -211,35 +213,38 @@ class _ReflectionQuillEditorState extends State<ReflectionQuillEditor> {
           scrollController: widget.scrollController,
           config: widget.config.copyWith(editorKey: _editorKey),
         ),
-        ValueListenableBuilder<List<Offset>>(
-          valueListenable: _quoteOffsets,
-          builder: (context, offsets, _) => Stack(
-            children: [
-              for (final offset in offsets)
-                Positioned(
-                  left:
-                      offset.dx -
-                      _reflectionQuoteLeftSpacing +
-                      _reflectionQuoteMarkInset,
-                  top: offset.dy - 6,
-                  child: ExcludeSemantics(
-                    child: IgnorePointer(
-                      child: Text(
-                        '“',
-                        style: TextStyle(
-                          color: AppColors.reflectionTextBlue.withValues(
-                            alpha: 0.55,
+        Positioned.fill(
+          child: ValueListenableBuilder<List<Offset>>(
+            valueListenable: _quoteOffsets,
+            builder: (context, offsets, _) => Stack(
+              clipBehavior: Clip.none,
+              children: [
+                for (final offset in offsets)
+                  Positioned(
+                    left:
+                        offset.dx -
+                        _reflectionQuoteLeftSpacing +
+                        _reflectionQuoteMarkInset,
+                    top: offset.dy - 6,
+                    child: ExcludeSemantics(
+                      child: IgnorePointer(
+                        child: Text(
+                          '“',
+                          style: TextStyle(
+                            color: AppColors.reflectionTextBlue.withValues(
+                              alpha: 0.55,
+                            ),
+                            fontSize: 28.8,
+                            height: 0.9,
+                            fontWeight: FontWeight.w700,
+                            fontStyle: FontStyle.normal,
                           ),
-                          fontSize: 28.8,
-                          height: 0.9,
-                          fontWeight: FontWeight.w700,
-                          fontStyle: FontStyle.normal,
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -254,12 +259,14 @@ class BookReflectionEditorScreen extends ConsumerStatefulWidget {
     required this.userBookId,
     required this.bookTitle,
     this.reflection,
+    this.visibilityOverride,
   });
 
   final int ownerUserId;
   final int userBookId;
   final String bookTitle;
   final BookReflection? reflection;
+  final bool? visibilityOverride;
 
   @override
   ConsumerState<BookReflectionEditorScreen> createState() =>
@@ -277,10 +284,10 @@ class _BookReflectionEditorScreenState
   late final String _initialDocumentJson;
   final FocusNode _editorFocusNode = FocusNode();
   final ScrollController _editorScrollController = ScrollController();
+  bool _allowImageDeletion = false;
   bool _isSaving = false;
   bool _allowPop = false;
   bool _isConfirmingPop = false;
-  double _editorBodyWidth = 1;
 
   @override
   void initState() {
@@ -289,14 +296,46 @@ class _BookReflectionEditorScreenState
     _titleController = _NoComposingUnderlineTextController(
       text: reflection?.title ?? '',
     );
+    final document = _adapter.fromServerJson(reflection?.contentJson);
     _quillController = QuillController(
-      document: _adapter.fromServerJson(reflection?.contentJson),
-      selection: const TextSelection.collapsed(offset: 0),
+      document: document,
+      selection: TextSelection.collapsed(
+        offset: reflection == null ? 0 : document.length - 1,
+      ),
+      onReplaceText: _allowTextReplacement,
     );
     _initialTitle = _titleController.text;
     _initialDocumentJson = jsonEncode(
       _quillController.document.toDelta().toJson(),
     );
+    if (reflection != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _editorFocusNode.requestFocus();
+      });
+    }
+  }
+
+  /// 삭제 범위가 이미지 embed와 겹치면 막는다 — 어떤 값으로 대체하든(빈
+  /// 문자열 삭제·글자 덮어쓰기·붙여넣기·새 이미지 삽입용 Delta 등) 이미지가
+  /// 명시적 삭제 경로([_deleteImage]) 없이 사라지는 일을 막기 위해서다.
+  /// [data]의 타입은 보지 않는다 — 삭제 범위(length>0)가 이미지를
+  /// 포함하는지만 본다. [BookReflectionMemoInsertService]의 프로그램적
+  /// 삽입([documentRangeOverlapsImage])과 같은 판정을 재사용해 두 곳이
+  /// 어긋나지 않게 한다.
+  bool _allowTextReplacement(int index, int length, Object? data) {
+    if (_allowImageDeletion) return true;
+    return !documentRangeOverlapsImage(_quillController.document, index, length);
+  }
+
+  void _deleteImage(QuillController controller, int offset) {
+    _allowImageDeletion = true;
+    try {
+      controller
+        ..skipRequestKeyboard = true
+        ..replaceText(offset, 1, '', TextSelection.collapsed(offset: offset));
+    } finally {
+      _allowImageDeletion = false;
+    }
   }
 
   @override
@@ -328,7 +367,10 @@ class _BookReflectionEditorScreenState
               title: title,
               contentJson: _adapter.toServerJson(document),
               contentText: _adapter.toContentText(document),
-              isPublic: widget.reflection?.isPublic ?? false,
+              isPublic:
+                  widget.visibilityOverride ??
+                  widget.reflection?.isPublic ??
+                  false,
             ),
           );
       ref.read(bookReflectionSyncVersionProvider.notifier).state++;
@@ -344,17 +386,19 @@ class _BookReflectionEditorScreenState
   /// 서버 업로드는 저장 후 push가 맡으므로(오프라인에서도 이미지 첨부가
   /// 가능해야 한다) 여기서는 네트워크를 타지 않는다.
   Future<String?> _pickAndSaveImage(BuildContext context) async {
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-      maxWidth: 1600,
-    );
+    final picked = await pickImageFromGallery(imageQuality: 85, maxWidth: 1600);
     if (picked == null || !context.mounted) return null;
+    final edited = await openSharedImageEditor(
+      context,
+      imagePath: picked,
+      profile: SharedImageEditorProfile.general,
+    );
+    if (edited == null || !context.mounted) return null;
     AppLoading.show(context);
     try {
       return await ref
           .read(bookReflectionRepositoryProvider)
-          .saveLocalImage(picked.path);
+          .saveLocalImage(edited);
     } on ApiException catch (error) {
       if (context.mounted) AppSnackBar.error(context, error.message);
       return null;
@@ -372,11 +416,13 @@ class _BookReflectionEditorScreenState
     String imageSource,
     QuillController controller,
   ) async {
-    _memoInsertService.insertImageBlock(
+    final inserted = _memoInsertService.insertImageBlock(
       controller,
       imageSource,
-      bodyWidth: _editorBodyWidth,
     );
+    if (!inserted && mounted) {
+      AppSnackBar.error(context, '이미지가 포함된 범위에는 삽입할 수 없습니다.');
+    }
   }
 
   Future<void> _insertMemo() async {
@@ -393,13 +439,21 @@ class _BookReflectionEditorScreenState
       await _insertPhotoMemo(memo, selection);
       return;
     }
-    _memoInsertService.insert(_quillController, memo, selection: selection);
+    final inserted = _memoInsertService.insert(
+      _quillController,
+      memo,
+      selection: selection,
+    );
+    if (!inserted) AppSnackBar.error(context, '메모를 삽입하지 못했습니다.');
   }
 
   /// 사진 확보(네트워크/파일 I/O)가 끝난 뒤에야 [mounted]를 다시 확인하고
   /// 문서를 바꾼다 — 대기 중 화면이 닫혀 [_quillController]가 이미 폐기된
   /// 채로 건드리는 일을 막기 위해서다.
-  Future<void> _insertPhotoMemo(BookNoteMemo memo, TextSelection selection) async {
+  Future<void> _insertPhotoMemo(
+    BookNoteMemo memo,
+    TextSelection selection,
+  ) async {
     AppLoading.show(context);
     String? imageSource;
     try {
@@ -415,7 +469,6 @@ class _BookReflectionEditorScreenState
           memo,
           imageSource,
           selection: selection,
-          bodyWidth: _editorBodyWidth,
         );
     if (!inserted) AppSnackBar.error(context, '사진 메모를 불러오지 못했습니다.');
   }
@@ -511,10 +564,6 @@ class _BookReflectionEditorScreenState
                   clipBehavior: Clip.antiAlias,
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      _editorBodyWidth = (constraints.maxWidth - 36).clamp(
-                        1,
-                        double.infinity,
-                      );
                       // 제목을 화면에 고정하지 않고 본문과 함께 스크롤되게
                       // 하기 위해, Quill 편집기는 자체 스크롤을 끄고
                       // (scrollable: false) 제목·구분선과 한 스크롤뷰를
@@ -598,6 +647,7 @@ class _BookReflectionEditorScreenState
                                     embedBuilders: [
                                       ReflectionImageEmbedBuilder(
                                         localImagePaths: localImagePaths,
+                                        onDeleteImage: _deleteImage,
                                       ),
                                     ],
                                   ),

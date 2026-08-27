@@ -66,8 +66,9 @@ class BookReflectionDetailScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     BookReflection reflection,
-    BookReflectionDetailArgs args,
-  ) async {
+    BookReflectionDetailArgs args, {
+    bool? visibilityOverride,
+  }) async {
     await Navigator.of(context).push<int>(
       MaterialPageRoute(
         builder: (_) => BookReflectionEditorScreen(
@@ -75,6 +76,7 @@ class BookReflectionDetailScreen extends ConsumerWidget {
           userBookId: userBookId,
           bookTitle: bookTitle,
           reflection: reflection,
+          visibilityOverride: visibilityOverride,
         ),
       ),
     );
@@ -87,92 +89,131 @@ class BookReflectionDetailScreen extends ConsumerWidget {
     BookReflection reflection,
     BookReflectionDetailArgs args,
   ) async {
-    final action = await showModalBottomSheet<_ReflectionAction>(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => RecordDialogShell(
-        title: '독후감 관리',
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: reflection.isPublic,
-              onChanged: (_) =>
-                  Navigator.of(sheetContext).pop(_ReflectionAction.visibility),
-              secondary: Icon(
-                reflection.isPublic
-                    ? PhosphorIconsRegular.globe
-                    : PhosphorIconsRegular.lock,
+    // 시트 안 `StatefulBuilder.builder`가 매개변수 이름을 `context`로 다시
+    // 써서 바깥 화면의 context를 가린다 — 시트가 닫힌 뒤에도 안내를 보여줄
+    // 수 있도록 화면 context를 별도 이름으로 미리 잡아 둔다.
+    final screenContext = context;
+    var isPublic = reflection.isPublic;
+    var isUpdatingVisibility = false;
+    final result =
+        await showModalBottomSheet<({_ReflectionAction action, bool isPublic})>(
+          context: context,
+          useRootNavigator: true,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (sheetContext) => StatefulBuilder(
+            builder: (context, setSheetState) => RecordDialogShell(
+              title: '독후감 관리',
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: isPublic,
+                    activeThumbColor: AppColors.surface,
+                    activeTrackColor: AppColors.accentForeground,
+                    inactiveThumbColor: AppColors.surface,
+                    inactiveTrackColor: AppColors.controlInactive,
+                    onChanged: (value) async {
+                      if (isUpdatingVisibility) return;
+                      final previousValue = isPublic;
+                      // await 뒤에 쓸 provider는 지금(반드시 mounted인
+                      // 시점) 미리 확보해 둔다 — 시트가 닫힌 뒤 화면
+                      // 자체가 dispose되면 await 뒤의 `ref.read()`가
+                      // 예외를 던지기 때문이다. `bookReflectionDetailProvider`는
+                      // 이 값을 watch하므로 별도 invalidate 없이도
+                      // 갱신된다.
+                      final syncVersionNotifier = ref.read(
+                        bookReflectionSyncVersionProvider.notifier,
+                      );
+                      final repository = ref.read(
+                        bookReflectionRepositoryProvider,
+                      );
+                      setSheetState(() {
+                        isPublic = value;
+                        isUpdatingVisibility = true;
+                      });
+                      try {
+                        await repository.setPublic(
+                          ownerUserId: ownerUserId,
+                          userBookId: userBookId,
+                          reflectionId: reflection.id,
+                          isPublic: value,
+                        );
+                        // 요청이 성공하면 시트가 이미 닫혔더라도 상세
+                        // 화면의 캐시된 공개 여부는 항상 최신화한다 —
+                        // 시트 생명주기와 서버 반영 여부는 별개다.
+                        syncVersionNotifier.state++;
+                        if (sheetContext.mounted) {
+                          setSheetState(() => isUpdatingVisibility = false);
+                        }
+                      } catch (_) {
+                        if (sheetContext.mounted) {
+                          setSheetState(() {
+                            isPublic = previousValue;
+                            isUpdatingVisibility = false;
+                          });
+                        } else if (screenContext.mounted) {
+                          AppSnackBar.error(screenContext, '공개 여부를 변경하지 못했습니다.');
+                        }
+                      }
+                    },
+                    secondary: Icon(
+                      isPublic
+                          ? PhosphorIconsRegular.globe
+                          : PhosphorIconsRegular.lock,
+                    ),
+                    title: const Text('공개 여부'),
+                    subtitle: Text(isPublic ? '공개' : '비공개'),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(PhosphorIconsRegular.pencil),
+                    title: const Text('수정'),
+                    onTap: isUpdatingVisibility
+                        ? null
+                        : () => Navigator.of(sheetContext).pop((
+                            action: _ReflectionAction.edit,
+                            isPublic: isPublic,
+                          )),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(
+                      PhosphorIconsRegular.trash,
+                      color: AppColors.error,
+                    ),
+                    title: const Text(
+                      '삭제',
+                      style: TextStyle(color: AppColors.error),
+                    ),
+                    onTap: isUpdatingVisibility
+                        ? null
+                        : () => Navigator.of(sheetContext).pop((
+                            action: _ReflectionAction.delete,
+                            isPublic: isPublic,
+                          )),
+                  ),
+                ],
               ),
-              title: const Text('공개 여부'),
-              subtitle: Text(reflection.isPublic ? '공개' : '비공개'),
             ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(PhosphorIconsRegular.pencil),
-              title: const Text('수정'),
-              onTap: () =>
-                  Navigator.of(sheetContext).pop(_ReflectionAction.edit),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(
-                PhosphorIconsRegular.trash,
-                color: AppColors.error,
-              ),
-              title: const Text('삭제', style: TextStyle(color: AppColors.error)),
-              onTap: () =>
-                  Navigator.of(sheetContext).pop(_ReflectionAction.delete),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (action == null || !context.mounted) return;
+          ),
+        );
+    if (result == null || !context.mounted) return;
 
-    switch (action) {
-      case _ReflectionAction.visibility:
-        await _setPublic(context, ref, reflection, args);
-        return;
+    switch (result.action) {
       case _ReflectionAction.edit:
-        await _openEditor(context, ref, reflection, args);
+        await _openEditor(
+          context,
+          ref,
+          reflection,
+          args,
+          visibilityOverride: result.isPublic,
+        );
         return;
       case _ReflectionAction.delete:
         await _delete(context, ref, reflection);
         return;
-    }
-  }
-
-  Future<void> _setPublic(
-    BuildContext context,
-    WidgetRef ref,
-    BookReflection reflection,
-    BookReflectionDetailArgs args,
-  ) async {
-    try {
-      await ref
-          .read(bookReflectionRepositoryProvider)
-          .setPublic(
-            ownerUserId: ownerUserId,
-            userBookId: userBookId,
-            reflectionId: reflection.id,
-            isPublic: !reflection.isPublic,
-          );
-      ref.read(bookReflectionSyncVersionProvider.notifier).state++;
-      ref.invalidate(bookReflectionDetailProvider(args));
-      if (context.mounted) {
-        AppSnackBar.success(
-          context,
-          reflection.isPublic ? '비공개로 변경했습니다.' : '공개로 변경했습니다.',
-        );
-      }
-    } catch (_) {
-      if (context.mounted) {
-        AppSnackBar.error(context, '공개 여부를 변경하지 못했습니다.');
-      }
     }
   }
 
@@ -207,7 +248,7 @@ class BookReflectionDetailScreen extends ConsumerWidget {
   }
 }
 
-enum _ReflectionAction { visibility, edit, delete }
+enum _ReflectionAction { edit, delete }
 
 class _ReflectionBody extends StatelessWidget {
   const _ReflectionBody({required this.reflection, required this.onMore});

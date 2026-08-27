@@ -1,14 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/image/services/image_gallery_picker.dart';
 import '../../../bookshelf/screens/widgets/book_cover.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
-
-const _allowedThumbnailExtensions = {'jpg', 'jpeg', 'png', 'webp'};
-const _maxThumbnailBytes = 5 * 1024 * 1024;
 
 /// 표지 이미지 선택 결과. [file]이 non-null이면 성공, [error]가 non-null이면
 /// 형식/용량 검증 실패, 둘 다 null이면 사용자가 선택을 취소한 것이다.
@@ -24,25 +21,12 @@ class ThumbnailPickResult {
 /// (책 정보 수정)와 `custom_book_dialog.dart`(직접 등록)가 공유한다.
 Future<ThumbnailPickResult?> pickBookThumbnail() async {
   try {
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 90,
-    );
+    final picked = await pickImageFromGallery(imageQuality: 90);
     if (picked == null) return null;
 
-    final extension = picked.path.split('.').last.toLowerCase();
-    if (!_allowedThumbnailExtensions.contains(extension)) {
-      return const ThumbnailPickResult(
-        error: 'JPEG, PNG, WebP 형식의 이미지만 사용할 수 있습니다.',
-      );
-    }
-
-    final file = File(picked.path);
-    final sizeBytes = await file.length();
-    if (sizeBytes > _maxThumbnailBytes) {
-      return const ThumbnailPickResult(error: '이미지 용량은 5MB를 넘을 수 없습니다.');
-    }
-    return ThumbnailPickResult(file: file);
+    final error = await validateImageFile(picked);
+    if (error != null) return ThumbnailPickResult(error: error);
+    return ThumbnailPickResult(file: File(picked));
   } catch (_) {
     return const ThumbnailPickResult(error: '이미지를 선택하지 못했습니다.');
   }

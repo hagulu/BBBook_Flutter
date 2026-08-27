@@ -62,8 +62,7 @@
 
 - `lib/features/book_note/screens/book_note_list.dart` — 책 기록 상세의 노트 목록 탭(노트 추가·상세 진입, 당겨서 새로고침)
 - `lib/features/book_note/screens/book_note_detail_screen.dart` — 노트 제목 자동 저장과 타입별 메모 타임라인·로컬 CRUD 화면
-- `lib/features/book_note/screens/memo_ocr_camera_screen.dart` — 발췌 OCR용 카메라 미리보기·수평 가이드 및 갤러리 이미지 선택 화면
-- `lib/features/book_note/screens/memo_photo_camera_screen.dart` — 메모 사진용 카메라 미리보기(좌하단 갤러리 아이콘으로 갤러리 선택 겸용) 화면
+- `lib/features/book_note/screens/memo_photo_camera_screen.dart` — 공용 카메라(`shared/image`)에 메모 사진 촬영 정책을 얹은 진입점(세로 미리보기·갤러리 재인코딩·5MB 촬영 게이트)
 - `lib/features/book_note/data/book_note_api.dart` — 노트 제목 PUT, 메모 생성/수정/삭제, 사진 업로드, 증분 동기화 조회 API 호출
 - `lib/features/book_note/data/book_note_dao.dart` — 로컬 DB 쿼리·dirty push 확정·전체/증분 reconcile(dirty 행 보호, 로컬 PK와 server_id 분리)
 - `lib/features/book_note/data/book_note_repository.dart` — 노트 화면 source of truth, 로컬 우선 CRUD 직후 조용히 서버 push하고 실패 시 dirty 유지, 최초엔 전체(`/api/me/records`)·이후엔 증분(`/api/me/notes/sync/changes`) 동기화, 사진은 로컬 사본 우선(업로드 후에도 유지·서버 사진은 노트를 열 때 내려받기)
@@ -122,6 +121,13 @@
 - `lib/shared/widgets/app_snackbar.dart` — 공통 SnackBar(pill 형태, 성공/정보는 아이덴티티 컬러·에러는 에러 컬러 반투명 배경 + 상태 아이콘)
 - `lib/shared/widgets/record_dialog_shell.dart` — 여러 기능의 선택·수정 폼이 공유하는 바텀시트 셸(드래그 핸들·제목·콘텐츠·공통 버튼)
 
+## shared/image
+
+- `lib/shared/image/widgets/shared_image_viewer.dart` — 공용 이미지 전체화면 뷰어(핀치 확대/축소, 호출부가 넘긴 이미지 위젯 표시, 선택적 수정/삭제 액션 바)
+- `lib/shared/image/screens/shared_camera_screen.dart` — 공용 카메라 화면(초기화·방향 잠금·생명주기는 공통, 미리보기 모드·가이드·갤러리 압축·촬영 용량 게이트는 `CameraCapturePolicy`로 목적별 주입), 좌하단 아이콘으로 갤러리 전환
+- `lib/shared/image/screens/shared_image_editor_screen.dart` — 공용 이미지 에디터(`pro_image_editor` 래핑, JPEG 출력), 일반(크롭·회전·텍스트·그리기)/OCR(크롭·회전만) 프로필
+- `lib/shared/image/services/image_gallery_picker.dart` — `image_picker` 갤러리 선택과 `LocalImageStore` 기준(jpg/jpeg/png/webp·5MB) 형식·용량 검증
+
 ## docs
 
 - `docs/review/20260806-174318-initial-implementation-review.md` — 최초 구현의 구조·인증·공통 컴포넌트 심층 리뷰
@@ -166,3 +172,7 @@
 - `docs/review/20260824-151950-local-storage-mode-review.md` — 서버→로컬 저장 모드 전환의 삭제 정합성·복구·이미지 보존·직접 쓰기 경로 리뷰
 - `docs/review/20260826-124257-record-patch-dirty-fields-review.md` — 책 기록 PATCH 3-상태·dirty 필드 추적의 완독일 계약 및 push 확정 경합 리뷰
 - `docs/review/20260826-132019-reflection-photo-memo-insert-review.md` — 사진 메모 독후감 삽입의 이미지 독립성·비동기 생명주기·테스트 계약 리뷰
+- `docs/review/20260826-141346-reflection-quote-scroll-reader-review.md` — 독후감 인용 부호 오버레이의 무한 높이로 인한 작성 스크롤·리더 레이아웃 파손 리뷰
+- `docs/review/20260827-020212-shared-image-and-reflection-review.md` — 공용 이미지 편집·OCR와 독후감 이미지 삭제 보호·공개 상태 최신성 리뷰
+- `docs/review/20260827-105809-shared-image-and-reflection-rereview.md` — 공용 이미지·독후감 변경의 미해결 이미지 삭제 보호·오류 처리·상태 최신성 재리뷰
+- `docs/review/20260827-123306-shared-image-and-reflection-third-review.md` — 공용 이미지·독후감 후속 수정의 Quill 교체 거부 상태와 공개 설정 생명주기 리뷰

@@ -5,18 +5,55 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/image/screens/shared_camera_screen.dart';
+import '../../../../shared/image/screens/shared_image_editor_screen.dart';
 import '../../../../shared/widgets/app_alert.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../services/book_note_memo_ocr_service.dart';
-import '../memo_ocr_camera_screen.dart';
+
+/// 발췌 OCR용 촬영 정책 — 문장을 수평으로 맞출 가이드를 겹쳐 그리고,
+/// 갤러리 선택은 인식률을 위해 압축하지 않은 원본을 그대로 받아 분석이
+/// 끝날 때까지 살아있을 임시 경로로 복사해 둔다.
+const _memoOcrCapturePolicy = CameraCapturePolicy(
+  guideOverlayBuilder: _buildOcrGuideOverlay,
+  hintText: '문장이 가이드선과 수평이 되도록 맞춰주세요.',
+  copyGalleryPickToTemp: true,
+  tempFilePrefix: 'memo_ocr_gallery_',
+);
+
+Widget _buildOcrGuideOverlay(BuildContext context) {
+  return const Padding(
+    padding: EdgeInsets.symmetric(horizontal: 24),
+    child: Center(child: _HorizontalGuide()),
+  );
+}
+
+class _HorizontalGuide extends StatelessWidget {
+  const _HorizontalGuide();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 2,
+      decoration: BoxDecoration(
+        color: AppColors.highlightGold,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowStrong,
+            blurRadius: 4,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 /// 카메라 촬영부터 단어 드래그 선택까지 진행하고 발췌문을 반환한다.
 Future<String?> captureMemoQuoteWithOcr(BuildContext context) async {
-  final capturedPath = await Navigator.of(context).push<String>(
-    MaterialPageRoute(
-      fullscreenDialog: true,
-      builder: (_) => const MemoOcrCameraScreen(),
-    ),
+  final capturedPath = await showSharedCameraScreen(
+    context,
+    policy: _memoOcrCapturePolicy,
   );
   if (capturedPath == null) return null;
   if (!context.mounted) {
@@ -24,11 +61,25 @@ Future<String?> captureMemoQuoteWithOcr(BuildContext context) async {
     return null;
   }
 
+  // 크롭/회전만 지원한다 — 인식 대상 문장을 텍스트/그리기로 가릴 이유가
+  // 없다. 편집을 건너뛰면(취소) 촬영/선택 원본을 그대로 분석한다.
+  final editedPath = await openSharedImageEditor(
+    context,
+    imagePath: capturedPath,
+    profile: SharedImageEditorProfile.cropRotateOnly,
+  );
+  final analyzedPath = editedPath ?? capturedPath;
+  if (editedPath != null) await _deleteCapturedFile(capturedPath);
+  if (!context.mounted) {
+    await _deleteCapturedFile(analyzedPath);
+    return null;
+  }
+
   try {
     BookNoteMemoOcrAnalysis? analysis;
     AppLoading.show(context);
     try {
-      analysis = await const BookNoteMemoOcrService().analyzeImage(capturedPath);
+      analysis = await const BookNoteMemoOcrService().analyzeImage(analyzedPath);
     } catch (_) {
       analysis = null;
     } finally {
@@ -57,14 +108,14 @@ Future<String?> captureMemoQuoteWithOcr(BuildContext context) async {
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => _MemoOcrSelectionScreen(
-          imagePath: capturedPath,
+          imagePath: analyzedPath,
           analysis: analysis!,
         ),
       ),
     );
     return selectedText;
   } finally {
-    await _deleteCapturedFile(capturedPath);
+    await _deleteCapturedFile(analyzedPath);
   }
 }
 

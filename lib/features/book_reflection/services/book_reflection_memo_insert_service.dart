@@ -2,12 +2,40 @@ import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
+import 'package:flutter_quill/quill_delta.dart';
 
 import '../../../core/storage/local_image_store.dart';
 import '../../book_note/models/book_note.dart';
 import '../../book_note/services/note_memo_image_store.dart';
 import '../../book_note/utils/memo_highlight.dart';
 import 'reflection_image_store.dart';
+
+/// [index, index+length) 범위가 이미지 embed와 겹치는지 검사한다.
+///
+/// `QuillController.replaceText()`는 `void`를 반환하고, `onReplaceText`가
+/// 거부해도 그 사실을 호출부에 알려주지 않는다 — 그래서 이미지를 포함한
+/// 범위에 프로그램적으로 삽입/치환을 시도하는 쪽([insert]/[insertImageBlock])은
+/// `replaceText()`를 부르기 전에 이 판정을 직접 먼저 해서, 실제로 적용될
+/// 교체에 대해서만 성공을 반환해야 한다. 편집 화면의 `onReplaceText`
+/// 거부 판정(키보드 입력·붙여넣기 경로)도 같은 판정을 재사용해 두 곳이
+/// 어긋나지 않게 한다.
+bool documentRangeOverlapsImage(Document document, int index, int length) {
+  if (length <= 0) return false;
+  var operationStart = 0;
+  final rangeEnd = index + length;
+  for (final operation in document.toDelta().operations) {
+    final operationEnd = operationStart + (operation.length ?? 0);
+    final overlapsRange = operationStart < rangeEnd && operationEnd > index;
+    final operationData = operation.data;
+    if (overlapsRange &&
+        operationData is Map &&
+        operationData.containsKey(BlockEmbed.imageType)) {
+      return true;
+    }
+    operationStart = operationEnd;
+  }
+  return false;
+}
 
 /// 노트 메모의 타입과 강조 마크업을 Quill 문서 서식으로 변환해 삽입한다.
 ///
@@ -18,6 +46,21 @@ class BookReflectionMemoInsertService {
   const BookReflectionMemoInsertService();
 
   static const highlightColorValue = '#fef08a';
+
+  /// `width`는 Quill에서 ignore scope 속성이라 `formatText()`의 기본 서식
+  /// 규칙으로는 이미지에 적용되지 않는다. 이미지 operation을 retain하는
+  /// Delta를 직접 compose해 너비를 저장하고 편집기를 다시 그린다.
+  static void setImageWidth(
+    QuillController controller, {
+    required int offset,
+    required double ratio,
+  }) {
+    final percentage = (ratio * 100).round().clamp(1, 100);
+    final delta = Delta()
+      ..retain(offset)
+      ..retain(1, {Attribute.width.key: '$percentage%'});
+    controller.compose(delta, controller.selection, ChangeSource.local);
+  }
 
   /// 텍스트형 메모(요약/발췌/생각)를 즉시 삽입한다.
   bool insert(
@@ -32,6 +75,9 @@ class BookReflectionMemoInsertService {
     final currentSelection = selection ?? controller.selection;
     final start = currentSelection.start.clamp(0, documentText.length - 1);
     final end = currentSelection.end.clamp(start, documentText.length - 1);
+    if (documentRangeOverlapsImage(controller.document, start, end - start)) {
+      return false;
+    }
     final isQuote = memo.type == BookNoteMemoType.quote;
     final needsLeadingNewline =
         isQuote && start > 0 && documentText.codeUnitAt(start - 1) != 0x0A;
@@ -115,14 +161,12 @@ class BookReflectionMemoInsertService {
     BookNoteMemo memo,
     String imageSource, {
     TextSelection? selection,
-    required double bodyWidth,
   }) {
     return insertImageBlock(
       controller,
       imageSource,
       caption: stripMemoHighlightMarkup(memo.content),
       selection: selection,
-      bodyWidth: bodyWidth,
     );
   }
 
@@ -135,70 +179,48 @@ class BookReflectionMemoInsertService {
     String imageSource, {
     String? caption,
     TextSelection? selection,
-    required double bodyWidth,
   }) {
     final documentText = controller.document.toPlainText();
     final currentSelection = selection ?? controller.selection;
     final start = currentSelection.start.clamp(0, documentText.length - 1);
     final end = currentSelection.end.clamp(start, documentText.length - 1);
+    if (documentRangeOverlapsImage(controller.document, start, end - start)) {
+      return false;
+    }
     final needsLeadingNewline =
         start > 0 && documentText.codeUnitAt(start - 1) != 0x0A;
 
-    controller
-      ..skipRequestKeyboard = true
-      ..replaceText(start, end - start, '', TextSelection.collapsed(offset: start));
-
-    var index = start;
-    if (needsLeadingNewline) {
-      controller
-        ..skipRequestKeyboard = true
-        ..replaceText(index, 0, '\n', TextSelection.collapsed(offset: index + 1));
-      index += 1;
-    }
-
-    controller
-      ..skipRequestKeyboard = true
-      ..replaceText(
-        index,
-        0,
-        BlockEmbed.image(imageSource),
-        TextSelection.collapsed(offset: index + 1),
-      )
-      ..formatText(index, 1, WidthAttribute(bodyWidth.toStringAsFixed(1)));
-    var cursor = index + 1;
-
     final trimmedCaption = caption?.trim() ?? '';
-    if (trimmedCaption.isNotEmpty) {
-      final captionText = '\n$trimmedCaption';
-      controller
-        ..skipRequestKeyboard = true
-        ..replaceText(
-          cursor,
-          0,
-          captionText,
-          TextSelection.collapsed(offset: cursor + captionText.length),
-        );
-      cursor += captionText.length;
-      // 삽입 지점에 형광펜 등 서식이 걸려 있으면 새 텍스트가 그 서식을
-      // 그대로 물려받는다 — 설명 텍스트만 서식 없이 보이도록 리셋한다.
-      controller.formatText(
-        cursor - trimmedCaption.length,
-        trimmedCaption.length,
-        const BackgroundAttribute(null),
-      );
+    final insertion = Delta();
+    var insertedLength = 0;
+    if (needsLeadingNewline) {
+      insertion.insert('\n');
+      insertedLength += 1;
     }
+    insertion
+      ..insert(BlockEmbed.image(imageSource).toJson(), {
+        Attribute.width.key: '100%',
+      })
+      ..insert('\n');
+    insertedLength += 2;
+    if (trimmedCaption.isNotEmpty) {
+      insertion
+        ..insert(trimmedCaption)
+        ..insert('\n');
+      insertedLength += trimmedCaption.length + 1;
+    }
+    // 사진(과 설명) 아래에 계속 작성할 빈 줄을 하나 둔다.
+    insertion.insert('\n');
+    insertedLength += 1;
 
-    // 사진(과 설명) 줄을 닫고 그 아래 빈 줄을 하나 더 만든다 — 이어서
-    // 타이핑할 자리를 항상 마련해 둔다.
     controller
       ..skipRequestKeyboard = true
-      ..replaceText(
-        cursor,
-        0,
-        '\n\n',
-        TextSelection.collapsed(offset: cursor + 1),
+      ..replaceText(start, end - start, insertion, null)
+      ..skipRequestKeyboard = true
+      ..updateSelection(
+        TextSelection.collapsed(offset: start + insertedLength - 1),
+        ChangeSource.local,
       );
-    controller.moveCursorToPosition(cursor + 1);
     return true;
   }
 }

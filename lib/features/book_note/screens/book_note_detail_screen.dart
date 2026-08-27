@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/image/widgets/shared_image_viewer.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
 import '../../../shared/widgets/app_snackbar.dart';
@@ -381,16 +382,16 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
       AppSnackBar.info(context, '메모를 저장하고 있습니다.');
       return;
     }
-    final action = await showDialog<_PhotoMemoAction>(
-      context: context,
-      useSafeArea: false,
-      builder: (context) => _PhotoMemoViewer(memo: memo),
+    final action = await showSharedImageViewer(
+      context,
+      image: _MemoPhotoImage(memo: memo, fit: BoxFit.contain),
+      showActions: true,
     );
     if (!mounted || action == null) return;
     switch (action) {
-      case _PhotoMemoAction.edit:
+      case SharedImageViewerAction.edit:
         await _editMemo(memo);
-      case _PhotoMemoAction.delete:
+      case SharedImageViewerAction.delete:
         await _deleteMemo(memo, totalMemoCount: totalMemoCount);
     }
   }
@@ -501,90 +502,6 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
 }
 
 enum _NoteMemoAction { edit, copy, delete }
-
-enum _PhotoMemoAction { edit, delete }
-
-class _PhotoMemoViewer extends StatelessWidget {
-  const _PhotoMemoViewer({required this.memo});
-
-  final BookNoteMemo memo;
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog.fullscreen(
-      backgroundColor: AppColors.mediaBackdrop,
-      child: Scaffold(
-        backgroundColor: AppColors.mediaBackdrop,
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            SafeArea(
-              bottom: false,
-              child: InteractiveViewer(
-                minScale: 0.8,
-                maxScale: 4,
-                child: Center(
-                  child: _MemoPhotoImage(memo: memo, fit: BoxFit.contain),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 12,
-              left: 12,
-              child: SafeArea(
-                child: IconButton.filledTonal(
-                  onPressed: () => Navigator.of(context).pop(),
-                  tooltip: '닫기',
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.surface.withValues(alpha: 0.88),
-                    foregroundColor: AppColors.textStrong,
-                  ),
-                  icon: const Icon(PhosphorIconsRegular.x),
-                ),
-              ),
-            ),
-          ],
-        ),
-        bottomNavigationBar: Material(
-          color: AppColors.mediaBackdrop,
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextButton.icon(
-                    onPressed: () =>
-                        Navigator.of(context).pop(_PhotoMemoAction.edit),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.surface,
-                      minimumSize: const Size(96, 48),
-                    ),
-                    icon: const Icon(PhosphorIconsRegular.pencil, size: 19),
-                    label: const Text('수정'),
-                  ),
-                  const SizedBox(width: 20),
-                  TextButton.icon(
-                    onPressed: () =>
-                        Navigator.of(context).pop(_PhotoMemoAction.delete),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.error,
-                      minimumSize: const Size(96, 48),
-                    ),
-                    icon: const Icon(PhosphorIconsRegular.trash, size: 19),
-                    label: const Text('삭제'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _NoteMemoActionSheet extends StatelessWidget {
   const _NoteMemoActionSheet();
