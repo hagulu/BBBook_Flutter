@@ -109,9 +109,18 @@
 
 ## features/book_detail
 
-- `lib/features/book_detail/screens/book_detail_screen.dart` — 검색 결과 경유 책 상세 화면, 정보/서재 담기/구매/커뮤니티 리뷰 조립(토론·공개 독후감 탭은 미이관 기능이라 제외)
+- `lib/features/book_detail/screens/book_detail_screen.dart` — 검색 결과 경유 책 상세 화면, 정보/서재 담기/구매/커뮤니티 리뷰 조립(공개 독후감 탭은 미이관 기능이라 제외), 주제 토론 목록 진입
 - `lib/features/book_detail/data/book_detail_api.dart` — 책 상세 API 호출(상세 조회, 서재 존재 확인, 서재 담기, 리뷰 CRUD, 좋아요, 신고)
 - `lib/features/book_detail/providers/book_detail_providers.dart` — 책 상세/커뮤니티 리뷰 관련 Riverpod provider(상세+서재 포함 여부 컨트롤러, 리뷰 커서 무한 스크롤 컨트롤러)
+
+## features/discussion
+
+- `lib/features/discussion/screens/discussion_list_screen.dart` — 책 한 권의 주제 토론 목록(열린 토론/전체 필터, 커서 무한 스크롤, 토론 작성 진입)
+- `lib/features/discussion/screens/discussion_detail_screen.dart` — 토론 상세(선택지 결과 바·답변 작성/목록·공감·작성자 메뉴(수정/마감일/닫기·재오픈/삭제))
+- `lib/features/discussion/screens/discussion_form_screen.dart` — 토론 주제 작성/수정 폼(자유 토론·선택지 토론 전환, 수정 시 기존 선택지 append-only 잠금)
+- `lib/features/discussion/data/discussion_api.dart` — 토론 API 호출(주제 목록/상세/작성/수정/마감일/닫기/재오픈/삭제, 답변 CRUD, 공감, 신고)
+- `lib/features/discussion/providers/discussion_providers.dart` — 토론 관련 Riverpod provider(목록·상세·답변 목록 컨트롤러, 낙관적 공감 토글)
+- `lib/features/discussion/utils/discussion_poll.dart` — 선택지 색 팔레트 배정·append-only 검증·퍼센트 포맷
 
 ## shared/widgets
 
@@ -137,3 +146,4 @@
 - `docs/review/20260827-105809-shared-image-and-reflection-rereview.md` — 공용 이미지·독후감 변경의 미해결 이미지 삭제 보호·오류 처리·상태 최신성 재리뷰
 - `docs/review/20260827-123306-shared-image-and-reflection-third-review.md` — 공용 이미지·독후감 후속 수정의 Quill 교체 거부 상태와 공개 설정 생명주기 리뷰
 - `docs/review/20260827-144636-shared-image-editor-ocr-review.md` — 공용 이미지 에디터와 OCR 크롭 종료 상태·단어 선택 접근성 리뷰
+- `docs/review/20260828-104114-discussion-feature-review.md` — 주제 토론 기능의 답변 중복 등록·상태 최신성·표시 정확성·터치 접근성 리뷰

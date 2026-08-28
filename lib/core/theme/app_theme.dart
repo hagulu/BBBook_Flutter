@@ -68,6 +68,19 @@ class AppColors {
   static const reflectionHighlightPurple = Color(0xFFE9D5FF);
   static const reflectionQuoteText = Color(0xFF64748B);
 
+  // --- 토론 선택지(Poll) ---
+  /// 토론 선택지를 순서대로 구분하는 고정 팔레트. 1~5번째 선택지가 차례로
+  /// 배정되고, 마지막 [pollGray]는 자동 제공되는 "기타" 전용이다.
+  /// 웹 원본(`--color-poll-*`)이 메모/에디터 토큰을 `color-mix`로 섞어 만든
+  /// 값이라, 같은 공식을 이 팔레트의 대응 토큰에 그대로 적용했다.
+  /// (예: [pollBlue] = [memoSummaryForeground] 55% + [reflectionTextSky] 45%)
+  static const pollBlue = Color(0xFF1A7FB8);
+  static const pollPurple = memoQuoteForeground;
+  static const pollGreen = Color(0xFF38A046);
+  static const pollAmber = Color(0xFFBC5C0B);
+  static const pollPink = Color(0xFFB53F57);
+  static const pollGray = reflectionTextGray;
+
   // --- 텍스트 ---
   /// 제목·강조 텍스트.
   static const textStrong = Color(0xFF27311F);
