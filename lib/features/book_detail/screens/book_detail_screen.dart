@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/author_display.dart';
+import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../book_record/screens/widgets/star_rating.dart';
@@ -153,7 +154,7 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('검색으로'),
+        title: const AppBarTitle('검색으로'),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,

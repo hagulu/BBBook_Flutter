@@ -8,6 +8,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/image/screens/shared_image_editor_screen.dart';
 import '../../../../shared/widgets/app_alert.dart';
+import '../../../../shared/widgets/app_bar_title.dart';
 import '../../../../shared/widgets/app_confirm.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../models/book_note.dart';
@@ -327,10 +328,7 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
           tooltip: '닫기',
           icon: const Icon(PhosphorIconsRegular.x),
         ),
-        title: Text(
-          widget.initialMemo == null ? '메모 작성' : '메모 수정',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
+        title: AppBarTitle(widget.initialMemo == null ? '메모 작성' : '메모 수정'),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,

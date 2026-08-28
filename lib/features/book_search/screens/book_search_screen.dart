@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_bar_title.dart';
 import '../../book_detail/screens/book_detail_screen.dart';
 import '../../book_record/screens/book_record_screen.dart';
 import '../providers/book_search_providers.dart';
@@ -74,7 +75,7 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('책 검색'),
+        title: const AppBarTitle('책 검색'),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,

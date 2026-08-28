@@ -79,13 +79,8 @@ class DiscussionTopicCard extends StatelessWidget {
                     DiscussionAuthorRow(
                       user: topic.user,
                       createdAt: topic.createdAt,
-                      showTime: false,
                       avatarRadius: 12,
-                      trailing: const Icon(
-                        PhosphorIconsRegular.caretRight,
-                        size: 16,
-                        color: AppColors.controlInactive,
-                      ),
+                      horizontal: true,
                     ),
                     if (_metaItems.isNotEmpty) ...[
                       const SizedBox(height: 10),

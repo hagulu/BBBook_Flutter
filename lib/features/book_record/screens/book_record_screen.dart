@@ -5,6 +5,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/network/patch_field.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/author_display.dart';
+import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
@@ -17,6 +18,7 @@ import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../bookshelf/screens/widgets/book_cover.dart';
 import '../models/record_labels.dart';
 import '../providers/book_record_providers.dart';
+import 'book_sharing_list.dart';
 import 'widgets/book_info_edit_dialog.dart';
 import 'widgets/finish_confirm_dialog.dart';
 import 'widgets/meta_dialogs.dart';
@@ -63,7 +65,7 @@ class BookRecordScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('책 기록'),
+        title: const AppBarTitle('책 기록'),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,
@@ -123,7 +125,7 @@ class _BookRecordBody extends ConsumerWidget {
     );
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           SliverPersistentHeader(
@@ -145,7 +147,11 @@ class _BookRecordBody extends ConsumerWidget {
                   Tab(text: '정보'),
                   Tab(text: '노트'),
                   Tab(text: '독후감'),
+                  Tab(text: '생각나눔'),
                 ],
+                // 탭이 4개라 기본 labelPadding(좌우 16)으로는 좁은 화면에서
+                // '생각나눔'이 잘린다.
+                labelPadding: const EdgeInsets.symmetric(horizontal: 8),
                 labelColor: AppColors.textStrong,
                 unselectedLabelColor: AppColors.textMuted,
                 indicatorColor: AppColors.accentForeground,
@@ -299,6 +305,7 @@ class _BookRecordBody extends ConsumerWidget {
             ),
             BookNoteList(userBookId: userBookId, bookTitle: book.title),
             BookReflectionList(userBookId: userBookId, bookTitle: book.title),
+            BookSharingList(bookTitle: book.title, isbn13: book.isbn13),
           ],
         ),
       ),

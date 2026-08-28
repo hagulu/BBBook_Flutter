@@ -5,9 +5,9 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../utils/discussion_poll.dart';
 
-/// 선택지 입력 UI.
+/// 선택지 입력 UI. 순서는 항상 작성한 순서대로 고정이며 바꿀 수 없다.
 ///
-/// [lockedCount]만큼의 앞쪽 선택지는 이미 저장된 항목이라 수정·삭제·순서 변경이
+/// [lockedCount]만큼의 앞쪽 선택지는 이미 저장된 항목이라 수정·삭제가
 /// 불가능하다(수정 화면의 append-only 제약). 마지막에는 사용자가 만들 수 없는
 /// "기타"가 자동 제공 항목으로 항상 붙는다.
 class DiscussionOptionsEditor extends StatelessWidget {
@@ -16,35 +16,30 @@ class DiscussionOptionsEditor extends StatelessWidget {
     required this.controllers,
     required this.lockedCount,
     required this.enabled,
-    required this.onAdd,
     required this.onRemove,
-    required this.onMove,
+    this.autofocusIndex,
+    this.autofocusNode,
   });
 
   final List<TextEditingController> controllers;
   final int lockedCount;
   final bool enabled;
-  final VoidCallback onAdd;
   final void Function(int index) onRemove;
 
-  /// [index]의 선택지를 [delta]만큼(-1 위 / +1 아래) 옮긴다.
-  final void Function(int index, int delta) onMove;
+  /// 이 인덱스의 선택지 입력창에 자동 포커스를 준다(방금 추가한 항목이라
+  /// 키보드가 내려갔다 다시 올라오는 깜빡임 없이 바로 이어서 입력할 수 있게).
+  final int? autofocusIndex;
+
+  /// [autofocusIndex] 행에 붙는 포커스 노드. `autofocus`는 시트 안에 이미
+  /// 포커스를 가진 다른 입력창이 있으면 동작하지 않으므로("+"로 추가한
+  /// 경우), 호출부가 이 노드에 명시적으로 `requestFocus()`를 걸어 보정한다.
+  final FocusNode? autofocusNode;
 
   @override
   Widget build(BuildContext context) {
-    final canAdd =
-        enabled && controllers.length < kMaxDiscussionOptions;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (lockedCount > 0) ...[
-          const Text(
-            '기존 선택지는 수정하거나 삭제할 수 없습니다. 새 선택지만 추가할 수 있어요.',
-            style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 10),
-        ],
         for (var i = 0; i < controllers.length; i++) ...[
           _OptionRow(
             controller: controllers[i],
@@ -52,58 +47,42 @@ class DiscussionOptionsEditor extends StatelessWidget {
             index: i,
             isLocked: i < lockedCount,
             enabled: enabled,
-            canMoveUp: i > lockedCount,
-            canMoveDown: i < controllers.length - 1 && i >= lockedCount,
+            autofocus: i == autofocusIndex,
+            focusNode: i == autofocusIndex ? autofocusNode : null,
             onRemove: () => onRemove(i),
-            onMove: (delta) => onMove(i, delta),
           ),
           const SizedBox(height: 8),
         ],
-        Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: discussionOtherOptionColor,
-                shape: BoxShape.circle,
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: discussionOtherOptionColor,
+                  shape: BoxShape.circle,
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              '기타',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textStrong,
+              const SizedBox(width: 10),
+              const Text(
+                '기타',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textStrong,
+                ),
               ),
-            ),
-            const SizedBox(width: 6),
-            const Text(
-              '자동 제공',
-              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
-            ),
-          ],
+              const SizedBox(width: 12),
+              const Text(
+                '자동 제공',
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+              ),
+            ],
+          ),
         ),
-        if (canAdd) ...[
-          const SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: onAdd,
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.accentForeground,
-              padding: EdgeInsets.zero,
-              alignment: Alignment.centerLeft,
-            ),
-            icon: const Icon(PhosphorIconsRegular.plus, size: 15),
-            label: Text(
-              '선택지 추가 (${controllers.length}/$kMaxDiscussionOptions)',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -116,10 +95,9 @@ class _OptionRow extends StatelessWidget {
     required this.index,
     required this.isLocked,
     required this.enabled,
-    required this.canMoveUp,
-    required this.canMoveDown,
     required this.onRemove,
-    required this.onMove,
+    this.autofocus = false,
+    this.focusNode,
   });
 
   final TextEditingController controller;
@@ -127,78 +105,73 @@ class _OptionRow extends StatelessWidget {
   final int index;
   final bool isLocked;
   final bool enabled;
-  final bool canMoveUp;
-  final bool canMoveDown;
   final VoidCallback onRemove;
-  final void Function(int delta) onMove;
+  final bool autofocus;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: TextField(
-            controller: controller,
-            enabled: enabled && !isLocked,
-            maxLength: kMaxDiscussionOptionLength,
-            inputFormatters: [
-              LengthLimitingTextInputFormatter(kMaxDiscussionOptionLength),
-            ],
-            style: TextStyle(
-              fontSize: 14,
-              color: isLocked ? AppColors.textMuted : AppColors.textBody,
-            ),
-            decoration: InputDecoration(
-              counterText: '',
-              isDense: true,
-              hintText: '선택지 ${index + 1}',
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 12,
+    return Container(
+      decoration: BoxDecoration(
+        // 선택지 색을 옅은 배경으로(선택지 결과 바의 % 게이지와 같은 톤).
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              enabled: enabled && !isLocked,
+              autofocus: autofocus,
+              focusNode: focusNode,
+              maxLength: kMaxDiscussionOptionLength,
+              inputFormatters: [
+                LengthLimitingTextInputFormatter(kMaxDiscussionOptionLength),
+              ],
+              style: TextStyle(
+                fontSize: 14,
+                color: isLocked ? AppColors.textMuted : AppColors.textBody,
+              ),
+              decoration: InputDecoration(
+                counterText: '',
+                isDense: true,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                hintText: '선택지 ${index + 1}',
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
               ),
             ),
           ),
-        ),
-        if (isLocked)
-          const Padding(
-            padding: EdgeInsets.only(left: 8),
-            child: Icon(
-              PhosphorIconsRegular.lock,
-              size: 16,
-              color: AppColors.controlInactive,
+          if (isLocked)
+            const Padding(
+              padding: EdgeInsets.only(right: 10),
+              child: Icon(
+                PhosphorIconsRegular.lock,
+                size: 16,
+                color: AppColors.controlInactive,
+              ),
+            )
+          else
+            _IconAction(
+              icon: PhosphorIconsRegular.trash,
+              tooltip: '선택지 ${index + 1} 삭제',
+              onPressed: enabled ? onRemove : null,
             ),
-          )
-        else ...[
-          _IconAction(
-            icon: PhosphorIconsRegular.caretUp,
-            tooltip: '선택지 ${index + 1} 위로 이동',
-            onPressed: enabled && canMoveUp ? () => onMove(-1) : null,
-          ),
-          _IconAction(
-            icon: PhosphorIconsRegular.caretDown,
-            tooltip: '선택지 ${index + 1} 아래로 이동',
-            onPressed: enabled && canMoveDown ? () => onMove(1) : null,
-          ),
-          _IconAction(
-            icon: PhosphorIconsRegular.trash,
-            tooltip: '선택지 ${index + 1} 삭제',
-            onPressed: enabled ? onRemove : null,
-          ),
         ],
-      ],
+      ),
     );
   }
 }
 
-/// 이동/삭제가 나란히 붙어 있어 오조작하기 쉬운 자리라, 아이콘은 작게 두되
-/// 터치 영역은 [kMinInteractiveDimension](48dp)을 그대로 쓴다. 스크린리더와
-/// 롱프레스 힌트를 위해 [tooltip]도 함께 지정한다.
+/// 삭제 버튼. 아이콘은 작게 두되 터치 영역은 [kMinInteractiveDimension]
+/// (48dp)을 그대로 쓴다. 스크린리더와 롱프레스 힌트를 위해 [tooltip]도
+/// 함께 지정한다.
 class _IconAction extends StatelessWidget {
   const _IconAction({
     required this.icon,
@@ -218,9 +191,7 @@ class _IconAction extends StatelessWidget {
       icon: Icon(
         icon,
         size: 16,
-        color: onPressed == null
-            ? AppColors.border
-            : AppColors.controlInactive,
+        color: onPressed == null ? AppColors.border : AppColors.controlInactive,
       ),
       onPressed: onPressed,
     );

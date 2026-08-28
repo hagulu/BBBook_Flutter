@@ -4,13 +4,12 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/utils/author_display.dart';
+import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
-import '../../book_detail/screens/book_detail_screen.dart';
+import '../../../shared/widgets/record_dialog_shell.dart';
 import '../../book_detail/screens/widgets/report_dialog.dart';
-import '../../bookshelf/screens/widgets/book_cover.dart';
 import '../models/discussion_answer.dart';
 import '../models/discussion_topic.dart';
 import '../providers/discussion_providers.dart';
@@ -268,21 +267,21 @@ class _DiscussionDetailScreenState
     }
   }
 
-  void _openBook(String isbn13) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => BookDetailScreen(isbn: isbn13)));
-  }
-
   @override
   Widget build(BuildContext context) {
     final detailState = ref.watch(
       discussionDetailControllerProvider(widget.topicId),
     );
+    final bookTitle = switch (detailState) {
+      AsyncData(:final value) => value.book.title,
+      _ => null,
+    };
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('토론'),
+        title: bookTitle == null
+            ? const AppBarTitle('토론')
+            : AppBarTitle(bookTitle, subtitle: '토론'),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,
@@ -331,7 +330,6 @@ class _DiscussionDetailScreenState
           children: [
             _TopicCard(
               topic: topic,
-              onOpenBook: () => _openBook(topic.isbn13),
               onEdit: () => _editTopic(topic),
               onEditDeadline: () => _editDeadline(topic),
               onClose: _closeTopic,
@@ -353,7 +351,7 @@ class _DiscussionDetailScreenState
                 onSubmit: () => _submitAnswer(withOption: false),
               ),
             ],
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             switch (answersState) {
               AsyncData(:final value) => _AnswerList(
                 state: value,
@@ -422,11 +420,11 @@ class _DiscussionDetailScreenState
   }
 }
 
-/// 책 정보 + 주제 본문 + (선택지 토론이면) 결과 바 + 공감 버튼을 담는 카드.
+/// 주제 본문 + (선택지 토론이면) 결과 바 + 공감 버튼을 담는 카드. 책 정보는
+/// 앱바(책 이름 + "토론" 서브타이틀)로 옮겼다.
 class _TopicCard extends StatelessWidget {
   const _TopicCard({
     required this.topic,
-    required this.onOpenBook,
     required this.onEdit,
     required this.onEditDeadline,
     required this.onClose,
@@ -438,7 +436,6 @@ class _TopicCard extends StatelessWidget {
   });
 
   final DiscussionTopicDetail topic;
-  final VoidCallback onOpenBook;
   final VoidCallback onEdit;
   final VoidCallback onEditDeadline;
   final VoidCallback onClose;
@@ -460,10 +457,6 @@ class _TopicCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _BookHeader(book: topic.book, onTap: onOpenBook),
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: AppColors.border),
-          const SizedBox(height: 14),
           if (topic.isClosed || topic.isSpoiler) ...[
             Wrap(
               spacing: 6,
@@ -475,7 +468,7 @@ class _TopicCard extends StatelessWidget {
             const SizedBox(height: 8),
           ],
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: Text(
@@ -509,7 +502,7 @@ class _TopicCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
           DiscussionAuthorRow(user: topic.user, createdAt: topic.createdAt),
           if (topic.closesAt != null) ...[
             const SizedBox(height: 8),
@@ -524,14 +517,16 @@ class _TopicCard extends StatelessWidget {
                 Text(
                   '${formatDiscussionDate(topic.closesAt!)} 마감',
                   style: const TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     color: AppColors.textMuted,
                   ),
                 ),
               ],
             ),
           ],
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: AppColors.border),
+          const SizedBox(height: 16),
           Text(
             topic.content ?? '',
             style: const TextStyle(
@@ -543,12 +538,12 @@ class _TopicCard extends StatelessWidget {
           if (pollSection != null) ...[
             const SizedBox(height: 18),
             const Divider(height: 1, color: AppColors.border),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             pollSection!,
           ],
           const SizedBox(height: 16),
           const Divider(height: 1, color: AppColors.border),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
             child: DiscussionLikeButton(
@@ -556,67 +551,6 @@ class _TopicCard extends StatelessWidget {
               likeCount: topic.likeCount,
               onTap: onToggleLike,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BookHeader extends StatelessWidget {
-  const _BookHeader({required this.book, required this.onTap});
-
-  final DiscussionBook book;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 36,
-            child: BookCover(
-              imageUrl: book.coverImageUrl,
-              title: book.title,
-              borderRadius: 6,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  book.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textStrong,
-                  ),
-                ),
-                if (book.author != null && book.author!.isNotEmpty)
-                  Text(
-                    displayAuthor(book.author!),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const Icon(
-            PhosphorIconsRegular.caretRight,
-            size: 15,
-            color: AppColors.controlInactive,
           ),
         ],
       ),
@@ -641,87 +575,72 @@ class _TopicMenu extends StatelessWidget {
   final VoidCallback onReopen;
   final VoidCallback onDelete;
 
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<_TopicMenuAction>(
-      icon: const Icon(
-        PhosphorIconsRegular.dotsThreeVertical,
-        size: 20,
-        color: AppColors.textMuted,
-      ),
-      onSelected: (action) {
-        switch (action) {
-          case _TopicMenuAction.edit:
-            onEdit();
-          case _TopicMenuAction.deadline:
-            onEditDeadline();
-          case _TopicMenuAction.close:
-            onClose();
-          case _TopicMenuAction.reopen:
-            onReopen();
-          case _TopicMenuAction.delete:
-            onDelete();
-        }
-      },
-      itemBuilder: (context) => [
-        if (!topic.isClosed)
-          const PopupMenuItem(
-            value: _TopicMenuAction.edit,
-            child: _MenuRow(icon: PhosphorIconsRegular.pencilSimple, label: '수정'),
-          ),
-        const PopupMenuItem(
-          value: _TopicMenuAction.deadline,
-          child: _MenuRow(
-            icon: PhosphorIconsRegular.calendarBlank,
-            label: '마감일 설정/수정',
-          ),
-        ),
-        if (!topic.isClosed)
-          const PopupMenuItem(
-            value: _TopicMenuAction.close,
-            child: _MenuRow(icon: PhosphorIconsRegular.lock, label: '토론 닫기'),
-          ),
-        if (topic.canReopen)
-          const PopupMenuItem(
-            value: _TopicMenuAction.reopen,
-            child: _MenuRow(
-              icon: PhosphorIconsRegular.lockOpen,
-              label: '다시 열기',
+  Future<void> _openSheet(BuildContext context) async {
+    final action = await showModalBottomSheet<_TopicMenuAction>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => RecordDialogShell(
+        title: '토론 관리',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!topic.isClosed)
+              DiscussionMenuTile(
+                icon: PhosphorIconsRegular.pencilSimple,
+                label: '수정',
+                onTap: () => Navigator.pop(sheetContext, _TopicMenuAction.edit),
+              ),
+            DiscussionMenuTile(
+              icon: PhosphorIconsRegular.calendarBlank,
+              label: '마감일 설정/수정',
+              onTap: () =>
+                  Navigator.pop(sheetContext, _TopicMenuAction.deadline),
             ),
-          ),
-        const PopupMenuDivider(),
-        const PopupMenuItem(
-          value: _TopicMenuAction.delete,
-          child: _MenuRow(
-            icon: PhosphorIconsRegular.trash,
-            label: '삭제',
-            color: AppColors.error,
-          ),
+            if (!topic.isClosed)
+              DiscussionMenuTile(
+                icon: PhosphorIconsRegular.lock,
+                label: '토론 닫기',
+                onTap: () => Navigator.pop(sheetContext, _TopicMenuAction.close),
+              ),
+            if (topic.canReopen)
+              DiscussionMenuTile(
+                icon: PhosphorIconsRegular.lockOpen,
+                label: '다시 열기',
+                onTap: () =>
+                    Navigator.pop(sheetContext, _TopicMenuAction.reopen),
+              ),
+            const Divider(height: 20, color: AppColors.border),
+            DiscussionMenuTile(
+              icon: PhosphorIconsRegular.trash,
+              label: '삭제',
+              color: AppColors.error,
+              onTap: () => Navigator.pop(sheetContext, _TopicMenuAction.delete),
+            ),
+          ],
         ),
-      ],
+      ),
     );
+    if (action == null) return;
+    switch (action) {
+      case _TopicMenuAction.edit:
+        onEdit();
+      case _TopicMenuAction.deadline:
+        onEditDeadline();
+      case _TopicMenuAction.close:
+        onClose();
+      case _TopicMenuAction.reopen:
+        onReopen();
+      case _TopicMenuAction.delete:
+        onDelete();
+    }
   }
-}
-
-class _MenuRow extends StatelessWidget {
-  const _MenuRow({
-    required this.icon,
-    required this.label,
-    this.color = AppColors.textBody,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: color),
-        const SizedBox(width: 10),
-        Text(label, style: TextStyle(fontSize: 14, color: color)),
-      ],
+    return DiscussionMoreButton(
+      tooltip: '토론 메뉴',
+      onTap: () => _openSheet(context),
     );
   }
 }

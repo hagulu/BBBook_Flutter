@@ -6,7 +6,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_confirm.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
-import '../../../book_record/screens/widgets/record_section_card.dart';
+import '../../../book_record/screens/widgets/entry_button.dart';
 import '../../../book_record/screens/widgets/star_rating.dart';
 import '../../../discussion/screens/discussion_list_screen.dart';
 import '../../models/book_review.dart';
@@ -257,7 +257,7 @@ class _DiscussionEntryButtons extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: _EntryButton(
+          child: EntryButton(
             icon: PhosphorIconsRegular.notebook,
             label: '독후감',
             onTap: onOpenReflections,
@@ -265,68 +265,13 @@ class _DiscussionEntryButtons extends StatelessWidget {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: _EntryButton(
+          child: EntryButton(
             icon: PhosphorIconsRegular.chatsCircle,
             label: '주제 토론',
             onTap: onOpenDiscussions,
           ),
         ),
       ],
-    );
-  }
-}
-
-/// `ReadingStatusTile`(책 기록 상세)과 같은 구성 — 원형 아이콘 배지 + 라벨 —
-/// 을 카드(`RecordSectionCard`)에 가로로 담아 진입 버튼으로 쓴다.
-class _EntryButton extends StatelessWidget {
-  const _EntryButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return RecordSectionCard(
-      padding: EdgeInsets.zero,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: AppColors.accentSurface.withValues(alpha: 0.35),
-                child: Icon(icon, color: AppColors.accentForeground, size: 16),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textStrong,
-                  ),
-                ),
-              ),
-              const Icon(
-                PhosphorIconsRegular.caretRight,
-                size: 15,
-                color: AppColors.controlInactive,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

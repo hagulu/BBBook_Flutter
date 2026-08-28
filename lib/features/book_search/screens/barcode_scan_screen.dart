@@ -7,6 +7,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_alert.dart';
+import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../book_record/models/record_labels.dart';
 import '../../bookshelf/models/book_status.dart';
@@ -167,7 +168,7 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text('바코드로 등록'),
+        title: const AppBarTitle('바코드로 등록'),
       ),
       // 카메라/스캔 프레임 영역은 원래대로 화면 전체를 채우고, 빠른 등록
       // 컨트롤은 별도 구획 없이 그 위에 오버레이로 얹는다(배경 패널 없음).

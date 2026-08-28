@@ -488,6 +488,7 @@ class _MainAppBar extends StatelessWidget implements PreferredSizeWidget {
     final i18n = editor.i18n;
     final foregroundColor = style.appBarColor;
     return AppBar(
+      toolbarHeight: kToolbarHeight,
       foregroundColor: foregroundColor,
       backgroundColor: style.appBarBackground,
       leading: mainEditorConfigs.enableCloseButton
@@ -561,6 +562,7 @@ class _OcrCropAppBar extends StatelessWidget implements PreferredSizeWidget {
     final icons = state.configs.cropRotateEditor.icons;
     final i18n = state.i18n.cropRotateEditor;
     return AppBar(
+      toolbarHeight: kToolbarHeight,
       automaticallyImplyLeading: false,
       backgroundColor: style.appBarBackground,
       foregroundColor: style.appBarColor,

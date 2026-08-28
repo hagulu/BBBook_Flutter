@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../models/discussion_answer.dart';
 import '../../models/discussion_topic.dart';
 import '../../utils/discussion_poll.dart';
@@ -167,32 +168,48 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
       );
     }
 
-    return PopupMenuButton<_AnswerMenuAction>(
-      icon: const Icon(
-        PhosphorIconsRegular.dotsThreeVertical,
-        size: 18,
-        color: AppColors.textMuted,
-      ),
-      onSelected: (action) {
-        switch (action) {
-          case _AnswerMenuAction.edit:
-            _startEdit();
-          case _AnswerMenuAction.delete:
-            widget.onDelete();
-        }
-      },
-      itemBuilder: (context) => [
-        if (widget.canEdit)
-          const PopupMenuItem(
-            value: _AnswerMenuAction.edit,
-            child: Text('수정'),
-          ),
-        const PopupMenuItem(
-          value: _AnswerMenuAction.delete,
-          child: Text('삭제', style: TextStyle(color: AppColors.error)),
-        ),
-      ],
+    return DiscussionMoreButton(
+      tooltip: '답변 메뉴',
+      iconSize: 18,
+      onTap: () => _openMenuSheet(context),
     );
+  }
+
+  Future<void> _openMenuSheet(BuildContext context) async {
+    final action = await showModalBottomSheet<_AnswerMenuAction>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => RecordDialogShell(
+        title: '답변 관리',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.canEdit)
+              DiscussionMenuTile(
+                icon: PhosphorIconsRegular.pencilSimple,
+                label: '수정',
+                onTap: () =>
+                    Navigator.pop(sheetContext, _AnswerMenuAction.edit),
+              ),
+            DiscussionMenuTile(
+              icon: PhosphorIconsRegular.trash,
+              label: '삭제',
+              color: AppColors.error,
+              onTap: () =>
+                  Navigator.pop(sheetContext, _AnswerMenuAction.delete),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case _AnswerMenuAction.edit:
+        _startEdit();
+      case _AnswerMenuAction.delete:
+        widget.onDelete();
+    }
   }
 }
 

@@ -7,6 +7,7 @@ import '../features/bookshelf/providers/bookshelf_providers.dart';
 import '../features/bookshelf/screens/bookshelf_screen.dart';
 import '../features/home/screens/home_tab_placeholder.dart';
 import '../features/profile/screens/profile_tab_placeholder.dart';
+import '../shared/widgets/app_bar_title.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 로그인 후 진입하는 하단 탭 셸(HOME/BOOKSHELF/PROFILE, `navigation.md` 대응).
@@ -58,8 +59,7 @@ class _MainShellState extends ConsumerState<MainShell>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('책책책'),
-        centerTitle: false,
+        title: const AppBarTitle('책책책'),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,

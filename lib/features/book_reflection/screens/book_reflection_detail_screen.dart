@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
@@ -41,7 +42,7 @@ class BookReflectionDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(bookTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: AppBarTitle(bookTitle),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,
@@ -298,7 +299,7 @@ class _ReflectionBody extends StatelessWidget {
                     title == null || title.isEmpty ? '제목 없음' : title,
                     style: const TextStyle(
                       color: AppColors.textStrong,
-                      fontSize: 20,
+                      fontSize: 17,
                       fontWeight: FontWeight.bold,
                     ),
                   ),

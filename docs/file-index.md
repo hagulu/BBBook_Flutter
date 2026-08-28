@@ -51,7 +51,8 @@
 
 ## features/book_record
 
-- `lib/features/book_record/screens/book_record_screen.dart` — 책 기록 상세 화면(자체 AppBar, 책장에서 책 선택 시 진입), 정보/진행률/상태/출처/난이도/태그/삭제 조립
+- `lib/features/book_record/screens/book_record_screen.dart` — 책 기록 상세 화면(자체 AppBar, 책장에서 책 선택 시 진입), 정보/노트/독후감/생각나눔 4탭과 진행률/상태/출처/난이도/태그/삭제 조립
+- `lib/features/book_record/screens/book_sharing_list.dart` — 책 기록 상세의 생각나눔 탭(독자평·독후감·토론 진입 버튼, 현재는 토론만 연결)
 - `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH(RecordPatch 기준 부분 수정), 책 정보 PATCH(카테고리 포함), ISBN 연결/해제 PATCH, 태그 POST/DELETE, 태그 목록/플랫폼 옵션 GET, 삭제 DELETE)
 - `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth(로컬 조회는 bookshelf 레포지토리 재사용, 기록 필드 수정은 로컬 우선 + 바꾼 필드만 뒤에서 재전송, 그 외는 서버 PATCH 성공 후 로컬 반영), 로컬 저장 모드에서는 책 정보 수정·ISBN 연결·책 삭제를 로컬에만 반영하고 태그 등 서버 전용 기능은 차단
 - `lib/features/book_record/providers/book_record_providers.dart` — 책 기록 관련 Riverpod provider(단일 책 상태 컨트롤러, 태그 자동완성, 플랫폼 옵션)
@@ -125,6 +126,7 @@
 ## shared/widgets
 
 - `lib/shared/widgets/app_alert.dart` — 공통 Alert 팝업(제목/내용/확인 버튼)
+- `lib/shared/widgets/app_bar_title.dart` — 공통 앱바 타이틀(전역 축소 글씨 크기, `subtitle` 지정 시 제목 아래 작게 배치)
 - `lib/shared/widgets/app_confirm.dart` — 공통 Confirm 팝업(확인/취소, Future<bool> 반환)
 - `lib/shared/widgets/app_loading.dart` — 공통 Loading(전체 화면 `AppLoading`, 영역 단위 `AppLoadingOverlay`)
 - `lib/shared/widgets/app_snackbar.dart` — 공통 SnackBar(pill 형태, 성공/정보는 아이덴티티 컬러·에러는 에러 컬러 반투명 배경 + 상태 아이콘)
@@ -147,3 +149,6 @@
 - `docs/review/20260827-123306-shared-image-and-reflection-third-review.md` — 공용 이미지·독후감 후속 수정의 Quill 교체 거부 상태와 공개 설정 생명주기 리뷰
 - `docs/review/20260827-144636-shared-image-editor-ocr-review.md` — 공용 이미지 에디터와 OCR 크롭 종료 상태·단어 선택 접근성 리뷰
 - `docs/review/20260828-104114-discussion-feature-review.md` — 주제 토론 기능의 답변 중복 등록·상태 최신성·표시 정확성·터치 접근성 리뷰
+- `docs/review/20260828-150017-app-bar-sharing-discussion-ui-review.md` — 공통 앱바·생각나눔·토론 UI 변경의 선택지 상태·상대 시각·탭 피드백 리뷰
+- `docs/review/20260828-151504-app-bar-sharing-discussion-ui-rereview.md` — 공통 앱바·생각나눔·토론 UI 후속 수정의 선택지 최대 개수·상대 시각 재리뷰
+- `docs/review/20260828-152535-app-bar-sharing-discussion-ui-third-review.md` — 선택지 추가 UI 후속 수정의 최대 개수 경계·상대 시각 3차 리뷰

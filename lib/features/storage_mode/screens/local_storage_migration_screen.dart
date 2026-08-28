@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../providers/storage_mode_providers.dart';
 import '../services/local_storage_migration_service.dart';
@@ -41,7 +42,7 @@ class _LocalStorageMigrationScreenState
       canPop: completed || failed,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('로컬 저장으로 전환'),
+          title: const AppBarTitle('로컬 저장으로 전환'),
           backgroundColor: AppColors.pageBackground,
           foregroundColor: AppColors.textStrong,
           automaticallyImplyLeading: completed || failed,

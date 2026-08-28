@@ -11,6 +11,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/image/screens/shared_image_editor_screen.dart';
 import '../../../shared/image/services/image_gallery_picker.dart';
+import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_snackbar.dart';
@@ -519,10 +520,8 @@ class _BookReflectionEditorScreenState
       child: Scaffold(
         resizeToAvoidBottomInset: true,
         appBar: AppBar(
-          title: Text(
+          title: AppBarTitle(
             widget.reflection == null ? '독후감 작성' : '독후감 수정',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
           backgroundColor: AppColors.pageBackground,
           foregroundColor: AppColors.textStrong,
@@ -607,14 +606,14 @@ class _BookReflectionEditorScreenState
                                         _editorFocusNode.requestFocus(),
                                     style: const TextStyle(
                                       color: AppColors.textStrong,
-                                      fontSize: 22,
+                                      fontSize: 19,
                                       fontWeight: FontWeight.bold,
                                     ),
                                     decoration: const InputDecoration(
                                       hintText: '이 기록에 제목을 붙여보세요',
                                       hintStyle: TextStyle(
                                         color: AppColors.textMuted,
-                                        fontSize: 20,
+                                        fontSize: 18,
                                         fontWeight: FontWeight.normal,
                                       ),
                                       counterText: '',

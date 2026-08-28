@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_bar_title.dart';
 import '../models/discussion_topic.dart';
 import '../providers/discussion_providers.dart';
 import 'discussion_detail_screen.dart';
@@ -83,11 +84,7 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.bookTitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        title: AppBarTitle(widget.bookTitle),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,

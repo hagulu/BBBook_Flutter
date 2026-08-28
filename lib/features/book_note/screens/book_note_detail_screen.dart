@@ -9,6 +9,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/image/widgets/shared_image_viewer.dart';
+import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
 import '../../../shared/widgets/app_snackbar.dart';
@@ -94,11 +95,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            widget.bookTitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          title: AppBarTitle(widget.bookTitle),
           backgroundColor: AppColors.pageBackground,
           foregroundColor: AppColors.textStrong,
           elevation: 0,

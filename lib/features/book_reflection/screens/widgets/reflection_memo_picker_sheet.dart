@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_bar_title.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../../book_note/models/book_note.dart';
 import '../../../book_note/providers/book_note_providers.dart';
@@ -190,7 +191,7 @@ class _ReflectionMemoListScreenState
           tooltip: '메모 목록 닫기',
           icon: const Icon(PhosphorIconsRegular.x),
         ),
-        title: const Text('메모 선택'),
+        title: const AppBarTitle('메모 선택'),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         actions: [

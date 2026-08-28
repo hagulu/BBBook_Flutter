@@ -26,11 +26,16 @@ class RecordDialogShell extends StatelessWidget {
     required this.title,
     required this.content,
     this.buttons = const [],
+    this.titleTrailing,
   });
 
   final String title;
   final Widget content;
   final List<RecordDialogButton> buttons;
+
+  /// 제목 오른쪽에 붙는 보조 액션(예: 항목 추가 "+" 버튼). 지정하지 않으면
+  /// 제목만 표시한다.
+  final Widget? titleTrailing;
 
   @override
   Widget build(BuildContext context) {
@@ -69,13 +74,20 @@ class RecordDialogShell extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textStrong,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textStrong,
+                      ),
+                    ),
+                  ),
+                  ?titleTrailing,
+                ],
               ),
               const SizedBox(height: 18),
               content,

@@ -67,7 +67,7 @@ class DiscussionPoll extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         for (var i = 0; i < detail.options.length; i++) ...[
           _PollRow(
             label: detail.options[i].content,
@@ -77,7 +77,7 @@ class DiscussionPoll extends StatelessWidget {
             isSelected: selectedOptionId == detail.options[i].id,
             onTap: interactive ? () => onSelect(detail.options[i].id) : null,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
         ],
         _PollRow(
           label: '기타',
@@ -140,13 +140,15 @@ class _PollRow extends StatelessWidget {
             ),
           ),
           clipBehavior: Clip.antiAlias,
+          // Stack 기본 정렬(topStart)이라 라벨이 위로 붙어 있었다.
           child: Stack(
+            alignment: AlignmentDirectional.centerStart,
             children: [
               // 게이지: 비율만큼 선택지 색의 옅은 톤으로 채운다.
               FractionallySizedBox(
                 widthFactor: ratio,
                 heightFactor: 1,
-                child: ColoredBox(color: color.withValues(alpha: 0.18)),
+                child: ColoredBox(color: color.withValues(alpha: 0.12)),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -168,15 +170,17 @@ class _PollRow extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight: isTop
-                              ? FontWeight.bold
-                              : FontWeight.w500,
+                          fontWeight: isTop ? FontWeight.bold : FontWeight.w500,
                           color: AppColors.textStrong,
                         ),
                       ),
                     ),
                     if (isSelected) ...[
-                      Icon(PhosphorIconsFill.checkCircle, size: 16, color: color),
+                      Icon(
+                        PhosphorIconsFill.checkCircle,
+                        size: 16,
+                        color: color,
+                      ),
                       const SizedBox(width: 8),
                     ],
                     Text(
@@ -215,9 +219,8 @@ class DiscussionVoteBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.45)),
       ),
       child: Row(
         children: [

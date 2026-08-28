@@ -5,7 +5,9 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/record_dialog_shell.dart';
 import '../models/discussion_topic.dart';
 import '../providers/discussion_providers.dart';
 import '../utils/discussion_poll.dart';
@@ -47,13 +49,19 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
   late final List<String> _initialOptions;
 
   late bool _isSpoiler;
-  late bool _useOptions;
   bool _isSaving = false;
 
   bool get _isEdit => widget.topic != null;
 
   /// 닫힌 토론은 본문 수정이 불가능하다(마감일만 상세 화면에서 바꿀 수 있다).
   bool get _isLocked => widget.topic?.isClosed ?? false;
+
+  /// 선택지 토론 여부. 별도 모드 스위치 없이, 값이 채워진 선택지가 하나라도
+  /// 있으면 선택지 토론으로 취급한다(툴바의 "선택지 추가"/"선택지 관리"에서
+  /// 추가·삭제). 빈 텍스트인 선택지는 없는 것으로 본다 — 빈 채로 남겨두고
+  /// 시트를 닫아도 자유 토론 등록을 막지 않는다.
+  bool get _useOptions =>
+      _optionControllers.any((c) => c.text.trim().isNotEmpty);
 
   @override
   void initState() {
@@ -63,7 +71,6 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
     _contentController = TextEditingController(text: topic?.content ?? '');
     _isSpoiler = topic?.isSpoiler ?? false;
     _initialOptions = topic?.options.map((o) => o.content).toList() ?? const [];
-    _useOptions = _initialOptions.isNotEmpty;
     for (final content in _initialOptions) {
       _optionControllers.add(TextEditingController(text: content));
     }
@@ -83,47 +90,6 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
   }
 
   void _onFormChanged() => setState(() {});
-
-  void _toggleMode(bool useOptions) {
-    if (_isLocked || useOptions == _useOptions) return;
-    setState(() {
-      _useOptions = useOptions;
-      // 선택지 토론으로 처음 전환하면 빈 선택지 1개를 미리 만들어 준다.
-      if (useOptions && _optionControllers.isEmpty) {
-        _addOptionController();
-      }
-    });
-  }
-
-  void _addOptionController() {
-    final controller = TextEditingController();
-    controller.addListener(_onFormChanged);
-    _optionControllers.add(controller);
-  }
-
-  void _addOption() {
-    if (_optionControllers.length >= kMaxDiscussionOptions) return;
-    setState(_addOptionController);
-  }
-
-  void _removeOption(int index) {
-    if (index < _initialOptions.length) return;
-    setState(() {
-      _optionControllers.removeAt(index).dispose();
-    });
-  }
-
-  void _moveOption(int index, int delta) {
-    final target = index + delta;
-    // 잠긴 선택지 영역으로는 옮길 수 없다.
-    if (target < _initialOptions.length || target >= _optionControllers.length) {
-      return;
-    }
-    setState(() {
-      final controller = _optionControllers.removeAt(index);
-      _optionControllers.insert(target, controller);
-    });
-  }
 
   List<String> get _currentOptions =>
       _optionControllers.map((c) => c.text.trim()).toList();
@@ -189,7 +155,7 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEdit ? '토론 수정' : '토론 작성'),
+        title: AppBarTitle(_isEdit ? '토론 수정' : '토론 작성'),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,
@@ -204,129 +170,258 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            child: Text(
-              _isSaving ? '저장 중' : (_isEdit ? '수정' : '등록'),
-            ),
+            child: Text(_isSaving ? '저장 중' : (_isEdit ? '수정' : '등록')),
           ),
           const SizedBox(width: 8),
         ],
       ),
       body: SafeArea(
         top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_isLocked) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.highlightGoldSurface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    '마감된 토론은 내용을 수정할 수 없습니다.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.memoThoughtForeground,
+        child: Column(
+          children: [
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: AppColors.shadowSoft,
+                      blurRadius: 4,
+                      offset: Offset(0, 1),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-              ],
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _titleController,
-                      enabled: !_isLocked,
-                      maxLength: kMaxDiscussionTitleLength,
-                      inputFormatters: [
-                        LengthLimitingTextInputFormatter(
-                          kMaxDiscussionTitleLength,
+                clipBehavior: Clip.antiAlias,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_isLocked) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.highlightGoldSurface,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            '마감된 토론은 내용을 수정할 수 없습니다.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.memoThoughtForeground,
+                            ),
+                          ),
                         ),
+                        const SizedBox(height: 16),
                       ],
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textStrong,
-                      ),
-                      decoration: const InputDecoration(
-                        counterText: '',
-                        hintText: '토론 주제 제목을 입력하세요',
-                        hintStyle: TextStyle(
+                      TextField(
+                        controller: _titleController,
+                        enabled: !_isLocked,
+                        maxLength: kMaxDiscussionTitleLength,
+                        inputFormatters: [
+                          LengthLimitingTextInputFormatter(
+                            kMaxDiscussionTitleLength,
+                          ),
+                        ],
+                        style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textMuted,
+                          color: AppColors.textStrong,
+                        ),
+                        decoration: const InputDecoration(
+                          counterText: '',
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          hintText: '토론 주제 제목을 입력하세요',
+                          hintStyle: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textMuted,
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _contentController,
+                        enabled: !_isLocked,
+                        minLines: 8,
+                        maxLines: 16,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textBody,
+                        ),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          hintText: '토론 주제를 자세히 작성해보세요...',
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 10),
-                  _SpoilerToggle(
-                    isSpoiler: _isSpoiler,
-                    onTap: _isLocked
-                        ? null
-                        : () => setState(() => _isSpoiler = !_isSpoiler),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _contentController,
-                enabled: !_isLocked,
-                minLines: 8,
-                maxLines: 16,
-                style: const TextStyle(fontSize: 14, color: AppColors.textBody),
-                decoration: const InputDecoration(
-                  hintText: '토론 주제를 자세히 작성해보세요...',
                 ),
               ),
-              const SizedBox(height: 24),
-              const Text(
-                '토론 방식',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textStrong,
-                ),
+            ),
+            _buildKeyboardToolbar(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 선택지 관리 바텀시트. 원본 상태(`_optionControllers`)를 바로 바꾸지
+  /// 않고, 임시(draft) 컨트롤러 목록을 따로 만들어 시트 안에서만 편집한다.
+  /// "저장"을 눌러야 원본에 반영되고, 뒤로가기·드래그로 그냥 닫으면 편집한
+  /// 내용이 버려진다(잠긴 항목은 draft에도 보이지만 원본 그대로 유지된다).
+  /// 시트를 열 때는 항목을 자동으로 추가하지 않는다 — 추가는 항상 제목
+  /// 오른쪽의 "+" 버튼으로만 한다(최대 개수 제한도 그 버튼 하나에서만
+  /// 지키면 된다). 빈 선택지는 저장 시 자동으로 걸러진다(빈 선택지는
+  /// "없는 것"으로 취급 — `_useOptions`).
+  Future<void> _openOptionsSheet() async {
+    final lockedCount = _initialOptions.length;
+    final draftControllers = [
+      for (final c in _optionControllers) TextEditingController(text: c.text),
+    ];
+    final newOptionFocusNode = FocusNode();
+    int? autofocusIndex;
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          final canAdd =
+              !_isLocked && draftControllers.length < kMaxDiscussionOptions;
+          return RecordDialogShell(
+            title: '선택지 관리',
+            titleTrailing: IconButton(
+              onPressed: canAdd
+                  ? () {
+                      draftControllers.add(TextEditingController());
+                      autofocusIndex = draftControllers.length - 1;
+                      setSheetState(() {});
+                      // autofocus는 시트 안에 이미 포커스를 가진 입력창이
+                      // 있으면 동작하지 않는다(Flutter 기본 동작) — 새 행이
+                      // 그려진 다음 프레임에 명시적으로 포커스를 옮긴다.
+                      // 이전 입력창에 커서가 남는 문제를 막기 위해 먼저
+                      // 명시적으로 포커스를 내린 뒤 새 입력창으로 옮긴다.
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        if (newOptionFocusNode.canRequestFocus) {
+                          newOptionFocusNode.requestFocus();
+                        }
+                      });
+                    }
+                  : null,
+              tooltip: '선택지 추가',
+              visualDensity: VisualDensity.compact,
+              icon: const Icon(PhosphorIconsRegular.plus, size: 20),
+            ),
+            content: DiscussionOptionsEditor(
+              controllers: draftControllers,
+              lockedCount: lockedCount,
+              enabled: !_isLocked,
+              autofocusIndex: autofocusIndex,
+              autofocusNode: newOptionFocusNode,
+              onRemove: (index) {
+                if (index < lockedCount) return;
+                draftControllers.removeAt(index).dispose();
+                setSheetState(() {});
+              },
+            ),
+            buttons: [
+              RecordDialogButton(
+                label: '저장',
+                onPressed: () => Navigator.pop(sheetContext, true),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '자유롭게 의견을 나누거나 최대 $kMaxDiscussionOptions개의 선택지를 함께 제시할 수 있습니다.',
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textMuted,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _ModeToggle(
-                useOptions: _useOptions,
-                // 이미 저장된 선택지가 있으면 자유 토론으로 되돌릴 수 없다
-                // (선택지 삭제에 해당하므로 서버가 400을 반환한다).
-                canChooseFree: !_isLocked && _initialOptions.isEmpty,
-                canChooseOptions: !_isLocked,
-                onChanged: _toggleMode,
-              ),
-              if (_useOptions) ...[
-                const SizedBox(height: 14),
-                DiscussionOptionsEditor(
-                  controllers: _optionControllers,
-                  lockedCount: _initialOptions.length,
-                  enabled: !_isLocked,
-                  onAdd: _addOption,
-                  onRemove: _removeOption,
-                  onMove: _moveOption,
-                ),
-              ],
             ],
-          ),
+          );
+        },
+      ),
+    );
+    newOptionFocusNode.dispose();
+
+    if (saved != true) {
+      for (final c in draftControllers) {
+        c.dispose();
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      for (final c in _optionControllers.skip(lockedCount)) {
+        c.dispose();
+      }
+      _optionControllers.removeRange(lockedCount, _optionControllers.length);
+      for (final c in draftControllers.skip(lockedCount)) {
+        if (c.text.trim().isEmpty) {
+          c.dispose();
+          continue;
+        }
+        c.addListener(_onFormChanged);
+        _optionControllers.add(c);
+      }
+    });
+    // 잠긴 항목의 draft 사본은 원본을 그대로 쓰므로 저장 후엔 필요 없다.
+    for (final c in draftControllers.take(lockedCount)) {
+      c.dispose();
+    }
+  }
+
+  /// 스포일러 토글 + 선택지 관리 진입 버튼을 담는 바. 스크롤 영역 밖, `Scaffold`
+  /// 하단에 둬서 키보드가 올라오면 그 바로 위에 붙는 입력 보조 툴바처럼
+  /// 동작한다(키보드가 닫혀 있으면 화면 맨 아래에 고정).
+  Widget _buildKeyboardToolbar() {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: AppColors.surface,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        child: Row(
+          children: [
+            _SpoilerToggle(
+              isSpoiler: _isSpoiler,
+              onTap: _isLocked
+                  ? null
+                  : () => setState(() => _isSpoiler = !_isSpoiler),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _isLocked ? null : _openOptionsSheet,
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.accentForeground,
+                disabledForegroundColor: AppColors.controlInactive,
+              ),
+              icon: const Icon(PhosphorIconsRegular.listBullets, size: 16),
+              label: Text(
+                _useOptions
+                    ? '선택지 관리 (${_optionControllers.length}/$kMaxDiscussionOptions)'
+                    : '선택지 추가',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -374,96 +469,6 @@ class _SpoilerToggle extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ModeToggle extends StatelessWidget {
-  const _ModeToggle({
-    required this.useOptions,
-    required this.canChooseFree,
-    required this.canChooseOptions,
-    required this.onChanged,
-  });
-
-  final bool useOptions;
-  final bool canChooseFree;
-  final bool canChooseOptions;
-  final void Function(bool useOptions) onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceSubtle,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _ModeButton(
-              label: '자유 토론',
-              isSelected: !useOptions,
-              onTap: canChooseFree ? () => onChanged(false) : null,
-            ),
-          ),
-          Expanded(
-            child: _ModeButton(
-              label: '선택지 토론',
-              isSelected: useOptions,
-              onTap: canChooseOptions ? () => onChanged(true) : null,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ModeButton extends StatelessWidget {
-  const _ModeButton({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool isSelected;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 11),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.surface : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: isSelected
-              ? const [
-                  BoxShadow(
-                    color: AppColors.shadowSoft,
-                    blurRadius: 4,
-                    offset: Offset(0, 1),
-                  ),
-                ]
-              : null,
-        ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: onTap == null
-                ? AppColors.controlInactive
-                : (isSelected ? AppColors.textStrong : AppColors.textMuted),
-          ),
         ),
       ),
     );

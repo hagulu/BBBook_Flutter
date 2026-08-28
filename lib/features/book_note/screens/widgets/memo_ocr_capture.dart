@@ -8,6 +8,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/image/screens/shared_camera_screen.dart';
 import '../../../../shared/image/screens/shared_image_editor_screen.dart';
 import '../../../../shared/widgets/app_alert.dart';
+import '../../../../shared/widgets/app_bar_title.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../services/book_note_memo_ocr_service.dart';
 
@@ -156,10 +157,7 @@ class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
           tooltip: '닫기',
           icon: const Icon(PhosphorIconsRegular.x),
         ),
-        title: const Text(
-          '발췌 문장 선택',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
+        title: const AppBarTitle('발췌 문장 선택'),
         actions: [
           TextButton(
             onPressed: _selectedIndexes.isEmpty

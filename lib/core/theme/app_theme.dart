@@ -152,6 +152,9 @@ ThemeData buildAppTheme() {
     useMaterial3: true,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: AppColors.pageBackground,
+    // titleTextStyle을 여기 넣으면 화면별 foregroundColor 상속이 끊긴다.
+    // toolbarHeight는 기본값(kToolbarHeight=56)을 그대로 쓴다.
+    appBarTheme: const AppBarTheme(centerTitle: false),
     // 기본 M3 bodyLarge(16px)는 TextField 입력 글씨로 쓰기엔 커 보여서(design-system.md
     // 본문 14~15px 기준) 앱 전역 입력창 글씨 크기를 낮춘다.
     textTheme: const TextTheme(
