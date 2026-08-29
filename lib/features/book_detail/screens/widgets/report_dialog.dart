@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
 
 /// 신고 사유 4종(common-interactions.md `ReportModal` 대응).
@@ -73,9 +74,16 @@ class _ReportDialogState extends State<_ReportDialog> {
                 for (final reason in ReportReason.values)
                   RadioListTile<ReportReason>(
                     value: reason,
+                    activeColor: AppColors.accentForeground,
                     dense: true,
                     contentPadding: EdgeInsets.zero,
-                    title: Text(reason.label, style: const TextStyle(fontSize: 14)),
+                    title: Text(
+                      reason.label,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textBody,
+                      ),
+                    ),
                   ),
               ],
             ),

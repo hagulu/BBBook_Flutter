@@ -108,13 +108,8 @@ class BookReflectionDetailScreen extends ConsumerWidget {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
+                  RecordDialogToggleTile(
                     value: isPublic,
-                    activeThumbColor: AppColors.surface,
-                    activeTrackColor: AppColors.accentForeground,
-                    inactiveThumbColor: AppColors.surface,
-                    inactiveTrackColor: AppColors.controlInactive,
                     onChanged: (value) async {
                       if (isUpdatingVisibility) return;
                       final previousValue = isPublic;
@@ -155,22 +150,23 @@ class BookReflectionDetailScreen extends ConsumerWidget {
                             isUpdatingVisibility = false;
                           });
                         } else if (screenContext.mounted) {
-                          AppSnackBar.error(screenContext, '공개 여부를 변경하지 못했습니다.');
+                          AppSnackBar.error(
+                            screenContext,
+                            '공개 여부를 변경하지 못했습니다.',
+                          );
                         }
                       }
                     },
-                    secondary: Icon(
-                      isPublic
-                          ? PhosphorIconsRegular.globe
-                          : PhosphorIconsRegular.lock,
-                    ),
-                    title: const Text('공개 여부'),
-                    subtitle: Text(isPublic ? '공개' : '비공개'),
+                    icon: isPublic
+                        ? PhosphorIconsRegular.globe
+                        : PhosphorIconsRegular.lock,
+                    title: '공개 여부',
+                    subtitle: isPublic ? '공개' : '비공개',
                   ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(PhosphorIconsRegular.pencil),
-                    title: const Text('수정'),
+                  const SizedBox(height: RecordDialogMetrics.itemSpacing),
+                  RecordDialogActionTile(
+                    icon: PhosphorIconsRegular.pencil,
+                    label: '수정',
                     onTap: isUpdatingVisibility
                         ? null
                         : () => Navigator.of(sheetContext).pop((
@@ -178,16 +174,11 @@ class BookReflectionDetailScreen extends ConsumerWidget {
                             isPublic: isPublic,
                           )),
                   ),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(
-                      PhosphorIconsRegular.trash,
-                      color: AppColors.error,
-                    ),
-                    title: const Text(
-                      '삭제',
-                      style: TextStyle(color: AppColors.error),
-                    ),
+                  const SizedBox(height: RecordDialogMetrics.itemSpacing),
+                  RecordDialogActionTile(
+                    icon: PhosphorIconsRegular.trash,
+                    label: '삭제',
+                    destructive: true,
                     onTap: isUpdatingVisibility
                         ? null
                         : () => Navigator.of(sheetContext).pop((

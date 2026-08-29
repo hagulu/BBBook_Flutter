@@ -510,69 +510,25 @@ class _NoteMemoActionSheet extends StatelessWidget {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _NoteMemoActionTile(
+          RecordDialogActionTile(
             icon: PhosphorIconsRegular.copy,
             label: '복사',
             onTap: () => Navigator.of(context).pop(_NoteMemoAction.copy),
           ),
           const SizedBox(height: 8),
-          _NoteMemoActionTile(
+          RecordDialogActionTile(
             icon: PhosphorIconsRegular.pencil,
             label: '수정',
             onTap: () => Navigator.of(context).pop(_NoteMemoAction.edit),
           ),
           const SizedBox(height: 8),
-          _NoteMemoActionTile(
+          RecordDialogActionTile(
             icon: PhosphorIconsRegular.trash,
             label: '삭제',
             destructive: true,
             onTap: () => Navigator.of(context).pop(_NoteMemoAction.delete),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _NoteMemoActionTile extends StatelessWidget {
-  const _NoteMemoActionTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.destructive = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool destructive;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = destructive ? AppColors.error : AppColors.textStrong;
-    return Material(
-      color: AppColors.surfaceSubtle,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-          child: Row(
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 12),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

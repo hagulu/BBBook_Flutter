@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/community_content.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../models/discussion_answer.dart';
 import '../../models/discussion_topic.dart';
+import '../../utils/discussion_date.dart';
 import '../../utils/discussion_poll.dart';
-import 'discussion_common.dart';
 import 'discussion_poll.dart';
 
 /// 답변 카드 한 장. "..." 메뉴의 수정을 누르면 카드가 인라인 편집 모드로
@@ -56,7 +57,9 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
 
   void _startEdit() {
     setState(() {
-      _editController = TextEditingController(text: widget.answer.content ?? '');
+      _editController = TextEditingController(
+        text: widget.answer.content ?? '',
+      );
     });
   }
 
@@ -86,21 +89,19 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
   Widget build(BuildContext context) {
     final answer = widget.answer;
 
-    return Container(
+    return CommunityContentCard(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
+      borderRadius: 14,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!_isEditing)
-            DiscussionAuthorRow(
-              user: answer.user,
-              createdAt: answer.createdAt,
+            CommunityAuthorRow(
+              nickname: answer.user.nickname,
+              profileImageUrl: answer.user.profileImageUrl,
+              dateLabel: formatDiscussionDateTime(answer.createdAt),
               avatarRadius: 13,
+              layout: CommunityAuthorLayout.stacked,
               trailing: answer.isHidden ? null : _buildMenu(answer),
             ),
           if (answer.isHidden)
@@ -141,7 +142,7 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
               const SizedBox(height: 10),
               Align(
                 alignment: Alignment.centerLeft,
-                child: DiscussionLikeButton(
+                child: CommunityLikeButton(
                   isLiked: answer.likedByMe,
                   likeCount: answer.likeCount,
                   onTap: widget.onToggleLike,
@@ -168,7 +169,7 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
       );
     }
 
-    return DiscussionMoreButton(
+    return CommunityMoreButton(
       tooltip: '답변 메뉴',
       iconSize: 18,
       onTap: () => _openMenuSheet(context),
@@ -186,13 +187,13 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (widget.canEdit)
-              DiscussionMenuTile(
+              CommunityMenuTile(
                 icon: PhosphorIconsRegular.pencilSimple,
                 label: '수정',
                 onTap: () =>
                     Navigator.pop(sheetContext, _AnswerMenuAction.edit),
               ),
-            DiscussionMenuTile(
+            CommunityMenuTile(
               icon: PhosphorIconsRegular.trash,
               label: '삭제',
               color: AppColors.error,
@@ -244,9 +245,7 @@ class _EditForm extends StatelessWidget {
           children: [
             TextButton(
               onPressed: isSaving ? null : onCancel,
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.textMuted,
-              ),
+              style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
               child: const Text('취소'),
             ),
             const SizedBox(width: 4),

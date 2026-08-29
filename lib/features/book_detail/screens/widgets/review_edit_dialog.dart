@@ -98,10 +98,15 @@ class _ReviewEditDialogState extends State<_ReviewEditDialog> {
           CheckboxListTile(
             value: _isSpoiler,
             onChanged: (v) => setState(() => _isSpoiler = v ?? false),
+            activeColor: AppColors.accentForeground,
+            checkColor: AppColors.surface,
             dense: true,
             contentPadding: EdgeInsets.zero,
             controlAffinity: ListTileControlAffinity.leading,
-            title: const Text('스포일러 포함', style: TextStyle(fontSize: 13)),
+            title: const Text(
+              '스포일러 포함',
+              style: TextStyle(fontSize: 13, color: AppColors.textBody),
+            ),
           ),
           if (_errorText != null)
             Padding(
@@ -113,9 +118,7 @@ class _ReviewEditDialogState extends State<_ReviewEditDialog> {
             ),
         ],
       ),
-      buttons: [
-        RecordDialogButton(label: '저장', onPressed: _save),
-      ],
+      buttons: [RecordDialogButton(label: '저장', onPressed: _save)],
     );
   }
 }

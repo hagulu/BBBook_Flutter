@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/community_content.dart';
 import '../../models/discussion_topic.dart';
 import '../../utils/discussion_date.dart';
 import 'discussion_common.dart';
@@ -22,81 +23,67 @@ class DiscussionTopicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surface,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: topic.isHidden
-              ? const Text(
-                  '숨김 처리된 토론입니다.',
-                  style: TextStyle(fontSize: 14, color: AppColors.textMuted),
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (topic.isClosed || topic.isSpoiler) ...[
-                      Wrap(
-                        spacing: 6,
-                        children: [
-                          if (topic.isClosed) const DiscussionBadge.closed(),
-                          if (topic.isSpoiler) const DiscussionBadge.spoiler(),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
+    return CommunityContentCard(
+      onTap: onTap,
+      child: topic.isHidden
+          ? const Text(
+              '숨김 처리된 토론입니다.',
+              style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (topic.isClosed || topic.isSpoiler) ...[
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      if (topic.isClosed) const DiscussionBadge.closed(),
+                      if (topic.isSpoiler) const DiscussionBadge.spoiler(),
                     ],
-                    Text(
-                      topic.title ?? '',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textStrong,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      topic.isSpoiler
-                          ? '스포일러가 포함된 토론입니다'
-                          : (topic.content ?? ''),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textMuted,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DiscussionAuthorRow(
-                      user: topic.user,
-                      createdAt: topic.createdAt,
-                      avatarRadius: 12,
-                      horizontal: true,
-                    ),
-                    if (_metaItems.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 4,
-                        children: [
-                          for (final item in _metaItems)
-                            _MetaChip(icon: item.$1, label: item.$2),
-                        ],
-                      ),
-                    ],
-                  ],
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                Text(
+                  topic.title ?? '',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textStrong,
+                  ),
                 ),
-        ),
-      ),
+                const SizedBox(height: 4),
+                Text(
+                  topic.isSpoiler ? '스포일러가 포함된 토론입니다' : (topic.content ?? ''),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textMuted,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                CommunityAuthorRow(
+                  nickname: topic.user.nickname,
+                  profileImageUrl: topic.user.profileImageUrl,
+                  dateLabel: formatDiscussionDate(topic.createdAt),
+                  avatarRadius: 12,
+                ),
+                if (_metaItems.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
+                    children: [
+                      for (final item in _metaItems)
+                        _MetaChip(icon: item.$1, label: item.$2),
+                    ],
+                  ),
+                ],
+              ],
+            ),
     );
   }
 

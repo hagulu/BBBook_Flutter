@@ -21,9 +21,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 /// 검색 결과 경유 책 상세 화면(`/books/[isbn]` 대응, book-detail.md).
 /// `BookSearchScreen`의 검색 결과 카드에서 `Navigator.push`로 진입한다.
 ///
-/// 공개 독후감 탭은 해당 기능(reflection-editor)이 아직 이관되지 않아 이번
-/// 범위에서 제외한다(사용자 확인 사항) — 커뮤니티 리뷰 섹션과 주제 토론
-/// 진입 버튼만 탭 구분 없이 바로 붙인다.
+/// 커뮤니티 리뷰와 공개 독후감·주제 토론 진입점을 책 정보 아래에 구성한다.
 class BookDetailScreen extends ConsumerStatefulWidget {
   const BookDetailScreen({super.key, required this.isbn});
 

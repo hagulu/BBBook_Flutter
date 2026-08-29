@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 /// 앱바 타이틀 공용 위젯. 기본 앱바 높이(56)에 맞춘 축소 글씨 크기를 쓰고,
 /// `subtitle`을 지정하면 제목 아래에 작게 배치한다(서브타이틀이 필요한 화면만
-/// 선택적으로 사용) — 이때는 제목도 14로 한 단계 더 줄여 두 줄이 한 덩어리로
-/// 보이게 한다. 두 줄일 때도 시스템 폰트 확대 배율 최대치(AppBar가 clamp하는
+/// 선택적으로 사용) — 이때는 제목을 14로 줄여 두 줄이 한 덩어리로 보이게
+/// 하고, 제목만 있을 때는 18로 표시한다. 두 줄일 때도 시스템 폰트 확대 배율 최대치(AppBar가 clamp하는
 /// 1.34배)까지 곱해도 56 안에 들어오도록 크기를 정했다
 /// (14*1.1 + 11*1.1 ≈ 27.5, ×1.34 ≈ 36.9 < 56).
 ///
@@ -26,7 +26,7 @@ class AppBarTitle extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        fontSize: hasSubtitle ? 14 : 16,
+        fontSize: hasSubtitle ? 14 : 18,
         fontWeight: FontWeight.w600,
         height: 1.1,
       ),

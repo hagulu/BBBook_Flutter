@@ -9,6 +9,7 @@ import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../book_record/screens/widgets/entry_button.dart';
 import '../../../book_record/screens/widgets/star_rating.dart';
 import '../../../discussion/screens/discussion_list_screen.dart';
+import '../../../public_reflection/screens/public_reflection_list_screen.dart';
 import '../../models/book_review.dart';
 import '../../providers/book_detail_providers.dart';
 import 'report_dialog.dart';
@@ -19,9 +20,8 @@ import 'review_item.dart';
 /// 화면(TODO: 미구현)에서 커서 기반 페이지네이션으로 보여준다.
 const _kPreviewCount = 3;
 
-/// 커뮤니티 리뷰 섹션(book-detail.md `CommunityReviews` 대응). 공개 독후감 탭은
-/// 해당 기능이 아직 이관되지 않아 이번 범위에서 제외하고(사용자 확인 사항),
-/// 이 섹션과 주제 토론 진입 버튼만 책 상세 화면에 직접 붙인다.
+/// 커뮤니티 리뷰 섹션(book-detail.md `CommunityReviews` 대응). 공개 독후감과
+/// 주제 토론 진입 버튼을 책 상세 화면에 직접 붙인다.
 ///
 /// 작성 폼은 화면에 포함하지 않는다(사용자 확인 사항) — 조회 전용으로,
 /// 최대 [_kPreviewCount]개만 보여주고 "더보기"는 전체 리스트 화면(미구현)
@@ -47,7 +47,7 @@ class CommunityReviewsSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _DiscussionEntryButtons(
-          onOpenReflections: () => _handleShowPlaceholder(context, '독후감'),
+          onOpenReflections: () => _openReflections(context),
           onOpenDiscussions: () => _openDiscussions(context),
         ),
         const SizedBox(height: 20),
@@ -68,10 +68,13 @@ class CommunityReviewsSection extends ConsumerWidget {
               const SizedBox(height: 12),
               _ReviewsList(
                 state: value,
-                onToggleLike: (review) => _handleToggleLike(context, controller, review),
+                onToggleLike: (review) =>
+                    _handleToggleLike(context, controller, review),
                 onEdit: (review) => _handleEdit(context, controller, review),
-                onDelete: (review) => _handleDelete(context, controller, review),
-                onReport: (review) => _handleReport(context, controller, review),
+                onDelete: (review) =>
+                    _handleDelete(context, controller, review),
+                onReport: (review) =>
+                    _handleReport(context, controller, review),
                 onShowMore: () => _handleShowMore(context),
               ),
             ],
@@ -189,9 +192,19 @@ class CommunityReviewsSection extends ConsumerWidget {
     );
   }
 
-  void _handleShowMore(BuildContext context) => _handleShowPlaceholder(context, '전체 리뷰 목록');
+  void _openReflections(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            PublicReflectionListScreen(isbn13: isbn13, bookTitle: bookTitle),
+      ),
+    );
+  }
 
-  // TODO: 독후감/전체 리뷰 목록 화면 구현 후 각각 해당 화면으로 이동.
+  void _handleShowMore(BuildContext context) =>
+      _handleShowPlaceholder(context, '전체 리뷰 목록');
+
+  // TODO: 전체 리뷰 목록 화면 구현 후 해당 화면으로 이동.
   void _handleShowPlaceholder(BuildContext context, String label) {
     AppSnackBar.info(context, '$label 화면은 준비 중입니다.');
   }
@@ -209,7 +222,8 @@ class _RatingSummary extends StatelessWidget {
     final rated = items.where((r) => r.rating != null).toList();
     if (rated.isEmpty) return const SizedBox.shrink();
 
-    final average = rated.map((r) => r.rating!).reduce((a, b) => a + b) / rated.length;
+    final average =
+        rated.map((r) => r.rating!).reduce((a, b) => a + b) / rated.length;
 
     return Row(
       children: [
@@ -242,7 +256,6 @@ class _RatingSummary extends StatelessWidget {
 /// 개수 배지는 노출하지 않는다 — 두 기능 모두 목록 API가 커서 페이지네이션만
 /// 제공하고 전체 개수(`totalCount`)를 내려주지 않아, 화면에 채울 수 있는
 /// 값이 실제 개수와 다르기 때문이다(TODO: 전체 개수 계약이 생기면 되살린다).
-/// 독후감 화면은 아직 이관되지 않아(사용자 확인 사항) 준비 중 안내만 띄운다.
 class _DiscussionEntryButtons extends StatelessWidget {
   const _DiscussionEntryButtons({
     required this.onOpenReflections,
@@ -324,10 +337,7 @@ class _ReviewsList extends StatelessWidget {
           const SizedBox(height: 10),
         ],
         if (hasMore)
-          TextButton(
-            onPressed: onShowMore,
-            child: const Text('더보기'),
-          ),
+          TextButton(onPressed: onShowMore, child: const Text('더보기')),
         if (state.isLoadingMore)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 12),

@@ -6,6 +6,7 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../../book_search/models/book_search_item.dart';
 import '../../../book_search/providers/book_search_providers.dart';
 import '../../../book_search/screens/widgets/search_result_card.dart';
@@ -217,155 +218,114 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // 흰 배경 컨테이너가 화면 맨 아래까지 이어지도록 SafeArea로 감싸 크기를
-    // 줄이는 대신, 하단 세이프 에어리어(홈 인디케이터 등)만큼을 컨테이너
-    // 내부 패딩에 더한다(record_dialog_shell.dart와 동일한 처리) — 검색
-    // 결과 목록은 길이가 가변적이라 다른 바텀시트처럼 내용에 맞춰 크기를
-    // 줄이는 대신 화면의 85%를 고정 높이로 잡고 그 안에서 목록만 스크롤한다.
-    return Material(
-      color: Colors.transparent,
-      child: Container(
-        height: MediaQuery.sizeOf(context).height * 0.85,
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: EdgeInsets.only(
-          top: 12,
-          bottom:
-              MediaQuery.viewInsetsOf(context).bottom +
-              MediaQuery.viewPaddingOf(context).bottom,
-        ),
-        child: Column(
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+    // 검색 결과는 길이가 가변적이므로 화면의 85% 높이 안에서 목록만
+    // 스크롤한다. 높이 차이는 유지하고 표면·핸들·헤더는 다른 시트와 같은
+    // 공통 규격을 사용한다.
+    return RecordDialogSurface(
+      height: MediaQuery.sizeOf(context).height * 0.85,
+      horizontalPadding: 0,
+      bottomPadding: 0,
+      child: Column(
+        children: [
+          const RecordDialogHandle(),
+          const SizedBox(height: RecordDialogMetrics.handleToHeader),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: RecordDialogMetrics.horizontalPadding,
             ),
-            const SizedBox(height: 16),
-            // 제목은 왼쪽, 진행 개수 + 건너뛰기/중단은 오른쪽에 묶는다
-            // (좁은 화면·큰 글자 배율에서는 `Wrap`이 오른쪽 묶음을 다음
-            // 줄로 자연스럽게 내린다).
+            child: RecordDialogHeader(
+              title: '책 연결',
+              trailing: widget.bulkProgress == null
+                  ? null
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${widget.bulkProgress!.index} / ${widget.bulkProgress!.total}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        SkipStopButtons(
+                          onSkip: _handleSkip,
+                          onStop: () => Navigator.of(
+                            context,
+                          ).pop(const IsbnSearchResult.stop()),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+          if (widget.bulkProgress != null &&
+              widget.userBookId != null &&
+              (widget.immediateSave != null ||
+                  widget.excludeFromList != null)) ...[
+            const SizedBox(height: 10),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              // 이 시트를 감싼 바깥 `Column`이 `crossAxisAlignment`를
-              // 지정하지 않아(기본값 center) `Wrap`이 그냥 두면 자기
-              // 콘텐츠 폭만큼만 차지해 `spaceBetween`이 벌릴 여유 공간이
-              // 없다 — `SizedBox(width: double.infinity)`로 가로 폭을
-              // 강제로 꽉 채운다.
+              padding: const EdgeInsets.symmetric(
+                horizontal: RecordDialogMetrics.horizontalPadding,
+              ),
               child: SizedBox(
                 width: double.infinity,
                 child: Wrap(
                   alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    const Text(
-                      '책 연결',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textStrong,
-                      ),
-                    ),
-                    if (widget.bulkProgress != null)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${widget.bulkProgress!.index} / ${widget.bulkProgress!.total}',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textMuted,
+                    ?widget.immediateSave != null
+                        ? ValueListenableBuilder<bool>(
+                            valueListenable: widget.immediateSave!,
+                            builder: (context, checked, _) => PillOption(
+                              label: '즉시 저장',
+                              icon: PhosphorIconsRegular.lightning,
+                              selected: checked,
+                              onTap: () =>
+                                  widget.immediateSave!.value = !checked,
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          SkipStopButtons(
-                            onSkip: _handleSkip,
-                            onStop: () => Navigator.of(
-                              context,
-                            ).pop(const IsbnSearchResult.stop()),
-                          ),
-                        ],
-                      ),
+                          )
+                        : null,
+                    ?widget.excludeFromList != null
+                        ? ValueListenableBuilder<bool>(
+                            valueListenable: widget.excludeFromList!,
+                            builder: (context, checked, _) => PillOption(
+                              label: '연결 대상 목록에서 제외',
+                              icon: PhosphorIconsRegular.eyeSlash,
+                              selected: checked,
+                              onTap: () =>
+                                  widget.excludeFromList!.value = !checked,
+                            ),
+                          )
+                        : null,
                   ],
                 ),
               ),
             ),
-            if (widget.bulkProgress != null &&
-                widget.userBookId != null &&
-                (widget.immediateSave != null ||
-                    widget.excludeFromList != null)) ...[
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                // 위 제목 행과 같은 이유로 `SizedBox`로 가로 폭을 꽉
-                // 채워야 `spaceBetween`이 두 토글을 양 끝으로 벌린다.
-                child: SizedBox(
-                  width: double.infinity,
-                  child: Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      ?widget.immediateSave != null
-                          ? ValueListenableBuilder<bool>(
-                              valueListenable: widget.immediateSave!,
-                              builder: (context, checked, _) => PillOption(
-                                label: '즉시 저장',
-                                icon: PhosphorIconsRegular.lightning,
-                                selected: checked,
-                                onTap: () =>
-                                    widget.immediateSave!.value = !checked,
-                              ),
-                            )
-                          : null,
-                      ?widget.excludeFromList != null
-                          ? ValueListenableBuilder<bool>(
-                              valueListenable: widget.excludeFromList!,
-                              builder: (context, checked, _) => PillOption(
-                                label: '연결 대상 목록에서 제외',
-                                icon: PhosphorIconsRegular.eyeSlash,
-                                selected: checked,
-                                onTap: () =>
-                                    widget.excludeFromList!.value = !checked,
-                              ),
-                            )
-                          : null,
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: TextField(
-                controller: _queryController,
-                textInputAction: TextInputAction.search,
-                onSubmitted: (_) => _search(),
-                decoration: const InputDecoration(
-                  isDense: true,
-                  hintText: '책, 저자, ISBN으로 검색',
-                  prefixIcon: Icon(
-                    PhosphorIconsRegular.magnifyingGlass,
-                    size: 18,
-                  ),
+          ],
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: RecordDialogMetrics.horizontalPadding,
+            ),
+            child: TextField(
+              controller: _queryController,
+              textInputAction: TextInputAction.search,
+              onSubmitted: (_) => _search(),
+              decoration: const InputDecoration(
+                isDense: true,
+                hintText: '책, 저자, ISBN으로 검색',
+                prefixIcon: Icon(
+                  PhosphorIconsRegular.magnifyingGlass,
+                  size: 18,
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            Expanded(child: _body()),
-          ],
-        ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(child: _body()),
+        ],
       ),
     );
   }

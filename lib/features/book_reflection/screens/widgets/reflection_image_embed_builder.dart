@@ -189,7 +189,7 @@ class ReflectionImageEmbedBuilder extends EmbedBuilder {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: _ImageMenuItem(
+              child: RecordDialogActionCard(
                 icon: PhosphorIconsRegular.arrowsIn,
                 label: '작게',
                 description: '50%',
@@ -204,7 +204,7 @@ class ReflectionImageEmbedBuilder extends EmbedBuilder {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: _ImageMenuItem(
+              child: RecordDialogActionCard(
                 icon: PhosphorIconsRegular.arrowsHorizontal,
                 label: '보통',
                 description: '75%',
@@ -219,7 +219,7 @@ class ReflectionImageEmbedBuilder extends EmbedBuilder {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: _ImageMenuItem(
+              child: RecordDialogActionCard(
                 icon: PhosphorIconsRegular.arrowsOut,
                 label: '크게',
                 description: '100%',
@@ -234,10 +234,10 @@ class ReflectionImageEmbedBuilder extends EmbedBuilder {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: _ImageMenuItem(
+              child: RecordDialogActionCard(
                 icon: PhosphorIconsRegular.trash,
                 label: '삭제',
-                foregroundColor: AppColors.error,
+                destructive: true,
                 onTap: () {
                   Navigator.of(sheetContext).pop();
                   onDeleteImage?.call(controller, offset);
@@ -280,91 +280,6 @@ class _ViewerBrokenImage extends StatelessWidget {
         PhosphorIconsRegular.imageBroken,
         size: 36,
         color: AppColors.textMuted,
-      ),
-    );
-  }
-}
-
-class _ImageMenuItem extends StatelessWidget {
-  const _ImageMenuItem({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.description,
-    this.selected = false,
-    this.foregroundColor = AppColors.textBody,
-  });
-
-  final IconData icon;
-  final String label;
-  final String? description;
-  final bool selected;
-  final Color foregroundColor;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDestructive = foregroundColor == AppColors.error;
-    final iconColor = isDestructive
-        ? AppColors.error
-        : selected
-        ? AppColors.accentForeground
-        : AppColors.controlInactive;
-    final labelColor = isDestructive
-        ? AppColors.error
-        : selected
-        ? AppColors.accentForeground
-        : AppColors.textBody;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: label,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onTap,
-        child: Container(
-          height: 84,
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 12),
-          decoration: BoxDecoration(
-            color: selected
-                ? AppColors.accentSurface.withValues(alpha: 0.35)
-                : AppColors.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: selected ? AppColors.accentForeground : AppColors.border,
-              width: selected ? 1.5 : 1,
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 24, color: iconColor),
-              const SizedBox(height: 7),
-              Text(
-                label,
-                maxLines: 1,
-                style: TextStyle(
-                  color: labelColor,
-                  fontSize: 11,
-                  fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-                ),
-              ),
-              if (description != null) ...[
-                const SizedBox(height: 2),
-                Text(
-                  description!,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: selected
-                        ? AppColors.accentForeground
-                        : AppColors.textMuted,
-                    fontSize: 10,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
       ),
     );
   }

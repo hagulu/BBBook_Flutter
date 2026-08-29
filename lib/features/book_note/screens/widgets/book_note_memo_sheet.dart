@@ -11,6 +11,7 @@ import '../../../../shared/widgets/app_alert.dart';
 import '../../../../shared/widgets/app_bar_title.dart';
 import '../../../../shared/widgets/app_confirm.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../models/book_note.dart';
 import '../../services/note_memo_image_store.dart';
 import '../memo_photo_camera_screen.dart';
@@ -39,10 +40,7 @@ Future<BookNoteMemoDraft?> showBookNoteMemoQuickComposer(BuildContext context) {
     context: context,
     isScrollControlled: true,
     showDragHandle: false,
-    backgroundColor: AppColors.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-    ),
+    backgroundColor: Colors.transparent,
     builder: (_) => const _BookNoteMemoQuickComposer(),
   );
 }
@@ -75,139 +73,133 @@ class _BookNoteMemoQuickComposerState
 
   @override
   Widget build(BuildContext context) {
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final canSave = _contentController.text.trim().isNotEmpty;
-    return AnimatedPadding(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
-      padding: EdgeInsets.only(bottom: keyboardInset),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+    return RecordDialogSurface(
+      horizontalPadding: 16,
+      bottomPadding: 12,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const RecordDialogHandle(),
+          const SizedBox(height: 12),
+          Row(
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: [
-                        for (final type in _quickTypes)
-                          Builder(
-                            builder: (context) {
-                              final style = _NoteMemoTypeChoiceStyle.of(type);
-                              final selected = _type == type;
-                              return ChoiceChip(
-                                avatar: Icon(
-                                  style.icon,
-                                  size: 16,
-                                  color: style.foreground,
-                                ),
-                                label: Text(type.label),
-                                selected: selected,
-                                showCheckmark: false,
-                                selectedColor: style.background,
-                                backgroundColor: AppColors.surface,
-                                side: BorderSide(
-                                  color: selected
-                                      ? style.foreground
-                                      : AppColors.border,
-                                  width: selected ? 1.3 : 1,
-                                ),
-                                shape: const StadiumBorder(),
-                                visualDensity: const VisualDensity(
-                                  horizontal: -1,
-                                  vertical: 1,
-                                ),
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                                labelPadding: const EdgeInsets.only(
-                                  left: 3,
-                                  right: 5,
-                                ),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 5,
-                                ),
-                                labelStyle: TextStyle(
-                                  color: style.foreground,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                onSelected: (_) => _onTypeSelected(type),
-                              );
-                            },
-                          ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _expand,
-                    tooltip: '전체 편집 화면으로 확장',
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(PhosphorIconsRegular.arrowsOut, size: 18),
-                  ),
-                ],
+              Expanded(
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    for (final type in _quickTypes)
+                      Builder(
+                        builder: (context) {
+                          final style = _NoteMemoTypeChoiceStyle.of(type);
+                          final selected = _type == type;
+                          return ChoiceChip(
+                            avatar: Icon(
+                              style.icon,
+                              size: 16,
+                              color: style.foreground,
+                            ),
+                            label: Text(type.label),
+                            selected: selected,
+                            showCheckmark: false,
+                            selectedColor: style.background,
+                            backgroundColor: AppColors.surface,
+                            side: BorderSide(
+                              color: selected
+                                  ? style.foreground
+                                  : AppColors.border,
+                              width: selected ? 1.3 : 1,
+                            ),
+                            shape: const StadiumBorder(),
+                            visualDensity: const VisualDensity(
+                              horizontal: -1,
+                              vertical: 1,
+                            ),
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            labelPadding: const EdgeInsets.only(
+                              left: 3,
+                              right: 5,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 5,
+                            ),
+                            labelStyle: TextStyle(
+                              color: style.foreground,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            onSelected: (_) => _onTypeSelected(type),
+                          );
+                        },
+                      ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 6),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _contentController,
-                      autofocus: true,
-                      minLines: 1,
-                      maxLines: 5,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.newline,
-                      style: const TextStyle(
-                        color: AppColors.textBody,
-                        fontSize: 15,
-                        height: 1.35,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: '메모를 빠르게 남겨보세요.',
-                        filled: false,
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 10,
-                        ),
-                      ),
-                      onChanged: (_) => setState(() {}),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  IconButton(
-                    onPressed: canSave ? _submit : null,
-                    tooltip: '메모 추가',
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 46,
-                      height: 46,
-                    ),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.accentFill,
-                      disabledBackgroundColor: AppColors.surfaceSubtle,
-                      foregroundColor: AppColors.textStrong,
-                      disabledForegroundColor: AppColors.controlInactive,
-                      shape: const CircleBorder(),
-                    ),
-                    icon: const Icon(PhosphorIconsRegular.arrowUp, size: 21),
-                  ),
-                ],
+              IconButton(
+                onPressed: _expand,
+                tooltip: '전체 편집 화면으로 확장',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(PhosphorIconsRegular.arrowsOut, size: 18),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _contentController,
+                  autofocus: true,
+                  minLines: 1,
+                  maxLines: 5,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+                  style: const TextStyle(
+                    color: AppColors.textBody,
+                    fontSize: 15,
+                    height: 1.35,
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: '메모를 빠르게 남겨보세요.',
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 10,
+                    ),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              const SizedBox(width: 10),
+              IconButton(
+                onPressed: canSave ? _submit : null,
+                tooltip: '메모 추가',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 46,
+                  height: 46,
+                ),
+                style: IconButton.styleFrom(
+                  backgroundColor: AppColors.accentFill,
+                  disabledBackgroundColor: AppColors.surfaceSubtle,
+                  foregroundColor: AppColors.textStrong,
+                  disabledForegroundColor: AppColors.controlInactive,
+                  shape: const CircleBorder(),
+                ),
+                icon: const Icon(PhosphorIconsRegular.arrowUp, size: 21),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -110,7 +110,7 @@
 
 ## features/book_detail
 
-- `lib/features/book_detail/screens/book_detail_screen.dart` — 검색 결과 경유 책 상세 화면, 정보/서재 담기/구매/커뮤니티 리뷰 조립(공개 독후감 탭은 미이관 기능이라 제외), 주제 토론 목록 진입
+- `lib/features/book_detail/screens/book_detail_screen.dart` — 검색 결과 경유 책 상세 화면, 정보/서재 담기/구매/커뮤니티 리뷰 조립과 공개 독후감·주제 토론 목록 진입
 - `lib/features/book_detail/data/book_detail_api.dart` — 책 상세 API 호출(상세 조회, 서재 존재 확인, 서재 담기, 리뷰 CRUD, 좋아요, 신고)
 - `lib/features/book_detail/providers/book_detail_providers.dart` — 책 상세/커뮤니티 리뷰 관련 Riverpod provider(상세+서재 포함 여부 컨트롤러, 리뷰 커서 무한 스크롤 컨트롤러)
 
@@ -122,6 +122,14 @@
 - `lib/features/discussion/data/discussion_api.dart` — 토론 API 호출(주제 목록/상세/작성/수정/마감일/닫기/재오픈/삭제, 답변 CRUD, 공감, 신고)
 - `lib/features/discussion/providers/discussion_providers.dart` — 토론 관련 Riverpod provider(목록·상세·답변 목록 컨트롤러, 낙관적 공감 토글)
 - `lib/features/discussion/utils/discussion_poll.dart` — 선택지 색 팔레트 배정·append-only 검증·퍼센트 포맷
+
+## features/public_reflection
+
+- `lib/features/public_reflection/screens/public_reflection_list_screen.dart` — ISBN13 기준 공개 독후감 목록(숨김 제외, 커서 무한 스크롤)과 리더 진입점
+- `lib/features/public_reflection/screens/public_reflection_reader_screen.dart` — 공개·발행 상태를 검증한 독후감의 읽기 전용 Quill 리더(이미지·헤더·인용·목록·색상·공감 지원)
+- `lib/features/public_reflection/data/public_reflection_api.dart` — 공개 독후감 목록·상세 조회와 공감 추가·취소 API 호출
+- `lib/features/public_reflection/services/public_reflection_service.dart` — 숨김 목록 제거와 공개·발행·ISBN 상세 노출 조건을 보장하는 조회 서비스
+- `lib/features/public_reflection/providers/public_reflection_providers.dart` — 공개 독후감 목록 커서 페이징·상세 조회·낙관적 공감 토글 Riverpod provider
 
 ## shared/widgets
 
@@ -152,3 +160,4 @@
 - `docs/review/20260828-150017-app-bar-sharing-discussion-ui-review.md` — 공통 앱바·생각나눔·토론 UI 변경의 선택지 상태·상대 시각·탭 피드백 리뷰
 - `docs/review/20260828-151504-app-bar-sharing-discussion-ui-rereview.md` — 공통 앱바·생각나눔·토론 UI 후속 수정의 선택지 최대 개수·상대 시각 재리뷰
 - `docs/review/20260828-152535-app-bar-sharing-discussion-ui-third-review.md` — 선택지 추가 UI 후속 수정의 최대 개수 경계·상대 시각 3차 리뷰
+- `docs/review/20260828-212316-public-reflection-and-common-ui-review.md` — 공개 독후감과 공용 커뮤니티 UI의 숨김 페이지네이션·공감 경합·시간·터치 접근성 리뷰

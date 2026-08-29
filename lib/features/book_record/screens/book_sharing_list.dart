@@ -3,13 +3,14 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../discussion/screens/discussion_list_screen.dart';
+import '../../public_reflection/screens/public_reflection_list_screen.dart';
 import 'widgets/entry_button.dart';
 
 /// 책 기록 상세의 "생각나눔" 탭. 이 책에 대해 다른 독자와 나누는 콘텐츠
 /// (독자평/독후감/토론) 목록으로 넘어가는 진입 버튼만 모아 둔다.
 ///
-/// 현재는 주제 토론만 연결돼 있고, 독자평·공개 독후감 목록은 아직 이관되지
-/// 않아 안내만 띄운다.
+/// 독자평은 아직 준비 중이며, 공개 독후감과 주제 토론은 ISBN 기준 목록으로
+/// 연결한다.
 class BookSharingList extends StatelessWidget {
   const BookSharingList({
     super.key,
@@ -19,7 +20,8 @@ class BookSharingList extends StatelessWidget {
 
   final String bookTitle;
 
-  /// 토론은 ISBN 기준 API라 직접 등록한 책(ISBN 없음)에서는 진입할 수 없다.
+  /// 공개 독후감과 토론은 ISBN 기준 API라 직접 등록한 책(ISBN 없음)에서는
+  /// 진입할 수 없다.
   final String? isbn13;
 
   @override
@@ -37,7 +39,7 @@ class BookSharingList extends StatelessWidget {
         EntryButton(
           icon: PhosphorIconsRegular.notebook,
           label: '독후감',
-          onTap: () => _showPlaceholder(context, '독후감'),
+          onTap: () => _openReflections(context),
         ),
         const SizedBox(height: 12),
         EntryButton(
@@ -63,7 +65,21 @@ class BookSharingList extends StatelessWidget {
     );
   }
 
-  // TODO: 독자평/공개 독후감 목록 화면 구현 후 각각 해당 화면으로 이동.
+  void _openReflections(BuildContext context) {
+    final isbn = isbn13;
+    if (isbn == null || isbn.isEmpty) {
+      AppSnackBar.info(context, 'ISBN이 없는 책은 공개 독후감을 조회할 수 없습니다.');
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            PublicReflectionListScreen(isbn13: isbn, bookTitle: bookTitle),
+      ),
+    );
+  }
+
+  // TODO: 독자평 목록 화면 구현 후 해당 화면으로 이동.
   void _showPlaceholder(BuildContext context, String label) {
     AppSnackBar.info(context, '$label 화면은 준비 중입니다.');
   }

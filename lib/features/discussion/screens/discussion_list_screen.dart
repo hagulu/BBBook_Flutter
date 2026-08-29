@@ -4,6 +4,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_bar_title.dart';
+import '../../../shared/widgets/community_content.dart';
 import '../models/discussion_topic.dart';
 import '../providers/discussion_providers.dart';
 import 'discussion_detail_screen.dart';
@@ -71,7 +72,9 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
 
   Future<void> _openDetail(int topicId) async {
     await Navigator.of(context).push<void>(
-      MaterialPageRoute(builder: (_) => DiscussionDetailScreen(topicId: topicId)),
+      MaterialPageRoute(
+        builder: (_) => DiscussionDetailScreen(topicId: topicId),
+      ),
     );
     if (!mounted) return;
     // 상세에서 작성/수정/닫기/삭제가 일어났을 수 있어 목록을 최신화한다.
@@ -84,7 +87,7 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: AppBarTitle(widget.bookTitle),
+        title: AppBarTitle(widget.bookTitle, subtitle: '주제 토론'),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,
@@ -94,20 +97,11 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Row(
+            CommunityContentListHeader(
+              title: '주제 토론',
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Expanded(
-                    child: Text(
-                      '주제 토론',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textStrong,
-                      ),
-                    ),
-                  ),
                   _FilterChip(
                     label: '열린 토론',
                     isSelected: !_includeClosed,
@@ -132,11 +126,12 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
                       .refresh(),
                   onOpen: _openDetail,
                 ),
-                AsyncError() => _ErrorBody(
+                AsyncError() => CommunityContentErrorState(
+                  message: '토론을 불러오지 못했습니다.',
                   onRetry: () =>
                       ref.invalidate(discussionListControllerProvider(_args)),
                 ),
-                _ => const Center(child: CircularProgressIndicator()),
+                _ => const CommunityContentLoadingState(),
               },
             ),
           ],
@@ -172,21 +167,10 @@ class _TopicList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (state.items.isEmpty) {
-      return RefreshIndicator(
+      return CommunityContentEmptyList(
+        message: '아직 등록된 토론이 없습니다.',
+        scrollController: scrollController,
         onRefresh: onRefresh,
-        child: ListView(
-          controller: scrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: const [
-            SizedBox(height: 80),
-            Center(
-              child: Text(
-                '아직 등록된 토론이 없습니다.',
-                style: TextStyle(color: AppColors.textMuted),
-              ),
-            ),
-          ],
-        ),
       );
     }
 
@@ -200,15 +184,7 @@ class _TopicList extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(height: 10),
         itemBuilder: (context, index) {
           if (index >= state.items.length) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(
-                child: Text(
-                  '불러오는 중...',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-                ),
-              ),
-            );
+            return const CommunityContentPageLoader();
           }
           final topic = state.items[index];
           return DiscussionTopicCard(
@@ -252,29 +228,6 @@ class _FilterChip extends StatelessWidget {
             color: isSelected ? AppColors.textStrong : AppColors.textMuted,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ErrorBody extends StatelessWidget {
-  const _ErrorBody({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text(
-            '토론을 불러오지 못했습니다.',
-            style: TextStyle(color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 8),
-          TextButton(onPressed: onRetry, child: const Text('다시 시도')),
-        ],
       ),
     );
   }
