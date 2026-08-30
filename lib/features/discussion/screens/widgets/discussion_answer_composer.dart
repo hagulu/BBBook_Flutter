@@ -1,84 +1,125 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
+import 'discussion_poll.dart';
 
-/// 답변 작성 입력창(본문 + 취소/등록).
+/// 답변 작성 바텀시트(본문 입력 + 등록). 선택지 토론이면 상단에 선택한
+/// 선택지를 [DiscussionVoteBanner]로 보여준 채로 의견을 적게 하고, 자유
+/// 토론이면 선택지 표시 없이 본문만 입력한다.
 ///
-/// 선택지 토론에서는 선택한 선택지 바로 아래에 인라인으로 열리고, 자유 토론
-/// 에서는 "내 답변 작성" 카드 안에서 열린다. 두 경우 모두 등록 버튼은 본문이
-/// 비어 있으면 비활성화된다.
-class DiscussionAnswerComposer extends StatelessWidget {
-  const DiscussionAnswerComposer({
-    super.key,
-    required this.controller,
+/// [onSubmit]이 성공(true)을 반환하면 시트를 닫고, 실패(false)를 반환하면
+/// 입력값을 유지한 채 다시 등록할 수 있게 열어 둔다(에러 안내는 호출부가
+/// 스낵바로 표시).
+Future<void> showDiscussionAnswerSheet(
+  BuildContext context, {
+  required String hintText,
+  required Future<bool> Function(String content) onSubmit,
+  String? selectedOptionLabel,
+  Color? accentColor,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => _DiscussionAnswerSheet(
+      hintText: hintText,
+      selectedOptionLabel: selectedOptionLabel,
+      accentColor: accentColor,
+      onSubmit: onSubmit,
+    ),
+  );
+}
+
+class _DiscussionAnswerSheet extends StatefulWidget {
+  const _DiscussionAnswerSheet({
     required this.hintText,
-    required this.isSubmitting,
-    required this.onCancel,
     required this.onSubmit,
+    this.selectedOptionLabel,
     this.accentColor,
   });
 
-  final TextEditingController controller;
   final String hintText;
-  final bool isSubmitting;
-  final VoidCallback onCancel;
-  final VoidCallback onSubmit;
-
-  /// 선택지 토론에서 선택한 선택지 색. 지정하면 입력창 포커스 테두리에 쓴다.
+  final Future<bool> Function(String content) onSubmit;
+  final String? selectedOptionLabel;
   final Color? accentColor;
 
   @override
-  Widget build(BuildContext context) {
-    final accent = accentColor ?? AppColors.accentForeground;
+  State<_DiscussionAnswerSheet> createState() => _DiscussionAnswerSheetState();
+}
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: controller,
-          autofocus: true,
-          minLines: 3,
-          maxLines: 8,
-          style: const TextStyle(fontSize: 14, color: AppColors.textBody),
-          decoration: InputDecoration(
-            hintText: hintText,
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: accent, width: 1.5),
+class _DiscussionAnswerSheetState extends State<_DiscussionAnswerSheet> {
+  final _controller = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 본문이 비어 있으면 등록 버튼을 비활성화하기 위해 입력마다 다시
+    // 그린다(빈 답변으로 눌러도 조용히 무시되던 문제).
+    _controller.addListener(_handleContentChanged);
+  }
+
+  void _handleContentChanged() => setState(() {});
+
+  @override
+  void dispose() {
+    _controller.removeListener(_handleContentChanged);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final content = _controller.text.trim();
+    if (content.isEmpty || _isSubmitting) return;
+    setState(() => _isSubmitting = true);
+    final success = await widget.onSubmit(content);
+    if (!mounted) return;
+    if (success) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() => _isSubmitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = widget.accentColor ?? AppColors.accentForeground;
+
+    return RecordDialogShell(
+      title: '답변 작성',
+      content: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.selectedOptionLabel != null) ...[
+            DiscussionVoteBanner(
+              label: widget.selectedOptionLabel!,
+              color: accent,
+            ),
+            const SizedBox(height: 12),
+          ],
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            minLines: 3,
+            maxLines: 8,
+            style: const TextStyle(fontSize: 14, color: AppColors.textBody),
+            decoration: InputDecoration(
+              hintText: widget.hintText,
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: accent, width: 1.5),
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            TextButton(
-              onPressed: isSubmitting ? null : onCancel,
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.textMuted,
-              ),
-              child: const Text('취소'),
-            ),
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: controller,
-              builder: (context, value, _) {
-                final canSubmit = value.text.trim().isNotEmpty && !isSubmitting;
-                return FilledButton(
-                  onPressed: canSubmit ? onSubmit : null,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.accentFill,
-                    foregroundColor: AppColors.textStrong,
-                    minimumSize: const Size(72, 38),
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                  child: Text(isSubmitting ? '등록 중' : '등록'),
-                );
-              },
-            ),
-          ],
+        ],
+      ),
+      buttons: [
+        RecordDialogButton(
+          label: _isSubmitting ? '등록 중' : '등록',
+          onPressed: _controller.text.trim().isNotEmpty && !_isSubmitting
+              ? _submit
+              : null,
         ),
       ],
     );

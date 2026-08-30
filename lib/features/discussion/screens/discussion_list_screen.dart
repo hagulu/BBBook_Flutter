@@ -94,58 +94,32 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CommunityContentListHeader(
-              title: '주제 토론',
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _FilterChip(
-                    label: '열린 토론',
-                    isSelected: !_includeClosed,
-                    onTap: () => setState(() => _includeClosed = false),
-                  ),
-                  const SizedBox(width: 6),
-                  _FilterChip(
-                    label: '전체',
-                    isSelected: _includeClosed,
-                    onTap: () => setState(() => _includeClosed = true),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: switch (state) {
-                AsyncData(:final value) => _TopicList(
-                  scrollController: _scrollController,
-                  state: value,
-                  onRefresh: () => ref
-                      .read(discussionListControllerProvider(_args).notifier)
-                      .refresh(),
-                  onOpen: _openDetail,
-                ),
-                AsyncError() => CommunityContentErrorState(
-                  message: '토론을 불러오지 못했습니다.',
-                  onRetry: () =>
-                      ref.invalidate(discussionListControllerProvider(_args)),
-                ),
-                _ => const CommunityContentLoadingState(),
-              },
-            ),
-          ],
-        ),
+        child: switch (state) {
+          AsyncData(:final value) => _TopicList(
+            scrollController: _scrollController,
+            state: value,
+            includeClosed: _includeClosed,
+            onFilterChanged: (value) => setState(() => _includeClosed = value),
+            onRefresh: () => ref
+                .read(discussionListControllerProvider(_args).notifier)
+                .refresh(),
+            onOpen: _openDetail,
+          ),
+          AsyncError() => CommunityContentErrorState(
+            message: '토론을 불러오지 못했습니다.',
+            onRetry: () =>
+                ref.invalidate(discussionListControllerProvider(_args)),
+          ),
+          _ => const CommunityContentLoadingState(),
+        },
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: FloatingActionButton(
         onPressed: _openForm,
+        tooltip: '토론 작성',
+        shape: const CircleBorder(),
         backgroundColor: AppColors.accentFill,
         foregroundColor: AppColors.textStrong,
-        icon: const Icon(PhosphorIconsRegular.plus, size: 18),
-        label: const Text(
-          '토론 작성',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        ),
+        child: const Icon(PhosphorIconsRegular.plus),
       ),
     );
   }
@@ -155,22 +129,59 @@ class _TopicList extends StatelessWidget {
   const _TopicList({
     required this.scrollController,
     required this.state,
+    required this.includeClosed,
+    required this.onFilterChanged,
     required this.onRefresh,
     required this.onOpen,
   });
 
   final ScrollController scrollController;
   final DiscussionListState<DiscussionTopic> state;
+  final bool includeClosed;
+  final ValueChanged<bool> onFilterChanged;
   final Future<void> Function() onRefresh;
   final void Function(int topicId) onOpen;
 
   @override
   Widget build(BuildContext context) {
+    final filterRow = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _FilterChip(
+            label: '열린 토론',
+            isSelected: !includeClosed,
+            onTap: () => onFilterChanged(false),
+          ),
+          const SizedBox(width: 6),
+          _FilterChip(
+            label: '전체',
+            isSelected: includeClosed,
+            onTap: () => onFilterChanged(true),
+          ),
+        ],
+      ),
+    );
+
     if (state.items.isEmpty) {
-      return CommunityContentEmptyList(
-        message: '아직 등록된 토론이 없습니다.',
-        scrollController: scrollController,
+      return RefreshIndicator(
         onRefresh: onRefresh,
+        child: ListView(
+          controller: scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            filterRow,
+            const SizedBox(height: 68),
+            const Center(
+              child: Text(
+                '아직 등록된 토론이 없습니다.',
+                style: TextStyle(color: AppColors.textMuted),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -179,18 +190,27 @@ class _TopicList extends StatelessWidget {
       child: ListView.separated(
         controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
-        itemCount: state.items.length + (state.isLoadingMore ? 1 : 0),
-        separatorBuilder: (_, _) => const SizedBox(height: 10),
+        padding: const EdgeInsets.fromLTRB(0, 0, 0, 96),
+        itemCount: 1 + state.items.length + (state.isLoadingMore ? 1 : 0),
+        separatorBuilder: (_, index) =>
+            index == 0 ? const SizedBox.shrink() : const SizedBox(height: 10),
         itemBuilder: (context, index) {
-          if (index >= state.items.length) {
-            return const CommunityContentPageLoader();
+          if (index == 0) return filterRow;
+          final itemIndex = index - 1;
+          if (itemIndex >= state.items.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: CommunityContentPageLoader(),
+            );
           }
-          final topic = state.items[index];
-          return DiscussionTopicCard(
-            key: ValueKey(topic.id),
-            topic: topic,
-            onTap: () => onOpen(topic.id),
+          final topic = state.items[itemIndex];
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: DiscussionTopicCard(
+              key: ValueKey(topic.id),
+              topic: topic,
+              onTap: () => onOpen(topic.id),
+            ),
           );
         },
       ),

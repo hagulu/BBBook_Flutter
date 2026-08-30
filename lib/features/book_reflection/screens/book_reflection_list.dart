@@ -54,12 +54,20 @@ class BookReflectionList extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  IconButton(
+                  ElevatedButton.icon(
                     onPressed: ownerUserId == null
                         ? null
                         : () => _openEditor(context, ownerUserId: ownerUserId),
-                    tooltip: '독후감 작성',
-                    icon: const Icon(PhosphorIconsRegular.plus),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(0, 36),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      textStyle: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    icon: const Icon(PhosphorIconsRegular.plus, size: 15),
+                    label: const Text('독후감 쓰기'),
                   ),
                 ],
               ),

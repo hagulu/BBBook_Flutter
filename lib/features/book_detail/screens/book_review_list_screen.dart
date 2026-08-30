@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
@@ -16,8 +17,7 @@ import 'widgets/review_item.dart';
 /// ISBN13 한 권의 독자평 전체 목록(`/api/books/{isbn13}/reviews` 커서 기반).
 ///
 /// 책 검색 상세의 커뮤니티 미리보기, 책 기록 상세의 생각나눔 탭 양쪽에서
-/// "독자평" 진입 버튼으로 들어오는 공통 화면이다. 작성 폼은 포함하지 않는다
-/// (사용자 확인 사항) — 조회·수정(본인)·삭제(본인)·공감·신고만 지원한다.
+/// "독자평" 진입 버튼으로 들어오는 공통 화면이다.
 class BookReviewListScreen extends ConsumerStatefulWidget {
   const BookReviewListScreen({
     super.key,
@@ -35,6 +35,7 @@ class BookReviewListScreen extends ConsumerStatefulWidget {
 
 class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
   final _scrollController = ScrollController();
+  final _pendingLikeIds = <int>{};
 
   @override
   void initState() {
@@ -58,10 +59,39 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
   }
 
   Future<void> _handleToggleLike(BookReview review) async {
+    if (_pendingLikeIds.contains(review.id)) return;
+    setState(() => _pendingLikeIds.add(review.id));
     try {
       await ref
           .read(reviewsControllerProvider(widget.isbn13).notifier)
           .toggleLike(review);
+    } on ApiException catch (e) {
+      if (mounted) AppSnackBar.error(context, e.message);
+    } finally {
+      if (mounted) setState(() => _pendingLikeIds.remove(review.id));
+    }
+  }
+
+  Future<void> _handleCreate() async {
+    final result = await showReviewCreateDialog(context);
+    if (result == null || !mounted) return;
+    try {
+      final success = await ref
+          .read(reviewsControllerProvider(widget.isbn13).notifier)
+          .submitReview(
+            rating: result.rating,
+            content: result.content,
+            isSpoiler: result.isSpoiler,
+          );
+      if (!mounted) return;
+      if (success) {
+        AppSnackBar.success(context, '독자평이 등록되었습니다.');
+      } else {
+        // submitReview()는 등록(POST) 자체가 성공한 뒤 첫 페이지 재조회만
+        // 실패했을 때 false를 반환한다 — 여기서 "등록 실패"로 안내하면
+        // 사용자가 같은 내용을 다시 등록해 중복 리뷰가 생길 수 있다.
+        AppSnackBar.info(context, '독자평을 등록했어요. 목록은 잠시 후 새로고침해주세요.');
+      }
     } on ApiException catch (e) {
       if (mounted) AppSnackBar.error(context, e.message);
     }
@@ -133,33 +163,34 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const CommunityContentListHeader(title: '독자평'),
-            Expanded(
-              child: switch (state) {
-                AsyncData(:final value) => _ReviewList(
-                  scrollController: _scrollController,
-                  state: value,
-                  onRefresh: () => ref
-                      .read(reviewsControllerProvider(widget.isbn13).notifier)
-                      .refresh(),
-                  onToggleLike: _handleToggleLike,
-                  onEdit: _handleEdit,
-                  onDelete: _handleDelete,
-                  onReport: _handleReport,
-                ),
-                AsyncError() => CommunityContentErrorState(
-                  message: '독자평을 불러오지 못했습니다.',
-                  onRetry: () =>
-                      ref.invalidate(reviewsControllerProvider(widget.isbn13)),
-                ),
-                _ => const CommunityContentLoadingState(),
-              },
-            ),
-          ],
-        ),
+        child: switch (state) {
+          AsyncData(:final value) => _ReviewList(
+            scrollController: _scrollController,
+            state: value,
+            pendingLikeIds: _pendingLikeIds,
+            onRefresh: () => ref
+                .read(reviewsControllerProvider(widget.isbn13).notifier)
+                .refresh(),
+            onToggleLike: _handleToggleLike,
+            onEdit: _handleEdit,
+            onDelete: _handleDelete,
+            onReport: _handleReport,
+          ),
+          AsyncError() => CommunityContentErrorState(
+            message: '독자평을 불러오지 못했습니다.',
+            onRetry: () =>
+                ref.invalidate(reviewsControllerProvider(widget.isbn13)),
+          ),
+          _ => const CommunityContentLoadingState(),
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _handleCreate,
+        tooltip: '독자평 쓰기',
+        shape: const CircleBorder(),
+        backgroundColor: AppColors.accentFill,
+        foregroundColor: AppColors.textStrong,
+        child: const Icon(PhosphorIconsRegular.plus),
       ),
     );
   }
@@ -169,6 +200,7 @@ class _ReviewList extends StatelessWidget {
   const _ReviewList({
     required this.scrollController,
     required this.state,
+    required this.pendingLikeIds,
     required this.onRefresh,
     required this.onToggleLike,
     required this.onEdit,
@@ -178,6 +210,7 @@ class _ReviewList extends StatelessWidget {
 
   final ScrollController scrollController;
   final ReviewsState state;
+  final Set<int> pendingLikeIds;
   final Future<void> Function() onRefresh;
   final void Function(BookReview review) onToggleLike;
   final void Function(BookReview review) onEdit;
@@ -199,9 +232,10 @@ class _ReviewList extends StatelessWidget {
       child: ListView.separated(
         controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         itemCount: state.items.length + (state.isLoadingMore ? 1 : 0),
-        separatorBuilder: (_, _) => const SizedBox(height: 10),
+        separatorBuilder: (_, _) =>
+            const Divider(height: 1, color: AppColors.border),
         itemBuilder: (context, index) {
           if (index >= state.items.length) {
             return const CommunityContentPageLoader();
@@ -210,7 +244,9 @@ class _ReviewList extends StatelessWidget {
           return ReviewItem(
             key: ValueKey(review.id),
             review: review,
-            onToggleLike: () => onToggleLike(review),
+            onToggleLike: pendingLikeIds.contains(review.id)
+                ? null
+                : () => onToggleLike(review),
             onEdit: () => onEdit(review),
             onDelete: () => onDelete(review),
             onReport: () => onReport(review),

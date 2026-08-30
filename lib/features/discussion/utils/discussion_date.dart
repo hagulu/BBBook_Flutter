@@ -2,6 +2,8 @@
 /// 바꿔 보여준다.
 library;
 
+import '../../../core/utils/relative_time.dart';
+
 /// `2026.08.27` — 목록 카드/마감일 표기.
 String formatDiscussionDate(DateTime value) {
   final local = value.toLocal();
@@ -10,11 +12,21 @@ String formatDiscussionDate(DateTime value) {
   return '${local.year}.$month.$day';
 }
 
-/// 상세/답변 카드의 작성 시각. 화면을 오래 열어 둬도 표시가 오래된 상대
-/// 시각으로 남지 않도록 `2026.08.27 16:47` 형태의 절대 시각을 사용한다.
+/// `2026.08.27 16:47` — 마감일 등 날짜+시간이 필요한 절대 시각 표기.
 String formatDiscussionDateTime(DateTime value) {
   final local = value.toLocal();
   final hour = local.hour.toString().padLeft(2, '0');
   final minute = local.minute.toString().padLeft(2, '0');
   return '${formatDiscussionDate(value)} $hour:$minute';
 }
+
+/// 작성 시각의 상대 표기(`N초 전`/`N분 전`/`N시간 전`/`N일 전`). 30일이
+/// 지났거나 미래 시각(시계 오차)이면 [formatDiscussionDate]의 절대 표기로
+/// 되돌린다.
+String formatRelativeDiscussionDate(DateTime value) =>
+    formatRelativeTime(value, fallback: formatDiscussionDate);
+
+/// 작성 시각의 상대 표기. 30일이 지났거나 미래 시각이면
+/// [formatDiscussionDateTime]의 절대(날짜+시간) 표기로 되돌린다.
+String formatRelativeDiscussionDateTime(DateTime value) =>
+    formatRelativeTime(value, fallback: formatDiscussionDateTime);

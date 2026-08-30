@@ -37,7 +37,9 @@ class DiscussionAnswerItem extends StatefulWidget {
   final Future<bool> Function(String content) onSubmitEdit;
   final VoidCallback onDelete;
   final VoidCallback onReport;
-  final VoidCallback onToggleLike;
+
+  /// 공감 요청이 진행 중이면 null을 넘겨 중복 탭(POST/DELETE 경합)을 막는다.
+  final VoidCallback? onToggleLike;
 
   @override
   State<DiscussionAnswerItem> createState() => _DiscussionAnswerItemState();
@@ -99,7 +101,7 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
             CommunityAuthorRow(
               nickname: answer.user.nickname,
               profileImageUrl: answer.user.profileImageUrl,
-              dateLabel: formatDiscussionDateTime(answer.createdAt),
+              dateLabel: formatRelativeDiscussionDateTime(answer.createdAt),
               avatarRadius: 13,
               layout: CommunityAuthorLayout.stacked,
               trailing: answer.isHidden ? null : _buildMenu(answer),
@@ -137,12 +139,10 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
                   height: 1.5,
                 ),
               ),
-              const SizedBox(height: 12),
-              const Divider(height: 1, color: AppColors.border),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Align(
-                alignment: Alignment.centerLeft,
-                child: CommunityLikeButton(
+                alignment: Alignment.centerRight,
+                child: CommunityLikeInline(
                   isLiked: answer.likedByMe,
                   likeCount: answer.likeCount,
                   onTap: widget.onToggleLike,

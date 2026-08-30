@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/community_content.dart';
@@ -68,56 +67,14 @@ class DiscussionTopicCard extends StatelessWidget {
                 CommunityAuthorRow(
                   nickname: topic.user.nickname,
                   profileImageUrl: topic.user.profileImageUrl,
-                  dateLabel: formatDiscussionDate(topic.createdAt),
+                  dateLabel: formatRelativeDiscussionDate(topic.createdAt),
                   avatarRadius: 12,
+                  trailing: topic.likeCount > 0
+                      ? CommunityLikeCount(likeCount: topic.likeCount)
+                      : null,
                 ),
-                if (_metaItems.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 4,
-                    children: [
-                      for (final item in _metaItems)
-                        _MetaChip(icon: item.$1, label: item.$2),
-                    ],
-                  ),
-                ],
               ],
             ),
-    );
-  }
-
-  /// 공감 수/마감일은 값이 있을 때만 노출한다(답변 수는 목록 응답 규격에 없어
-  /// 표시하지 않는다).
-  List<(IconData, String)> get _metaItems => [
-    if (topic.likeCount > 0)
-      (PhosphorIconsRegular.heart, '공감 ${topic.likeCount}'),
-    if (topic.closesAt != null && !topic.isClosed)
-      (
-        PhosphorIconsRegular.calendarBlank,
-        '${formatDiscussionDate(topic.closesAt!)} 마감',
-      ),
-  ];
-}
-
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: AppColors.controlInactive),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-        ),
-      ],
     );
   }
 }

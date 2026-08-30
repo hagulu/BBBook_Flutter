@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
@@ -32,21 +33,31 @@ Future<ReviewEditResult?> showReviewEditDialog(
   );
 }
 
+/// 새 독자평 작성 모달.
+Future<ReviewEditResult?> showReviewCreateDialog(BuildContext context) {
+  return showModalBottomSheet<ReviewEditResult>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => const _ReviewEditDialog(review: null),
+  );
+}
+
 class _ReviewEditDialog extends StatefulWidget {
   const _ReviewEditDialog({required this.review});
 
-  final BookReview review;
+  final BookReview? review;
 
   @override
   State<_ReviewEditDialog> createState() => _ReviewEditDialogState();
 }
 
 class _ReviewEditDialogState extends State<_ReviewEditDialog> {
-  late double _rating = widget.review.rating ?? 0;
+  late double _rating = widget.review?.rating ?? 0;
   late final _contentController = TextEditingController(
-    text: widget.review.content ?? '',
+    text: widget.review?.content ?? '',
   );
-  late bool _isSpoiler = widget.review.isSpoiler;
+  late bool _isSpoiler = widget.review?.isSpoiler ?? false;
   String? _errorText;
 
   @override
@@ -74,15 +85,28 @@ class _ReviewEditDialogState extends State<_ReviewEditDialog> {
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      title: '리뷰 수정',
+      title: widget.review == null ? '독자평 작성' : '리뷰 수정',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: StarRatingInput(
-              rating: _rating,
-              onChanged: (v) => setState(() => _rating = v),
-            ),
+          // 별점(5개 × 44px 터치 영역)과 스포일러 토글을 한 Row에 두면
+          // 좁은 화면·큰 글자 배율에서 가로 폭이 모자라 RenderFlex가
+          // 넘친다. Wrap을 써서 자리가 부족하면 스포일러 토글이 다음
+          // 줄로 자연스럽게 내려가게 한다.
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            runSpacing: 8,
+            children: [
+              StarRatingInput(
+                rating: _rating,
+                onChanged: (v) => setState(() => _rating = v),
+              ),
+              _SpoilerToggle(
+                isSpoiler: _isSpoiler,
+                onTap: () => setState(() => _isSpoiler = !_isSpoiler),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           TextField(
@@ -95,19 +119,6 @@ class _ReviewEditDialogState extends State<_ReviewEditDialog> {
               counterText: '',
             ),
           ),
-          CheckboxListTile(
-            value: _isSpoiler,
-            onChanged: (v) => setState(() => _isSpoiler = v ?? false),
-            activeColor: AppColors.accentForeground,
-            checkColor: AppColors.surface,
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-            title: const Text(
-              '스포일러 포함',
-              style: TextStyle(fontSize: 13, color: AppColors.textBody),
-            ),
-          ),
           if (_errorText != null)
             Padding(
               padding: const EdgeInsets.only(top: 4),
@@ -118,7 +129,59 @@ class _ReviewEditDialogState extends State<_ReviewEditDialog> {
             ),
         ],
       ),
-      buttons: [RecordDialogButton(label: '저장', onPressed: _save)],
+      buttons: [
+        RecordDialogButton(
+          label: widget.review == null ? '등록' : '저장',
+          onPressed: _save,
+        ),
+      ],
+    );
+  }
+}
+
+class _SpoilerToggle extends StatelessWidget {
+  const _SpoilerToggle({required this.isSpoiler, required this.onTap});
+
+  final bool isSpoiler;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSpoiler
+              ? AppColors.highlightGoldSurface
+              : AppColors.surfaceSubtle,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              PhosphorIconsRegular.eyeSlash,
+              size: 14,
+              color: isSpoiler
+                  ? AppColors.memoThoughtForeground
+                  : AppColors.textMuted,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              '스포일러',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isSpoiler
+                    ? AppColors.memoThoughtForeground
+                    : AppColors.textMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

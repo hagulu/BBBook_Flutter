@@ -8,24 +8,18 @@ import '../../utils/discussion_poll.dart';
 /// 선택지 결과 바 목록. 선택지 토론에서만 그린다.
 ///
 /// 닫힌 토론([interactive]가 false)에서는 클릭할 수 없는 결과 표시 전용으로
-/// 렌더링된다. 선택 가능한 상태에서 행을 누르면 해당 선택지가 강조되고, 화면
-/// 쪽에서 바로 아래에 답변 작성 폼을 연다.
+/// 렌더링된다. 선택 가능한 상태에서 행을 누르면 화면 쪽에서 그 선택지를
+/// 보여주는 답변 작성 바텀시트를 곧바로 연다.
 class DiscussionPoll extends StatelessWidget {
   const DiscussionPoll({
     super.key,
     required this.detail,
     required this.interactive,
-    required this.selectedOptionId,
-    required this.isOtherSelected,
     required this.onSelect,
   });
 
   final DiscussionTopicDetail detail;
   final bool interactive;
-
-  /// 선택된 선택지 ID. "기타"를 고른 경우 null이면서 [isOtherSelected]가 true다.
-  final int? selectedOptionId;
-  final bool isOtherSelected;
 
   /// [optionId]가 null이면 "기타"를 선택한 것이다.
   final void Function(int? optionId) onSelect;
@@ -74,7 +68,6 @@ class DiscussionPoll extends StatelessWidget {
             percentage: detail.options[i].votePercentage,
             color: discussionOptionColorAt(i),
             isTop: _isTopPercentage(detail.options[i].votePercentage),
-            isSelected: selectedOptionId == detail.options[i].id,
             onTap: interactive ? () => onSelect(detail.options[i].id) : null,
           ),
           const SizedBox(height: 6),
@@ -84,7 +77,6 @@ class DiscussionPoll extends StatelessWidget {
           percentage: detail.otherVotePercentage,
           color: discussionOtherOptionColor,
           isTop: _isTopPercentage(detail.otherVotePercentage),
-          isSelected: isOtherSelected,
           onTap: interactive ? () => onSelect(null) : null,
         ),
       ],
@@ -109,7 +101,6 @@ class _PollRow extends StatelessWidget {
     required this.percentage,
     required this.color,
     required this.isTop,
-    required this.isSelected,
     required this.onTap,
   });
 
@@ -117,7 +108,6 @@ class _PollRow extends StatelessWidget {
   final double percentage;
   final Color color;
   final bool isTop;
-  final bool isSelected;
   final VoidCallback? onTap;
 
   @override
@@ -134,10 +124,7 @@ class _PollRow extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected ? color : AppColors.border,
-              width: isSelected ? 1.6 : 1,
-            ),
+            border: Border.all(color: AppColors.border),
           ),
           clipBehavior: Clip.antiAlias,
           // Stack 기본 정렬(topStart)이라 라벨이 위로 붙어 있었다.
@@ -175,14 +162,6 @@ class _PollRow extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (isSelected) ...[
-                      Icon(
-                        PhosphorIconsFill.checkCircle,
-                        size: 16,
-                        color: color,
-                      ),
-                      const SizedBox(width: 8),
-                    ],
                     Text(
                       formatVotePercentage(percentage),
                       style: TextStyle(

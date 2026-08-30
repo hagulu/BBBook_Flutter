@@ -171,6 +171,9 @@ class CommunityContentHeader extends StatelessWidget {
   final String? profileImageUrl;
   final String dateLabel;
   final List<Widget> badges;
+
+  /// 헤더 맨 아래 줄(마감일 등 [metadata]가 있으면 그 오른쪽, 없으면 작성자
+  /// 행 오른쪽) 붙는 메뉴/신고 버튼 등.
   final Widget? trailing;
   final Widget? metadata;
 
@@ -185,22 +188,14 @@ class CommunityContentHeader extends StatelessWidget {
         ],
         ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 44),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.textStrong,
-                    fontSize: 19,
-                    height: 1.35,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              ?trailing,
-            ],
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textStrong,
+              fontSize: 19,
+              height: 1.35,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
         const SizedBox(height: 8),
@@ -210,8 +205,17 @@ class CommunityContentHeader extends StatelessWidget {
           dateLabel: dateLabel,
           avatarRadius: 14,
           layout: CommunityAuthorLayout.stacked,
+          trailing: metadata == null ? trailing : null,
         ),
-        if (metadata != null) ...[const SizedBox(height: 8), metadata!],
+        if (metadata != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: metadata!),
+              ?trailing,
+            ],
+          ),
+        ],
       ],
     );
   }
@@ -422,6 +426,99 @@ class CommunityLikeButton extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 목록 카드 하단에 붙는 가벼운 공감 표시(하트 아이콘 + 개수). 상세 화면의
+/// 독립된 공감 버튼([CommunityLikeButton])과 달리 배경 필 없이 목록 행에
+/// 자연스럽게 붙는 작은 규격이다.
+class CommunityLikeInline extends StatelessWidget {
+  const CommunityLikeInline({
+    super.key,
+    required this.isLiked,
+    required this.likeCount,
+    required this.onTap,
+  });
+
+  final bool isLiked;
+  final int likeCount;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isEnabled = onTap != null;
+    return Semantics(
+      button: true,
+      enabled: isEnabled,
+      toggled: isLiked,
+      label: '공감 $likeCount개',
+      child: ExcludeSemantics(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    isLiked
+                        ? PhosphorIconsFill.heart
+                        : PhosphorIconsRegular.heart,
+                    size: 18,
+                    color: isLiked
+                        ? AppColors.error
+                        : AppColors.controlInactive,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    '$likeCount',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 목록 카드의 작성자 행에서 공감 수를 읽기 전용으로 보여주는 하트+숫자.
+/// 탭해서 토글하는 [CommunityLikeButton]/[CommunityLikeInline]과 달리
+/// 목록에서는 누를 수 없는 정보 표시용이다.
+class CommunityLikeCount extends StatelessWidget {
+  const CommunityLikeCount({super.key, required this.likeCount});
+
+  final int likeCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '공감 $likeCount개',
+      child: ExcludeSemantics(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              PhosphorIconsRegular.heart,
+              size: 16,
+              color: AppColors.controlInactive,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '$likeCount',
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            ),
+          ],
         ),
       ),
     );

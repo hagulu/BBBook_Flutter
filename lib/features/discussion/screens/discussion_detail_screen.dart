@@ -25,9 +25,10 @@ import 'widgets/discussion_poll.dart';
 
 /// 토론 주제 상세(`/discussions/{topicId}` 대응).
 ///
-/// 선택지 토론이면 결과 바 아래에서 바로 답변을 작성하고, 자유 토론이면 답변
-/// 목록 위의 "내 답변 작성" 카드에서 작성한다. 닫힌 토론에서는 두 경우 모두
-/// 작성 UI가 노출되지 않는다.
+/// 답변은 항상 바텀시트로 작성한다. 선택지 토론이면 결과 바에서 선택지를
+/// 누르는 즉시 그 선택지를 보여주는 시트가 뜨고, 자유 토론이면 "내 답변
+/// 작성" 카드를 눌러 시트를 연다. 닫힌 토론에서는 두 경우 모두 작성 UI가
+/// 노출되지 않는다.
 class DiscussionDetailScreen extends ConsumerStatefulWidget {
   const DiscussionDetailScreen({super.key, required this.topicId});
 
@@ -40,24 +41,30 @@ class DiscussionDetailScreen extends ConsumerStatefulWidget {
 
 class _DiscussionDetailScreenState
     extends ConsumerState<DiscussionDetailScreen> {
-  final _answerController = TextEditingController();
+  final _scrollController = ScrollController();
+  final _pendingAnswerLikeIds = <int>{};
+  bool _isTogglingTopicLike = false;
 
-  /// 선택지 토론에서 지금 고른 선택지. 아무것도 고르지 않았으면 null이고,
-  /// "기타"를 고르면 [_isOtherSelected]가 true가 된다.
-  int? _selectedOptionId;
-  bool _isOtherSelected = false;
-
-  /// 자유 토론의 답변 작성 폼이 펼쳐졌는지 여부.
-  bool _isFreeComposerOpen = false;
-  bool _isSubmittingAnswer = false;
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
 
   @override
   void dispose() {
-    _answerController.dispose();
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     super.dispose();
   }
 
-  bool get _hasSelection => _selectedOptionId != null || _isOtherSelected;
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 200) {
+      _answersController.loadMore();
+    }
+  }
 
   DiscussionDetailController get _detailController =>
       ref.read(discussionDetailControllerProvider(widget.topicId).notifier);
@@ -65,54 +72,52 @@ class _DiscussionDetailScreenState
   DiscussionAnswersController get _answersController =>
       ref.read(discussionAnswersControllerProvider(widget.topicId).notifier);
 
-  void _selectOption(int? optionId) {
-    setState(() {
-      if (optionId == null) {
-        _isOtherSelected = !_isOtherSelected;
-        _selectedOptionId = null;
-      } else {
-        _isOtherSelected = false;
-        _selectedOptionId = _selectedOptionId == optionId ? null : optionId;
-      }
-      if (!_hasSelection) _answerController.clear();
-    });
+  void _openPollAnswerSheet(DiscussionTopicDetail topic, int? optionId) {
+    final label = optionId == null
+        ? '기타'
+        : topic.options.firstWhere((o) => o.id == optionId).content;
+    final color = discussionOptionColorOf(topic.options, optionId);
+    showDiscussionAnswerSheet(
+      context,
+      hintText: '이 선택을 한 이유나 생각을 들려주세요...',
+      selectedOptionLabel: label,
+      accentColor: color,
+      onSubmit: (content) =>
+          _submitAnswer(content: content, withOption: true, optionId: optionId),
+    );
   }
 
-  void _closeComposer() {
-    setState(() {
-      _selectedOptionId = null;
-      _isOtherSelected = false;
-      _isFreeComposerOpen = false;
-      _answerController.clear();
-    });
+  void _openFreeAnswerSheet() {
+    showDiscussionAnswerSheet(
+      context,
+      hintText: '답변을 작성해보세요...',
+      onSubmit: (content) => _submitAnswer(content: content, withOption: false),
+    );
   }
 
-  Future<void> _submitAnswer({required bool withOption}) async {
-    final content = _answerController.text.trim();
-    if (content.isEmpty || _isSubmittingAnswer) return;
-
-    setState(() => _isSubmittingAnswer = true);
+  Future<bool> _submitAnswer({
+    required String content,
+    required bool withOption,
+    int? optionId,
+  }) async {
     try {
       final refreshed = await _answersController.submit(
         content: content,
         withOption: withOption,
-        optionId: _selectedOptionId,
+        optionId: optionId,
       );
       await _detailController.reload();
-      if (!mounted) return;
-      // 등록은 성공했으므로 목록 갱신 실패와 무관하게 작성 폼을 닫는다
-      // (폼을 남겨 두면 같은 답변을 다시 등록할 수 있다).
-      _closeComposer();
-      if (!refreshed) {
+      if (!refreshed && mounted) {
         AppSnackBar.info(context, '답변을 등록했어요. 목록은 잠시 후 새로고침해주세요.');
       }
+      return true;
     } on ApiException catch (e) {
-      if (!mounted) return;
-      AppSnackBar.error(context, e.message);
-      // 닫힌 토론(409)이면 최신 닫힘 상태를 화면에 반영한다.
-      if (e.statusCode == 409) await _detailController.reload();
-    } finally {
-      if (mounted) setState(() => _isSubmittingAnswer = false);
+      if (mounted) {
+        AppSnackBar.error(context, e.message);
+        // 닫힌 토론(409)이면 최신 닫힘 상태를 화면에 반영한다.
+        if (e.statusCode == 409) await _detailController.reload();
+      }
+      return false;
     }
   }
 
@@ -164,18 +169,26 @@ class _DiscussionDetailScreenState
   }
 
   Future<void> _toggleAnswerLike(DiscussionAnswer answer) async {
+    if (_pendingAnswerLikeIds.contains(answer.id)) return;
+    setState(() => _pendingAnswerLikeIds.add(answer.id));
     try {
       await _answersController.toggleLike(answer);
     } on ApiException catch (e) {
       if (mounted) AppSnackBar.error(context, e.message);
+    } finally {
+      if (mounted) setState(() => _pendingAnswerLikeIds.remove(answer.id));
     }
   }
 
   Future<void> _toggleTopicLike() async {
+    if (_isTogglingTopicLike) return;
+    setState(() => _isTogglingTopicLike = true);
     try {
       await _detailController.toggleLike();
     } on ApiException catch (e) {
       if (mounted) AppSnackBar.error(context, e.message);
+    } finally {
+      if (mounted) setState(() => _isTogglingTopicLike = false);
     }
   }
 
@@ -326,6 +339,7 @@ class _DiscussionDetailScreenState
         } catch (_) {}
       },
       child: SingleChildScrollView(
+        controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         child: CommunityContentWidth(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
@@ -340,19 +354,14 @@ class _DiscussionDetailScreenState
                 onReopen: _reopenTopic,
                 onDelete: _deleteTopic,
                 onReport: _reportTopic,
-                onToggleLike: _toggleTopicLike,
+                onToggleLike: _isTogglingTopicLike ? null : _toggleTopicLike,
                 pollSection: topic.hasOptions ? _buildPollSection(topic) : null,
               ),
               if (!topic.hasOptions) ...[
                 const SizedBox(height: 12),
                 _FreeAnswerCard(
                   isClosed: topic.isClosed,
-                  isOpen: _isFreeComposerOpen,
-                  controller: _answerController,
-                  isSubmitting: _isSubmittingAnswer,
-                  onOpen: () => setState(() => _isFreeComposerOpen = true),
-                  onCancel: _closeComposer,
-                  onSubmit: () => _submitAnswer(withOption: false),
+                  onOpen: _openFreeAnswerSheet,
                 ),
               ],
               const SizedBox(height: 16),
@@ -361,7 +370,7 @@ class _DiscussionDetailScreenState
                   state: value,
                   options: topic.options,
                   canEditAnswers: !topic.isClosed,
-                  onLoadMore: () => _answersController.loadMore(),
+                  pendingLikeIds: _pendingAnswerLikeIds,
                   onSubmitEdit: _updateAnswer,
                   onDelete: _deleteAnswer,
                   onReport: _reportAnswer,
@@ -386,31 +395,10 @@ class _DiscussionDetailScreenState
   }
 
   Widget _buildPollSection(DiscussionTopicDetail topic) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DiscussionPoll(
-          detail: topic,
-          interactive: !topic.isClosed,
-          selectedOptionId: _selectedOptionId,
-          isOtherSelected: _isOtherSelected,
-          onSelect: _selectOption,
-        ),
-        if (!topic.isClosed && _hasSelection) ...[
-          const SizedBox(height: 12),
-          DiscussionAnswerComposer(
-            controller: _answerController,
-            hintText: '이 선택을 한 이유나 생각을 들려주세요...',
-            isSubmitting: _isSubmittingAnswer,
-            accentColor: discussionOptionColorOf(
-              topic.options,
-              _selectedOptionId,
-            ),
-            onCancel: _closeComposer,
-            onSubmit: () => _submitAnswer(withOption: true),
-          ),
-        ],
-      ],
+    return DiscussionPoll(
+      detail: topic,
+      interactive: !topic.isClosed,
+      onSelect: (optionId) => _openPollAnswerSheet(topic, optionId),
     );
   }
 }
@@ -437,7 +425,7 @@ class _TopicCard extends StatelessWidget {
   final VoidCallback onReopen;
   final VoidCallback onDelete;
   final VoidCallback onReport;
-  final VoidCallback onToggleLike;
+  final VoidCallback? onToggleLike;
   final Widget? pollSection;
 
   @override
@@ -450,7 +438,7 @@ class _TopicCard extends StatelessWidget {
             title: topic.title ?? '',
             nickname: topic.user.nickname,
             profileImageUrl: topic.user.profileImageUrl,
-            dateLabel: formatDiscussionDateTime(topic.createdAt),
+            dateLabel: formatRelativeDiscussionDateTime(topic.createdAt),
             badges: [
               if (topic.isClosed) const DiscussionBadge.closed(),
               if (topic.isSpoiler) const DiscussionBadge.spoiler(),
@@ -615,25 +603,12 @@ class _TopicMenu extends StatelessWidget {
   }
 }
 
-/// 자유 토론 전용 "내 답변 작성" 카드.
+/// 자유 토론 전용 "내 답변 작성" 카드. 누르면 답변 작성 바텀시트를 연다.
 class _FreeAnswerCard extends StatelessWidget {
-  const _FreeAnswerCard({
-    required this.isClosed,
-    required this.isOpen,
-    required this.controller,
-    required this.isSubmitting,
-    required this.onOpen,
-    required this.onCancel,
-    required this.onSubmit,
-  });
+  const _FreeAnswerCard({required this.isClosed, required this.onOpen});
 
   final bool isClosed;
-  final bool isOpen;
-  final TextEditingController controller;
-  final bool isSubmitting;
   final VoidCallback onOpen;
-  final VoidCallback onCancel;
-  final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
@@ -648,37 +623,28 @@ class _FreeAnswerCard extends StatelessWidget {
               children: [
                 const DiscussionSectionLabel('내 답변 작성'),
                 const SizedBox(height: 12),
-                if (isOpen)
-                  DiscussionAnswerComposer(
-                    controller: controller,
-                    hintText: '답변을 작성해보세요...',
-                    isSubmitting: isSubmitting,
-                    onCancel: onCancel,
-                    onSubmit: onSubmit,
-                  )
-                else
-                  InkWell(
-                    onTap: onOpen,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceSubtle,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        '답변을 작성해보세요...',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textMuted,
-                        ),
+                InkWell(
+                  onTap: onOpen,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceSubtle,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      '답변을 작성해보세요...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textMuted,
                       ),
                     ),
                   ),
+                ),
               ],
             ),
     );
@@ -690,7 +656,7 @@ class _AnswerList extends StatelessWidget {
     required this.state,
     required this.options,
     required this.canEditAnswers,
-    required this.onLoadMore,
+    required this.pendingLikeIds,
     required this.onSubmitEdit,
     required this.onDelete,
     required this.onReport,
@@ -700,7 +666,7 @@ class _AnswerList extends StatelessWidget {
   final DiscussionListState<DiscussionAnswer> state;
   final List<DiscussionOption> options;
   final bool canEditAnswers;
-  final VoidCallback onLoadMore;
+  final Set<int> pendingLikeIds;
   final Future<bool> Function(int answerId, String content) onSubmitEdit;
   final void Function(int answerId) onDelete;
   final void Function(int answerId) onReport;
@@ -733,17 +699,13 @@ class _AnswerList extends StatelessWidget {
               onSubmitEdit: (content) => onSubmitEdit(answer.id, content),
               onDelete: () => onDelete(answer.id),
               onReport: () => onReport(answer.id),
-              onToggleLike: () => onToggleLike(answer),
+              onToggleLike: pendingLikeIds.contains(answer.id)
+                  ? null
+                  : () => onToggleLike(answer),
             ),
             const SizedBox(height: 10),
           ],
-        if (state.hasNext)
-          Center(
-            child: TextButton(
-              onPressed: state.isLoadingMore ? null : onLoadMore,
-              child: Text(state.isLoadingMore ? '불러오는 중...' : '더 보기'),
-            ),
-          ),
+        if (state.isLoadingMore) const CommunityContentPageLoader(),
       ],
     );
   }

@@ -23,18 +23,21 @@ import '../../providers/book_community_providers.dart';
 /// 정의가 같다). 독자평 전체 개수(`reviewCount`)만 community-preview에
 /// 없어서, 그 값이 실제로 필요한 화면([showReviewButton] true)에서만
 /// community-counts를 추가로 부른다 — 두 요청은 서로 독립된 provider라 한쪽이
-/// 실패해도 다른 쪽 데이터는 그대로 표시된다.
+/// 실패해도 다른 쪽 데이터는 그대로 표시된다. 독자평 평균 별점도 이때 같은
+/// community-counts 응답의 `averageRating`을 함께 쓴다.
 ///
-/// 독후감/토론은 세로로 쌓은 큼직한 진입 버튼으로, 독자평은 평균 별점·최근
-/// 3건을 화면에 직접 보여주고 하단 "더보기"로 전체 목록에 진입한다.
+/// 독후감/토론은 세로로 쌓은 큼직한 진입 버튼이다.
 ///
-/// 책 검색 상세([showReviewButton] 기본값 false)에서는 독후감·토론 둘 다
-/// 0건이면 진입 버튼 자체를 접고, 최근 독자평이 없으면 미리보기 섹션도
-/// 통째로 숨겨 어색한 빈 공간을 만들지 않는다.
+/// 책 검색 상세([showReviewButton] 기본값 false)에서는 독자평도 평균
+/// 별점·최근 3건을 화면에 직접 보여주고 하단 "더보기"로 전체 목록에
+/// 진입하며, 독후감·토론 둘 다 0건이면 진입 버튼 자체를 접고, 최근
+/// 독자평이 없으면 미리보기 섹션도 통째로 숨겨 어색한 빈 공간을 만들지
+/// 않는다.
 ///
 /// 책 기록 상세의 생각나눔 탭([showReviewButton] true)에서는 이미 내 책장에
-/// 있는 책이라 세 진입 버튼(독자평 포함)을 개수와 무관하게 항상 보여준다
-/// (사용자 확인 사항).
+/// 있는 책이라 세 진입 버튼(독자평 포함)을 개수와 무관하게 항상 보여주고,
+/// 독자평은 진입 버튼만 두어 최근 독자평 미리보기는 보여주지 않는다(사용자
+/// 확인 사항).
 ///
 /// [userBookId]를 넘기면(두 화면 모두 가능 — 검색 상세도 이미 서재에 있는
 /// 책이면 넘긴다) 독후감 배지에서 내가 이미 쓴 공개 독후감 수를 뺀다.
@@ -64,12 +67,11 @@ class BookCommunityPreviewSection extends ConsumerWidget {
     final previewState = ref.watch(previewProvider);
     final preview = previewState.valueOrNull;
 
-    final reviewCount = showReviewButton
-        ? ref
-              .watch(bookCommunityCountsProvider(isbn13))
-              .valueOrNull
-              ?.reviewCount
+    final reviewCounts = showReviewButton
+        ? ref.watch(bookCommunityCountsProvider(isbn13)).valueOrNull
         : null;
+    final reviewCount = reviewCounts?.reviewCount;
+    final reviewAverageRating = reviewCounts?.averageRating;
 
     final myPublicReflectionCount = userBookId == null
         ? 0
@@ -93,8 +95,12 @@ class BookCommunityPreviewSection extends ConsumerWidget {
         showReviewButton ||
         (preview != null &&
             (preview.reflectionCount > 0 || preview.discussionCount > 0));
-    // 최근 독자평이 없으면 미리보기 섹션을 통째로 숨긴다(안내 문구도 없음).
-    final showReviews = preview != null && preview.reviewItems.isNotEmpty;
+    // 책 검색 상세에서만 최근 독자평 미리보기를 보여준다. 생각나눔 탭은
+    // 이미 독자평 진입 버튼이 있으므로 미리보기를 중복 노출하지 않는다
+    // (사용자 확인 사항). 최근 독자평이 없으면 섹션 자체를 숨긴다(안내
+    // 문구도 없음).
+    final showReviews =
+        !showReviewButton && preview != null && preview.reviewItems.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -102,6 +108,7 @@ class BookCommunityPreviewSection extends ConsumerWidget {
         if (showEntryButtons)
           _EntryButtons(
             reviewCount: reviewCount,
+            reviewAverageRating: reviewAverageRating,
             reflectionCount: reflectionCount,
             discussionCount: preview?.discussionCount,
             showReviewButton: showReviewButton,
@@ -194,11 +201,13 @@ class BookCommunityPreviewSection extends ConsumerWidget {
   }
 }
 
-/// 독자평(생각나눔 탭만)/독후감/토론 진입 버튼(세로로 쌓은 큼직한 터치
-/// 영역). 각 개수가 아직 로딩 전(null)이면 배지 없이 버튼만 먼저 보여준다.
+/// 독자평(생각나눔 탭만)/독후감/토론 진입 버튼. 각 버튼은 전체 폭을 차지하며
+/// 아이콘 + 라벨(1줄) + 평점/개수(2줄)로 구성된 2줄 규격이다(사용자 확인
+/// 사항). 각 개수가 아직 로딩 전(null)이면 배지 없이 버튼만 먼저 보여준다.
 class _EntryButtons extends StatelessWidget {
   const _EntryButtons({
     required this.reviewCount,
+    required this.reviewAverageRating,
     required this.reflectionCount,
     required this.discussionCount,
     required this.showReviewButton,
@@ -208,6 +217,7 @@ class _EntryButtons extends StatelessWidget {
   });
 
   final int? reviewCount;
+  final double? reviewAverageRating;
 
   /// 독후감 배지에 표시할 값. 생각나눔 탭에서는 내가 이미 쓴 공개 독후감
   /// 수를 뺀 값이 들어온다.
@@ -220,30 +230,50 @@ class _EntryButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        if (showReviewButton) ...[
+    final discussionButton = EntryButton(
+      icon: PhosphorIconsRegular.chatsCircle,
+      label: '토론',
+      count: discussionCount,
+      onTap: onOpenDiscussions,
+      compact: true,
+    );
+
+    if (!showReviewButton) {
+      return Column(
+        children: [
           EntryButton(
-            icon: PhosphorIconsRegular.star,
-            label: '독자평',
-            count: reviewCount,
-            onTap: onOpenReviews,
+            icon: PhosphorIconsRegular.notebook,
+            label: '독후감',
+            count: reflectionCount,
+            onTap: onOpenReflections,
+            compact: true,
           ),
           const SizedBox(height: 12),
+          discussionButton,
         ],
+      );
+    }
+
+    return Column(
+      children: [
+        EntryButton(
+          icon: PhosphorIconsRegular.star,
+          label: '독자평',
+          count: reviewCount,
+          rating: reviewAverageRating,
+          onTap: onOpenReviews,
+          compact: true,
+        ),
+        const SizedBox(height: 12),
         EntryButton(
           icon: PhosphorIconsRegular.notebook,
           label: '독후감',
           count: reflectionCount,
           onTap: onOpenReflections,
+          compact: true,
         ),
         const SizedBox(height: 12),
-        EntryButton(
-          icon: PhosphorIconsRegular.chatsCircle,
-          label: '토론',
-          count: discussionCount,
-          onTap: onOpenDiscussions,
-        ),
+        discussionButton,
       ],
     );
   }
@@ -296,14 +326,23 @@ class _ReviewsPreview extends StatelessWidget {
             ],
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 4),
         for (var i = 0; i < items.length; i++) ...[
+          if (i != 0) const Divider(height: 1, color: AppColors.border),
           _ReviewPreviewCard(item: items[i], onTap: onOpenReviews),
-          if (i != items.length - 1) const SizedBox(height: 10),
         ],
         const SizedBox(height: 8),
         Center(
-          child: TextButton(onPressed: onOpenReviews, child: const Text('더보기')),
+          child: TextButton(
+            onPressed: onOpenReviews,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.accentForeground,
+            ),
+            child: const Text(
+              '더보기',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
         ),
       ],
     );
@@ -318,58 +357,60 @@ class _ReviewPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CommunityContentCard(
+    return InkWell(
       onTap: onTap,
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CommunityAuthorRow(
-            nickname: item.user.nickname,
-            profileImageUrl: item.user.profileImageUrl,
-            dateLabel: formatDiscussionDate(item.createdAt),
-            avatarRadius: 12,
-            trailing: item.rating != null
-                ? StarRatingDisplay(
-                    rating: item.rating!,
-                    size: 12,
-                    filledColor: AppColors.accentGraphic,
-                  )
-                : null,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            item.content,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textBody,
-              height: 1.4,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CommunityAuthorRow(
+              nickname: item.user.nickname,
+              profileImageUrl: item.user.profileImageUrl,
+              dateLabel: formatRelativeDiscussionDate(item.createdAt),
+              avatarRadius: 12,
+              trailing: item.rating != null
+                  ? StarRatingDisplay(
+                      rating: item.rating!,
+                      size: 12,
+                      filledColor: AppColors.accentGraphic,
+                    )
+                  : null,
             ),
-          ),
-          if (item.likeCount > 0) ...[
             const SizedBox(height: 8),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  PhosphorIconsRegular.heart,
-                  size: 13,
-                  color: AppColors.controlInactive,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '공감 ${item.likeCount}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
+            Text(
+              item.content,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textBody,
+                height: 1.4,
+              ),
             ),
+            if (item.likeCount > 0) ...[
+              const SizedBox(height: 8),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    PhosphorIconsRegular.heart,
+                    size: 13,
+                    color: AppColors.controlInactive,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '공감 ${item.likeCount}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

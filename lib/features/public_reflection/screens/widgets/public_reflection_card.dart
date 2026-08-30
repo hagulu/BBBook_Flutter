@@ -51,7 +51,10 @@ class PublicReflectionCard extends StatelessWidget {
           CommunityAuthorRow(
             nickname: reflection.user.nickname,
             profileImageUrl: reflection.user.profileImageUrl,
-            dateLabel: formatDiscussionDate(reflection.createdAt),
+            dateLabel: formatRelativeDiscussionDate(reflection.createdAt),
+            trailing: reflection.likeCount > 0
+                ? CommunityLikeCount(likeCount: reflection.likeCount)
+                : null,
           ),
         ],
       ),

@@ -46,6 +46,7 @@ class PublicReflectionSummary {
     required this.user,
     required this.createdAt,
     required this.updatedAt,
+    this.likeCount = 0,
   });
 
   final int id;
@@ -57,6 +58,7 @@ class PublicReflectionSummary {
   final PublicReflectionAuthor user;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final int likeCount;
 
   factory PublicReflectionSummary.fromJson(Map<String, dynamic> json) {
     return PublicReflectionSummary(
@@ -67,6 +69,7 @@ class PublicReflectionSummary {
       user: PublicReflectionAuthor.fromContainerJson(json),
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
+      likeCount: json['likeCount'] as int? ?? 0,
     );
   }
 }

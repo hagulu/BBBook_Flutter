@@ -105,17 +105,22 @@ class BookCommunityPreview {
 /// 콘텐츠를 포함해서 집계한다.
 class BookCommunityCounts {
   const BookCommunityCounts({
+    required this.averageRating,
     required this.reviewCount,
     required this.reflectionCount,
     required this.discussionCount,
   });
 
+  /// 숨김 처리되지 않고 별점이 있는 전체 독자평의 평균(소수점 1자리). 대상이
+  /// 없으면 null.
+  final double? averageRating;
   final int reviewCount;
   final int reflectionCount;
   final int discussionCount;
 
   factory BookCommunityCounts.fromJson(Map<String, dynamic> json) {
     return BookCommunityCounts(
+      averageRating: (json['averageRating'] as num?)?.toDouble(),
       reviewCount: json['reviewCount'] as int,
       reflectionCount: json['reflectionCount'] as int,
       discussionCount: json['discussionCount'] as int,

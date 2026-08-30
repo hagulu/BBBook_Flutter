@@ -135,9 +135,9 @@ class _ReaderBody extends StatelessWidget {
       top: false,
       child: SingleChildScrollView(
         child: CommunityContentWidth(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 48),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           child: CommunityContentCard(
-            padding: const EdgeInsets.fromLTRB(22, 24, 22, 36),
+            padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -145,7 +145,7 @@ class _ReaderBody extends StatelessWidget {
                   title: detail.title.trim().isEmpty ? '제목 없음' : detail.title,
                   nickname: detail.user.nickname,
                   profileImageUrl: detail.user.profileImageUrl,
-                  dateLabel: formatDiscussionDateTime(detail.createdAt),
+                  dateLabel: formatRelativeDiscussionDateTime(detail.createdAt),
                 ),
                 const ReflectionTitleBodyDivider(horizontalInset: 0),
                 _PublicReflectionRichContent(

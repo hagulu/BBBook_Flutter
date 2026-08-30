@@ -79,35 +79,27 @@ class _PublicReflectionListScreenState
       ),
       body: SafeArea(
         top: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const CommunityContentListHeader(title: '공개 독후감'),
-            Expanded(
-              child: switch (state) {
-                AsyncData(:final value) => _ReflectionList(
-                  scrollController: _scrollController,
-                  state: value,
-                  onRefresh: () => ref
-                      .read(
-                        publicReflectionListControllerProvider(
-                          widget.isbn13,
-                        ).notifier,
-                      )
-                      .refresh(),
-                  onOpen: _openReader,
-                ),
-                AsyncError() => CommunityContentErrorState(
-                  message: '독후감을 불러오지 못했습니다.',
-                  onRetry: () => ref.invalidate(
-                    publicReflectionListControllerProvider(widget.isbn13),
-                  ),
-                ),
-                _ => const CommunityContentLoadingState(),
-              },
+        child: switch (state) {
+          AsyncData(:final value) => _ReflectionList(
+            scrollController: _scrollController,
+            state: value,
+            onRefresh: () => ref
+                .read(
+                  publicReflectionListControllerProvider(
+                    widget.isbn13,
+                  ).notifier,
+                )
+                .refresh(),
+            onOpen: _openReader,
+          ),
+          AsyncError() => CommunityContentErrorState(
+            message: '독후감을 불러오지 못했습니다.',
+            onRetry: () => ref.invalidate(
+              publicReflectionListControllerProvider(widget.isbn13),
             ),
-          ],
-        ),
+          ),
+          _ => const CommunityContentLoadingState(),
+        },
       ),
     );
   }
@@ -141,7 +133,7 @@ class _ReflectionList extends StatelessWidget {
       child: ListView.separated(
         controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         itemCount: state.items.length + (state.isLoadingMore ? 1 : 0),
         separatorBuilder: (_, _) => const SizedBox(height: 10),
         itemBuilder: (context, index) {
