@@ -132,8 +132,10 @@ class _BookRecordBody extends ConsumerWidget {
       initialIndex: book.status == BookStatus.wantToRead ? 3 : 0,
       child: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          // 책 표지·제목 헤더는 스크롤과 함께 완전히 사라진다(앱바가 이미
-          // 책 제목을 보여주므로 고정해 둘 필요가 없다 — 사용자 확인 사항).
+          // 책 표지·제목 헤더는 스크롤과 함께 말려 올라가고(사용자 확인
+          // 사항), 탭 바만 상단에 고정한다. 헤더는 여기 한 곳에만 있고 탭
+          // 콘텐츠마다 따로 넣지 않는다 — NestedScrollView가 활성 탭의
+          // 스크롤에 맞춰 이 헤더를 공유해서 접어준다.
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -147,7 +149,6 @@ class _BookRecordBody extends ConsumerWidget {
               ),
             ),
           ),
-          // 탭 바는 대신 상단에 고정한다(사용자 확인 사항).
           SliverPersistentHeader(
             pinned: true,
             delegate: _TabBarHeaderDelegate(
@@ -562,9 +563,6 @@ class _BookRecordBody extends ConsumerWidget {
   }
 }
 
-/// 스크롤에 따라 책 정보 카드가 점점 작아지며 상단에 썸네일+제목만 남는
-/// 컴팩트 바로 자연스럽게 전환되는 헤더. `shrinkOffset`이 곧 스크롤 진행도라
-/// 별도 AnimationController 없이 opacity/scale을 직접 보간한다.
 /// 탭 바를 스크롤 상단에 고정하기 위한 델리게이트.
 class _TabBarHeaderDelegate extends SliverPersistentHeaderDelegate {
   const _TabBarHeaderDelegate(this.tabBar);

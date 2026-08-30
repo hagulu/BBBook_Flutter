@@ -171,3 +171,4 @@
 - `docs/review/20260829-201842-book-community-preview-and-review-list-review.md` — 커뮤니티 미리보기·독자평 전체 목록의 공감/페이지네이션 경합과 비동기 생명주기 리뷰
 - `docs/review/20260830-133204-book-community-preview-and-review-list-rereview.md` — 커뮤니티 미리보기·독자평 목록 후속 변경의 로딩·공감 경합과 중복 API 요청 재리뷰
 - `docs/review/20260830-145157-book-community-preview-and-review-list-third-review.md` — 커뮤니티 미리보기·독자평 목록의 독후감 개수 기준과 미해결 비동기 경합 3차 리뷰
+- `docs/review/20260830-185915-book-record-fixed-header-review.md` — 책 기록 상세 고정 헤더의 작은 세로 화면·큰 글자 배율 레이아웃 리뷰
