@@ -52,7 +52,7 @@
 ## features/book_record
 
 - `lib/features/book_record/screens/book_record_screen.dart` — 책 기록 상세 화면(자체 AppBar, 책장에서 책 선택 시 진입), 정보/노트/독후감/생각나눔 4탭과 진행률/상태/출처/난이도/태그/삭제 조립
-- `lib/features/book_record/screens/book_sharing_list.dart` — 책 기록 상세의 생각나눔 탭(독자평·독후감·토론 진입 버튼, 현재는 토론만 연결)
+- `lib/features/book_record/screens/book_sharing_list.dart` — 책 기록 상세의 생각나눔 탭(ISBN 있으면 커뮤니티 미리보기 공용 위젯 — 독자평 버튼 항상 노출, 독후감 배지는 내 공개 독후감 수 제외, 없으면 안내용 진입 버튼)
 - `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH(RecordPatch 기준 부분 수정), 책 정보 PATCH(카테고리 포함), ISBN 연결/해제 PATCH, 태그 POST/DELETE, 태그 목록/플랫폼 옵션 GET, 삭제 DELETE)
 - `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth(로컬 조회는 bookshelf 레포지토리 재사용, 기록 필드 수정은 로컬 우선 + 바꾼 필드만 뒤에서 재전송, 그 외는 서버 PATCH 성공 후 로컬 반영), 로컬 저장 모드에서는 책 정보 수정·ISBN 연결·책 삭제를 로컬에만 반영하고 태그 등 서버 전용 기능은 차단
 - `lib/features/book_record/providers/book_record_providers.dart` — 책 기록 관련 Riverpod provider(단일 책 상태 컨트롤러, 태그 자동완성, 플랫폼 옵션)
@@ -110,9 +110,16 @@
 
 ## features/book_detail
 
-- `lib/features/book_detail/screens/book_detail_screen.dart` — 검색 결과 경유 책 상세 화면, 정보/서재 담기/구매/커뮤니티 리뷰 조립과 공개 독후감·주제 토론 목록 진입
+- `lib/features/book_detail/screens/book_detail_screen.dart` — 검색 결과 경유 책 상세 화면, 정보/서재 담기/구매/커뮤니티 미리보기 조립
+- `lib/features/book_detail/screens/book_review_list_screen.dart` — ISBN13 기준 독자평 전체 목록(커서 무한 스크롤, 본인 리뷰 수정·삭제, 공감, 신고), 작성 폼은 없음
 - `lib/features/book_detail/data/book_detail_api.dart` — 책 상세 API 호출(상세 조회, 서재 존재 확인, 서재 담기, 리뷰 CRUD, 좋아요, 신고)
 - `lib/features/book_detail/providers/book_detail_providers.dart` — 책 상세/커뮤니티 리뷰 관련 Riverpod provider(상세+서재 포함 여부 컨트롤러, 리뷰 커서 무한 스크롤 컨트롤러)
+
+## features/book_community
+
+- `lib/features/book_community/data/book_community_api.dart` — 커뮤니티 미리보기·개수 API 호출(GET community-preview, community-counts)
+- `lib/features/book_community/providers/book_community_providers.dart` — isbn13 기준 미리보기(독후감/토론 개수 포함)·독자평 전체 개수 독립 조회 Riverpod provider(한쪽 실패가 다른 쪽에 영향 없음)
+- `lib/features/book_community/screens/widgets/book_community_preview_section.dart` — 책 검색 상세·책 기록 상세(생각나눔 탭)가 공유하는 커뮤니티 미리보기 위젯(독자평/독후감/토론 개수 진입 버튼 + 최근 독자평 미리보기)
 
 ## features/discussion
 
@@ -161,3 +168,6 @@
 - `docs/review/20260828-151504-app-bar-sharing-discussion-ui-rereview.md` — 공통 앱바·생각나눔·토론 UI 후속 수정의 선택지 최대 개수·상대 시각 재리뷰
 - `docs/review/20260828-152535-app-bar-sharing-discussion-ui-third-review.md` — 선택지 추가 UI 후속 수정의 최대 개수 경계·상대 시각 3차 리뷰
 - `docs/review/20260828-212316-public-reflection-and-common-ui-review.md` — 공개 독후감과 공용 커뮤니티 UI의 숨김 페이지네이션·공감 경합·시간·터치 접근성 리뷰
+- `docs/review/20260829-201842-book-community-preview-and-review-list-review.md` — 커뮤니티 미리보기·독자평 전체 목록의 공감/페이지네이션 경합과 비동기 생명주기 리뷰
+- `docs/review/20260830-133204-book-community-preview-and-review-list-rereview.md` — 커뮤니티 미리보기·독자평 목록 후속 변경의 로딩·공감 경합과 중복 API 요청 재리뷰
+- `docs/review/20260830-145157-book-community-preview-and-review-list-third-review.md` — 커뮤니티 미리보기·독자평 목록의 독후감 개수 기준과 미해결 비동기 경합 3차 리뷰

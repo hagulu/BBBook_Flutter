@@ -36,10 +36,8 @@ class BookDetailData {
 /// 책 상세 조회 + 서재 포함 여부 확인(`getBookshelfExists` 대응). [isbn]은
 /// ISBN10/13 어느 쪽이든 받되, 이후 서재 담기/리뷰 API는 응답의 canonical
 /// ISBN13([BookDetail.isbn])만 사용한다.
-class BookDetailController extends AutoDisposeFamilyAsyncNotifier<
-  BookDetailData,
-  String
-> {
+class BookDetailController
+    extends AutoDisposeFamilyAsyncNotifier<BookDetailData, String> {
   late BookDetailApi _api;
 
   @override
@@ -62,11 +60,10 @@ class BookDetailController extends AutoDisposeFamilyAsyncNotifier<
   }
 }
 
-final bookDetailControllerProvider =
-    AsyncNotifierProvider.autoDispose
-        .family<BookDetailController, BookDetailData, String>(
-          BookDetailController.new,
-        );
+final bookDetailControllerProvider = AsyncNotifierProvider.autoDispose
+    .family<BookDetailController, BookDetailData, String>(
+      BookDetailController.new,
+    );
 
 /// 커뮤니티 리뷰 목록 상태(커서 기반 무한 스크롤).
 class ReviewsState {
@@ -102,6 +99,12 @@ class ReviewsController
     extends AutoDisposeFamilyAsyncNotifier<ReviewsState, String> {
   late BookDetailApi _api;
 
+  /// `_reloadFirstPage()`(새로고침/작성 후 재조회)가 시작될 때마다 올라가는
+  /// 세대값. `loadMore()`가 요청을 보낸 뒤 이 값이 바뀌었다면, 그 사이 첫
+  /// 페이지가 통째로 교체된 것이므로 응답이 와도 병합하지 않고 버린다(오래된
+  /// 커서 기준 페이지가 새로고침된 첫 페이지 뒤에 잘못 이어붙는 것을 방지).
+  int _requestGeneration = 0;
+
   @override
   FutureOr<ReviewsState> build(String isbn13) async {
     _api = ref.watch(bookDetailApiProvider);
@@ -117,12 +120,14 @@ class ReviewsController
     final current = state.valueOrNull;
     if (current == null || !current.hasNext || current.isLoadingMore) return;
 
+    final generation = _requestGeneration;
     state = AsyncValue.data(current.copyWith(isLoadingMore: true));
     try {
       final page = await _api.getReviews(
         isbn13: arg,
         cursor: current.nextCursor,
       );
+      if (generation != _requestGeneration) return;
       final latest = state.valueOrNull;
       if (latest == null) return;
       state = AsyncValue.data(
@@ -134,6 +139,7 @@ class ReviewsController
         ),
       );
     } catch (_) {
+      if (generation != _requestGeneration) return;
       final latest = state.valueOrNull;
       if (latest != null) {
         state = AsyncValue.data(latest.copyWith(isLoadingMore: false));
@@ -207,7 +213,11 @@ class ReviewsController
   }
 
   /// 리뷰 신고. targetType은 항상 REVIEW로 고정한다.
-  Future<void> reportReview(int reviewId, {required String reason, String? content}) {
+  Future<void> reportReview(
+    int reviewId, {
+    required String reason,
+    String? content,
+  }) {
     return _api.postReport(
       targetType: 'REVIEW',
       targetId: reviewId,
@@ -245,7 +255,27 @@ class ReviewsController
     }
   }
 
+  /// 당겨서 새로고침(전체 목록 화면). 실패해도 화면에 남아 있는 목록을
+  /// 유지한다(다시 시도는 사용자가 결정, `DiscussionListController.refresh`와
+  /// 동일한 방침).
+  Future<void> refresh() async {
+    try {
+      await _reloadFirstPage();
+    } catch (_) {
+      // 화면에 남아 있는 목록을 유지한다.
+    }
+  }
+
   Future<void> _reloadFirstPage() async {
+    _requestGeneration++;
+    // 세대를 올리는 시점에 진행 중이던 loadMore()는 그 결과를 병합하지 않고
+    // 버리게 되므로(위 generation 체크), 그 loadMore()가 남긴 isLoadingMore를
+    // 여기서 미리 꺼 둔다 — 그렇지 않으면 이 재조회가 실패했을 때(catch에서
+    // 기존 상태를 그대로 유지) 목록이 "더 불러오는 중" 상태로 영구히 멈춘다.
+    final loadingMore = state.valueOrNull;
+    if (loadingMore != null && loadingMore.isLoadingMore) {
+      state = AsyncValue.data(loadingMore.copyWith(isLoadingMore: false));
+    }
     final page = await _api.getReviews(isbn13: arg);
     state = AsyncValue.data(
       ReviewsState(
@@ -270,8 +300,5 @@ class ReviewsController
   }
 }
 
-final reviewsControllerProvider =
-    AsyncNotifierProvider.autoDispose
-        .family<ReviewsController, ReviewsState, String>(
-          ReviewsController.new,
-        );
+final reviewsControllerProvider = AsyncNotifierProvider.autoDispose
+    .family<ReviewsController, ReviewsState, String>(ReviewsController.new);

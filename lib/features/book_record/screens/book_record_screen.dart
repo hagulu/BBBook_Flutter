@@ -305,7 +305,11 @@ class _BookRecordBody extends ConsumerWidget {
             ),
             BookNoteList(userBookId: userBookId, bookTitle: book.title),
             BookReflectionList(userBookId: userBookId, bookTitle: book.title),
-            BookSharingList(bookTitle: book.title, isbn13: book.isbn13),
+            BookSharingList(
+              userBookId: userBookId,
+              bookTitle: book.title,
+              isbn13: book.isbn13,
+            ),
           ],
         ),
       ),
@@ -504,8 +508,7 @@ class _BookRecordBody extends ConsumerWidget {
       // 완독 상태에서는 완독일을 지울 수 없다 — 서버가 삭제를 무시하고 기존
       // 값(없으면 오늘)을 유지한다(api-doc). 날짜를 없애려면 상태를 먼저
       // 바꿔야 한다.
-      canClear:
-          isStartedAt || book.status != BookStatus.finished,
+      canClear: isStartedAt || book.status != BookStatus.finished,
     );
     if (result == null) return;
     // "선택 해제"는 명시적 null(삭제), 날짜 선택은 그 값으로 수정이다.
@@ -596,10 +599,7 @@ class _CollapsingBookHeaderDelegate extends SliverPersistentHeaderDelegate {
                   scale: 1 - progress * 0.1,
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                    child: _Header(
-                      book: book,
-                      onEditBookInfo: onEditBookInfo,
-                    ),
+                    child: _Header(book: book, onEditBookInfo: onEditBookInfo),
                   ),
                 ),
               ),
@@ -617,7 +617,11 @@ class _CollapsingBookHeaderDelegate extends SliverPersistentHeaderDelegate {
             if (overlapsContent && compactOpacity > 0)
               const Align(
                 alignment: Alignment.bottomCenter,
-                child: Divider(height: 1, thickness: 1, color: AppColors.border),
+                child: Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: AppColors.border,
+                ),
               ),
           ],
         ),

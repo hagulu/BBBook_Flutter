@@ -8,20 +8,21 @@ import '../../../core/utils/author_display.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../book_community/screens/widgets/book_community_preview_section.dart';
 import '../../book_record/screens/widgets/star_rating.dart';
 import '../../bookshelf/models/book_status.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../bookshelf/screens/widgets/book_cover.dart';
 import '../providers/book_detail_providers.dart';
 import 'widgets/add_status_dialog.dart';
-import 'widgets/community_reviews_section.dart';
 import 'widgets/finish_options_dialog.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 검색 결과 경유 책 상세 화면(`/books/[isbn]` 대응, book-detail.md).
 /// `BookSearchScreen`의 검색 결과 카드에서 `Navigator.push`로 진입한다.
 ///
-/// 커뮤니티 리뷰와 공개 독후감·주제 토론 진입점을 책 정보 아래에 구성한다.
+/// 책 정보 아래에 커뮤니티 미리보기(독자평/공개 독후감/주제 토론)를
+/// 구성한다.
 class BookDetailScreen extends ConsumerStatefulWidget {
   const BookDetailScreen({super.key, required this.isbn});
 
@@ -125,9 +126,10 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
             children: [
               _HeroSection(data: value),
               const SizedBox(height: 24),
-              CommunityReviewsSection(
+              BookCommunityPreviewSection(
                 isbn13: value.detail.isbn,
                 bookTitle: value.detail.title,
+                userBookId: value.userBookId,
               ),
             ],
           ),

@@ -12,11 +12,15 @@ class EntryButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.count,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+
+  /// 진입 대상 콘텐츠 개수 배지. null이면 표시하지 않는다(0은 배지로 표시).
+  final int? count;
 
   @override
   Widget build(BuildContext context) {
@@ -29,38 +33,59 @@ class EntryButton extends StatelessWidget {
         type: MaterialType.transparency,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: Row(
               children: [
                 CircleAvatar(
-                  radius: 16,
+                  radius: 20,
                   backgroundColor: AppColors.accentSurface.withValues(
                     alpha: 0.35,
                   ),
                   child: Icon(
                     icon,
                     color: AppColors.accentForeground,
-                    size: 16,
+                    size: 20,
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textStrong,
                     ),
                   ),
                 ),
+                if (count != null) ...[
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceSubtle,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+                ],
                 const Icon(
                   PhosphorIconsRegular.caretRight,
-                  size: 15,
+                  size: 18,
                   color: AppColors.controlInactive,
                 ),
               ],
