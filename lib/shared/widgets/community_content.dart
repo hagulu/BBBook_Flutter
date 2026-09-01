@@ -459,31 +459,29 @@ class CommunityLikeInline extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-            child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isLiked
-                        ? PhosphorIconsFill.heart
-                        : PhosphorIconsRegular.heart,
-                    size: 18,
-                    color: isLiked
-                        ? AppColors.error
-                        : AppColors.controlInactive,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isLiked
+                      ? PhosphorIconsFill.heart
+                      : PhosphorIconsRegular.heart,
+                  size: 18,
+                  color: isLiked
+                      ? AppColors.error
+                      : AppColors.controlInactive,
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  '$likeCount',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textMuted,
                   ),
-                  const SizedBox(width: 5),
-                  Text(
-                    '$likeCount',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
