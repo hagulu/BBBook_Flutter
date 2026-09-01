@@ -64,7 +64,8 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
     super.dispose();
   }
 
-  int get _maxPage => widget.book.totalPages ?? 0;
+  int get _maxPage =>
+      widget.book.isAudioBook ? 100 : (widget.book.effectiveTotalPages ?? 0);
 
   void _onFocusChanged() {
     if (_pageFocus.hasFocus) {
@@ -115,8 +116,14 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
 
   @override
   Widget build(BuildContext context) {
-    final totalPages = widget.book.totalPages;
+    final isAudioBook = widget.book.isAudioBook;
+    // 오디오북은 currentPage 자체가 0~100 진행률 값이라 별도 총량 표시가
+    // 없다 — 페이지 기반 총쪽수는 종이책/전자책에서만 의미가 있다.
+    final totalPages = isAudioBook ? null : widget.book.effectiveTotalPages;
     final ratio = widget.book.progressRatio;
+    // 진행률 바에 쓸 상한. 오디오북은 항상 100(%), 그 외는 총쪽수를 알 때만.
+    final showBar = isAudioBook || (totalPages != null && totalPages > 0);
+    final barMax = isAudioBook ? 100 : totalPages;
 
     return RecordSectionCard(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
@@ -125,7 +132,9 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
         children: [
           Row(
             children: [
-              if (ratio != null)
+              // 오디오북은 오른쪽 입력값 자체가 이미 퍼센트라(접미사 '%')
+              // 왼쪽에 같은 값을 또 보여주면 중복이라 생략한다.
+              if (!isAudioBook && ratio != null)
                 Padding(
                   padding: const EdgeInsets.only(left: 6),
                   child: Text(
@@ -164,15 +173,23 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
                   ),
                 ),
               ),
-              if (totalPages != null)
+              if (isAudioBook)
+                const Text(
+                  '%',
+                  style: TextStyle(color: AppColors.textMuted),
+                )
+              else if (totalPages != null)
                 Text(
                   ' / $totalPages쪽',
                   style: const TextStyle(color: AppColors.textMuted),
                 ),
             ],
           ),
-          if (totalPages != null && totalPages > 0) const SizedBox(height: 6),
-          if (totalPages != null && totalPages > 0)
+          // 오디오북은 페이지가 아니라 0~100 퍼센트 상한으로 같은 바를
+          // 그대로 쓴다 — "페이지 기반 슬라이더"가 아니라 퍼센트 진행 바라
+          // 오디오북에도 자연스럽다.
+          if (showBar) const SizedBox(height: 6),
+          if (showBar)
             SizedBox(
               // 표시 전용(드래그 불가)이라 손잡이 터치 영역이 필요 없어,
               // 트랙 두께에 맞춰 세로 여백을 최소화했다.
@@ -191,9 +208,9 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
                 ),
                 child: Slider(
                   padding: EdgeInsets.zero,
-                  value: _sliderValue.clamp(0, totalPages.toDouble()),
+                  value: _sliderValue.clamp(0, barMax!.toDouble()),
                   min: 0,
-                  max: totalPages.toDouble(),
+                  max: barMax.toDouble(),
                   // onChanged를 주지 않아 수정을 막는다(표시 전용).
                   onChanged: null,
                 ),

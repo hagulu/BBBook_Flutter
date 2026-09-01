@@ -1,8 +1,10 @@
 import 'package:calendar_date_picker2/calendar_date_picker2.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/network/patch_field.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/app_confirm.dart';
 import '../../../bookshelf/models/book_status.dart';
 import '../../models/record_labels.dart';
 import 'icon_option_selector.dart';
@@ -107,21 +109,42 @@ class _StatusCard extends StatelessWidget {
 }
 
 /// [showSourcePlatformDialog] 결과. [platformName]이 null이면 요청에서
-/// 생략하고(실물책 선택 시 서버가 platformName을 자동으로 null 처리하므로
-/// 별도 전송이 필요 없다), `PatchField.clear()`면 명시적 null로 지운다.
+/// 생략(변경 없음), `PatchField.clear()`면 명시적 null로 지운다. 종이책을
+/// 선택하면 이전에 설정된 플랫폼이 있든 없든 항상 `.clear()`가 담긴다(서버가
+/// sourceType=PAPER_BOOK일 때 platformName을 강제로 null 처리하지만, 그
+/// 자동 정리에 기대지 않고 여기서도 명시적으로 지운다).
+/// [displayTotalPages]는 전자책 전체 쪽수 override — null이면 변경 없음,
+/// `PatchField.clear()`면 삭제(종이책 기준 쪽수로 되돌아감), `.value(n)`이면
+/// 그 값으로 설정. 전자책이 아닌 형태를 선택했는데 기존에 override가
+/// 설정돼 있었다면 자동으로 `.clear()`가 담긴다(그러지 않으면 화면에서는
+/// 사라진 것처럼 보이는 값이 진행률·완독 상한 계산에는 계속 쓰인다).
 class SourcePlatformResult {
-  const SourcePlatformResult({required this.sourceType, this.platformName});
+  const SourcePlatformResult({
+    required this.sourceType,
+    this.platformName,
+    this.displayTotalPages,
+  });
 
   final BookSourceType sourceType;
   final PatchField<String>? platformName;
+  final PatchField<int>? displayTotalPages;
 }
 
-/// 출처(실물책/전자책/오디오북) 및 플랫폼 선택 팝업.
+/// 출처(종이책/전자책/오디오북) 및 플랫폼 선택 팝업. 전자책을 고르면 전자책
+/// 전체 쪽수(선택 사항) 입력 필드가 함께 나온다 — 설정하면 그 값을 기준으로
+/// 진행률을 계산하고(`displayTotalPages ?? statsTotalPages`), 비워두면 종이책
+/// 기준 쪽수로 fallback한다. 종이책 기준 쪽수 자체는 이 팝업에서 바꾸지 않는다.
+///
+/// [initialCurrentPage]는 전자책 쪽수 입력값 검증에 쓴다 — 새로 입력한
+/// 값이 현재 읽은 쪽수보다 작으면 `PATCH .../book-info`가 400으로 거부되므로
+/// (api-doc), 저장 전에 이 팝업 안에서 미리 막는다.
 Future<SourcePlatformResult?> showSourcePlatformDialog(
   BuildContext context, {
   required BookSourceType? initialSource,
   required String? initialPlatform,
   required Map<String, List<String>> platformOptions,
+  int? initialDisplayTotalPages,
+  required int initialCurrentPage,
 }) {
   return showModalBottomSheet<SourcePlatformResult>(
     context: context,
@@ -131,6 +154,8 @@ Future<SourcePlatformResult?> showSourcePlatformDialog(
       initialSource: initialSource,
       initialPlatform: initialPlatform,
       platformOptions: platformOptions,
+      initialDisplayTotalPages: initialDisplayTotalPages,
+      initialCurrentPage: initialCurrentPage,
     ),
   );
 }
@@ -143,11 +168,15 @@ class _SourcePlatformDialog extends StatefulWidget {
     required this.initialSource,
     required this.initialPlatform,
     required this.platformOptions,
+    this.initialDisplayTotalPages,
+    required this.initialCurrentPage,
   });
 
   final BookSourceType? initialSource;
   final String? initialPlatform;
   final Map<String, List<String>> platformOptions;
+  final int? initialDisplayTotalPages;
+  final int initialCurrentPage;
 
   @override
   State<_SourcePlatformDialog> createState() => _SourcePlatformDialogState();
@@ -165,6 +194,10 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
   late final _customController = TextEditingController(
     text: _hasCustomInitialPlatform ? widget.initialPlatform! : '',
   );
+  late final _ebookPagesController = TextEditingController(
+    text: widget.initialDisplayTotalPages?.toString() ?? '',
+  );
+  String? _ebookPagesError;
 
   bool _isKnownPlatform() {
     final key = widget.initialSource?.platformOptionsKey;
@@ -187,6 +220,7 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
   @override
   void dispose() {
     _customController.dispose();
+    _ebookPagesController.dispose();
     super.dispose();
   }
 
@@ -198,9 +232,12 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
 
   bool get _isCustomSelected => _selectedPlatform == _kCustomPlatformLabel;
 
+  bool get _isEbookSelected => _source == BookSourceType.ebook;
+
   void _save() {
     final source = _source;
     if (source == null) return;
+    if (_ebookPagesError != null) setState(() => _ebookPagesError = null);
 
     PatchField<String>? platformName;
     if (source.platformOptionsKey != null) {
@@ -222,14 +259,74 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
         // 출처의 플랫폼명이 그대로 남으므로 명시적으로 지운다.
         platformName = const PatchField.clear();
       }
+    } else {
+      // 종이책은 플랫폼 개념이 없다 — 메인 기록 PATCH는 sourceType이
+      // PAPER_BOOK이면 platformName을 값과 무관하게 강제로 null 처리하지만
+      // (api-me-books-userBookId-patch.md), 그 자동 정리에 기대지 않고
+      // 여기서도 항상 명시적으로 지워 요청 의도를 분명히 한다.
+      platformName = const PatchField.clear();
     }
-    Navigator.of(
-      context,
-    ).pop(SourcePlatformResult(sourceType: source, platformName: platformName));
+
+    PatchField<int>? displayTotalPages;
+    if (_isEbookSelected) {
+      final text = _ebookPagesController.text.trim();
+      final parsed = text.isEmpty ? null : int.tryParse(text);
+      if (text.isEmpty) {
+        // 비워둔 채 저장 — 기존에 설정된 값이 있었을 때만 명시적으로 지운다.
+        if (widget.initialDisplayTotalPages != null) {
+          displayTotalPages = const PatchField.clear();
+        }
+      } else if (parsed != null &&
+          _source == widget.initialSource &&
+          parsed < widget.initialCurrentPage) {
+        // 현재 읽은 쪽수보다 작은 값은 저장 요청 자체가 400으로 거부된다
+        // (api-me-books-userBookId-book-info-patch.md) — 요청을 보내기 전에
+        // 여기서 미리 막는다. 출처 자체를 바꾸는 경우(전자책을 유지하는
+        // 게 아니라 다른 출처에서 전자책으로 전환)는 저장 시
+        // `BookItem.normalizedCurrentPageForSourceChange`가 진행 기록을
+        // 0으로 초기화하므로(사용자에게는 출처 선택 시점에 미리 경고) 이
+        // 비교 자체가 필요 없다 — 어떤 총쪽수를 입력해도 항상 유효하다.
+        setState(() {
+          _ebookPagesError = '현재 읽은 쪽수(${widget.initialCurrentPage}쪽)보다 작을 수 없어요.';
+        });
+        return;
+      } else if (parsed != null && parsed != widget.initialDisplayTotalPages) {
+        displayTotalPages = PatchField.value(parsed);
+      }
+    } else if (widget.initialDisplayTotalPages != null) {
+      // 전자책이 아닌 형태로 바꾸면 남아있는 전자책 쪽수 override를 함께
+      // 지운다 — 그러지 않으면 화면에서만 사라진 것처럼 보이고 진행률·완독
+      // 상한 계산에는 계속 쓰인다.
+      displayTotalPages = const PatchField.clear();
+    }
+
+    Navigator.of(context).pop(
+      SourcePlatformResult(
+        sourceType: source,
+        platformName: platformName,
+        displayTotalPages: displayTotalPages,
+      ),
+    );
   }
 
-  /// 출처 선택. 플랫폼이 필요 없는 출처(실물책)는 바로 저장하고 닫는다.
-  void _selectSource(BookSourceType source) {
+  /// 출처 선택. 이미 진행 기록이 있는 책의 출처를 실제로 바꾸면(초기 출처와
+  /// 다르고 [widget.initialCurrentPage]가 0보다 크면) 저장 시 진행 기록이
+  /// 0으로 초기화된다(쪽수 ↔ 퍼센트는 단위가 달라 자동 환산하지 않는다 —
+  /// `BookItem.normalizedCurrentPageForSourceChange`) — 선택하는 이 시점에
+  /// 한 번만 경고 확인을 받고, 취소하면 선택을 되돌린다. 플랫폼이 필요
+  /// 없는 출처(종이책)는 확인(또는 애초에 경고가 필요 없으면 곧바로) 후
+  /// 바로 저장하고 닫는다.
+  Future<void> _selectSource(BookSourceType source) async {
+    if (source != widget.initialSource && widget.initialCurrentPage > 0) {
+      final confirmed = await AppConfirm.show(
+        context,
+        title: '출처 변경',
+        message: '출처를 바꾸면 현재 읽은 기록이 0으로 초기화됩니다. 계속할까요?',
+        confirmText: '변경',
+        destructive: true,
+      );
+      if (!confirmed || !mounted) return;
+    }
     setState(() {
       _source = source;
       _selectedPlatform = null;
@@ -237,11 +334,12 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
     if (source.platformOptionsKey == null) _save();
   }
 
-  /// 플랫폼 선택. '직접 입력'을 고르면 입력창을 펼치기만 하고, 그 외에는
-  /// 바로 저장하고 닫는다.
+  /// 플랫폼 선택. '직접 입력'을 고르면 입력창을 펼치기만 하고, 전자책은
+  /// 쪽수 입력을 이어서 받아야 하므로 "저장" 버튼을 눌러야 닫힌다. 그 외
+  /// (오디오북)는 플랫폼을 고르면 바로 저장하고 닫는다.
   void _selectPlatform(String platform) {
     setState(() => _selectedPlatform = platform);
-    if (platform != _kCustomPlatformLabel) _save();
+    if (platform != _kCustomPlatformLabel && !_isEbookSelected) _save();
   }
 
   @override
@@ -305,9 +403,43 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
               ),
             ],
           ],
+          if (_isEbookSelected) ...[
+            const SizedBox(height: 16),
+            const Text(
+              '전자책 전체 쪽수',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _ebookPagesController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              onChanged: (_) {
+                if (_ebookPagesError != null) {
+                  setState(() => _ebookPagesError = null);
+                }
+              },
+              decoration: const InputDecoration(
+                isDense: true,
+                hintText: '선택 사항 — 비워두면 종이책 기준 쪽수를 사용해요',
+                counterText: '',
+              ),
+            ),
+            if (_ebookPagesError != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                _ebookPagesError!,
+                style: const TextStyle(color: AppColors.error, fontSize: 12),
+              ),
+            ],
+          ],
         ],
       ),
-      buttons: _isCustomSelected
+      buttons: _isCustomSelected || _isEbookSelected
           ? [RecordDialogButton(label: '저장', onPressed: _save)]
           : const [],
     );

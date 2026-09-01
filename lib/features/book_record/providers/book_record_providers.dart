@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/patch_field.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/models/book_tag.dart';
@@ -90,7 +91,8 @@ class BookRecordController
     required String title,
     String? author,
     String? publisher,
-    int? totalPages,
+    int? statsTotalPages,
+    int? displayTotalPages,
     int? categoryId,
     String? coverImageUrl,
     File? thumbnailFile,
@@ -102,13 +104,53 @@ class BookRecordController
         title: title,
         author: author,
         publisher: publisher,
-        totalPages: totalPages,
+        statsTotalPages: statsTotalPages,
+        displayTotalPages: displayTotalPages,
         categoryId: categoryId,
         coverImageUrl: coverImageUrl,
         thumbnailFile: thumbnailFile,
         removeThumbnail: removeThumbnail,
       ),
     );
+  }
+
+  /// 출처(sourceType/platformName)를 저장하고, [displayTotalPages]가 있으면
+  /// 전자책 쪽수 override까지 함께 저장한다(정리는
+  /// [BookRecordRepository.updateSourceType] 참고).
+  ///
+  /// [_mutate]를 그대로 쓰지 않는다 — [displayTotalPages]가 있을 때는 서버
+  /// 요청이 두 단계([BookRecordRepository.updateSourceType] 문서 참고)라
+  /// 첫 단계(출처)만 성공하고 두 번째(쪽수)가 실패할 수 있는데,
+  /// `_mutate`는 예외가 나면 무조건 작업 전 상태로 되돌린다. 그러면 이미
+  /// 서버·로컬 DB에 반영된 첫 단계 결과가 화면에서만 사라져 DB와 어긋난다.
+  /// 여기서는 [SourceTypeUpdateResult.item]으로 항상 상태를 갱신한 뒤에만
+  /// [SourceTypeUpdateResult.error]를 던져, 부분 성공이 화면에도 그대로
+  /// 남게 한다.
+  Future<BookItem> updateSourceType({
+    required String sourceType,
+    required PatchField<String>? platformName,
+    PatchField<int>? displayTotalPages,
+  }) async {
+    if (_isMutating) {
+      throw const ApiException('저장 중입니다. 잠시 후 다시 시도해주세요.');
+    }
+    _isMutating = true;
+    state = const AsyncValue<BookItem?>.loading().copyWithPrevious(state);
+    try {
+      final result = await _repository.updateSourceType(
+        arg,
+        sourceType: sourceType,
+        platformName: platformName,
+        displayTotalPages: displayTotalPages,
+      );
+      state = AsyncValue.data(result.item);
+      ref.read(bookshelfSyncVersionProvider.notifier).state++;
+      final error = result.error;
+      if (error != null) throw error;
+      return result.item;
+    } finally {
+      _isMutating = false;
+    }
   }
 
   /// ISBN 연결/재연결/연결 해제. [isbn13]이 null이면 연결 해제다. 호출부

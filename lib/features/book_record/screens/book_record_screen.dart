@@ -419,11 +419,11 @@ class _BookRecordBody extends ConsumerWidget {
                     ? null
                     : tapped.apiValue,
                 rereadCount: count,
-                // totalPages를 아는 책은 마지막 쪽으로 진행률을 맞춘다(실제
-                // 웹 클라이언트와 동일 — 완독인데 진행률이 중간에 멈춰 있는
-                // 모순 방지). 재독 팝업은 완독 상태가 아닌 책에서도 열릴 수
-                // 있어 이 값이 항상 이미 반영돼 있지는 않다.
-                currentPage: book.totalPages,
+                // 총쪽수(오디오북은 100%)를 아는 책은 끝까지로 진행률을
+                // 맞춘다(실제 웹 클라이언트와 동일 — 완독인데 진행률이
+                // 중간에 멈춰 있는 모순 방지). 재독 팝업은 완독 상태가 아닌
+                // 책에서도 열릴 수 있어 이 값이 항상 이미 반영돼 있지는 않다.
+                currentPage: book.progressUpperBound,
               ),
             );
           case RereadFinishCancelled():
@@ -442,9 +442,9 @@ class _BookRecordBody extends ConsumerWidget {
       await controller.updateRecord(
         RecordPatch(
           status: tapped.apiValue,
-          // totalPages를 아는 책은 마지막 쪽으로 진행률을 맞춘다(실제 웹
-          // 클라이언트와 동일 — 완독인데 진행률이 중간에 멈춰 있는 모순 방지).
-          currentPage: book.totalPages,
+          // 총쪽수(오디오북은 100%)를 아는 책은 끝까지로 진행률을 맞춘다(실제
+          // 웹 클라이언트와 동일 — 완독인데 진행률이 중간에 멈춰 있는 모순 방지).
+          currentPage: book.progressUpperBound,
           // 완독 팝업에서 입력하지 않은 항목은 아예 보내지 않는다(기존 값
           // 유지) — 빈 값을 지움 신호로 쓰지 않는다.
           difficulty: patchIfPresent(result.difficulty),
@@ -478,15 +478,30 @@ class _BookRecordBody extends ConsumerWidget {
       initialSource: BookSourceType.fromApiValue(book.sourceType),
       initialPlatform: book.platformName,
       platformOptions: options,
+      initialDisplayTotalPages: book.displayTotalPages,
+      initialCurrentPage: book.currentPage,
     );
-    if (result == null) return;
+    if (result == null || !context.mounted) return;
 
-    await controller.updateRecord(
-      RecordPatch(
-        sourceType: PatchField.value(result.sourceType.apiValue),
+    // 순수 출처 변경이든 전자책 쪽수 변경을 겸하든 항상 리포지토리의 단일
+    // 진입점으로 보낸다 — currentPage 정리([BookItem.normalizedCurrentPageForSourceChange]
+    // — 출처가 실제로 바뀌고 진행 기록이 있으면 0으로 초기화)를 다이얼로그를
+    // 연 시점에 캡처해 둔 [book] 대신 저장 시작 시점의 최신 로컬 행 기준으로
+    // 계산하기 위함이다(리포지토리 문서 참고). 사용자에게는
+    // [showSourcePlatformDialog]가 출처를 고르는 시점에 미리 경고 확인을
+    // 받는다.
+    AppLoading.show(context);
+    try {
+      await controller.updateSourceType(
+        sourceType: result.sourceType.apiValue,
         platformName: result.platformName,
-      ),
-    );
+        displayTotalPages: result.displayTotalPages,
+      );
+    } on ApiException catch (e) {
+      if (context.mounted) AppSnackBar.error(context, e.message);
+    } finally {
+      AppLoading.hide();
+    }
   }
 
   Future<void> _openDifficultyDialog(

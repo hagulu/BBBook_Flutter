@@ -172,3 +172,6 @@
 - `docs/review/20260830-133204-book-community-preview-and-review-list-rereview.md` — 커뮤니티 미리보기·독자평 목록 후속 변경의 로딩·공감 경합과 중복 API 요청 재리뷰
 - `docs/review/20260830-145157-book-community-preview-and-review-list-third-review.md` — 커뮤니티 미리보기·독자평 목록의 독후감 개수 기준과 미해결 비동기 경합 3차 리뷰
 - `docs/review/20260830-185915-book-record-fixed-header-review.md` — 책 기록 상세 고정 헤더의 작은 세로 화면·큰 글자 배율 레이아웃 리뷰
+- `docs/review/20260831-171201-book-progress-source-pages-review.md` — 책 형태별 진행률·전자책 쪽수 저장의 PATCH 경합과 출처 전환 정합성 리뷰
+- `docs/review/20260901-112239-book-progress-source-pages-rereview.md` — 책 형태별 진행률 후속 수정의 쪽수 축소 요청 순서·오디오북 역변환·최신 상태 정합성 재리뷰
+- `docs/review/20260901-142758-book-progress-source-pages-third-review.md` — 출처·전자책 쪽수 조정 작업의 dirty push 경합·중간 실패·최신 진행 상태 3차 리뷰

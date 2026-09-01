@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/patch_field.dart';
 import '../../book_search/models/book_search_item.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
 import '../../bookshelf/data/bookshelf_repository.dart';
@@ -32,6 +33,12 @@ import 'book_record_api.dart';
 /// `BookshelfRepository.sync()`가 증분/전체 동기화에 쓰는 것과 동일한
 /// 보호 장치다 — 그러지 않으면 로그아웃 직전에 시작된 PATCH/삭제 응답이
 /// 늦게 도착했을 때 방금 비운 DB에 이전 계정의 책을 다시 채워 넣을 수 있다.
+/// [BookRecordRepository.updateSourceType] 결과. [error]가 non-null이면
+/// [item]까지는(출처/`currentPage` 변경) 성공적으로 반영됐지만 그 다음
+/// 단계(전자책 쪽수 저장)가 실패했다는 뜻이다 — 호출부는 [item]으로 상태를
+/// 갱신하면서 [error]도 사용자에게 알려야 한다(둘 다 무시하면 안 된다).
+typedef SourceTypeUpdateResult = ({BookItem item, ApiException? error});
+
 class BookRecordRepository {
   BookRecordRepository({
     required this._api,
@@ -88,7 +95,8 @@ class BookRecordRepository {
     required String title,
     String? author,
     String? publisher,
-    int? totalPages,
+    int? statsTotalPages,
+    int? displayTotalPages,
     int? categoryId,
     String? coverImageUrl,
     File? thumbnailFile,
@@ -102,7 +110,8 @@ class BookRecordRepository {
         title: title,
         author: author,
         publisher: publisher,
-        totalPages: totalPages,
+        statsTotalPages: statsTotalPages,
+        displayTotalPages: displayTotalPages,
         categoryId: categoryId,
         coverImageUrl: coverImageUrl,
         thumbnailFile: thumbnailFile,
@@ -115,13 +124,172 @@ class BookRecordRepository {
       title: title,
       author: author,
       publisher: publisher,
-      totalPages: totalPages,
+      statsTotalPages: statsTotalPages,
+      displayTotalPages: displayTotalPages,
       categoryId: categoryId,
       coverImageUrl: coverImageUrl,
       thumbnailFile: thumbnailFile,
       removeThumbnail: removeThumbnail,
     );
     return _persist(current, data, expectedGeneration);
+  }
+
+  /// 출처(sourceType/platformName)를 저장하고, [displayTotalPages]가 있으면
+  /// 전자책 쪽수 override까지 함께 저장한다. `currentPage` 정리
+  /// ([BookItem.normalizedCurrentPageForSourceChange] — 출처가 실제로
+  /// 바뀌고 진행 기록이 있으면 0으로 초기화)를 위해 항상 이 메서드를 통해야
+  /// 한다 — 호출부(책 기록 화면)가 다이얼로그를 연 시점에 캡처해 둔
+  /// 스냅샷이 아니라, 저장 시작 시점에 다시 읽은 최신 로컬 행을 기준으로
+  /// 계산한다.
+  ///
+  /// [displayTotalPages]가 없으면 기존 [updateRecord]와 같은 로컬 우선·
+  /// 오프라인 친화적 경로를 쓴다. 있으면 서버 API가 `PATCH .../userBookId`
+  /// (기록)와 `PATCH .../book-info`(쪽수) 두 개로 나뉘어 있어 조정이
+  /// 필요하다:
+  /// - 이 책의 기존 dirty 편집(예: 오프라인 평점 수정)을 먼저 확정 push한
+  ///   뒤, 그 push와 [BookshelfRepository.pushDirtyRecord]가 공유하는 책별
+  ///   순서 큐([BookshelfRepository.runSerializedForBook])에 이 저장을 태워
+  ///   실행한다 — 그러지 않으면 dirty push와 이 메서드의 직접 API 호출이
+  ///   동시에 나가 서로의 `updated_at` 기준값을 무효화시키고, dirty
+  ///   편집이 409로 거부돼 되돌아갈 수 있다.
+  /// - 조정된 `currentPage`를 담은 기록 PATCH를 서버 응답까지 완전히 기다린
+  ///   뒤에 book-info PATCH를 보낸다 — 반대로 하면 아직 낮추지 않은
+  ///   `currentPage`가 새 총쪽수보다 커서 book-info 요청 자체가 400으로
+  ///   거부될 수 있다.
+  /// - book-info 단계가 실패해도 이미 성공한 기록 PATCH 결과(출처/
+  ///   `currentPage`)는 [SourceTypeUpdateResult.item]으로 그대로 반환하고
+  ///   실패는 [SourceTypeUpdateResult.error]에 담는다 — 호출부가 이 결과를
+  ///   통째로 버리면 서버·로컬 DB에는 이미 반영된 변경이 화면에서만
+  ///   사라진다.
+  Future<SourceTypeUpdateResult> updateSourceType(
+    int userBookId, {
+    required String sourceType,
+    required PatchField<String>? platformName,
+    PatchField<int>? displayTotalPages,
+  }) async {
+    if (displayTotalPages == null) {
+      final current = await _requireLocal(userBookId);
+      final adjustedCurrentPage = current.normalizedCurrentPageForSourceChange(
+        newSourceType: sourceType,
+      );
+      final recordPatch = RecordPatch(
+        currentPage: adjustedCurrentPage == current.currentPage
+            ? null
+            : adjustedCurrentPage,
+        sourceType: PatchField.value(sourceType),
+        platformName: platformName,
+      );
+      final merged = current.copyWithRecord(
+        recordPatch,
+        updatedAt: DateTime.now().toUtc(),
+      );
+      await _bookshelfRepository.applyLocalEdit(
+        merged,
+        changedFields: recordPatch.changedFields,
+      );
+      unawaited(_bookshelfRepository.pushDirtyRecord(userBookId));
+      return (item: merged, error: null);
+    }
+
+    // 이 책의 기존 dirty 편집을 먼저 정리해 pushDirtyRecord와 같은 순서
+    // 큐에 합류시킨다(위 문서 참고).
+    await _bookshelfRepository.pushDirtyRecord(userBookId);
+    return _bookshelfRepository.runSerializedForBook(
+      userBookId,
+      () => _updateSourceTypeWithPages(
+        userBookId,
+        sourceType: sourceType,
+        platformName: platformName,
+        displayTotalPages: displayTotalPages,
+      ),
+    );
+  }
+
+  Future<SourceTypeUpdateResult> _updateSourceTypeWithPages(
+    int userBookId, {
+    required String sourceType,
+    required PatchField<String>? platformName,
+    required PatchField<int> displayTotalPages,
+  }) async {
+    final expectedGeneration = BookshelfDatabase.sessionGeneration;
+    final current = await _requireLocal(userBookId);
+
+    final adjustedCurrentPage = current.normalizedCurrentPageForSourceChange(
+      newSourceType: sourceType,
+    );
+    final recordPatch = RecordPatch(
+      currentPage: adjustedCurrentPage == current.currentPage
+          ? null
+          : adjustedCurrentPage,
+      sourceType: PatchField.value(sourceType),
+      platformName: platformName,
+    );
+
+    if (await _storageMode.isLocal()) {
+      final merged = current.copyWithRecord(
+        recordPatch,
+        updatedAt: DateTime.now().toUtc(),
+      );
+      final withPages = merged.copyWithBookInfo(
+        title: merged.title,
+        author: merged.author,
+        publisher: merged.publisher,
+        statsTotalPages: merged.statsTotalPages,
+        displayTotalPages: displayTotalPages.isCleared
+            ? null
+            : displayTotalPages.value,
+        displayCategoryId: merged.displayCategoryId,
+        category: merged.category,
+        coverImageUrl: merged.coverImageUrl,
+        isbn13: merged.isbn13,
+        bookId: merged.bookId,
+        updatedAt: merged.updatedAt,
+      );
+      await _bookshelfRepository.applyLocalEdit(
+        withPages,
+        changedFields: recordPatch.changedFields,
+      );
+      return (item: withPages, error: null);
+    }
+
+    final serverUserBookId = await _requireServerId(current);
+
+    final recordData = await _api.patchRecord(
+      userBookId: serverUserBookId,
+      patch: recordPatch,
+    );
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+      return (item: current, error: null);
+    }
+    final afterRecord = await _persist(current, recordData, expectedGeneration);
+
+    try {
+      final bookInfoData = await _api.patchBookInfo(
+        userBookId: serverUserBookId,
+        title: afterRecord.title,
+        author: afterRecord.author,
+        publisher: afterRecord.publisher,
+        statsTotalPages: afterRecord.statsTotalPages,
+        displayTotalPages: displayTotalPages.isCleared
+            ? null
+            : displayTotalPages.value,
+        categoryId: afterRecord.displayCategoryId,
+      );
+      if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+        return (item: afterRecord, error: null);
+      }
+      final finalItem = await _persist(
+        afterRecord,
+        bookInfoData,
+        expectedGeneration,
+      );
+      return (item: finalItem, error: null);
+    } on ApiException catch (e) {
+      // 출처 PATCH는 이미 서버·로컬 DB에 반영됐다 — book-info 실패로 그
+      // 성공까지 버리지 않고 afterRecord를 결과로 돌려준다(클래스 문서
+      // 참고).
+      return (item: afterRecord, error: e);
+    }
   }
 
   /// ISBN 연결/재연결/연결 해제(`PATCH /api/me/books/:userBookId/link`).
@@ -216,7 +384,8 @@ class BookRecordRepository {
     required String title,
     String? author,
     String? publisher,
-    int? totalPages,
+    int? statsTotalPages,
+    int? displayTotalPages,
     int? categoryId,
     String? coverImageUrl,
     File? thumbnailFile,
@@ -236,7 +405,8 @@ class BookRecordRepository {
       title: title,
       author: author,
       publisher: publisher,
-      totalPages: totalPages,
+      statsTotalPages: statsTotalPages,
+      displayTotalPages: displayTotalPages,
       displayCategoryId: categoryId,
       // 카테고리 이름은 서버 응답으로만 오던 값이라, 선택이 바뀌면 이름은
       // 비워 두고 ID만 남긴다(화면은 ID로 마스터 목록에서 이름을 찾는다).
@@ -273,7 +443,8 @@ class BookRecordRepository {
       title: linkedBook?.title ?? current.title,
       author: linkedBook?.author ?? current.author,
       publisher: linkedBook?.publisher ?? current.publisher,
-      totalPages: current.totalPages,
+      statsTotalPages: current.statsTotalPages,
+      displayTotalPages: current.displayTotalPages,
       displayCategoryId: current.displayCategoryId,
       category: current.category,
       coverImageUrl: linkedBook?.coverUrl ?? current.coverImageUrl,

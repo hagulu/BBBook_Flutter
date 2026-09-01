@@ -166,6 +166,27 @@ class BookshelfRepository {
     return operation;
   }
 
+  /// [userBookId]에 대한 서버 쓰기를 [pushDirtyRecord]와 같은 책별 순서
+  /// 큐([_dirtyPushChains])에 태워 실행한다. dirty push를 거치지 않고 직접
+  /// 서버 API를 호출하는 다른 쓰기(예:
+  /// [BookRecordRepository.updateSourceType]의 book-info 조합 저장)가 이
+  /// 책의 dirty push와 동시에 나가 서로의 `updated_at` 기준값을 무효화시키는
+  /// 것을 막기 위해 쓴다 — [pushDirtyRecord] 문서의 경합 설명과 동일한
+  /// 이유다.
+  ///
+  /// [action] 실행 중 던진 예외는 이 메서드가 반환한 Future로 그대로
+  /// 전달된다(호출부가 처리) — 그와 별개로 큐 자체는 항상 다음 대기 항목이
+  /// 이어지도록 에러를 내부적으로도 삼킨다.
+  Future<T> runSerializedForBook<T>(
+    int userBookId,
+    Future<T> Function() action,
+  ) {
+    final previous = _dirtyPushChains[userBookId] ?? Future<void>.value();
+    final operation = previous.then((_) => action());
+    _dirtyPushChains[userBookId] = operation.then((_) {}).catchError((_, _) {});
+    return operation;
+  }
+
   /// 실행 시점(대기열에서 순서가 왔을 때)의 최신 세션 generation과 dirty
   /// 상태를 기준으로 한다 — 큐에 오래 대기했을 수 있어 호출 시점 값을
   /// 넘겨받지 않고 여기서 새로 읽는다.
@@ -291,7 +312,7 @@ class BookshelfRepository {
             title: item.title,
             author: item.author,
             publisher: item.publisher,
-            totalPages: item.totalPages,
+            statsTotalPages: item.statsTotalPages,
             categoryId: item.displayCategoryId,
             thumbnailFile: item.createThumbnailPath == null
                 ? null
@@ -346,7 +367,7 @@ class BookshelfRepository {
     required String title,
     String? author,
     String? publisher,
-    int? totalPages,
+    int? statsTotalPages,
     String? coverImageUrl,
     int? categoryId,
     String? category,
@@ -371,7 +392,7 @@ class BookshelfRepository {
         title: title,
         author: author,
         publisher: publisher,
-        totalPages: totalPages,
+        statsTotalPages: statsTotalPages,
         coverImageUrl: coverImageUrl,
         displayCategoryId: categoryId,
         category: category,
@@ -400,7 +421,7 @@ class BookshelfRepository {
     required String title,
     String? author,
     String? publisher,
-    int? totalPages,
+    int? statsTotalPages,
     int? categoryId,
     File? thumbnailFile,
     required BookStatus status,
@@ -433,7 +454,7 @@ class BookshelfRepository {
           title: title,
           author: author,
           publisher: publisher,
-          totalPages: totalPages,
+          statsTotalPages: statsTotalPages,
           displayCategoryId: categoryId,
           status: status,
           currentPage: 0,

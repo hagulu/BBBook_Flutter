@@ -52,7 +52,7 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
             title: data.detail.title,
             author: data.detail.author,
             publisher: data.detail.publisher,
-            totalPages: data.detail.pageCount == 0
+            statsTotalPages: data.detail.pageCount == 0
                 ? null
                 : data.detail.pageCount,
             coverImageUrl: data.detail.coverUrl,

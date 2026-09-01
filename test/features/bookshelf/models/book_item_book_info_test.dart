@@ -19,7 +19,8 @@ void main() {
     title: '옛 제목',
     author: '옛 저자',
     publisher: '옛 출판사',
-    totalPages: 300,
+    statsTotalPages: 300,
+    displayTotalPages: null,
     coverImageUrl: 'https://cdn.example.com/old.jpg',
     displayCategoryId: 3,
     category: '소설',
@@ -45,7 +46,8 @@ void main() {
       title: '새 제목',
       author: null,
       publisher: '새 출판사',
-      totalPages: 320,
+      statsTotalPages: 320,
+      displayTotalPages: null,
       displayCategoryId: 5,
       category: null,
       coverImageUrl: 'book_covers/local_1.jpg',
@@ -58,7 +60,7 @@ void main() {
     // 넘긴 값이 곧 새 값이다 — null도 "지움"으로 반영한다.
     expect(updated.author, isNull);
     expect(updated.publisher, '새 출판사');
-    expect(updated.totalPages, 320);
+    expect(updated.statsTotalPages, 320);
     expect(updated.displayCategoryId, 5);
     expect(updated.coverImageUrl, 'book_covers/local_1.jpg');
     expect(updated.updatedAt, now);
@@ -86,7 +88,8 @@ void main() {
       title: book.title,
       author: book.author,
       publisher: book.publisher,
-      totalPages: book.totalPages,
+      statsTotalPages: book.statsTotalPages,
+      displayTotalPages: book.displayTotalPages,
       displayCategoryId: book.displayCategoryId,
       category: book.category,
       coverImageUrl: book.coverImageUrl,

@@ -15,7 +15,8 @@ class BookItem {
     required this.title,
     this.author,
     this.publisher,
-    this.totalPages,
+    this.statsTotalPages,
+    this.displayTotalPages,
     this.coverImageUrl,
     this.displayCategoryId,
     this.category,
@@ -57,7 +58,13 @@ class BookItem {
   final String title;
   final String? author;
   final String? publisher;
-  final int? totalPages;
+
+  /// 종이책 기준 쪽수(알라딘 책 정보 기준, 통계 계산에 사용).
+  final int? statsTotalPages;
+
+  /// 실제 읽는 판본(전자책 등)의 쪽수 override. null이면 [statsTotalPages]로
+  /// fallback한다 — [effectiveTotalPages] 참고.
+  final int? displayTotalPages;
   final String? coverImageUrl;
   final int? displayCategoryId;
   final String? category;
@@ -79,11 +86,39 @@ class BookItem {
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  /// 0.0 ~ 1.0. totalPages를 모르면 null(진행률 표시 불가).
+  /// 오디오북 여부(`sourceType == 'AUDIO_BOOK'`). 오디오북은 쪽수 대신
+  /// [currentPage] 자체를 0~100 진행률 값으로 쓴다.
+  bool get isAudioBook => sourceType == 'AUDIO_BOOK';
+
+  /// 실제 진행률 계산 기준 쪽수. [displayTotalPages]가 있으면 그 값을,
+  /// 없으면 [statsTotalPages]로 fallback한다(오디오북에는 의미 없는 값).
+  int? get effectiveTotalPages => displayTotalPages ?? statsTotalPages;
+
+  /// 완독/재독 시 진행 상태를 "끝까지" 채울 때 쓰는 상한값. 오디오북은
+  /// 100(퍼센트), 그 외는 [effectiveTotalPages].
+  int? get progressUpperBound => isAudioBook ? 100 : effectiveTotalPages;
+
+  /// 0.0 ~ 1.0. 오디오북은 [currentPage]를 그대로 0~100 퍼센트로 취급하고,
+  /// 그 외는 [effectiveTotalPages]를 모르면 null(진행률 표시 불가).
   double? get progressRatio {
-    final total = totalPages;
+    if (isAudioBook) {
+      return (currentPage.clamp(0, 100)) / 100.0;
+    }
+    final total = effectiveTotalPages;
     if (total == null || total <= 0) return null;
     return (currentPage / total).clamp(0.0, 1.0);
+  }
+
+  /// 출처를 [newSourceType]으로 바꿀 때 [currentPage]를 정리한다. 쪽수와
+  /// 퍼센트는 단위가 달라 자동으로 환산하면(과거 시도) 오히려 사용자가
+  /// 의도하지 않은 값으로 조용히 바뀔 수 있으므로, 출처가 실제로 바뀌고
+  /// 진행 기록이 있으면(0보다 크면) 0으로 초기화해 새 출처 기준으로
+  /// 다시 시작하게 한다 — 호출부가 이 초기화를 사용자에게 미리 안내해야
+  /// 한다(`showSourcePlatformDialog`의 경고 확인). 출처가 그대로거나 애초에
+  /// 진행 기록이 없으면 값을 그대로 둔다.
+  int normalizedCurrentPageForSourceChange({required String? newSourceType}) {
+    if (newSourceType == sourceType || currentPage <= 0) return currentPage;
+    return 0;
   }
 
   /// 책 정보(제목/저자/출판사/총쪽수/카테고리/표지)와 ISBN 연결만 바꾼
@@ -94,7 +129,8 @@ class BookItem {
     required String title,
     required String? author,
     required String? publisher,
-    required int? totalPages,
+    required int? statsTotalPages,
+    required int? displayTotalPages,
     required int? displayCategoryId,
     required String? category,
     required String? coverImageUrl,
@@ -112,7 +148,8 @@ class BookItem {
       title: title,
       author: author,
       publisher: publisher,
-      totalPages: totalPages,
+      statsTotalPages: statsTotalPages,
+      displayTotalPages: displayTotalPages,
       coverImageUrl: coverImageUrl,
       displayCategoryId: displayCategoryId,
       category: category,
@@ -150,7 +187,8 @@ class BookItem {
       title: title,
       author: author,
       publisher: publisher,
-      totalPages: totalPages,
+      statsTotalPages: statsTotalPages,
+      displayTotalPages: displayTotalPages,
       coverImageUrl: coverImageUrl,
       displayCategoryId: displayCategoryId,
       category: category,
@@ -216,7 +254,8 @@ class BookItem {
       title: title,
       author: author,
       publisher: publisher,
-      totalPages: totalPages,
+      statsTotalPages: statsTotalPages,
+      displayTotalPages: displayTotalPages,
       coverImageUrl: coverImageUrl,
       displayCategoryId: displayCategoryId,
       category: category,
@@ -287,7 +326,8 @@ class BookItem {
       title: json['title'] as String,
       author: json['author'] as String?,
       publisher: json['publisher'] as String?,
-      totalPages: json['totalPages'] as int?,
+      statsTotalPages: json['statsTotalPages'] as int?,
+      displayTotalPages: json['displayTotalPages'] as int?,
       coverImageUrl: json['coverImageUrl'] as String?,
       displayCategoryId: json['displayCategoryId'] as int?,
       category: json['category'] as String?,

@@ -40,7 +40,7 @@ class BookshelfDatabase {
     final path = join(dbPath, 'bookshelf.db');
     return openDatabase(
       path,
-      version: 16,
+      version: 17,
       onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -239,6 +239,28 @@ class BookshelfDatabase {
           // 않는다.
           await db.execute('ALTER TABLE user_book ADD COLUMN dirty_fields TEXT');
         }
+        if (oldVersion < 17 &&
+            await _hasTable(db, 'user_book') &&
+            !await _hasColumn(db, 'user_book', 'stats_total_pages')) {
+          // 서버가 "총 쪽수"를 종이책 기준 통계용(stats_total_pages)과
+          // 실제 읽는 판본(전자책 등) override(display_total_pages)로
+          // 분리했다. `RENAME COLUMN`은 SQLite 3.25+에서만 지원되는데 일부
+          // 기기의 번들 SQLite 버전이 그보다 낮아 문법 오류가 나므로(실기기
+          // 확인됨), 새 컬럼을 추가하고 기존 값을 그대로 복사한다 — 기존
+          // total_pages 컬럼은 항상 종이책 기준 값이었으므로 그 값을 그대로
+          // stats_total_pages로 옮기고, 더는 쓰지 않는 컬럼으로 남겨둔다
+          // (구버전 SQLite는 `DROP COLUMN`도 지원하지 않는 경우가 있어
+          // 제거하지 않는다 — DAO는 더 이상 이 컬럼을 읽거나 쓰지 않는다).
+          await db.execute(
+            'ALTER TABLE user_book ADD COLUMN stats_total_pages INTEGER',
+          );
+          await db.execute(
+            'ALTER TABLE user_book ADD COLUMN display_total_pages INTEGER',
+          );
+          await db.execute(
+            'UPDATE user_book SET stats_total_pages = total_pages',
+          );
+        }
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -250,7 +272,8 @@ class BookshelfDatabase {
             title TEXT NOT NULL,
             author TEXT,
             publisher TEXT,
-            total_pages INTEGER,
+            stats_total_pages INTEGER,
+            display_total_pages INTEGER,
             cover_image_url TEXT,
             display_category_id INTEGER,
             category TEXT,

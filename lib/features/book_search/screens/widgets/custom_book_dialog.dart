@@ -145,7 +145,7 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
             publisher: _publisherController.text.trim().isEmpty
                 ? null
                 : _publisherController.text.trim(),
-            totalPages: totalPages,
+            statsTotalPages: totalPages,
             categoryId: _selectedCategoryId,
             thumbnailFile: _pickedThumbnail,
             status: _status,

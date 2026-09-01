@@ -11,7 +11,8 @@ class UserBookCreateResult {
     required this.title,
     required this.author,
     required this.publisher,
-    required this.totalPages,
+    required this.statsTotalPages,
+    required this.displayTotalPages,
     required this.coverImageUrl,
     required this.status,
     required this.created,
@@ -23,7 +24,8 @@ class UserBookCreateResult {
   final String title;
   final String? author;
   final String? publisher;
-  final int? totalPages;
+  final int? statsTotalPages;
+  final int? displayTotalPages;
   final String? coverImageUrl;
   final String status;
   final bool created;
@@ -36,7 +38,8 @@ class UserBookCreateResult {
       title: json['title'] as String,
       author: json['author'] as String?,
       publisher: json['publisher'] as String?,
-      totalPages: json['totalPages'] as int?,
+      statsTotalPages: json['statsTotalPages'] as int?,
+      displayTotalPages: json['displayTotalPages'] as int?,
       coverImageUrl: json['coverImageUrl'] as String?,
       status: json['status'] as String,
       created: json['created'] as bool,

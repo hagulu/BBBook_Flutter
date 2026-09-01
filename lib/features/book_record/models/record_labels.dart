@@ -4,7 +4,9 @@ import '../../bookshelf/models/book_status.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 책 기록 화면에서 쓰는 상태/출처/난이도 표시용 한글 라벨 + 아이콘.
-/// `book-record.md` 기준 문구(읽고 싶음/읽는 중/완독/멈춤/중단, 실물책/전자책/오디오북).
+/// `book-record.md` 기준 문구(읽고 싶음/읽는 중/완독/멈춤/중단). 출처 라벨은
+/// api-doc의 "종이책 기준 쪽수"(statsTotalPages) 표현과 맞춰 종이책/전자책/
+/// 오디오북으로 통일한다.
 extension BookStatusLabel on BookStatus {
   String get label => switch (this) {
     BookStatus.wantToRead => '읽고 싶음',
@@ -23,7 +25,7 @@ extension BookStatusLabel on BookStatus {
   };
 }
 
-/// 서버 값(PAPER_BOOK 등)과 1:1 매핑되는 출처. book-record.md에는 실물책/전자책/
+/// 서버 값(PAPER_BOOK 등)과 1:1 매핑되는 출처. book-record.md에는 종이책/전자책/
 /// 오디오북 3종만 명시되어 있어(LIBRARY 미노출), 이 화면에서도 3종만 다룬다.
 enum BookSourceType {
   paperBook,
@@ -44,7 +46,7 @@ enum BookSourceType {
   };
 
   String get label => switch (this) {
-    BookSourceType.paperBook => '실물책',
+    BookSourceType.paperBook => '종이책',
     BookSourceType.ebook => '전자책',
     BookSourceType.audioBook => '오디오북',
   };
@@ -55,10 +57,11 @@ enum BookSourceType {
     BookSourceType.audioBook => PhosphorIconsRegular.headphones,
   };
 
-  /// `GET /api/books/options`의 `platforms` 맵 키.
+  /// `GET /api/books/options`의 `platforms` 맵 키(api-books-options-get.md
+  /// 기준 `EBOOK`/`AUDIO_BOOK` — sourceType 값과 동일한 문자열이다).
   String? get platformOptionsKey => switch (this) {
     BookSourceType.ebook => 'EBOOK',
-    BookSourceType.audioBook => 'AUDIOBOOK',
+    BookSourceType.audioBook => 'AUDIO_BOOK',
     BookSourceType.paperBook => null,
   };
 }

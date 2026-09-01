@@ -1,0 +1,14 @@
+# 리뷰 결과
+
+## 요약
+- 이전 리뷰의 자기 경합·오류 미노출은 개선됐지만, 쪽수 축소를 동반한 출처 전환 순서와 오디오북 역변환, 오래된 화면 스냅샷 사용으로 진행률 또는 다른 책 정보가 잘못 저장될 수 있다.
+
+## 문제점
+- [문제][높음][override를 지우면서 현재 쪽수도 낮춰야 하는 전환은 book-info 단계에서 먼저 거부됨] `displayTotalPages` 변경이 있으면 book-info PATCH를 먼저 완료한 뒤에야 `normalizedCurrentPageForSourceChange()`로 `currentPage`를 낮춰 record PATCH를 보낸다. 그러나 book-info API는 요청 시점의 기존 출처가 오디오북이 아니면 변경 후 `displayTotalPages ?? statsTotalPages`가 현재 `currentPage`보다 작은 경우 400을 반환한다. 예를 들어 전자책 override 500쪽, 현재 400쪽, 종이책 기준 300쪽인 책을 종이책이나 오디오북으로 바꾸면, override를 지우는 첫 요청이 `400 > 300`으로 실패해 뒤의 300쪽/80% 정규화 코드는 실행되지 않는다. 즉 이번에 추가된 자동 정규화가 가장 필요한 전환이 실제 UI에서는 완료될 수 없다. (`lib/features/book_record/screens/book_record_screen.dart:495`, `lib/features/book_record/screens/book_record_screen.dart:523`, `lib/features/book_record/screens/book_record_screen.dart:528`)
+- [문제][중간][오디오북에서 페이지 기반 출처로 바꾸면 진행률 비율이 보존되지 않음] 페이지 기반→오디오북은 기존 비율을 퍼센트로 환산하지만, 오디오북→종이책/전자책은 퍼센트 값을 새 총쪽수의 페이지 값으로 변환하지 않고 단순히 상한만 자른다. 따라서 50% 들은 오디오북을 400쪽 전자책으로 바꾸면 200쪽이 아니라 50쪽으로 저장되어 진행률이 12.5%로 떨어진다. 같은 단위 혼동 때문에 전자책 쪽수 검증도 오디오북의 `initialCurrentPage`를 퍼센트가 아닌 쪽수로 비교하여, 80% 상태에서 50쪽 전자책으로 전환하는 유효한 입력을 “현재 읽은 80쪽보다 작다”며 차단한다. (`lib/features/bookshelf/models/book_item.dart:126`, `lib/features/bookshelf/models/book_item.dart:134`, `lib/features/book_record/screens/widgets/meta_dialogs.dart:278`, `lib/features/book_record/screens/widgets/meta_dialogs.dart:283`)
+- [문제][중간][다이얼로그를 연 시점의 오래된 `book` 값으로 최신 서버·로컬 변경을 덮어쓸 수 있음] 플랫폼 옵션 조회와 바텀시트 입력을 기다리는 동안 외부 동기화가 책을 갱신해도 저장 단계는 메서드가 시작될 때 캡처한 `book`을 계속 사용한다. 전자책 쪽수만 바꾸려는 book-info PATCH에도 그 스냅샷의 제목·저자·출판사·종이책 쪽수·카테고리를 모두 포함하므로, 다른 기기에서 갱신된 관련 필드를 이전 값으로 되돌릴 수 있다. 이어지는 진행률 정규화도 최신 book-info 응답이나 컨트롤러 상태가 아니라 같은 오래된 `currentPage`/총쪽수로 계산해, 다이얼로그가 열린 사이 동기화된 진행률을 다시 덮어쓸 수 있다. API 문서는 book-info 필드 생략 시 현재값 유지가 가능하지만 현재 API 메서드는 모든 필드를 항상 전송한다. (`lib/features/book_record/screens/book_record_screen.dart:478`, `lib/features/book_record/screens/book_record_screen.dart:498`, `lib/features/book_record/screens/book_record_screen.dart:520`, `lib/features/book_record/data/book_record_api.dart:93`, `lib/features/book_record/data/book_record_api.dart:103`)
+
+## 개선 제안
+- book-info 선행 검증 실패 → 화면에서 두 컨트롤러 메서드를 이어 부르지 말고, 리포지토리에서 최신 로컬 행을 다시 읽어 최종 출처·쪽수·진행률을 계산하는 조정 작업으로 묶는다. 서버 모드에서는 최종 `sourceType`과 낮춘 `currentPage`의 record PATCH를 서버 응답까지 확정한 뒤 display 쪽수 PATCH를 보내 두 단계 모두 각 시점의 API 상한 검증을 통과시키고, 중간 실패·재시도도 한 작업에서 처리한다.
+- 오디오북 역변환 오류 → 오디오북→페이지 기반 전환은 `currentPage / 100 * newEffectiveTotalPages`로 페이지를 계산하고 0~새 상한으로 제한한다. 다이얼로그의 최소 쪽수 검증도 기존 출처가 오디오북이면 원시 퍼센트와 비교하지 말고 최종 환산 페이지를 기준으로 판단하며, 50%→400쪽과 80%→50쪽 전환 테스트를 추가한다.
+- 오래된 화면 스냅샷 덮어쓰기 → 저장 작업 시작 시 repository/controller에서 최신 `BookItem`을 다시 읽고 그 값을 기준으로 변환한다. 전자책 쪽수 수정은 book-info PATCH의 부분 수정 의미론을 살려 `displayTotalPages`만 전송하고, 꼭 필요한 경우에는 첫 요청이 반환한 최신 `BookItem`을 다음 단계 계산에 사용한다.

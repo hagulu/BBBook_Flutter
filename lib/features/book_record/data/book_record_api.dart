@@ -78,8 +78,10 @@ class BookRecordApi {
   ///
   /// [thumbnailFile]이 있으면 새 표지를 업로드하고, [removeThumbnail]이
   /// true이면 표지를 제거한다(둘 다 아니면 표지는 현재값 유지). [author],
-  /// [publisher], [totalPages], [categoryId]는 null을 명시적으로 보내면
-  /// 서버가 null로 저장한다(문서 기준, 메인 PATCH와 다른 의미론).
+  /// [publisher], [statsTotalPages], [displayTotalPages], [categoryId]는
+  /// null을 명시적으로 보내면 서버가 null로 저장한다(문서 기준, 메인 PATCH와
+  /// 다른 의미론). [displayTotalPages]에 null을 보내면 override를 해제하고
+  /// [statsTotalPages] 기준으로 되돌아간다.
   ///
   /// [coverImageUrl]은 [thumbnailFile]/[removeThumbnail]과 달리 값이 있을
   /// 때만 요청에 포함한다(생략 시 표지 현재값 유지 — 문서 기준 처리 우선순위
@@ -91,7 +93,8 @@ class BookRecordApi {
     required String title,
     String? author,
     String? publisher,
-    int? totalPages,
+    int? statsTotalPages,
+    int? displayTotalPages,
     int? categoryId,
     String? coverImageUrl,
     File? thumbnailFile,
@@ -101,7 +104,8 @@ class BookRecordApi {
       'title': title,
       'author': author,
       'publisher': publisher,
-      'totalPages': totalPages,
+      'statsTotalPages': statsTotalPages,
+      'displayTotalPages': displayTotalPages,
       'categoryId': categoryId,
       'coverImageUrl': ?coverImageUrl,
     };

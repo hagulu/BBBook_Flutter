@@ -212,9 +212,19 @@ class _ProgressRow extends StatelessWidget {
               const Spacer(),
             ] else
               const Spacer(),
-            if (book.totalPages != null)
+            if (book.isAudioBook)
+              // 오디오북은 페이지 기반 표현(현재 쪽/전체 쪽) 없이 퍼센트만
+              // 보여준다.
               Text(
-                '${book.currentPage} / ${book.totalPages}쪽'
+                ratio != null ? '${(ratio * 100).round()}%' : '',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textMuted,
+                ),
+              )
+            else if (book.effectiveTotalPages != null)
+              Text(
+                '${book.currentPage} / ${book.effectiveTotalPages}쪽'
                 '${ratio != null ? ' (${(ratio * 100).round()}%)' : ''}',
                 style: const TextStyle(
                   fontSize: 11,

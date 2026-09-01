@@ -78,7 +78,7 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
     text: widget.book.publisher ?? '',
   );
   late final _totalPagesController = TextEditingController(
-    text: widget.book.totalPages?.toString() ?? '',
+    text: widget.book.statsTotalPages?.toString() ?? '',
   );
 
   File? _pickedThumbnail;
@@ -185,7 +185,11 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
             publisher: _publisherController.text.trim().isEmpty
                 ? null
                 : _publisherController.text.trim(),
-            totalPages: totalPages,
+            statsTotalPages: totalPages,
+            // 이 다이얼로그는 종이책 기준 쪽수만 다룬다 — 전자책 override는
+            // "책 형태" 팝업(meta_dialogs.dart)이 전담하므로 여기서는 현재
+            // 값을 그대로 보내 덮어쓰지 않는다.
+            displayTotalPages: widget.book.displayTotalPages,
             categoryId: _selectedCategoryId,
             // 파일 업로드/삭제가 없고, ISBN 불러오기·변경으로 표지 URL이
             // 원래 값과 달라졌을 때만 그 URL을 함께 저장한다(그러지 않으면
