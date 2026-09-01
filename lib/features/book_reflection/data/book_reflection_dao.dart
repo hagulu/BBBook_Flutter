@@ -193,6 +193,24 @@ class BookReflectionDao {
     return rows.isEmpty ? null : _reflectionFromRow(rows.single);
   }
 
+  /// 서버 PK([BookReflection.serverId])로 로컬 행을 찾는다. 이 기기에서
+  /// 직접 작성한 행은 push가 끝난 뒤에도 로컬 PK([BookReflection.id])를
+  /// 그대로 유지하고 `server_id`만 채우므로("내가 작성한 콘텐츠" 목록처럼
+  /// 서버 ID만 갖고 있는 화면에서 로컬 상세로 연결할 때 이 조회가 필요하다.
+  Future<BookReflection?> getByServerId({
+    required int ownerUserId,
+    required int serverId,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'book_reflection',
+      where: 'server_id = ? AND owner_user_id = ? AND deleted_at IS NULL',
+      whereArgs: [serverId, ownerUserId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : _reflectionFromRow(rows.single);
+  }
+
   Future<void> confirmDelete({
     required int localId,
     required DateTime capturedUpdatedAt,

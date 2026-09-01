@@ -34,7 +34,17 @@
 
 ## features/profile
 
-- `lib/features/profile/screens/profile_tab_placeholder.dart` — 프로필 탭 임시 화면(TODO: profile 기능 포팅 후 교체), 저장 방식 표시·로컬 전환과 로그아웃 진입점
+- `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 통계 카드/내 콘텐츠 메뉴/공지사항/로그아웃/약관 링크), `docs/porting-reference/profile-main-screen.md` 대응
+- `lib/features/profile/screens/profile_edit_screen.dart` — 프로필 수정 화면(닉네임·프로필 이미지 변경/삭제, 저장, 회원 탈퇴), `docs/porting-reference/profile-edit-screen.md` 대응
+- `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(포팅 문서 범위 밖 저장 방식(서버/로컬) 전환 진입점), 프로필 탭 AppBar 설정 아이콘으로 진입
+- `lib/features/profile/screens/my_reflections_screen.dart` — 내가 작성한 독후감 목록(커서 무한 스크롤), 정상 항목은 서버 reflectionId로 로컬 행을 찾아 기존 `BookReflectionDetailScreen`(수정·삭제 포함)으로 이동
+- `lib/features/profile/screens/my_reviews_screen.dart` — 내가 작성한 독자평 목록(커서 무한 스크롤), 탭해도 이동하는 상세 화면 없음
+- `lib/features/profile/screens/my_discussions_screen.dart` — 내가 작성한 토론 목록(커서 무한 스크롤), 정상 항목은 `DiscussionDetailScreen`으로 이동
+- `lib/features/profile/screens/my_discussion_answers_screen.dart` — 내가 작성한 토론 댓글 목록(커서 무한 스크롤), 항목 탭 시 원본 토론(`DiscussionDetailScreen`)으로 이동
+- `lib/features/profile/data/profile_api.dart` — 프로필 API 호출(조회/수정/이미지 업로드/회원 탈퇴), 독서 통계 요약은 서버 API 대신 로컬 서재 데이터로 직접 계산
+- `lib/features/profile/data/my_content_api.dart` — "내가 작성한 콘텐츠" 4개 목록 API 호출(독후감/리뷰/토론/토론 댓글 커서 조회)
+- `lib/features/profile/providers/profile_providers.dart` — 프로필 조회·독서 통계 요약(로컬 계산) Riverpod provider
+- `lib/features/profile/providers/my_content_providers.dart` — "내가 작성한 콘텐츠" 4개 목록 커서 무한 스크롤 Riverpod provider
 
 ## features/bookshelf
 
@@ -138,6 +148,13 @@
 - `lib/features/public_reflection/services/public_reflection_service.dart` — 숨김 목록 제거와 공개·발행·ISBN 상세 노출 조건을 보장하는 조회 서비스
 - `lib/features/public_reflection/providers/public_reflection_providers.dart` — 공개 독후감 목록 커서 페이징·상세 조회·낙관적 공감 토글 Riverpod provider
 
+## features/notices
+
+- `lib/features/notices/screens/notices_list_screen.dart` — 공지사항 목록(인증 불필요, 커서 무한 스크롤, 다음 페이지 실패 시 하단 재시도), 프로필 메인 "공지사항" 메뉴로 진입
+- `lib/features/notices/screens/notice_detail_screen.dart` — 공지사항 상세(인증 불필요, 404는 재시도 없이 "찾을 수 없음" 표시)
+- `lib/features/notices/data/notices_api.dart` — 공지사항 목록·상세 API 호출(둘 다 인증 불필요)
+- `lib/features/notices/providers/notices_providers.dart` — 공지사항 목록 커서 무한 스크롤(다음 페이지 전용 에러 상태 포함)·상세 조회 Riverpod provider
+
 ## shared/widgets
 
 - `lib/shared/widgets/app_alert.dart` — 공통 Alert 팝업(제목/내용/확인 버튼)
@@ -162,3 +179,6 @@
 - `docs/review/20260901-142758-book-progress-source-pages-third-review.md` — 출처·전자책 쪽수 조정 작업의 dirty push 경합·중간 실패·최신 진행 상태 3차 리뷰
 - `docs/review/20260901-154051-want-to-reread-and-filter-review.md` — 또 볼래요 필드의 기존 DB 마이그레이션·레거시 dirty push 데이터 정합성 리뷰
 - `docs/review/20260901-155043-want-to-reread-and-filter-rereview.md` — 또 볼래요 후속 UI와 미해결 DB 마이그레이션·레거시 dirty push 재리뷰
+- `docs/review/20260901-163827-profile-main-edit-review.md` — 프로필 메인·수정 화면의 무반응 이동 메뉴, 로컬 로그아웃 경고, 통계 갱신·이미지 선택 생명주기 리뷰
+- `docs/review/20260901-172506-reflection-viewer-color-review.md` — 독후감 뷰어의 미지원 색상 문자열 렌더링 예외와 입력 정규화 누락 리뷰
+- `docs/review/20260901-174322-profile-content-notices-review.md` — 프로필 하위 콘텐츠·공지사항 구현의 로컬 ID 연결, 로그아웃 경고, 이동·갱신·페이지네이션 리뷰

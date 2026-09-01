@@ -80,6 +80,16 @@ class BookReflectionRepository {
     );
   }
 
+  /// 서버 PK로 로컬 행을 찾는다. "내가 작성한 독후감" 목록처럼 서버
+  /// reflectionId만 아는 화면이 기존 로컬 우선 상세/수정/삭제 화면
+  /// ([findDetail] 기준, 로컬 PK 필요)으로 연결할 때 사용한다.
+  Future<BookReflection?> findByServerId({
+    required int ownerUserId,
+    required int serverId,
+  }) {
+    return _dao.getByServerId(ownerUserId: ownerUserId, serverId: serverId);
+  }
+
   Future<BookReflection> save({
     required int ownerUserId,
     required int userBookId,

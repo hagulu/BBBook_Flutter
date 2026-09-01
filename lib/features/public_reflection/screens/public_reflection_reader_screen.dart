@@ -24,6 +24,30 @@ const _readerBodyTextStyle = TextStyle(
 /// 긴 글을 위한 행간을 적용하되 Quill의 헤더·인용·목록·인라인 색상 속성은
 /// 기존 독후감 리더와 같은 렌더러로 유지한다.
 const _readerQuillStyles = DefaultStyles(
+  h1: DefaultTextBlockStyle(
+    TextStyle(
+      color: AppColors.textStrong,
+      fontSize: 27,
+      height: 1.3,
+      fontWeight: FontWeight.bold,
+    ),
+    HorizontalSpacing.zero,
+    VerticalSpacing(12, 0),
+    VerticalSpacing.zero,
+    null,
+  ),
+  h2: DefaultTextBlockStyle(
+    TextStyle(
+      color: AppColors.textStrong,
+      fontSize: 22,
+      height: 1.3,
+      fontWeight: FontWeight.bold,
+    ),
+    HorizontalSpacing.zero,
+    VerticalSpacing(8, 0),
+    VerticalSpacing.zero,
+    null,
+  ),
   placeHolder: DefaultTextBlockStyle(
     TextStyle(color: AppColors.textMuted, fontSize: 16, height: 1.65),
     HorizontalSpacing.zero,

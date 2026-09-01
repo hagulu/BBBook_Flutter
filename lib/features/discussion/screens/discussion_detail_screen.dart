@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
@@ -30,9 +32,17 @@ import 'widgets/discussion_poll.dart';
 /// 작성" 카드를 눌러 시트를 연다. 닫힌 토론에서는 두 경우 모두 작성 UI가
 /// 노출되지 않는다.
 class DiscussionDetailScreen extends ConsumerStatefulWidget {
-  const DiscussionDetailScreen({super.key, required this.topicId});
+  const DiscussionDetailScreen({
+    super.key,
+    required this.topicId,
+    this.highlightAnswerId,
+  });
 
   final int topicId;
+
+  /// 지정하면 해당 답변으로 스크롤하고 외곽선으로 강조한다("내가 작성한
+  /// 토론 댓글" 목록에서 진입할 때 사용).
+  final int? highlightAnswerId;
 
   @override
   ConsumerState<DiscussionDetailScreen> createState() =>
@@ -43,7 +53,52 @@ class _DiscussionDetailScreenState
     extends ConsumerState<DiscussionDetailScreen> {
   final _scrollController = ScrollController();
   final _pendingAnswerLikeIds = <int>{};
+  final _highlightedAnswerKey = GlobalKey();
   bool _isTogglingTopicLike = false;
+  bool _hasScrolledToHighlight = false;
+  bool _isSearchingForHighlight = false;
+
+  void _scrollToHighlightedAnswer() {
+    final context = _highlightedAnswerKey.currentContext;
+    if (context == null) return;
+    Scrollable.ensureVisible(
+      context,
+      alignment: 0.2,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  /// 강조 대상 답변이 첫 페이지에 없으면 있을 때까지(또는 더 이상 페이지가
+  /// 없을 때까지) 다음 페이지를 순차 조회한 뒤 스크롤한다.
+  Future<void> _ensureHighlightVisible() async {
+    final highlightAnswerId = widget.highlightAnswerId;
+    if (highlightAnswerId == null ||
+        _hasScrolledToHighlight ||
+        _isSearchingForHighlight) {
+      return;
+    }
+    _isSearchingForHighlight = true;
+    try {
+      while (mounted) {
+        final state = ref
+            .read(discussionAnswersControllerProvider(widget.topicId))
+            .valueOrNull;
+        if (state == null) return;
+        if (state.items.any((answer) => answer.id == highlightAnswerId)) {
+          _hasScrolledToHighlight = true;
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _scrollToHighlightedAnswer(),
+          );
+          return;
+        }
+        if (!state.hasNext) return;
+        await _answersController.loadMore();
+      }
+    } finally {
+      _isSearchingForHighlight = false;
+    }
+  }
 
   @override
   void initState() {
@@ -323,6 +378,10 @@ class _DiscussionDetailScreenState
       discussionAnswersControllerProvider(widget.topicId),
     );
 
+    if (widget.highlightAnswerId != null && answersState.valueOrNull != null) {
+      unawaited(_ensureHighlightVisible());
+    }
+
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(discussionDetailControllerProvider(widget.topicId));
@@ -375,6 +434,8 @@ class _DiscussionDetailScreenState
                   onDelete: _deleteAnswer,
                   onReport: _reportAnswer,
                   onToggleLike: _toggleAnswerLike,
+                  highlightAnswerId: widget.highlightAnswerId,
+                  highlightKey: _highlightedAnswerKey,
                 ),
                 AsyncError() => CommunityContentErrorState(
                   message: '답변을 불러오지 못했습니다.',
@@ -661,6 +722,8 @@ class _AnswerList extends StatelessWidget {
     required this.onDelete,
     required this.onReport,
     required this.onToggleLike,
+    this.highlightAnswerId,
+    this.highlightKey,
   });
 
   final DiscussionListState<DiscussionAnswer> state;
@@ -671,6 +734,10 @@ class _AnswerList extends StatelessWidget {
   final void Function(int answerId) onDelete;
   final void Function(int answerId) onReport;
   final void Function(DiscussionAnswer answer) onToggleLike;
+
+  /// "내가 작성한 토론 댓글" 목록에서 진입했을 때 스크롤·강조할 답변 ID.
+  final int? highlightAnswerId;
+  final GlobalKey? highlightKey;
 
   @override
   Widget build(BuildContext context) {
@@ -691,22 +758,55 @@ class _AnswerList extends StatelessWidget {
           )
         else
           for (final answer in state.items) ...[
-            DiscussionAnswerItem(
-              key: ValueKey(answer.id),
-              answer: answer,
-              options: options,
-              canEdit: canEditAnswers,
-              onSubmitEdit: (content) => onSubmitEdit(answer.id, content),
-              onDelete: () => onDelete(answer.id),
-              onReport: () => onReport(answer.id),
-              onToggleLike: pendingLikeIds.contains(answer.id)
-                  ? null
-                  : () => onToggleLike(answer),
+            _MaybeHighlightedAnswer(
+              isHighlighted: answer.id == highlightAnswerId,
+              highlightKey: answer.id == highlightAnswerId
+                  ? highlightKey
+                  : null,
+              child: DiscussionAnswerItem(
+                key: ValueKey(answer.id),
+                answer: answer,
+                options: options,
+                canEdit: canEditAnswers,
+                onSubmitEdit: (content) => onSubmitEdit(answer.id, content),
+                onDelete: () => onDelete(answer.id),
+                onReport: () => onReport(answer.id),
+                onToggleLike: pendingLikeIds.contains(answer.id)
+                    ? null
+                    : () => onToggleLike(answer),
+              ),
             ),
             const SizedBox(height: 10),
           ],
         if (state.isLoadingMore) const CommunityContentPageLoader(),
       ],
+    );
+  }
+}
+
+/// 강조 대상 답변에 스크롤 앵커([highlightKey])와 외곽선을 씌운다.
+class _MaybeHighlightedAnswer extends StatelessWidget {
+  const _MaybeHighlightedAnswer({
+    required this.isHighlighted,
+    required this.highlightKey,
+    required this.child,
+  });
+
+  final bool isHighlighted;
+  final GlobalKey? highlightKey;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isHighlighted) return child;
+
+    return Container(
+      key: highlightKey,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.accentForeground, width: 1),
+      ),
+      child: child,
     );
   }
 }

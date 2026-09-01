@@ -3,53 +3,43 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
-import '../../auth/providers/auth_notifier.dart';
 import '../../storage_mode/data/storage_mode_store.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../../storage_mode/screens/local_storage_migration_screen.dart';
 
-/// TODO: 프로필 기능 포팅 전까지 사용하는 임시 화면(이번 작업 범위 아님).
-///
-/// 로그아웃과 저장 방식(서버/로컬) 전환 등 계정 관련 진입점만 우선 제공한다.
-class ProfileTabPlaceholder extends ConsumerWidget {
-  const ProfileTabPlaceholder({super.key});
+/// 설정 화면. 포팅 문서(`profile-main-screen.md`) 범위 밖의 저장 방식(서버/로컬)
+/// 전환 기능을 프로필 메인 화면과 분리해 여기에 둔다(프로필 탭 우측 상단
+/// 설정 아이콘으로 진입).
+class ProfileSettingsScreen extends ConsumerWidget {
+  const ProfileSettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authNotifierProvider.select((s) => s.user));
     final mode =
         ref.watch(storageModeProvider).valueOrNull ?? StorageMode.server;
     final isLocal = mode == StorageMode.local;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 32, 20, 40),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            '${user?.nickname ?? '사용자'}님, 로그인되었습니다.',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 28),
-          _StorageModeCard(
-            isLocal: isLocal,
-            serverCleanupPending:
-                isLocal &&
-                (ref.watch(serverDeletePendingProvider).valueOrNull ?? false),
-            onSwitchToLocal: () => _startMigration(context, ref),
-            onRetryServerCleanup: () => _retryServerCleanup(context, ref),
-          ),
-          const SizedBox(height: 28),
-          Center(
-            child: ElevatedButton(
-              onPressed: () => _logout(context, ref, isLocal: isLocal),
-              child: const Text('로그아웃'),
-            ),
-          ),
-        ],
+    return Scaffold(
+      appBar: AppBar(
+        title: const AppBarTitle('설정'),
+        backgroundColor: AppColors.pageBackground,
+        foregroundColor: AppColors.textStrong,
+        elevation: 0,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        child: _StorageModeCard(
+          isLocal: isLocal,
+          serverCleanupPending:
+              isLocal &&
+              (ref.watch(serverDeletePendingProvider).valueOrNull ?? false),
+          onSwitchToLocal: () => _startMigration(context, ref),
+          onRetryServerCleanup: () => _retryServerCleanup(context, ref),
+        ),
       ),
     );
   }
@@ -106,28 +96,6 @@ class ProfileTabPlaceholder extends ConsumerWidget {
     } else {
       AppSnackBar.error(context, '서버 기록을 정리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
     }
-  }
-
-  Future<void> _logout(
-    BuildContext context,
-    WidgetRef ref, {
-    required bool isLocal,
-  }) async {
-    final confirmed = await AppConfirm.show(
-      context,
-      title: '로그아웃',
-      message: isLocal
-          // 로컬 저장 모드에서는 이 기기가 유일한 사본이다(서버 기록은 전환
-          // 시점에 정리됐다).
-          ? '로컬 저장 모드입니다. 로그아웃하면 이 기기에 저장된 모든 기록과 사진이 '
-                '삭제되며 서버에도 사본이 없어 복구할 수 없습니다. 로그아웃할까요?'
-          : '아직 서버에 동기화되지 않은 메모와 사진은 이 기기에서 '
-                '삭제되어 복구할 수 없습니다. 로그아웃할까요?',
-      confirmText: '로그아웃',
-      destructive: true,
-    );
-    if (!confirmed || !context.mounted) return;
-    await ref.read(authNotifierProvider.notifier).logout();
   }
 }
 

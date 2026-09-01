@@ -40,6 +40,30 @@ const _reflectionBodyTextStyle = TextStyle(
 );
 
 const bookReflectionQuillStyles = DefaultStyles(
+  h1: DefaultTextBlockStyle(
+    TextStyle(
+      color: AppColors.textStrong,
+      fontSize: 27,
+      height: 1.3,
+      fontWeight: FontWeight.bold,
+    ),
+    HorizontalSpacing.zero,
+    VerticalSpacing(12, 0),
+    VerticalSpacing.zero,
+    null,
+  ),
+  h2: DefaultTextBlockStyle(
+    TextStyle(
+      color: AppColors.textStrong,
+      fontSize: 22,
+      height: 1.3,
+      fontWeight: FontWeight.bold,
+    ),
+    HorizontalSpacing.zero,
+    VerticalSpacing(8, 0),
+    VerticalSpacing.zero,
+    null,
+  ),
   placeHolder: DefaultTextBlockStyle(
     TextStyle(color: AppColors.textMuted, fontSize: 15, height: 1.5),
     HorizontalSpacing.zero,

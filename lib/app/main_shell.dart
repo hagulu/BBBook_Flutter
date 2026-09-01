@@ -6,15 +6,17 @@ import '../features/book_search/screens/book_search_screen.dart';
 import '../features/bookshelf/providers/bookshelf_providers.dart';
 import '../features/bookshelf/screens/bookshelf_screen.dart';
 import '../features/home/screens/home_tab_placeholder.dart';
-import '../features/profile/screens/profile_tab_placeholder.dart';
+import '../features/profile/screens/profile_screen.dart';
+import '../features/profile/screens/profile_settings_screen.dart';
 import '../shared/widgets/app_bar_title.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 로그인 후 진입하는 하단 탭 셸(HOME/BOOKSHELF/PROFILE, `navigation.md` 대응).
 ///
-/// 이번 작업 범위는 책장(BOOKSHELF) 목록 기능만이라 HOME/PROFILE은 최소
-/// placeholder만 둔다. 기본 선택 탭은 실제로 동작하는 BOOKSHELF로 두어
-/// 로그인 직후 책장 목록이 바로 보이도록 한다.
+/// HOME은 아직 최소 placeholder만 둔다. 기본 선택 탭은 실제로 동작하는
+/// BOOKSHELF로 두어 로그인 직후 책장 목록이 바로 보이도록 한다. PROFILE
+/// 탭 전용 설정(저장 방식 전환 등) 진입점은 이 셸의 AppBar 우측 설정
+/// 아이콘으로 연결한다.
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
 
@@ -27,7 +29,7 @@ class _MainShellState extends ConsumerState<MainShell>
   static const _tabs = [
     HomeTabPlaceholder(),
     BookshelfScreen(),
-    ProfileTabPlaceholder(),
+    ProfileScreen(),
   ];
 
   int _selectedIndex = 1;
@@ -63,6 +65,19 @@ class _MainShellState extends ConsumerState<MainShell>
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,
+        actions: _selectedIndex == 2
+            ? [
+                IconButton(
+                  icon: const Icon(PhosphorIconsRegular.gearSix),
+                  tooltip: '설정',
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ProfileSettingsScreen(),
+                    ),
+                  ),
+                ),
+              ]
+            : null,
       ),
       body: IndexedStack(index: _selectedIndex, children: _tabs),
       bottomNavigationBar: DecoratedBox(
@@ -163,9 +178,9 @@ class _AddNavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Expanded(
       child: InkWell(
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const BookSearchScreen()),
-        ),
+        onTap: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const BookSearchScreen())),
         child: Center(
           child: Container(
             width: 34,
