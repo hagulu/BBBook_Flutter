@@ -639,9 +639,7 @@ class BookshelfDao {
 
   /// 로컬 우선 편집을 덮어쓰기 전에 필요한 기존 행의 상태(충돌 검사 기준값과
   /// 아직 push되지 못한 편집 목록). 행이 없으면 모두 비어 있는 상태다.
-  Future<
-    ({bool isDirty, String? syncedUpdatedAt, Set<String>? dirtyFields})
-  >
+  Future<({bool isDirty, String? syncedUpdatedAt, Set<String>? dirtyFields})>
   _readDirtyState(Transaction txn, int userBookId) async {
     final existing = await txn.query(
       'user_book',
@@ -656,7 +654,9 @@ class BookshelfDao {
     return (
       isDirty: existing.first['is_dirty'] == 1,
       syncedUpdatedAt: existing.first['synced_updated_at'] as String?,
-      dirtyFields: _decodeDirtyFields(existing.first['dirty_fields'] as String?),
+      dirtyFields: _decodeDirtyFields(
+        existing.first['dirty_fields'] as String?,
+      ),
     );
   }
 
@@ -816,6 +816,7 @@ class BookshelfDao {
       'is_masterpiece': item.isMasterpiece ? 1 : 0,
       'source_type': item.sourceType,
       'reread_count': item.rereadCount,
+      'want_to_reread': item.wantToReread ? 1 : 0,
       'difficulty': item.difficulty,
       'started_at': _formatDate(item.startedAt),
       'finished_at': _formatDate(item.finishedAt),
@@ -854,6 +855,7 @@ class BookshelfDao {
       isMasterpiece: (row['is_masterpiece'] as int) == 1,
       sourceType: row['source_type'] as String?,
       rereadCount: row['reread_count'] as int,
+      wantToReread: (row['want_to_reread'] as int? ?? 0) == 1,
       difficulty: row['difficulty'] as String?,
       startedAt: _parseDate(row['started_at'] as String?),
       finishedAt: _parseDate(row['finished_at'] as String?),

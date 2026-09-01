@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_alert.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
+import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../../book_record/screens/book_record_screen.dart';
 import '../../models/book_item.dart';
 import '../../models/finished_filter.dart';
@@ -75,11 +76,9 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
   final _searchFocusNode = FocusNode();
   final _scrollController = ScrollController();
   final _scrubNotifier = ValueNotifier<({String label, double dy})?>(null);
-  final _filterPanelKey = GlobalKey();
   final _unlinkedBannerKey = GlobalKey();
   Timer? _searchDebounce;
   bool _searchOpen = false;
-  bool _filterPanelOpen = false;
 
   // 월별 그룹 결과 캐시. `_groupByMonth`는 완독 전체 목록을 순회하는데,
   // 검색/필터 패널 토글처럼 books와 무관한 setState에도 build()가 다시
@@ -141,10 +140,7 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
   /// 안에 있어 검색 바가 사라지면 접근할 수 없으므로 함께 닫는다.
   void _closeSearch() {
     _resetFilter();
-    setState(() {
-      _searchOpen = false;
-      _filterPanelOpen = false;
-    });
+    setState(() => _searchOpen = false);
   }
 
   void _onSearchChanged(String value) {
@@ -167,6 +163,18 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     _searchController.clear();
     ref.read(finishedFilterProvider.notifier).reset();
     _resetScroll();
+  }
+
+  /// 필터 버튼을 누르면 접혔다 펼쳐지는 인라인 패널 대신 바텀시트로
+  /// 띄운다(칩 토글은 즉시 반영되므로 별도 확인 버튼은 없다).
+  Future<void> _openFilterSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) =>
+          const RecordDialogShell(title: '필터', content: FinishedFilterPanel()),
+    );
   }
 
   /// 검색어/필터가 바뀌면 결과 집합과 그룹/그리드 구조 자체가 달라지므로,
@@ -204,9 +212,6 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     offset += _unlinkedBannerKey.currentContext?.size?.height ?? 0;
     if (_searchOpen) {
       offset += _kFinishedSearchBarHeight;
-      if (_filterPanelOpen) {
-        offset += _filterPanelKey.currentContext?.size?.height ?? 0;
-      }
     }
     offset += _kFinishedContentSpacing;
     return offset;
@@ -301,17 +306,8 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
                         onSearchChanged: _onSearchChanged,
                         onClearSearch: _clearSearch,
                         filterActiveCount: filter.activeCount,
-                        onToggleFilterPanel: () => setState(
-                          () => _filterPanelOpen = !_filterPanelOpen,
-                        ),
+                        onToggleFilterPanel: _openFilterSheet,
                         onResetFilter: _resetFilter,
-                      ),
-                    ),
-                  if (_filterPanelOpen)
-                    SliverToBoxAdapter(
-                      child: KeyedSubtree(
-                        key: _filterPanelKey,
-                        child: const FinishedFilterPanel(),
                       ),
                     ),
                   const SliverToBoxAdapter(
@@ -336,14 +332,7 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
                   scrollController: _scrollController,
                   onSelect: (groupKey) =>
                       _scrollToGroup(groups, contentWidth, groupKey),
-                  onScrubChanged: (value) {
-                    _scrubNotifier.value = value;
-                    if (value != null && _filterPanelOpen) {
-                      // 필터 패널이 열려 있으면 그 높이만큼 오프셋 계산이 어긋날 수
-                      // 있어(측정 지연), 스크럽을 시작하면 패널을 닫아 기준을 고정한다.
-                      setState(() => _filterPanelOpen = false);
-                    }
-                  },
+                  onScrubChanged: (value) => _scrubNotifier.value = value,
                 ),
               ),
             if (isDefaultMode)
@@ -745,12 +734,23 @@ class _FinishedSearchBar extends StatelessWidget {
                     style: TextButton.styleFrom(
                       minimumSize: const Size(0, 32),
                       padding: const EdgeInsets.symmetric(horizontal: 8),
+                      foregroundColor: AppColors.textStrong,
                     ),
                     onPressed: onToggleFilterPanel,
-                    icon: const Icon(PhosphorIconsRegular.funnel, size: 16),
+                    icon: Icon(
+                      filterActiveCount > 0
+                          ? PhosphorIconsFill.funnel
+                          : PhosphorIconsRegular.funnel,
+                      size: 16,
+                      color: AppColors.textStrong,
+                    ),
                     label: Text(
                       filterActiveCount > 0 ? '필터 $filterActiveCount' : '필터',
-                      style: const TextStyle(fontSize: 12),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textStrong,
+                      ),
                     ),
                   ),
                 ],

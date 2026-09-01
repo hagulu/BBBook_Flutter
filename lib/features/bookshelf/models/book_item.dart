@@ -27,6 +27,7 @@ class BookItem {
     required this.isMasterpiece,
     this.sourceType,
     required this.rereadCount,
+    this.wantToReread = false,
     this.difficulty,
     this.startedAt,
     this.finishedAt,
@@ -75,6 +76,10 @@ class BookItem {
   final bool isMasterpiece;
   final String? sourceType;
   final int rereadCount;
+
+  /// "또 볼래요" 여부. 완독 팝업/재독 횟수 조정 팝업에서 설정하며, 완독
+  /// 상태를 해제해도 값이 유지된다(api-doc — 완독과 독립적인 non-null 컬럼).
+  final bool wantToReread;
   final String? difficulty;
   final DateTime? startedAt;
   final DateTime? finishedAt;
@@ -160,6 +165,7 @@ class BookItem {
       isMasterpiece: isMasterpiece,
       sourceType: sourceType,
       rereadCount: rereadCount,
+      wantToReread: wantToReread,
       difficulty: difficulty,
       startedAt: startedAt,
       finishedAt: finishedAt,
@@ -199,6 +205,7 @@ class BookItem {
       isMasterpiece: isMasterpiece,
       sourceType: sourceType,
       rereadCount: rereadCount,
+      wantToReread: wantToReread,
       difficulty: difficulty,
       startedAt: startedAt,
       finishedAt: finishedAt,
@@ -266,6 +273,7 @@ class BookItem {
       isMasterpiece: patch.isMasterpiece ?? isMasterpiece,
       sourceType: patch.sourceType.applyTo(sourceType),
       rereadCount: patch.rereadCount ?? rereadCount,
+      wantToReread: patch.wantToReread ?? wantToReread,
       difficulty: patch.difficulty.applyTo(difficulty),
       startedAt: patch.startedAt.isPresent
           ? _parseDate(patch.startedAt.requestValue)
@@ -338,6 +346,7 @@ class BookItem {
       isMasterpiece: json['isMasterpiece'] as bool,
       sourceType: json['sourceType'] as String?,
       rereadCount: json['rereadCount'] as int,
+      wantToReread: json['wantToReread'] as bool? ?? false,
       difficulty: json['difficulty'] as String?,
       startedAt: _parseDate(json['startedAt'] as String?),
       finishedAt: _parseDate(json['finishedAt'] as String?),

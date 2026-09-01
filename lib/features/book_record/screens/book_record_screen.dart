@@ -188,6 +188,7 @@ class _BookRecordBody extends ConsumerWidget {
                         child: ReadingStatusTile(
                           status: book.status,
                           summary: _statusSummary(book),
+                          wantToReread: book.wantToReread,
                           onTap: () =>
                               _openReadingStatusDialog(context, controller),
                         ),
@@ -252,6 +253,10 @@ class _BookRecordBody extends ConsumerWidget {
                   sourceIcon: BookSourceType.fromApiValue(
                     book.sourceType,
                   )?.icon,
+                  sourceValueSecondary:
+                      (book.platformName == null || book.platformName!.isEmpty)
+                      ? null
+                      : book.platformName,
                   difficultyValue:
                       DifficultyLevel.fromApiValue(book.difficulty)?.label ??
                       DifficultyLevel.values.map((d) => d.label).join(' · '),
@@ -363,10 +368,7 @@ class _BookRecordBody extends ConsumerWidget {
     if (source == null) {
       return BookSourceType.values.map((s) => s.label).join(' · ');
     }
-    if (book.platformName == null || book.platformName!.isEmpty) {
-      return source.label;
-    }
-    return '${source.label} · ${book.platformName}';
+    return source.label;
   }
 
   Future<void> _openReadingStatusDialog(
@@ -403,10 +405,11 @@ class _BookRecordBody extends ConsumerWidget {
         final result = await showRereadDialog(
           context,
           initialCount: book.rereadCount + 1,
+          initialWantToReread: book.wantToReread,
         );
         if (result == null) return;
         switch (result) {
-          case RereadCountUpdated(:final count):
+          case RereadCountUpdated(:final count, :final wantToReread):
             await controller.updateRecord(
               RecordPatch(
                 // 이미 완독 상태면 status를 다시 보내지 않는다 — status가
@@ -419,6 +422,7 @@ class _BookRecordBody extends ConsumerWidget {
                     ? null
                     : tapped.apiValue,
                 rereadCount: count,
+                wantToReread: wantToReread,
                 // 총쪽수(오디오북은 100%)를 아는 책은 끝까지로 진행률을
                 // 맞춘다(실제 웹 클라이언트와 동일 — 완독인데 진행률이
                 // 중간에 멈춰 있는 모순 방지). 재독 팝업은 완독 상태가 아닌
@@ -437,7 +441,10 @@ class _BookRecordBody extends ConsumerWidget {
         return;
       }
 
-      final result = await showFinishConfirmDialog(context);
+      final result = await showFinishConfirmDialog(
+        context,
+        initialWantToReread: book.wantToReread,
+      );
       if (result == null) return;
       await controller.updateRecord(
         RecordPatch(
@@ -445,6 +452,7 @@ class _BookRecordBody extends ConsumerWidget {
           // 총쪽수(오디오북은 100%)를 아는 책은 끝까지로 진행률을 맞춘다(실제
           // 웹 클라이언트와 동일 — 완독인데 진행률이 중간에 멈춰 있는 모순 방지).
           currentPage: book.progressUpperBound,
+          wantToReread: result.wantToReread,
           // 완독 팝업에서 입력하지 않은 항목은 아예 보내지 않는다(기존 값
           // 유지) — 빈 값을 지움 신호로 쓰지 않는다.
           difficulty: patchIfPresent(result.difficulty),

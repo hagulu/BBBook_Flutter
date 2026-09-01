@@ -19,6 +19,7 @@ class MetaSummaryCard extends StatelessWidget {
     required this.sourceHasValue,
     required this.onTapSource,
     this.sourceIcon,
+    this.sourceValueSecondary,
     required this.difficultyValue,
     required this.difficultyHasValue,
     required this.onTapDifficulty,
@@ -33,6 +34,7 @@ class MetaSummaryCard extends StatelessWidget {
   final bool sourceHasValue;
   final VoidCallback onTapSource;
   final IconData? sourceIcon;
+  final String? sourceValueSecondary;
   final String difficultyValue;
   final bool difficultyHasValue;
   final VoidCallback onTapDifficulty;
@@ -84,6 +86,7 @@ class MetaSummaryCard extends StatelessWidget {
                   hasValue: sourceHasValue,
                   onTap: onTapSource,
                   valueIcon: sourceIcon,
+                  valueSecondary: sourceValueSecondary,
                 ),
               ),
               Container(

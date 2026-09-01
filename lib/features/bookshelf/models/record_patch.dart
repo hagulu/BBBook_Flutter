@@ -15,9 +15,9 @@ import 'book_status.dart';
 /// - 사용자가 건드리지 않은 필드는 요청 body에서 아예 제외한다(기존 값 유지).
 /// - 사용자가 기존 값을 제거한 필드만 명시적 `null`로 보낸다(삭제).
 /// - 빈 문자열은 삭제가 아니라 그대로 저장되는 값이다.
-/// - `status`/`currentPage`/`isMasterpiece`/`rereadCount`는 삭제할 수 없는
-///   non-null 컬럼이라 아예 3-상태가 필요 없다 — 값이 있을 때만 보낸다
-///   (`T?`, null이면 생략).
+/// - `status`/`currentPage`/`isMasterpiece`/`rereadCount`/`wantToReread`는
+///   삭제할 수 없는 non-null 컬럼이라 아예 3-상태가 필요 없다 — 값이 있을
+///   때만 보낸다(`T?`, null이면 생략).
 ///
 /// 삭제 가능한 필드는 [PatchField]로 생략/수정/삭제를 구분한다.
 class RecordPatch {
@@ -26,6 +26,7 @@ class RecordPatch {
     this.currentPage,
     this.isMasterpiece,
     this.rereadCount,
+    this.wantToReread,
     this.myRating,
     this.shortReview,
     this.sourceType,
@@ -43,6 +44,10 @@ class RecordPatch {
   final int? currentPage;
   final bool? isMasterpiece;
   final int? rereadCount;
+
+  /// 또 볼래요 여부. non-null boolean 필드라 삭제가 없다(api-doc) — 값이
+  /// 있을 때만 보내고, null이면 요청에서 생략(기존 값 유지)한다.
+  final bool? wantToReread;
 
   // 삭제 가능 — null이면 생략, PatchField.clear()면 명시적 null(삭제).
   final PatchField<double>? myRating;
@@ -66,6 +71,7 @@ class RecordPatch {
   static const String fieldCurrentPage = 'currentPage';
   static const String fieldIsMasterpiece = 'isMasterpiece';
   static const String fieldRereadCount = 'rereadCount';
+  static const String fieldWantToReread = 'wantToReread';
   static const String fieldMyRating = 'myRating';
   static const String fieldShortReview = 'shortReview';
   static const String fieldSourceType = 'sourceType';
@@ -85,8 +91,11 @@ class RecordPatch {
     if (currentPage != null) body[fieldCurrentPage] = currentPage;
     if (isMasterpiece != null) body[fieldIsMasterpiece] = isMasterpiece;
     if (rereadCount != null) body[fieldRereadCount] = rereadCount;
+    if (wantToReread != null) body[fieldWantToReread] = wantToReread;
     if (myRating.isPresent) body[fieldMyRating] = myRating.requestValue;
-    if (shortReview.isPresent) body[fieldShortReview] = shortReview.requestValue;
+    if (shortReview.isPresent) {
+      body[fieldShortReview] = shortReview.requestValue;
+    }
     if (sourceType.isPresent) body[fieldSourceType] = sourceType.requestValue;
     if (difficulty.isPresent) body[fieldDifficulty] = difficulty.requestValue;
     if (startedAt.isPresent) body[fieldStartedAt] = startedAt.requestValue;
@@ -122,7 +131,10 @@ class RecordPatch {
   /// 이하)에 쌓인 레거시 dirty 행이다 — 무엇을 바꿨는지 알 수 없으므로 예전
   /// 동작 그대로 "값이 있는 필드만 보내고 null은 생략"한다. 이 행들에
   /// 삭제(명시적 null)를 보내면 사용자가 지운 적 없는 서버 값까지 지울 수
-  /// 있다.
+  /// 있다. 단, `wantToReread`(v18에 추가된 필드)는 예외다 — 레거시 행은
+  /// 이 필드가 존재하기도 전에 쌓인 편집이라 로컬 값이 마이그레이션 기본값
+  /// (false)일 뿐 실제 값을 반영하지 않으므로, legacy일 때는 절대 보내지
+  /// 않는다.
   factory RecordPatch.fromSnapshot(
     BookItem item, {
     required Set<String>? changedFields,
@@ -157,10 +169,21 @@ class RecordPatch {
     }
 
     return RecordPatch(
-      status: includes(fieldStatus) && !skipStatus ? item.status.apiValue : null,
+      status: includes(fieldStatus) && !skipStatus
+          ? item.status.apiValue
+          : null,
       currentPage: includes(fieldCurrentPage) ? item.currentPage : null,
       isMasterpiece: includes(fieldIsMasterpiece) ? item.isMasterpiece : null,
       rereadCount: includes(fieldRereadCount) ? item.rereadCount : null,
+      // 레거시 dirty 행(dirty_fields=NULL)은 v18 이전에 쌓인 편집이라
+      // wantToReread 자체를 몰랐다 — 다른 삭제 불가 필드와 달리 legacy일
+      // 때는 절대 보내지 않는다. 로컬 값은 마이그레이션이 채운 기본값
+      // false일 뿐 실제 서버 값을 반영하지 않아, 그대로 보내면 서버의
+      // 실제 값(예: 다른 클라이언트에서 true로 설정한 값)을 덮어쓸 수
+      // 있다.
+      wantToReread: !legacy && includes(fieldWantToReread)
+          ? item.wantToReread
+          : null,
       myRating: field(fieldMyRating, item.myRating),
       shortReview: field(fieldShortReview, item.shortReview),
       sourceType: field(fieldSourceType, item.sourceType),
@@ -190,6 +213,9 @@ class RecordPatch {
       fieldCurrentPage,
       fieldIsMasterpiece,
       fieldRereadCount,
+      // wantToReread는 여기 포함하지 않는다 — 레거시 행은 v18 이전 편집이라
+      // 이 필드를 몰랐고, 로컬 값은 마이그레이션 기본값(false)일 뿐이라
+      // 진짜 서버 값을 덮어쓸 위험이 있다([fromSnapshot] 참고).
       if (item.myRating != null) fieldMyRating,
       if (item.shortReview != null) fieldShortReview,
       if (item.sourceType != null) fieldSourceType,

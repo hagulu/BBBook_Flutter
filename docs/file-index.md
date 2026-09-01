@@ -40,7 +40,7 @@
 
 - `lib/features/bookshelf/screens/bookshelf_screen.dart` — 책장 탭 콘텐츠(읽고 싶음/읽는 중/완독/중단 4탭, 기본은 읽는 중)
 - `lib/features/bookshelf/data/bookshelf_api.dart` — 책장 API 호출(전체 동기화, 증분 동기화, 완독 공개 설정 조회/수정, 카테고리 목록 GET)
-- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타·독후감 이미지 매칭·저장 모드, v16)
+- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타·독후감 이미지 매칭·저장 모드, v18)
 - `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호)
 - `lib/features/bookshelf/data/book_category_dao.dart` — 카테고리 마스터 목록 로컬 캐시 DAO(계정 무관, 로그아웃 시에도 유지)
 - `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화, 카테고리는 로컬 캐시 우선 조회
@@ -156,22 +156,9 @@
 
 ## docs
 
-- `docs/review/20260826-124257-record-patch-dirty-fields-review.md` — 책 기록 PATCH 3-상태·dirty 필드 추적의 완독일 계약 및 push 확정 경합 리뷰
-- `docs/review/20260826-132019-reflection-photo-memo-insert-review.md` — 사진 메모 독후감 삽입의 이미지 독립성·비동기 생명주기·테스트 계약 리뷰
-- `docs/review/20260826-141346-reflection-quote-scroll-reader-review.md` — 독후감 인용 부호 오버레이의 무한 높이로 인한 작성 스크롤·리더 레이아웃 파손 리뷰
-- `docs/review/20260827-020212-shared-image-and-reflection-review.md` — 공용 이미지 편집·OCR와 독후감 이미지 삭제 보호·공개 상태 최신성 리뷰
-- `docs/review/20260827-105809-shared-image-and-reflection-rereview.md` — 공용 이미지·독후감 변경의 미해결 이미지 삭제 보호·오류 처리·상태 최신성 재리뷰
-- `docs/review/20260827-123306-shared-image-and-reflection-third-review.md` — 공용 이미지·독후감 후속 수정의 Quill 교체 거부 상태와 공개 설정 생명주기 리뷰
-- `docs/review/20260827-144636-shared-image-editor-ocr-review.md` — 공용 이미지 에디터와 OCR 크롭 종료 상태·단어 선택 접근성 리뷰
-- `docs/review/20260828-104114-discussion-feature-review.md` — 주제 토론 기능의 답변 중복 등록·상태 최신성·표시 정확성·터치 접근성 리뷰
-- `docs/review/20260828-150017-app-bar-sharing-discussion-ui-review.md` — 공통 앱바·생각나눔·토론 UI 변경의 선택지 상태·상대 시각·탭 피드백 리뷰
-- `docs/review/20260828-151504-app-bar-sharing-discussion-ui-rereview.md` — 공통 앱바·생각나눔·토론 UI 후속 수정의 선택지 최대 개수·상대 시각 재리뷰
-- `docs/review/20260828-152535-app-bar-sharing-discussion-ui-third-review.md` — 선택지 추가 UI 후속 수정의 최대 개수 경계·상대 시각 3차 리뷰
-- `docs/review/20260828-212316-public-reflection-and-common-ui-review.md` — 공개 독후감과 공용 커뮤니티 UI의 숨김 페이지네이션·공감 경합·시간·터치 접근성 리뷰
-- `docs/review/20260829-201842-book-community-preview-and-review-list-review.md` — 커뮤니티 미리보기·독자평 전체 목록의 공감/페이지네이션 경합과 비동기 생명주기 리뷰
-- `docs/review/20260830-133204-book-community-preview-and-review-list-rereview.md` — 커뮤니티 미리보기·독자평 목록 후속 변경의 로딩·공감 경합과 중복 API 요청 재리뷰
-- `docs/review/20260830-145157-book-community-preview-and-review-list-third-review.md` — 커뮤니티 미리보기·독자평 목록의 독후감 개수 기준과 미해결 비동기 경합 3차 리뷰
 - `docs/review/20260830-185915-book-record-fixed-header-review.md` — 책 기록 상세 고정 헤더의 작은 세로 화면·큰 글자 배율 레이아웃 리뷰
 - `docs/review/20260831-171201-book-progress-source-pages-review.md` — 책 형태별 진행률·전자책 쪽수 저장의 PATCH 경합과 출처 전환 정합성 리뷰
 - `docs/review/20260901-112239-book-progress-source-pages-rereview.md` — 책 형태별 진행률 후속 수정의 쪽수 축소 요청 순서·오디오북 역변환·최신 상태 정합성 재리뷰
 - `docs/review/20260901-142758-book-progress-source-pages-third-review.md` — 출처·전자책 쪽수 조정 작업의 dirty push 경합·중간 실패·최신 진행 상태 3차 리뷰
+- `docs/review/20260901-154051-want-to-reread-and-filter-review.md` — 또 볼래요 필드의 기존 DB 마이그레이션·레거시 dirty push 데이터 정합성 리뷰
+- `docs/review/20260901-155043-want-to-reread-and-filter-rereview.md` — 또 볼래요 후속 UI와 미해결 DB 마이그레이션·레거시 dirty push 재리뷰

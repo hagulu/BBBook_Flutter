@@ -11,6 +11,9 @@ import '../../../../core/theme/app_theme.dart';
 /// 아이콘이다(예: 출처="전자책"이면 태블릿 아이콘). 값에 대응하는 아이콘이
 /// 없는 필드(자유 텍스트인 "알게 된 경로" 등)는 null로 두면 아이콘 없이
 /// 값만 표시된다 — 없는 아이콘을 억지로 채우지 않는다.
+///
+/// [valueSecondary]는 값에 딸린 부가 정보(예: 출처="전자책"일 때의 플랫폼명
+/// "리디북스")로, 주 값보다 작고 옅은 글자로 뒤에 이어 붙는다.
 class RecordFieldTile extends StatelessWidget {
   const RecordFieldTile({
     super.key,
@@ -19,6 +22,7 @@ class RecordFieldTile extends StatelessWidget {
     required this.hasValue,
     required this.onTap,
     this.valueIcon,
+    this.valueSecondary,
   });
 
   final String label;
@@ -26,6 +30,7 @@ class RecordFieldTile extends StatelessWidget {
   final bool hasValue;
   final VoidCallback onTap;
   final IconData? valueIcon;
+  final String? valueSecondary;
 
   @override
   Widget build(BuildContext context) {
@@ -55,14 +60,27 @@ class RecordFieldTile extends StatelessWidget {
                 const SizedBox(width: 4),
               ],
               Flexible(
-                child: Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: hasValue ? 15 : 13,
-                    fontWeight: hasValue ? FontWeight.w600 : FontWeight.w500,
-                    color: hasValue
-                        ? AppColors.textStrong
-                        : AppColors.textMuted,
+                child: Text.rich(
+                  TextSpan(
+                    style: TextStyle(
+                      fontSize: hasValue ? 15 : 13,
+                      fontWeight: hasValue ? FontWeight.w600 : FontWeight.w500,
+                      color: hasValue
+                          ? AppColors.textStrong
+                          : AppColors.textMuted,
+                    ),
+                    children: [
+                      TextSpan(text: value),
+                      if (hasValue && valueSecondary != null)
+                        TextSpan(
+                          text: ' · $valueSecondary',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                    ],
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

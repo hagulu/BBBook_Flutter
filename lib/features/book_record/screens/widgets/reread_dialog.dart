@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_confirm.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
+import 'want_to_reread_toggle.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// [showRereadDialog] 결과. 재독 횟수를 바꿨으면 [RereadCountUpdated], 0에서
@@ -12,8 +13,9 @@ sealed class RereadDialogResult {
 }
 
 class RereadCountUpdated extends RereadDialogResult {
-  const RereadCountUpdated(this.count);
+  const RereadCountUpdated(this.count, {required this.wantToReread});
   final int count;
+  final bool wantToReread;
 }
 
 class RereadFinishCancelled extends RereadDialogResult {
@@ -25,19 +27,27 @@ class RereadFinishCancelled extends RereadDialogResult {
 Future<RereadDialogResult?> showRereadDialog(
   BuildContext context, {
   required int initialCount,
+  bool initialWantToReread = false,
 }) {
   return showModalBottomSheet<RereadDialogResult>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => _RereadDialog(initialCount: initialCount),
+    builder: (context) => _RereadDialog(
+      initialCount: initialCount,
+      initialWantToReread: initialWantToReread,
+    ),
   );
 }
 
 class _RereadDialog extends StatefulWidget {
-  const _RereadDialog({required this.initialCount});
+  const _RereadDialog({
+    required this.initialCount,
+    required this.initialWantToReread,
+  });
 
   final int initialCount;
+  final bool initialWantToReread;
 
   @override
   State<_RereadDialog> createState() => _RereadDialogState();
@@ -45,6 +55,7 @@ class _RereadDialog extends StatefulWidget {
 
 class _RereadDialogState extends State<_RereadDialog> {
   late int _count = widget.initialCount;
+  late bool _wantToReread = widget.initialWantToReread;
 
   Future<void> _decrement() async {
     if (_count > 0) {
@@ -66,6 +77,11 @@ class _RereadDialogState extends State<_RereadDialog> {
   Widget build(BuildContext context) {
     return RecordDialogShell(
       title: '재독 횟수',
+      titleTrailing: WantToRereadToggle(
+        value: _wantToReread,
+        onChanged: (v) => setState(() => _wantToReread = v),
+        compact: true,
+      ),
       content: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -94,8 +110,9 @@ class _RereadDialogState extends State<_RereadDialog> {
       buttons: [
         RecordDialogButton(
           label: '확인',
-          onPressed: () =>
-              Navigator.of(context).pop(RereadCountUpdated(_count)),
+          onPressed: () => Navigator.of(
+            context,
+          ).pop(RereadCountUpdated(_count, wantToReread: _wantToReread)),
         ),
       ],
     );

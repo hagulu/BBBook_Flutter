@@ -24,6 +24,7 @@ void main() {
     DateTime? libraryDueAt,
     String? platformName,
     String? discoverySource,
+    bool wantToReread = false,
   }) {
     final now = DateTime.utc(2026, 8, 26);
     return BookItem(
@@ -37,6 +38,7 @@ void main() {
       isMasterpiece: false,
       sourceType: sourceType,
       rereadCount: 2,
+      wantToReread: wantToReread,
       difficulty: difficulty,
       startedAt: startedAt,
       finishedAt: finishedAt,
@@ -98,6 +100,18 @@ void main() {
       expect(body.keys, ['myRating']);
     });
 
+    test('wantToReread는 값이 있을 때만 보내고 null은 허용하지 않는다(삭제 불가)', () {
+      final body = const RecordPatch(wantToReread: true).toJson();
+
+      expect(body, {'wantToReread': true});
+    });
+
+    test('wantToReread를 담지 않으면 요청에서 제외된다(기존 값 유지)', () {
+      final body = const RecordPatch(currentPage: 1).toJson();
+
+      expect(body.containsKey('wantToReread'), isFalse);
+    });
+
     test('changedFields는 요청에 실리는 키와 같다', () {
       const patch = RecordPatch(
         status: 'FINISHED',
@@ -154,12 +168,7 @@ void main() {
 
       final body = RecordPatch.fromSnapshot(
         item,
-        changedFields: {
-          'startedAt',
-          'finishedAt',
-          'libraryDueAt',
-          'libraryId',
-        },
+        changedFields: {'startedAt', 'finishedAt', 'libraryDueAt', 'libraryId'},
       ).toJson();
 
       expect(body['startedAt'], '2026-01-02');
@@ -183,6 +192,10 @@ void main() {
       expect(body['currentPage'], 10);
       expect(body['isMasterpiece'], false);
       expect(body['rereadCount'], 2);
+      // wantToReread는 v18에 추가된 필드라 레거시 행이 쌓일 당시 존재하지
+      // 않았다 — 로컬 값은 마이그레이션 기본값(false)일 뿐이므로, 다른
+      // 삭제 불가 필드와 달리 보내지 않는다(실제 서버 값을 덮어쓸 위험).
+      expect(body.containsKey('wantToReread'), isFalse);
     });
 
     test('완독 상태인데 완독일을 모르면 status를 생략한다(서버가 오늘로 새로 잡는 것 방지)', () {
@@ -210,6 +223,36 @@ void main() {
 
       expect(body['status'], 'FINISHED');
       expect(body['finishedAt'], '2026-08-20');
+    });
+
+    test('wantToReread가 바뀐 목록에 있으면 로컬 값을 그대로 다시 보낸다', () {
+      final item = buildItem(wantToReread: true);
+
+      final body = RecordPatch.fromSnapshot(
+        item,
+        changedFields: {'wantToReread'},
+      ).toJson();
+
+      expect(body, {'wantToReread': true});
+    });
+
+    test('레거시 dirty 행은 wantToReread가 로컬에 true여도 보내지 않는다'
+        '(v18 이전 편집이라 이 필드를 몰랐던 행 — 마이그레이션 기본값을 '
+        '진짜 서버 값으로 오인해 덮어쓰지 않는다)', () {
+      final item = buildItem(wantToReread: true);
+
+      final body = RecordPatch.fromSnapshot(item, changedFields: null).toJson();
+
+      expect(body.containsKey('wantToReread'), isFalse);
+    });
+
+    test('nonNullFieldsOf는 wantToReread를 포함하지 않는다(레거시 행이 몰랐던 필드)', () {
+      final item = buildItem(wantToReread: true);
+
+      expect(
+        RecordPatch.nonNullFieldsOf(item),
+        isNot(contains('wantToReread')),
+      );
     });
 
     test('nonNullFieldsOf는 레거시 행이 보내던 필드를 모두 덮는다', () {
@@ -339,6 +382,44 @@ void main() {
       );
 
       expect(updated.finishedAt, isNull);
+    });
+
+    test('wantToReread를 담지 않으면 기존 값이 유지된다', () {
+      final item = buildItem(wantToReread: true);
+
+      final updated = item.copyWithRecord(
+        const RecordPatch(currentPage: 5),
+        updatedAt: DateTime.utc(2026, 8, 26),
+      );
+
+      expect(updated.wantToReread, isTrue);
+    });
+
+    test('wantToReread를 보내면 값이 바뀐다', () {
+      final item = buildItem(wantToReread: false);
+
+      final updated = item.copyWithRecord(
+        const RecordPatch(wantToReread: true),
+        updatedAt: DateTime.utc(2026, 8, 26),
+      );
+
+      expect(updated.wantToReread, isTrue);
+    });
+
+    test('완독 취소(status만 바꿈)에도 wantToReread 값은 유지된다', () {
+      final item = buildItem(
+        status: BookStatus.finished,
+        finishedAt: DateTime.utc(2026, 3, 4),
+        wantToReread: true,
+      );
+
+      final updated = item.copyWithRecord(
+        const RecordPatch(status: 'READING', rereadCount: 0),
+        updatedAt: DateTime.utc(2026, 8, 26),
+      );
+
+      expect(updated.status, BookStatus.reading);
+      expect(updated.wantToReread, isTrue);
     });
   });
 }
