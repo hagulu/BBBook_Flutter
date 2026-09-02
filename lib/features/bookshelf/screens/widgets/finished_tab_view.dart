@@ -410,7 +410,12 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     if (!filter.isDefaultMode) {
       return [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          padding: const EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            bookshelfFabBottomPadding,
+          ),
           sliver: SliverGrid(
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
@@ -467,7 +472,9 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
           ),
         ),
       ],
-      const SliverToBoxAdapter(child: SizedBox(height: 24)),
+      const SliverToBoxAdapter(
+        child: SizedBox(height: bookshelfFabBottomPadding),
+      ),
     ];
   }
 

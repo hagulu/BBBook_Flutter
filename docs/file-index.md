@@ -7,7 +7,7 @@
 - `lib/main.dart` — 앱 진입점
 - `lib/app/app.dart` — MaterialApp 루트 위젯
 - `lib/app/router.dart` — go_router 라우팅, 인증 상태 기반 redirect(AuthGuard 대응)
-- `lib/app/main_shell.dart` — 로그인 후 진입하는 하단 탭 셸(HOME/BOOKSHELF/PROFILE), 기본 탭은 BOOKSHELF, 포그라운드 전환 시 동기화 트리거
+- `lib/app/main_shell.dart` — 로그인 후 진입하는 하단 탭 셸(BOOKSHELF/PROFILE), 기본 탭은 BOOKSHELF, 책장 탭에서만 노트 상세와 동일한 원형 FAB로 책 검색 진입, 포그라운드 전환 시 동기화 트리거
 
 ## core
 
@@ -28,26 +28,22 @@
 - `lib/features/auth/data/social_auth_service.dart` — Google/Apple 네이티브 로그인
 - `lib/features/auth/widgets/auth_loading_gate.dart` — 인증 확인 중 빈 배경 표시(AuthGuard 대응)
 
-## features/home
-
-- `lib/features/home/screens/home_tab_placeholder.dart` — 홈 탭 임시 화면(TODO: home-feed 기능 포팅 후 교체)
-
 ## features/profile
 
-- `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 통계 카드/내 콘텐츠 메뉴/공지사항/로그아웃/약관 링크), `docs/porting-reference/profile-main-screen.md` 대응
+- `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 리포트 카드/내 글 모아보기 2×2 바로가기/공지사항/로그아웃/약관 링크), `docs/porting-reference/profile-main-screen.md` 대응
 - `lib/features/profile/screens/profile_edit_screen.dart` — 프로필 수정 화면(닉네임·프로필 이미지 변경/삭제, 저장, 회원 탈퇴), `docs/porting-reference/profile-edit-screen.md` 대응
 - `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(포팅 문서 범위 밖 저장 방식(서버/로컬) 전환 진입점), 프로필 탭 AppBar 설정 아이콘으로 진입
 - `lib/features/profile/screens/my_reflections_screen.dart` — 내가 작성한 독후감 목록(커서 무한 스크롤), 정상 항목은 서버 reflectionId로 로컬 행을 찾아 기존 `BookReflectionDetailScreen`(수정·삭제 포함)으로 이동
 - `lib/features/profile/screens/my_reviews_screen.dart` — 내가 작성한 독자평 목록(커서 무한 스크롤), 탭해도 이동하는 상세 화면 없음
 - `lib/features/profile/screens/my_discussions_screen.dart` — 내가 작성한 토론 목록(커서 무한 스크롤), 정상 항목은 `DiscussionDetailScreen`으로 이동
 - `lib/features/profile/screens/my_discussion_answers_screen.dart` — 내가 작성한 토론 댓글 목록(커서 무한 스크롤), 항목 탭 시 원본 토론(`DiscussionDetailScreen`)으로 이동
-- `lib/features/profile/screens/reading_stats_screen.dart` — 독서 통계(리포트) 화면(연도 선택, 요약 3종, 카테고리 도넛 차트, 월별 완독 막대 차트, 더 보기), 프로필 메인의 독서 통계 카드 탭 시 진입, `docs/porting-reference/stats-screen.md` 대응, 데이터는 서버 API 대신 로컬 서재·노트 데이터로 직접 계산
-- `lib/features/profile/data/profile_api.dart` — 프로필 API 호출(조회/수정/이미지 업로드/회원 탈퇴), 독서 통계 카드 요약은 서버 API 대신 로컬 서재 데이터로 직접 계산
+- `lib/features/profile/screens/reading_stats_screen.dart` — 독서 리포트 화면(AppBar 연도 선택, 요약 3종, 장르별 비율 트리맵·토글형 숫자 상세, 월별 완독 선그래프, 추가 지표), 프로필 메인의 독서 리포트 카드 탭 시 진입, `docs/porting-reference/stats-screen.md` 대응, 데이터는 서버 API 대신 로컬 서재·노트 데이터로 직접 계산
+- `lib/features/profile/data/profile_api.dart` — 프로필 API 호출(조회/수정/이미지 업로드/회원 탈퇴), 독서 리포트 카드 요약은 서버 API 대신 로컬 서재 데이터로 직접 계산
 - `lib/features/profile/data/my_content_api.dart` — "내가 작성한 콘텐츠" 4개 목록 API 호출(독후감/리뷰/토론/토론 댓글 커서 조회)
-- `lib/features/profile/services/reading_stats_calculator.dart` — 독서 통계(리포트) 화면 요약·연도 목록을 로컬 완독 책 목록에서 계산하는 순수 함수
-- `lib/features/profile/providers/profile_providers.dart` — 프로필 조회·독서 통계 카드 요약(로컬 계산) Riverpod provider
+- `lib/features/profile/services/reading_stats_calculator.dart` — 독서 리포트 화면 요약·연도 목록을 로컬 완독 책 목록에서 계산하는 순수 함수
+- `lib/features/profile/providers/profile_providers.dart` — 프로필 조회·독서 리포트 카드 요약(로컬 계산) Riverpod provider
 - `lib/features/profile/providers/my_content_providers.dart` — "내가 작성한 콘텐츠" 4개 목록 커서 무한 스크롤 Riverpod provider
-- `lib/features/profile/providers/reading_stats_providers.dart` — 독서 통계(리포트) 화면 연도 목록·연도별 통계 요약 Riverpod provider(로컬 계산)
+- `lib/features/profile/providers/reading_stats_providers.dart` — 독서 리포트 화면 연도 목록·연도별 요약 Riverpod provider(로컬 계산)
 
 ## features/bookshelf
 

@@ -1,145 +1,234 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../models/reading_stats_summary.dart';
+import 'reading_stats_treemap.dart';
 
-/// "카테고리" 도넛 차트 + 범례(`stats-screen.md` §1-4). [categories]가
-/// 비어 있으면 이 위젯을 아예 렌더링하지 않는 건 호출부(스크린)의 책임이다.
-class ReadingStatsCategoryChart extends StatelessWidget {
+/// 장르별 완독 비율을 트리맵으로 표시하고 숫자 상세를 토글한다.
+class ReadingStatsCategoryChart extends StatefulWidget {
   const ReadingStatsCategoryChart({super.key, required this.categories});
 
   final List<ReadingStatsCategory> categories;
 
   @override
+  State<ReadingStatsCategoryChart> createState() =>
+      _ReadingStatsCategoryChartState();
+}
+
+class _ReadingStatsCategoryChartState extends State<ReadingStatsCategoryChart> {
+  bool _showDetails = false;
+
+  @override
   Widget build(BuildContext context) {
+    final categories = widget.categories;
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        SizedBox(
-          width: 200,
-          height: 200,
-          child: CustomPaint(painter: _DonutPainter(categories: categories)),
+        AspectRatio(
+          aspectRatio: 4 / 3,
+          child: ReadingStatsTreemap(categories: categories),
         ),
-        const SizedBox(height: 16),
-        _CategoryLegend(categories: categories),
+        const SizedBox(height: 8),
+        Align(
+          child: TextButton(
+            onPressed: () => setState(() => _showDetails = !_showDetails),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.accentForeground,
+              minimumSize: const Size(96, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 160),
+                  child: Text(
+                    _showDetails ? '접기' : '자세히',
+                    key: ValueKey(_showDetails),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                AnimatedRotation(
+                  turns: _showDetails ? .5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  child: const Icon(PhosphorIconsRegular.caretDown, size: 16),
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: _showDetails
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 8),
+                    _CategoryDetails(categories: categories),
+                  ],
+                )
+              : const SizedBox(width: double.infinity),
+        ),
       ],
     );
   }
 }
 
-class _DonutPainter extends CustomPainter {
-  _DonutPainter({required this.categories});
-
-  final List<ReadingStatsCategory> categories;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2;
-    final strokeWidth = radius * 0.42;
-    final arcRadius = radius - strokeWidth / 2;
-    final rect = Rect.fromCircle(center: center, radius: arcRadius);
-    final gap = categories.length > 1 ? 0.035 : 0.0;
-
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.butt;
-
-    var startAngle = -math.pi / 2;
-    for (final category in categories) {
-      final sweep = category.ratio * 2 * math.pi;
-      paint.color = category.color;
-      // 매우 작은 조각(1권 미만 비율 등)은 고정 간격을 그대로 빼면 아예
-      // 사라져버리므로, 간격의 2배보다 클 때만 틈을 둔다.
-      final hasGap = sweep > gap * 2;
-      canvas.drawArc(
-        rect,
-        startAngle + (hasGap ? gap / 2 : 0),
-        hasGap ? sweep - gap : sweep,
-        false,
-        paint,
-      );
-      startAngle += sweep;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DonutPainter oldDelegate) =>
-      oldDelegate.categories != categories;
-}
-
-class _CategoryLegend extends StatelessWidget {
-  const _CategoryLegend({required this.categories});
+class _CategoryDetails extends StatelessWidget {
+  const _CategoryDetails({required this.categories});
 
   final List<ReadingStatsCategory> categories;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const spacing = 12.0;
-        const columns = 3;
-        final itemWidth =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
-        return Wrap(
-          spacing: spacing,
-          runSpacing: 10,
+    return Semantics(
+      container: true,
+      label: _detailsSemanticsLabel(categories),
+      excludeSemantics: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Column(
           children: [
             for (final category in categories)
-              SizedBox(
-                width: itemWidth,
-                child: _CategoryLegendItem(category: category),
-              ),
+              _CategoryDetailRow(category: category),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 }
 
-class _CategoryLegendItem extends StatelessWidget {
-  const _CategoryLegendItem({required this.category});
+class _CategoryDetailRow extends StatelessWidget {
+  const _CategoryDetailRow({required this.category});
 
   final ReadingStatsCategory category;
 
   @override
   Widget build(BuildContext context) {
     final percent = (category.ratio * 100).round();
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 3),
-          child: Container(
-            width: 8,
-            height: 8,
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 11),
+      child: Row(
+        children: [
+          DecoratedBox(
             decoration: BoxDecoration(
               color: category.color,
-              shape: BoxShape.circle,
+              borderRadius: BorderRadius.circular(2),
+            ),
+            child: const SizedBox.square(dimension: 10),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return Row(
+                  children: [
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: constraints.maxWidth * .65,
+                      ),
+                      child: Text(
+                        category.categoryName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textBody,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: SizedBox(
+                        height: 2,
+                        child: CustomPaint(painter: _DottedLeaderPainter()),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
-        ),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text.rich(
-            TextSpan(
-              style: const TextStyle(fontSize: 12, color: AppColors.textBody),
-              children: [
-                TextSpan(text: '${category.categoryName} '),
-                TextSpan(
-                  text: '$percent%',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                TextSpan(text: ' · ${category.count}권'),
-              ],
+          const SizedBox(width: 8),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48),
+            child: Text(
+              '$percent%',
+              maxLines: 1,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                color: AppColors.textStrong,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+          const SizedBox(width: 12),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 48),
+            child: Text(
+              '${category.count}권',
+              maxLines: 1,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                color: AppColors.textBody,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
+}
+
+class _DottedLeaderPainter extends CustomPainter {
+  const _DottedLeaderPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = AppColors.textMuted.withValues(alpha: .55)
+      ..strokeWidth = 1.25
+      ..strokeCap = StrokeCap.round;
+    const dashLength = 2.0;
+    const gapLength = 3.0;
+    final centerY = size.height / 2;
+
+    for (var x = 0.0; x < size.width; x += dashLength + gapLength) {
+      canvas.drawLine(
+        Offset(x, centerY),
+        Offset(math.min(x + dashLength, size.width), centerY),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DottedLeaderPainter oldDelegate) => false;
+}
+
+String _detailsSemanticsLabel(List<ReadingStatsCategory> categories) {
+  final items = categories
+      .map((category) {
+        final percent = (category.ratio * 100).round();
+        return '${category.categoryName} $percent%, ${category.count}권';
+      })
+      .join(', ');
+  return '장르별 완독 숫자 상세. $items';
 }

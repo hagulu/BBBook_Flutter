@@ -20,6 +20,15 @@
             "request": "launch",
             "type": "dart",
             "flutterMode": "release"
+        }, 
+        {
+            "name": "bbbook (release beta)",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release",
+            "toolArgs": [
+                "--dart-define=API_BASE_URL=http://192.168.0.51:8081"
+            ]
         }
     ]
 }

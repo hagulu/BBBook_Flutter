@@ -1,0 +1,11 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build Beta APK",
+      "type": "shell",
+      "command": "./scripts/build_release_apk.sh",
+      "problemMatcher": []
+    }
+  ]
+}

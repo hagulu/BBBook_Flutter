@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../models/reading_stats_summary.dart';
 import '../providers/reading_stats_providers.dart';
@@ -10,10 +11,8 @@ import 'widgets/reading_stats_category_chart.dart';
 import 'widgets/reading_stats_monthly_chart.dart';
 import 'widgets/reading_stats_year_picker.dart';
 
-/// 독서 통계(리포트) 화면(`docs/porting-reference/stats-screen.md`).
-///
-/// 전역 헤더는 뒤로가기 아이콘만 표시하고(§1-1), 화면 본문의 "독서 리포트"
-/// 텍스트가 실질적인 타이틀 역할을 한다.
+/// 독서 리포트 화면(`docs/porting-reference/stats-screen.md`). 화면 제목과 연도
+/// 선택은 AppBar에 함께 배치한다.
 class ReadingStatsScreen extends ConsumerStatefulWidget {
   const ReadingStatsScreen({super.key});
 
@@ -32,36 +31,30 @@ class _ReadingStatsScreenState extends ConsumerState<ReadingStatsScreen> {
     return Scaffold(
       backgroundColor: AppColors.pageBackground,
       appBar: AppBar(
+        title: const AppBarTitle('독서 리포트'),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: ReadingStatsYearPicker(
+                years: years,
+                selectedYear: _selectedYear,
+                onChanged: (year) => setState(() => _selectedYear = year),
+              ),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    '독서 리포트',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textStrong,
-                    ),
-                  ),
-                  ReadingStatsYearPicker(
-                    years: years,
-                    selectedYear: _selectedYear,
-                    onChanged: (year) => setState(() => _selectedYear = year),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
               // 이전 값이 있는데 동일 연도로 다시 로딩 중이면(백그라운드
               // 동기화로 인한 재조회 등, `bookshelfSyncVersionProvider` 참고)
               // 전체를 "불러오는 중..."으로 덮어쓰지 않고 공통
@@ -148,15 +141,13 @@ class _StatsContent extends StatelessWidget {
         _SummaryCards(stats: stats),
         if (stats.categoryStats.isNotEmpty) ...[
           const SizedBox(height: 20),
-          const _SectionLabel('카테고리'),
+          const _SectionLabel('장르별 비율'),
           const SizedBox(height: 10),
-          _Card(
-            child: ReadingStatsCategoryChart(categories: stats.categoryStats),
-          ),
+          ReadingStatsCategoryChart(categories: stats.categoryStats),
         ],
         const SizedBox(height: 20),
         _SectionLabel(
-          '월별 완독 · ${stats.monthlyYear == null ? '전체' : '${stats.monthlyYear}년'}',
+          stats.monthlyYear == null ? '월별 완독' : '월별 완독 · ${stats.monthlyYear}년',
         ),
         const SizedBox(height: 10),
         _Card(
@@ -164,8 +155,6 @@ class _StatsContent extends StatelessWidget {
         ),
         if (_moreItems(stats).isNotEmpty) ...[
           const SizedBox(height: 20),
-          const _SectionLabel('더 보기'),
-          const SizedBox(height: 10),
           _MoreSection(items: _moreItems(stats)),
         ],
         if (stats.finishedCount == 0) ...[
@@ -229,7 +218,7 @@ class _SummaryCards extends StatelessWidget {
             icon: PhosphorIconsRegular.bookOpen,
             value: _formatThousands(stats.finishedCount),
             unit: '권',
-            label: '완독 권수',
+            label: '완독',
           ),
         ),
         const SizedBox(width: 10),
@@ -287,7 +276,7 @@ class _SummaryCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 20,
+                    fontSize: 17,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textStrong,
                   ),
@@ -319,9 +308,9 @@ class _SummaryCard extends StatelessWidget {
 List<_MoreItem> _moreItems(ReadingStatsSummary stats) {
   return [
     if (stats.rereadCount > 0)
-      _MoreItem(value: '${stats.rereadCount}회', label: '재독 횟수'),
+      _MoreItem(value: '${stats.rereadCount}', unit: '회', label: '재독 횟수'),
     if (stats.masterpieceCount > 0)
-      _MoreItem(value: '${stats.masterpieceCount}권', label: '인생책'),
+      _MoreItem(value: '${stats.masterpieceCount}', unit: '권', label: '인생책'),
     if (stats.averageRating != null)
       _MoreItem(
         value: '★ ${stats.averageRating!.toStringAsFixed(1)}',
@@ -355,9 +344,10 @@ class _MoreSection extends StatelessWidget {
 }
 
 class _MoreItem {
-  const _MoreItem({required this.value, required this.label});
+  const _MoreItem({required this.value, this.unit, required this.label});
 
   final String value;
+  final String? unit;
   final String label;
 }
 
@@ -370,15 +360,34 @@ class _MoreColumn extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          item.value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textStrong,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Flexible(
+              child: Text(
+                item.value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textStrong,
+                ),
+              ),
+            ),
+            if (item.unit != null) ...[
+              const SizedBox(width: 2),
+              Text(
+                item.unit!,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 4),
         Text(

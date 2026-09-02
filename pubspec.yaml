@@ -57,6 +57,7 @@ dependencies:
   flutter_quill: ^11.5.1
   flutter_quill_extensions: ^11.0.0
   pro_image_editor: ^13.3.1
+  fl_chart: ^1.2.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

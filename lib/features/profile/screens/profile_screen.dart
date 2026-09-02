@@ -203,14 +203,14 @@ class _StatsCard extends ConsumerWidget {
 
     // 카드 전체가 하나의 시맨틱스 버튼으로 묶이면서(_SectionCard) 내부 값의
     // 시맨틱스는 제외되므로(다른 탭 이동 카드들과 동일한 관례), 완독
-    // 권수·읽은 쪽수·많이 읽은 분야 값을 라벨에 함께 담아 스크린 리더에서도
+    // 권수·읽은 페이지·많이 읽은 분야 값을 라벨에 함께 담아 스크린 리더에서도
     // 읽히게 한다.
     final semanticsLabel = statsAsync.when(
-      loading: () => '독서 통계, 불러오는 중',
-      error: (error, stackTrace) => '독서 통계, 통계를 불러오지 못했습니다',
+      loading: () => '독서 리포트, 불러오는 중',
+      error: (error, stackTrace) => '독서 리포트, 불러오지 못했습니다',
       data: (stats) =>
-          '독서 통계, 완독 ${_formatThousands(stats.finishedCount)}권, '
-          '읽은 쪽수 ${_formatThousands(stats.totalPages)}쪽, '
+          '독서 리포트, 완독 ${_formatThousands(stats.finishedCount)}권, '
+          '읽은 페이지 ${_formatThousands(stats.totalPages)}페이지, '
           '많이 읽은 분야 ${stats.mostReadCategory?.categoryName ?? '없음'}',
     );
 
@@ -227,7 +227,7 @@ class _StatsCard extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                '독서 통계',
+                '독서 리포트',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -246,7 +246,7 @@ class _StatsCard extends ConsumerWidget {
           statsAsync.when(
             loading: () => const _StatsPlaceholder(text: '불러오는 중...'),
             error: (error, stackTrace) =>
-                const _StatsPlaceholder(text: '통계를 불러오지 못했습니다'),
+                const _StatsPlaceholder(text: '리포트를 불러오지 못했습니다'),
             data: (stats) => _StatsRow(stats: stats),
           ),
         ],
@@ -292,8 +292,8 @@ class _StatsRow extends StatelessWidget {
           Expanded(
             child: _StatsColumn(
               value: _formatThousands(stats.totalPages),
-              unit: '쪽',
-              label: '읽은 쪽수',
+              unit: 'p',
+              label: '읽은 페이지',
             ),
           ),
           const VerticalDivider(width: 1, color: AppColors.border),
@@ -365,13 +365,50 @@ class _MyContentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final labelHeight = MediaQuery.textScalerOf(context).scale(14) * 1.4;
+    final itemHeight = 70 + labelHeight;
+    final shortcuts = [
+      _ContentShortcutButton(
+        icon: PhosphorIconsRegular.fileText,
+        label: '독후감',
+        semanticsLabel: '내가 작성한 독후감',
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(builder: (_) => const MyReflectionsScreen()),
+        ),
+      ),
+      _ContentShortcutButton(
+        icon: PhosphorIconsRegular.star,
+        label: '독자평',
+        semanticsLabel: '내가 작성한 독자평',
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(builder: (_) => const MyReviewsScreen()),
+        ),
+      ),
+      _ContentShortcutButton(
+        icon: PhosphorIconsRegular.chat,
+        label: '토론',
+        semanticsLabel: '내가 작성한 토론',
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(builder: (_) => const MyDiscussionsScreen()),
+        ),
+      ),
+      _ContentShortcutButton(
+        icon: PhosphorIconsRegular.chatCircle,
+        label: '토론 댓글',
+        semanticsLabel: '내가 작성한 토론 댓글',
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(builder: (_) => const MyDiscussionAnswersScreen()),
+        ),
+      ),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
           padding: EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
-            '내가 작성한 콘텐츠',
+            '내 글 모아보기',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -380,51 +417,69 @@ class _MyContentCard extends StatelessWidget {
             ),
           ),
         ),
-        _SectionCard(
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
           padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              _MenuRow(
-                icon: PhosphorIconsRegular.fileText,
-                label: '내가 작성한 독후감',
-                onTap: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute(
-                    builder: (_) => const MyReflectionsScreen(),
-                  ),
-                ),
-              ),
-              const Divider(height: 1, color: AppColors.border),
-              _MenuRow(
-                icon: PhosphorIconsRegular.star,
-                label: '내가 작성한 독자평',
-                onTap: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute(builder: (_) => const MyReviewsScreen()),
-                ),
-              ),
-              const Divider(height: 1, color: AppColors.border),
-              _MenuRow(
-                icon: PhosphorIconsRegular.chat,
-                label: '내가 작성한 토론',
-                onTap: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute(
-                    builder: (_) => const MyDiscussionsScreen(),
-                  ),
-                ),
-              ),
-              const Divider(height: 1, color: AppColors.border),
-              _MenuRow(
-                icon: PhosphorIconsRegular.chatCircle,
-                label: '내가 작성한 토론 댓글',
-                onTap: () => Navigator.of(context).push<void>(
-                  MaterialPageRoute(
-                    builder: (_) => const MyDiscussionAnswersScreen(),
-                  ),
-                ),
-              ),
-            ],
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            mainAxisExtent: itemHeight,
           ),
+          itemCount: shortcuts.length,
+          itemBuilder: (context, index) => shortcuts[index],
         ),
       ],
+    );
+  }
+}
+
+class _ContentShortcutButton extends StatelessWidget {
+  const _ContentShortcutButton({
+    required this.icon,
+    required this.label,
+    required this.semanticsLabel,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String semanticsLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      onTap: onTap,
+      semanticsLabel: semanticsLabel,
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.accentSurface,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: SizedBox.square(
+              dimension: 36,
+              child: Icon(icon, size: 19, color: AppColors.accentForeground),
+            ),
+          ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textStrong,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

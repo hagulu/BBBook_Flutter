@@ -63,11 +63,14 @@ class BookDetailApi {
   /// 이미 서재에 있으면 409([ApiException.statusCode] == 409).
   /// [clientRequestId]는 로컬 `user_book` 생성 때 발급해 저장한 UUID를 받으며,
   /// 이 메서드 안에서는 절대 새로 만들지 않는다.
+  /// [wantToReread]가 false면 문서의 기본값과 같으므로 필드를 생략하고,
+  /// true일 때만 전송한다(null은 서버가 허용하지 않는다).
   Future<UserBookCreateResult> addToBookshelf({
     required String isbn13,
     required String status,
     required String clientRequestId,
     String? sourceType,
+    bool wantToReread = false,
     double? myRating,
     String? shortReview,
     String? difficulty,
@@ -77,6 +80,7 @@ class BookDetailApi {
       'isbn13': isbn13,
       'status': status,
       'sourceType': ?sourceType,
+      if (wantToReread) 'wantToReread': true,
       'myRating': ?myRating,
       'shortReview': ?shortReview,
       'difficulty': ?difficulty,

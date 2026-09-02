@@ -46,6 +46,8 @@ class BookSearchApi {
   /// 총쪽수/표지/카테고리)에 상태·완독 옵션을 더해 받는다. [thumbnailFile]이
   /// 있으면 multipart(방식 B)로, 없으면 JSON(방식 A)으로 보낸다 — 새로
   /// 등록하는 책이라 기존 표지를 지우는 개념(removeThumbnail)은 없다.
+  /// [wantToReread]가 false면 문서의 기본값과 같으므로 필드를 생략하고,
+  /// true일 때만 JSON 또는 multipart의 data 파트에 포함한다.
   Future<UserBookCreateResult> postCustomBook({
     required String title,
     String? author,
@@ -56,6 +58,7 @@ class BookSearchApi {
     required String status,
     required String clientRequestId,
     String? sourceType,
+    bool wantToReread = false,
     double? myRating,
     String? shortReview,
     String? difficulty,
@@ -69,6 +72,7 @@ class BookSearchApi {
       'categoryId': ?categoryId,
       'status': status,
       'sourceType': ?sourceType,
+      if (wantToReread) 'wantToReread': true,
       'myRating': ?myRating,
       'shortReview': ?shortReview,
       'difficulty': ?difficulty,

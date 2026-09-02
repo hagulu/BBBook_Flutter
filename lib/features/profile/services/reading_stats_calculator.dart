@@ -86,11 +86,8 @@ ReadingStatsSummary computeReadingStatsSummary({
       ReadingStatsMonthly(month: month, count: monthlyCounts[month - 1]),
   ];
 
-  // [BookItem.rereadCount]는 로컬/서버 모두 이미 "재독 횟수" 자체를
-  // 담는 0-based 값이다(처음 완독한 책은 0, 이후 완독할 때마다 1씩 증가 —
-  // `book_record_screen.dart`의 재독 팝업 참고). 서버 통계 API 문서의
-  // "rereadCount - 1 기준"은 그쪽 원본 컬럼이 1-based(총 읽은 횟수)라 값을
-  // 보정해서 내려준다는 뜻이라, 로컬 계산에서는 그대로 합산한다.
+  // [BookItem.rereadCount]는 최초 완독을 제외한 0-based 재독 횟수다.
+  // 최초 완독은 0, 두 번째 완독부터 1씩 저장되므로 값을 그대로 합산한다.
   final rereadCount = yearFiltered.fold<int>(
     0,
     (sum, item) => sum + item.rereadCount,

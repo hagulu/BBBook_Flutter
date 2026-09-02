@@ -320,6 +320,7 @@ class BookshelfRepository {
             status: item.status.apiValue,
             clientRequestId: clientRequestId,
             sourceType: item.sourceType,
+            wantToReread: item.wantToReread,
             myRating: item.myRating,
             shortReview: item.shortReview,
             difficulty: item.difficulty,
@@ -330,6 +331,7 @@ class BookshelfRepository {
             status: item.status.apiValue,
             clientRequestId: clientRequestId,
             sourceType: item.sourceType,
+            wantToReread: item.wantToReread,
             myRating: item.myRating,
             shortReview: item.shortReview,
             difficulty: item.difficulty,
@@ -376,6 +378,7 @@ class BookshelfRepository {
     double? myRating,
     String? shortReview,
     String? difficulty,
+    bool wantToReread = false,
     String? finishedAt,
   }) async {
     final existing = await _dao.getByIsbn13(isbn13);
@@ -403,6 +406,7 @@ class BookshelfRepository {
         isMasterpiece: false,
         sourceType: sourceType,
         rereadCount: 0,
+        wantToReread: wantToReread,
         difficulty: difficulty,
         finishedAt: _createFinishedAt(status, finishedAt),
         tags: const [],
@@ -429,6 +433,7 @@ class BookshelfRepository {
     double? myRating,
     String? shortReview,
     String? difficulty,
+    bool wantToReread = false,
     String? finishedAt,
   }) async {
     final clientRequestId = _uuid.v4();
@@ -463,6 +468,7 @@ class BookshelfRepository {
           isMasterpiece: false,
           sourceType: sourceType,
           rereadCount: 0,
+          wantToReread: wantToReread,
           difficulty: difficulty,
           finishedAt: _createFinishedAt(status, finishedAt),
           tags: const [],

@@ -63,6 +63,7 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
             myRating: options?.myRating,
             shortReview: options?.shortReview,
             difficulty: options?.difficulty?.apiValue,
+            wantToReread: options?.wantToReread ?? false,
             finishedAt: options?.finishedAt == null
                 ? null
                 : _formatDate(options!.finishedAt!),

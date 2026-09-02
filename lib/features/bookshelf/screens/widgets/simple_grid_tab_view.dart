@@ -39,7 +39,12 @@ class SimpleGridTabView extends ConsumerWidget {
         builder: (context, items) {
           return GridView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            padding: const EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              bookshelfFabBottomPadding,
+            ),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
               crossAxisSpacing: 12,
@@ -86,10 +91,7 @@ class _GridBookCard extends StatelessWidget {
           if (book.author != null)
             Text(
               displayAuthor(book.author!),
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textMuted,
-              ),
+              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
