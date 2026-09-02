@@ -111,12 +111,12 @@ class _ReviewEditDialogState extends State<_ReviewEditDialog> {
           const SizedBox(height: 12),
           TextField(
             controller: _contentController,
-            maxLength: 2000,
+            maxLength: 150,
             maxLines: 4,
             decoration: const InputDecoration(
               isDense: true,
               hintText: '리뷰 내용을 입력해주세요',
-              counterText: '',
+              counterStyle: TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),
           ),
           if (_errorText != null)

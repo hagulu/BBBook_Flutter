@@ -101,12 +101,12 @@ class _FinishConfirmDialogState extends State<_FinishConfirmDialog> {
           const SizedBox(height: 12),
           TextField(
             controller: _reviewController,
-            maxLength: 2000,
+            maxLength: 150,
             maxLines: 3,
             decoration: const InputDecoration(
               isDense: true,
               hintText: '한줄평을 남겨보세요',
-              counterText: '',
+              counterStyle: TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),
           ),
         ],
