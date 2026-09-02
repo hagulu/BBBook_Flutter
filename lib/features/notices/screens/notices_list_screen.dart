@@ -108,86 +108,104 @@ class _NoticeList extends StatelessWidget {
       );
     }
 
-    return ListView(
+    // 카드 하나로 감싸는 모양은 유지하되, 누적된 항목을 전부 즉시 빌드하는
+    // Column 대신 화면 주변 행만 지연 생성하는 ListView.builder를 쓴다 —
+    // 각 행이 자기 위치(첫/마지막)에 맞는 모서리·테두리를 스스로 그린다.
+    return ListView.builder(
       controller: scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            children: [
-              for (var i = 0; i < items.length; i++)
-                _NoticeRow(notice: items[i], showTopBorder: i > 0),
-            ],
-          ),
-        ),
-        if (isLoadingMore) const CommunityContentPageLoader(),
-        if (loadMoreError) _LoadMoreError(onRetry: onRetryLoadMore),
-      ],
+      itemCount: items.length + (isLoadingMore || loadMoreError ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index >= items.length) {
+          return loadMoreError
+              ? _LoadMoreError(onRetry: onRetryLoadMore)
+              : const CommunityContentPageLoader();
+        }
+        return _NoticeRow(
+          notice: items[index],
+          isFirst: index == 0,
+          isLast: index == items.length - 1,
+        );
+      },
     );
   }
 }
 
 class _NoticeRow extends StatelessWidget {
-  const _NoticeRow({required this.notice, required this.showTopBorder});
+  const _NoticeRow({
+    required this.notice,
+    required this.isFirst,
+    required this.isLast,
+  });
 
   final NoticeSummary notice;
-  final bool showTopBorder;
+  final bool isFirst;
+  final bool isLast;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => Navigator.of(context).push<void>(
-        MaterialPageRoute(
-          builder: (_) => NoticeDetailScreen(noticeId: notice.id),
+    final borderRadius = BorderRadius.vertical(
+      top: isFirst ? const Radius.circular(16) : Radius.zero,
+      bottom: isLast ? const Radius.circular(16) : Radius.zero,
+    );
+
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push<void>(
+          MaterialPageRoute(
+            builder: (_) => NoticeDetailScreen(noticeId: notice.id),
+          ),
         ),
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          border: showTopBorder
-              ? const Border(top: BorderSide(color: AppColors.border))
-              : null,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    notice.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      color: AppColors.textStrong,
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: borderRadius,
+            border: Border(
+              top: const BorderSide(color: AppColors.border),
+              bottom: isLast
+                  ? const BorderSide(color: AppColors.border)
+                  : BorderSide.none,
+              left: const BorderSide(color: AppColors.border),
+              right: const BorderSide(color: AppColors.border),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      notice.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: AppColors.textStrong,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    formatDiscussionDate(notice.createdAt),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textMuted,
+                    const SizedBox(height: 4),
+                    Text(
+                      formatDiscussionDate(notice.createdAt),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              PhosphorIconsRegular.caretRight,
-              size: 16,
-              color: AppColors.textMuted,
-            ),
-          ],
+              const SizedBox(width: 8),
+              Icon(
+                PhosphorIconsRegular.caretRight,
+                size: 16,
+                color: AppColors.textMuted,
+              ),
+            ],
+          ),
         ),
       ),
     );

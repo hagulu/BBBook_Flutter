@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 
-import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../models/notice_detail.dart';
 import '../models/notice_summary.dart';
@@ -11,10 +10,13 @@ import '../models/notice_summary.dart';
 /// api-notices-id-get.md
 ///
 /// 두 요청 모두 인증이 필요 없는 공개 API다(`notices-screens.md` §1-2, §2-3).
+/// Authorization 헤더 자동 첨부·401 refresh 재시도가 붙는 [ApiClient] 대신,
+/// 그 인터셉터가 없는 순수 [Dio]를 주입받는다(`notices_providers.dart`의
+/// `_noticesDioProvider` 참고).
 class NoticesApi {
-  NoticesApi({required this.apiClient});
+  NoticesApi({required this.dio});
 
-  final ApiClient apiClient;
+  final Dio dio;
 
   /// GET /api/notices
   Future<NoticeSummaryPage> fetchNotices({
@@ -22,7 +24,7 @@ class NoticesApi {
     required int size,
   }) async {
     try {
-      final response = await apiClient.dio.get<Map<String, dynamic>>(
+      final response = await dio.get<Map<String, dynamic>>(
         '/api/notices',
         queryParameters: {'cursor': ?cursor, 'size': size},
       );
@@ -39,7 +41,7 @@ class NoticesApi {
   /// GET /api/notices/{id}
   Future<NoticeDetail> fetchNotice(int id) async {
     try {
-      final response = await apiClient.dio.get<Map<String, dynamic>>(
+      final response = await dio.get<Map<String, dynamic>>(
         '/api/notices/$id',
       );
       return NoticeDetail.fromJson(_unwrapMap(response));

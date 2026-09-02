@@ -8,7 +8,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../auth/providers/auth_notifier.dart';
 import '../../notices/screens/notices_list_screen.dart';
-import '../../storage_mode/data/storage_mode_store.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../models/profile_me.dart';
 import '../models/profile_stats_summary.dart';
@@ -202,30 +201,18 @@ class _StatsCard extends ConsumerWidget {
     final statsAsync = ref.watch(profileStatsSummaryProvider);
 
     return _SectionCard(
-      onTap: () {},
-      semanticsLabel: '독서 통계',
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '독서 통계',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.6,
-                  color: AppColors.textMuted,
-                ),
-              ),
-              const Icon(
-                PhosphorIconsRegular.caretRight,
-                size: 16,
-                color: AppColors.textMuted,
-              ),
-            ],
+          const Text(
+            '독서 통계',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.6,
+              color: AppColors.textMuted,
+            ),
           ),
           const SizedBox(height: 14),
           statsAsync.when(
@@ -476,8 +463,13 @@ class _LogoutButton extends ConsumerWidget {
     // (auth_notifier.dart의 logout()). 로컬 저장 모드는 서버 사본이 없는
     // 유일본이라 그 사실을 먼저 알려야 한다(포팅 문서는 이 앱에만 있는
     // 저장 모드 개념을 다루지 않아 별도로 안내한다).
-    final isLocal =
-        ref.read(storageModeProvider).valueOrNull == StorageMode.local;
+    //
+    // storageModeProvider(FutureProvider)를 read해 valueOrNull만 보면, 이
+    // 화면 진입 전에 아무도 이 provider를 구독하지 않았을 경우 최초 상태가
+    // AsyncLoading이라 실제로 로컬 모드여도 서버 모드용 문구가 뜬다.
+    // StorageModeStore.isLocal()을 직접 await해 확정된 값으로 판단한다.
+    final isLocal = await ref.read(storageModeStoreProvider).isLocal();
+    if (!context.mounted) return;
     final confirmed = await AppConfirm.show(
       context,
       title: '로그아웃',

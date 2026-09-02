@@ -1,8 +1,9 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/providers/auth_providers.dart';
+import '../../../core/network/api_base_options.dart';
 import '../data/notices_api.dart';
 import '../models/notice_detail.dart';
 import '../models/notice_summary.dart';
@@ -10,8 +11,15 @@ import '../models/notice_summary.dart';
 /// 공지사항 목록 페이지 크기(`notices-screens.md` §1-2).
 const int _kPageSize = 20;
 
+/// Authorization 헤더나 401 재시도 인터셉터가 없는 공지사항 전용 Dio.
+/// 공지사항 API는 인증이 필요 없는 공개 엔드포인트다(base URL/timeout은
+/// [apiClientProvider]와 동일하게 공유).
+final _noticesDioProvider = Provider<Dio>((ref) {
+  return Dio(buildApiBaseOptions());
+});
+
 final noticesApiProvider = Provider<NoticesApi>((ref) {
-  return NoticesApi(apiClient: ref.watch(apiClientProvider));
+  return NoticesApi(dio: ref.watch(_noticesDioProvider));
 });
 
 /// 공지사항 목록 상태. 다음 페이지 실패를 별도 상태(`loadMoreError`)로
