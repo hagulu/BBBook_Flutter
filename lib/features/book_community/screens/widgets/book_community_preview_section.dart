@@ -230,6 +230,34 @@ class _EntryButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!showReviewButton) {
+      return Row(
+        children: [
+          Expanded(
+            child: EntryButton(
+              icon: PhosphorIconsRegular.notebook,
+              label: '독후감',
+              count: reflectionCount,
+              onTap: onOpenReflections,
+              compact: true,
+              dense: true,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: EntryButton(
+              icon: PhosphorIconsRegular.chatsCircle,
+              label: '토론',
+              count: discussionCount,
+              onTap: onOpenDiscussions,
+              compact: true,
+              dense: true,
+            ),
+          ),
+        ],
+      );
+    }
+
     final discussionButton = EntryButton(
       icon: PhosphorIconsRegular.chatsCircle,
       label: '토론',
@@ -237,22 +265,6 @@ class _EntryButtons extends StatelessWidget {
       onTap: onOpenDiscussions,
       compact: true,
     );
-
-    if (!showReviewButton) {
-      return Column(
-        children: [
-          EntryButton(
-            icon: PhosphorIconsRegular.notebook,
-            label: '독후감',
-            count: reflectionCount,
-            onTap: onOpenReflections,
-            compact: true,
-          ),
-          const SizedBox(height: 12),
-          discussionButton,
-        ],
-      );
-    }
 
     return Column(
       children: [

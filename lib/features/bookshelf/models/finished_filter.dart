@@ -28,8 +28,9 @@ class FinishedFilter {
   /// (bookshelf.md: 필터/검색 시 일반 목록으로 전환).
   bool get isDefaultMode => isEmpty;
 
+  /// 검색어는 필터 기준이 아니라 별도 검색이라 이 개수에 포함하지 않는다
+  /// — 필터 버튼 배지/초기화 버튼은 카테고리·태그·명작·난이도 기준만 본다.
   int get activeCount =>
-      (keyword.isNotEmpty ? 1 : 0) +
       (categories.isNotEmpty ? 1 : 0) +
       (tagIds.isNotEmpty ? 1 : 0) +
       (masterpieceOnly ? 1 : 0) +

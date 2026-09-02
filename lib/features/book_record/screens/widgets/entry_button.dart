@@ -15,6 +15,7 @@ class EntryButton extends StatelessWidget {
     this.count,
     this.rating,
     this.compact = false,
+    this.dense = false,
   });
 
   final IconData icon;
@@ -31,6 +32,11 @@ class EntryButton extends StatelessWidget {
   /// (아이콘도 더 큼직하게). 생각나눔 탭의 세 진입 버튼이 이 규격을 쓴다.
   final bool compact;
 
+  /// [compact]와 함께 써서, 폭 절반씩만 차지하는 가로 2단 배치(책 검색
+  /// 상세의 독후감·토론 버튼)에서 아바타·여백을 더 줄여 라벨이 잘리지
+  /// 않도록 한다.
+  final bool dense;
+
   @override
   Widget build(BuildContext context) {
     return RecordSectionCard(
@@ -45,7 +51,7 @@ class EntryButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: 16,
+              horizontal: dense ? 10 : 16,
               vertical: compact ? 18 : 16,
             ),
             child: compact ? _buildCompact() : _buildSingleLine(),
@@ -98,8 +104,12 @@ class EntryButton extends StatelessWidget {
   Widget _buildCompact() {
     return Row(
       children: [
-        _Avatar(icon: icon, radius: 24, iconSize: 24),
-        const SizedBox(width: 14),
+        _Avatar(
+          icon: icon,
+          radius: dense ? 18 : 24,
+          iconSize: dense ? 18 : 24,
+        ),
+        SizedBox(width: dense ? 8 : 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -113,8 +123,8 @@ class EntryButton extends StatelessWidget {
                       label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 16,
+                      style: TextStyle(
+                        fontSize: dense ? 14 : 16,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textStrong,
                       ),
@@ -133,10 +143,10 @@ class EntryButton extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: 4),
-        const Icon(
+        SizedBox(width: dense ? 2 : 4),
+        Icon(
           PhosphorIconsRegular.caretRight,
-          size: 20,
+          size: dense ? 16 : 20,
           color: AppColors.controlInactive,
         ),
       ],

@@ -181,7 +181,13 @@ class FinishedFilterNotifier extends Notifier<FinishedFilter> {
     );
   }
 
+  /// 검색을 완전히 "종료"할 때(검색 바 닫기) 쓰는 전체 초기화 — 검색어까지
+  /// 함께 지운다.
   void reset() => state = const FinishedFilter();
+
+  /// 필터 바텀시트의 "초기화" — 검색어는 필터 기준이 아니므로 그대로 두고
+  /// 카테고리·태그·명작·난이도만 지운다.
+  void resetCriteria() => state = FinishedFilter(keyword: state.keyword);
 }
 
 final finishedFilterProvider =

@@ -174,6 +174,9 @@ class _BookRecordBody extends ConsumerWidget {
           children: [
             ListView(
               key: const PageStorageKey('book-record-info'),
+              // 쪽수 등 입력 중에 스크롤을 시작하면 포커스(커서)도 함께 풀어
+              // 편집 상태가 화면 밖으로 밀려도 그대로 남지 않게 한다.
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: const EdgeInsets.fromLTRB(16, 18, 16, 32),
               children: [
                 if (book.status == BookStatus.reading ||

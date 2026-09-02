@@ -492,6 +492,66 @@ Future<String?> showDiscoverySourceDialog(
   );
 }
 
+/// 한 줄 평(자유 텍스트, 최대 2000자) 입력 팝업. 저장을 누르면 trim된
+/// 텍스트를, 취소/배경 닫기면 null을 반환한다. [showDiscoverySourceDialog]와
+/// 같은 규칙으로, 입력을 비운 채 저장하면 빈 문자열이 돌아오고 호출부가
+/// 그것을 "지움"(명시적 null)으로 옮긴다.
+Future<String?> showShortReviewDialog(
+  BuildContext context, {
+  required String? initialValue,
+}) {
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => _ShortReviewDialog(initialValue: initialValue),
+  );
+}
+
+class _ShortReviewDialog extends StatefulWidget {
+  const _ShortReviewDialog({required this.initialValue});
+
+  final String? initialValue;
+
+  @override
+  State<_ShortReviewDialog> createState() => _ShortReviewDialogState();
+}
+
+class _ShortReviewDialogState extends State<_ShortReviewDialog> {
+  late final _controller = TextEditingController(
+    text: widget.initialValue ?? '',
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RecordDialogShell(
+      title: '한줄 평',
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        maxLength: 2000,
+        maxLines: 5,
+        decoration: const InputDecoration(
+          isDense: true,
+          hintText: '이 책에 대한 한 줄 평을 남겨보세요.',
+        ),
+      ),
+      buttons: [
+        RecordDialogButton(
+          label: '저장',
+          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
+        ),
+      ],
+    );
+  }
+}
+
 /// [showReadingDateDialog]의 결과. 날짜를 골랐으면 [date]가 채워지고
 /// [cleared]는 false, "선택 해제"를 눌렀으면 [date]는 null이고 [cleared]가
 /// true다 — 반환값 자체가 null(바텀시트를 그냥 닫음)인 "변경 없음"과

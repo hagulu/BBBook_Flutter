@@ -257,96 +257,138 @@ class _HeroSection extends StatelessWidget {
       if (detail.pubDate != null && detail.pubDate!.isNotEmpty) detail.pubDate!,
     ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        SizedBox(
-          width: 160,
-          child: BookCover(imageUrl: detail.coverUrl, title: detail.title),
-        ),
-        const SizedBox(height: 16),
-        if (detail.category != null) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppColors.accentSurface.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              detail.category!,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textBody,
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 160,
+            child: BookCover(imageUrl: detail.coverUrl, title: detail.title),
+          ),
+          const SizedBox(height: 16),
+          if (detail.category != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.accentSurface.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(999),
               ),
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
-        Text(
-          detail.title,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-            color: AppColors.textStrong,
-          ),
-        ),
-        if (detail.author != null && detail.author!.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text(
-            displayAuthor(detail.author!),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textMuted,
-            ),
-          ),
-        ],
-        if (metaParts.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text(
-            metaParts.join(' · '),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
-          ),
-        ],
-        if (detail.displayRating != null) ...[
-          const SizedBox(height: 8),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              StarRatingDisplay(rating: detail.displayRating!, size: 15),
-              const SizedBox(width: 6),
-              Text(
-                detail.rating!.toStringAsFixed(1),
+              child: Text(
+                detail.category!,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textStrong,
+                  color: AppColors.textBody,
                 ),
               ),
-            ],
+            ),
+            const SizedBox(height: 8),
+          ],
+          Text(
+            detail.title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              color: AppColors.textStrong,
+            ),
+          ),
+          if (detail.author != null && detail.author!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              displayAuthor(detail.author!),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textMuted,
+              ),
+            ),
+          ],
+          if (metaParts.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              metaParts.join(' · '),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ],
+          if (detail.displayRating != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                StarRatingDisplay(rating: detail.displayRating!, size: 15),
+                const SizedBox(width: 6),
+                Text(
+                  detail.rating!.toStringAsFixed(1),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textStrong,
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (detail.description != null &&
+              detail.description!.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            _DescriptionCard(description: detail.description!),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 책 설명을 카드 형태로 보여준다.
+class _DescriptionCard extends StatelessWidget {
+  const _DescriptionCard({required this.description});
+
+  final String description;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(
+            color: AppColors.shadowSoft,
+            blurRadius: 4,
+            offset: Offset(0, 1),
           ),
         ],
-        if (detail.description != null && detail.description!.isNotEmpty) ...[
-          const SizedBox(height: 20),
-          SizedBox(
-            width: double.infinity,
-            child: Text(
-              detail.description!,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textBody,
-                height: 1.5,
-              ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '책 소개',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textStrong,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            description,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textBody,
+              height: 1.5,
             ),
           ),
         ],
-      ],
+      ),
     );
   }
 }

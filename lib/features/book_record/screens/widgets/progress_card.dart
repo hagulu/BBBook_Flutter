@@ -27,7 +27,8 @@ class ProgressCard extends ConsumerStatefulWidget {
   ConsumerState<ProgressCard> createState() => _ProgressCardState();
 }
 
-class _ProgressCardState extends ConsumerState<ProgressCard> {
+class _ProgressCardState extends ConsumerState<ProgressCard>
+    with WidgetsBindingObserver {
   late final _pageController = TextEditingController(
     text: '${widget.book.currentPage}',
   );
@@ -43,6 +44,24 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
   void initState() {
     super.initState();
     _pageFocus.addListener(_onFocusChanged);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// 스크롤(→ [ScrollViewKeyboardDismissBehavior.onDrag])이 아니라 시스템
+  /// 제스처 등으로 키보드가 내려가면 뷰 인셋이 0이 되는데, 그때도 입력
+  /// 포커스(커서)를 그대로 두면 키보드 없이 편집 상태만 남는다 — 뷰 인셋이
+  /// 0이 되는 순간을 감지해 함께 풀어준다.
+  @override
+  void didChangeMetrics() {
+    if (!mounted || !_pageFocus.hasFocus) return;
+    final bottomInset = WidgetsBinding
+        .instance
+        .platformDispatcher
+        .views
+        .first
+        .viewInsets
+        .bottom;
+    if (bottomInset == 0) _pageFocus.unfocus();
   }
 
   @override
@@ -58,6 +77,7 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pageFocus.removeListener(_onFocusChanged);
     _pageController.dispose();
     _pageFocus.dispose();
@@ -165,10 +185,12 @@ class _ProgressCardState extends ConsumerState<ProgressCard> {
                     isDense: true,
                     contentPadding: const EdgeInsets.symmetric(vertical: 4),
                     hintText: _pageHint,
-                    hintStyle: const TextStyle(
+                    // 옅은 플레이스홀더 — 실제 입력값(textStrong)과 뚜렷이
+                    // 구분되도록 textMuted보다 더 옅게 낮춘다.
+                    hintStyle: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textMuted,
+                      color: AppColors.textMuted.withValues(alpha: 0.5),
                     ),
                   ),
                 ),

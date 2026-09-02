@@ -31,16 +31,6 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
     vsync: this,
   );
 
-  // 탭 내부 콘텐츠가 맨 위(pixels <= 0)가 아니면 이 탭 바(및 완독 탭 내부
-  // 아이콘 행)를 무조건 접어 숨긴다. 스크롤 방향은 보지 않는다 — 중간에
-  // 위로 스크롤한다고 다시 보여줄 필요는 없고, 맨 위로 돌아왔을 때만 다시
-  // 나타난다.
-  bool _chromeVisible = true;
-
-  // 탭마다 별도 스크롤 컨트롤러를 갖고 있어(각자 마지막 스크롤 위치를 그대로
-  // 유지), 다른 탭에서 스크롤을 내려 탭 바를 숨긴 채로 다른 탭으로 넘어가면
-  // 그 탭이 맨 위여도 탭 바가 계속 숨어 있을 수 있다 — 탭이 바뀔 때는 목적지
-  // 탭의 실제 스크롤 위치와 무관하게 무조건 다시 보여준다.
   int _lastTabIndex = 1;
 
   @override
@@ -59,27 +49,11 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
   void _handleTabChanged() {
     if (_tabController.index == _lastTabIndex) return;
     _lastTabIndex = _tabController.index;
-    _setChromeVisible(true);
     // 완독 탭은 keep-alive라 검색 TextField의 FocusNode도 탭을 떠나도
     // 폐기되지 않는다 — 포커스를 둔 채 다른 탭으로 넘어가면 보이지 않는
     // 검색창이 계속 포커스를 들고 있어 키보드가 남는다. 검색어/필터/스크롤
     // 상태는 그대로 두고 키보드 포커스만 해제한다.
     FocusManager.instance.primaryFocus?.unfocus();
-  }
-
-  void _setChromeVisible(bool visible) {
-    if (_chromeVisible != visible) {
-      setState(() => _chromeVisible = visible);
-    }
-  }
-
-  /// `TabBarView`(가로 `PageView`)의 탭 전환 스크롤은 무시하고, 각 탭
-  /// 콘텐츠(세로 스크롤)의 현재 위치만으로 탭 바 노출 여부를 정한다.
-  bool _handleScrollNotification(ScrollNotification notification) {
-    final metrics = notification.metrics;
-    if (metrics.axis != Axis.vertical) return false;
-    _setChromeVisible(metrics.pixels <= 0);
-    return false;
   }
 
   @override
@@ -117,69 +91,58 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
 
     return Column(
       children: [
-        ClipRect(
-          child: AnimatedAlign(
-            alignment: Alignment.topCenter,
-            heightFactor: _chromeVisible ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeInOut,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: TabBar(
-                controller: _tabController,
-                isScrollable: true,
-                tabAlignment: TabAlignment.start,
-                labelColor: AppColors.textStrong,
-                unselectedLabelColor: AppColors.textMuted,
-                labelStyle: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-                unselectedLabelStyle: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-                indicator: BoxDecoration(
-                  color: AppColors.accentFill,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                // 기본 상태 레이어(hover/press/선택)가 알약 모양 indicator와
-                // 무관하게 탭의 사각 영역 전체에 반투명 사각형으로 겹쳐 보여서
-                // 모두 끈다 — 선택 표시는 위 pill indicator 하나로 충분하다.
-                splashFactory: NoSplash.splashFactory,
-                overlayColor: WidgetStateProperty.all(Colors.transparent),
-                dividerColor: Colors.transparent,
-                padding: EdgeInsets.zero,
-                labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-                tabs: const [
-                  _PillTabLabel('읽고 싶음'),
-                  _PillTabLabel('읽는 중'),
-                  _PillTabLabel('완독'),
-                  _PillTabLabel('중단'),
-                ],
-              ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          child: TabBar(
+            controller: _tabController,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            labelColor: AppColors.textStrong,
+            unselectedLabelColor: AppColors.textMuted,
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
             ),
+            unselectedLabelStyle: const TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+            indicator: BoxDecoration(
+              color: AppColors.accentFill,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            indicatorSize: TabBarIndicatorSize.tab,
+            // 기본 상태 레이어(hover/press/선택)가 알약 모양 indicator와
+            // 무관하게 탭의 사각 영역 전체에 반투명 사각형으로 겹쳐 보여서
+            // 모두 끈다 — 선택 표시는 위 pill indicator 하나로 충분하다.
+            splashFactory: NoSplash.splashFactory,
+            overlayColor: WidgetStateProperty.all(Colors.transparent),
+            dividerColor: Colors.transparent,
+            padding: EdgeInsets.zero,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+            tabs: const [
+              _PillTabLabel('읽고 싶음'),
+              _PillTabLabel('읽는 중'),
+              _PillTabLabel('완독'),
+              _PillTabLabel('중단'),
+            ],
           ),
         ),
         Expanded(
-          child: NotificationListener<ScrollNotification>(
-            onNotification: _handleScrollNotification,
-            child: TabBarView(
-              controller: _tabController,
-              children: const [
-                SimpleGridTabView(
-                  status: BookStatus.wantToRead,
-                  emptyText: '읽고 싶은 책이 없습니다.',
-                ),
-                ReadingTabView(),
-                FinishedTabView(),
-                SimpleGridTabView(
-                  status: BookStatus.stopped,
-                  emptyText: '중단한 책이 없습니다.',
-                ),
-              ],
-            ),
+          child: TabBarView(
+            controller: _tabController,
+            children: const [
+              SimpleGridTabView(
+                status: BookStatus.wantToRead,
+                emptyText: '읽고 싶은 책이 없습니다.',
+              ),
+              ReadingTabView(),
+              FinishedTabView(),
+              SimpleGridTabView(
+                status: BookStatus.stopped,
+                emptyText: '중단한 책이 없습니다.',
+              ),
+            ],
           ),
         ),
       ],

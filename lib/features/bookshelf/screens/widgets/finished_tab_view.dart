@@ -166,14 +166,18 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
   }
 
   /// 필터 버튼을 누르면 접혔다 펼쳐지는 인라인 패널 대신 바텀시트로
-  /// 띄운다(칩 토글은 즉시 반영되므로 별도 확인 버튼은 없다).
+  /// 띄운다(칩 토글은 즉시 반영되므로 별도 확인 버튼은 없다). "초기화"는
+  /// 제목줄 오른쪽에 둔다(검색어는 필터 기준이 아니므로 건드리지 않는다).
   Future<void> _openFilterSheet() async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) =>
-          const RecordDialogShell(title: '필터', content: FinishedFilterPanel()),
+      builder: (sheetContext) => RecordDialogShell(
+        title: '필터',
+        titleTrailing: _FilterSheetResetButton(onReset: _resetScroll),
+        content: const FinishedFilterPanel(),
+      ),
     );
   }
 
@@ -307,7 +311,6 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
                         onClearSearch: _clearSearch,
                         filterActiveCount: filter.activeCount,
                         onToggleFilterPanel: _openFilterSheet,
-                        onResetFilter: _resetFilter,
                       ),
                     ),
                   const SliverToBoxAdapter(
@@ -644,6 +647,45 @@ class _FinishedIconBar extends ConsumerWidget {
   }
 }
 
+/// 필터 바텀시트 제목줄 오른쪽의 "초기화" 버튼. 검색어는 필터 기준이
+/// 아니므로 건드리지 않고 카테고리·태그·명작·난이도만 지운다. 지울 기준이
+/// 없으면(활성 필터 0개) 아예 표시하지 않는다.
+class _FilterSheetResetButton extends ConsumerWidget {
+  const _FilterSheetResetButton({required this.onReset});
+
+  /// 필터 기준 초기화 직후 호출된다. 검색/필터가 바뀌면 결과 구조 자체가
+  /// 달라지므로, 이전 스크롤 위치에 남지 않도록 그리드를 맨 위로 되돌린다.
+  final VoidCallback onReset;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final activeCount = ref.watch(
+      finishedFilterProvider.select((f) => f.activeCount),
+    );
+    if (activeCount == 0) return const SizedBox.shrink();
+    return TextButton.icon(
+      style: TextButton.styleFrom(
+        minimumSize: const Size(0, 32),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        foregroundColor: AppColors.accentForeground,
+        backgroundColor: AppColors.accentSurface.withValues(alpha: 0.4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+        ),
+      ),
+      onPressed: () {
+        ref.read(finishedFilterProvider.notifier).resetCriteria();
+        onReset();
+      },
+      icon: const Icon(PhosphorIconsRegular.arrowsClockwise, size: 14),
+      label: const Text(
+        '초기화',
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
+}
+
 /// 완독 탭 검색창 + 필터 버튼 행. 높이는 항상 [_kFinishedSearchBarHeight]에
 /// 맞춰야 한다. 아이콘 바의 검색 버튼을 누를 때만 트리에 들어왔다 빠지는
 /// 방식(스크롤과 무관한 단순 토글)이라 `SliverToBoxAdapter`로 감싸 쓴다.
@@ -655,7 +697,6 @@ class _FinishedSearchBar extends StatelessWidget {
     required this.onClearSearch,
     required this.filterActiveCount,
     required this.onToggleFilterPanel,
-    required this.onResetFilter,
   });
 
   final TextEditingController searchController;
@@ -664,7 +705,6 @@ class _FinishedSearchBar extends StatelessWidget {
   final VoidCallback onClearSearch;
   final int filterActiveCount;
   final VoidCallback onToggleFilterPanel;
-  final VoidCallback onResetFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -725,18 +765,6 @@ class _FinishedSearchBar extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (filterActiveCount > 0)
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(0, 32),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                      onPressed: onResetFilter,
-                      child: const Text(
-                        '필터 초기화',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
                   TextButton.icon(
                     style: TextButton.styleFrom(
                       minimumSize: const Size(0, 32),

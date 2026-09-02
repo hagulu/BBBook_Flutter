@@ -152,6 +152,13 @@ ThemeData buildAppTheme() {
     useMaterial3: true,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: AppColors.pageBackground,
+    // 전역 fontFamily를 따로 지정하지 않는다. `useMaterial3`인 `ThemeData`는
+    // `defaultTargetPlatform`에 맞춰 `Typography.material2021`을 구성하는데,
+    // iOS에서는 이미 본문에 `CupertinoSystemText`, 큰 제목에
+    // `CupertinoSystemDisplay`라는 공식 프록시 패밀리명을 스타일별로 따로
+    // 적용해 San Francisco를 그대로 쓴다(`typography.dart`). 여기서
+    // fontFamily를 하나로 덮어쓰면 이 스타일별 구분(Display/Text)이 사라지고
+    // 비공식 패밀리명이라 OS 버전에 따라 폴백될 위험도 있다.
     // titleTextStyle을 여기 넣으면 화면별 foregroundColor 상속이 끊긴다.
     // toolbarHeight는 기본값(kToolbarHeight=56)을 그대로 쓴다.
     appBarTheme: const AppBarTheme(centerTitle: false),

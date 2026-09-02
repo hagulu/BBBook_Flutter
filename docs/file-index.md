@@ -182,3 +182,4 @@
 - `docs/review/20260901-172506-reflection-viewer-color-review.md` — 독후감 뷰어의 미지원 색상 문자열 렌더링 예외와 입력 정규화 누락 리뷰
 - `docs/review/20260901-174322-profile-content-notices-review.md` — 프로필 하위 콘텐츠·공지사항 구현의 로컬 ID 연결, 로그아웃 경고, 이동·갱신·페이지네이션 리뷰
 - `docs/review/20260902-124339-reading-stats-review.md` — 독서 통계 화면의 연도 선택 취소, 시맨틱스, 요약 카드 오버플로, 공통 로딩 정책 리뷰
+- `docs/review/20260902-165631-book-record-bookshelf-ui-review.md` — 책 기록·검색 상세·완독 필터 UI 변경의 iOS 폰트, 좁은 화면 배치, 긴 한줄 평, 초기화·터치 영역 리뷰

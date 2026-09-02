@@ -37,18 +37,22 @@ class RecordSectionCard extends StatelessWidget {
 
 /// 카드/섹션 제목에 공통으로 붙이는 아이콘+텍스트 라벨.
 class SectionLabel extends StatelessWidget {
-  const SectionLabel(this.text, {super.key, required this.icon});
+  const SectionLabel(this.text, {super.key, this.icon});
 
   final String text;
-  final IconData icon;
+
+  /// null이면 아이콘 없이 텍스트만 보여준다.
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 16, color: AppColors.accentForeground),
-        const SizedBox(width: 6),
+        if (icon != null) ...[
+          Icon(icon, size: 16, color: AppColors.accentForeground),
+          const SizedBox(width: 6),
+        ],
         Text(
           text,
           style: const TextStyle(
