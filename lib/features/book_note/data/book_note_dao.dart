@@ -18,6 +18,39 @@ import '../models/book_note.dart';
 class BookNoteDao {
   const BookNoteDao();
 
+  /// 완독 책에 연결된 메모 총 개수(독서 통계 화면의 "메모" 카드,
+  /// `stats-screen.md` §1-3). [year]를 지정하면 그 해 완독한 책으로 범위를
+  /// 좁힌다(`finished_at`의 앞 4자리, `bookshelf_dao.dart`가 저장하는
+  /// `YYYY-MM-DD` 포맷 기준). `user_book_id IN (...)` 목록을 직접 바인딩하지
+  /// 않고 `user_book`을 조인하는 이유는 SQLite의 바인딩 파라미터 개수 제한
+  /// (기본 999개)에 걸리지 않기 위해서다 — 완독 책이 많은 사용자도 안전하다.
+  Future<int> countMemosForFinishedBooks({
+    required int ownerUserId,
+    required String finishedStatusApiValue,
+    int? year,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    final where = <String>[
+      'n.owner_user_id = ?',
+      'n.deleted_at IS NULL',
+      'm.deleted_at IS NULL',
+      'b.status = ?',
+    ];
+    final args = <Object?>[ownerUserId, finishedStatusApiValue];
+    if (year != null) {
+      where.add("substr(b.finished_at, 1, 4) = ?");
+      args.add(year.toString());
+    }
+    final rows = await db.rawQuery('''
+      SELECT COUNT(*) AS memo_count
+      FROM book_note_memo m
+      JOIN book_note n ON n.id = m.note_id
+      JOIN user_book b ON b.user_book_id = n.user_book_id
+      WHERE ${where.join(' AND ')}
+      ''', args);
+    return (rows.single['memo_count'] as int?) ?? 0;
+  }
+
   Future<List<BookNoteSummary>> findByUserBook({
     required int ownerUserId,
     required int userBookId,

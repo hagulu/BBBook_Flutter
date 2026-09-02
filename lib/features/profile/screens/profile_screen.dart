@@ -17,6 +17,7 @@ import 'my_discussions_screen.dart';
 import 'my_reflections_screen.dart';
 import 'my_reviews_screen.dart';
 import 'profile_edit_screen.dart';
+import 'reading_stats_screen.dart';
 
 /// 프로필(개인 페이지) 메인 화면(`docs/porting-reference/profile-main-screen.md`).
 ///
@@ -200,19 +201,46 @@ class _StatsCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(profileStatsSummaryProvider);
 
+    // 카드 전체가 하나의 시맨틱스 버튼으로 묶이면서(_SectionCard) 내부 값의
+    // 시맨틱스는 제외되므로(다른 탭 이동 카드들과 동일한 관례), 완독
+    // 권수·읽은 쪽수·많이 읽은 분야 값을 라벨에 함께 담아 스크린 리더에서도
+    // 읽히게 한다.
+    final semanticsLabel = statsAsync.when(
+      loading: () => '독서 통계, 불러오는 중',
+      error: (error, stackTrace) => '독서 통계, 통계를 불러오지 못했습니다',
+      data: (stats) =>
+          '독서 통계, 완독 ${_formatThousands(stats.finishedCount)}권, '
+          '읽은 쪽수 ${_formatThousands(stats.totalPages)}쪽, '
+          '많이 읽은 분야 ${stats.mostReadCategory?.categoryName ?? '없음'}',
+    );
+
     return _SectionCard(
+      onTap: () => Navigator.of(context).push<void>(
+        MaterialPageRoute(builder: (_) => const ReadingStatsScreen()),
+      ),
+      semanticsLabel: semanticsLabel,
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '독서 통계',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.6,
-              color: AppColors.textMuted,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '독서 통계',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.6,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              const Icon(
+                PhosphorIconsRegular.caretRight,
+                size: 16,
+                color: AppColors.textMuted,
+              ),
+            ],
           ),
           const SizedBox(height: 14),
           statsAsync.when(
@@ -255,14 +283,16 @@ class _StatsRow extends StatelessWidget {
         children: [
           Expanded(
             child: _StatsColumn(
-              value: '${_formatThousands(stats.finishedCount)}권',
+              value: _formatThousands(stats.finishedCount),
+              unit: '권',
               label: '완독',
             ),
           ),
           const VerticalDivider(width: 1, color: AppColors.border),
           Expanded(
             child: _StatsColumn(
-              value: '${_formatThousands(stats.totalPages)}쪽',
+              value: _formatThousands(stats.totalPages),
+              unit: '쪽',
               label: '읽은 쪽수',
             ),
           ),
@@ -280,25 +310,45 @@ class _StatsRow extends StatelessWidget {
 }
 
 class _StatsColumn extends StatelessWidget {
-  const _StatsColumn({required this.value, required this.label});
+  const _StatsColumn({required this.value, this.unit, required this.label});
 
   final String value;
+  final String? unit;
   final String label;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          value,
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textStrong,
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Flexible(
+              child: Text(
+                value,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textStrong,
+                ),
+              ),
+            ),
+            if (unit != null) ...[
+              const SizedBox(width: 1),
+              Text(
+                unit!,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ],
         ),
         const SizedBox(height: 4),
         Text(

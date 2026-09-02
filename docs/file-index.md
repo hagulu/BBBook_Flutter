@@ -41,10 +41,13 @@
 - `lib/features/profile/screens/my_reviews_screen.dart` — 내가 작성한 독자평 목록(커서 무한 스크롤), 탭해도 이동하는 상세 화면 없음
 - `lib/features/profile/screens/my_discussions_screen.dart` — 내가 작성한 토론 목록(커서 무한 스크롤), 정상 항목은 `DiscussionDetailScreen`으로 이동
 - `lib/features/profile/screens/my_discussion_answers_screen.dart` — 내가 작성한 토론 댓글 목록(커서 무한 스크롤), 항목 탭 시 원본 토론(`DiscussionDetailScreen`)으로 이동
-- `lib/features/profile/data/profile_api.dart` — 프로필 API 호출(조회/수정/이미지 업로드/회원 탈퇴), 독서 통계 요약은 서버 API 대신 로컬 서재 데이터로 직접 계산
+- `lib/features/profile/screens/reading_stats_screen.dart` — 독서 통계(리포트) 화면(연도 선택, 요약 3종, 카테고리 도넛 차트, 월별 완독 막대 차트, 더 보기), 프로필 메인의 독서 통계 카드 탭 시 진입, `docs/porting-reference/stats-screen.md` 대응, 데이터는 서버 API 대신 로컬 서재·노트 데이터로 직접 계산
+- `lib/features/profile/data/profile_api.dart` — 프로필 API 호출(조회/수정/이미지 업로드/회원 탈퇴), 독서 통계 카드 요약은 서버 API 대신 로컬 서재 데이터로 직접 계산
 - `lib/features/profile/data/my_content_api.dart` — "내가 작성한 콘텐츠" 4개 목록 API 호출(독후감/리뷰/토론/토론 댓글 커서 조회)
-- `lib/features/profile/providers/profile_providers.dart` — 프로필 조회·독서 통계 요약(로컬 계산) Riverpod provider
+- `lib/features/profile/services/reading_stats_calculator.dart` — 독서 통계(리포트) 화면 요약·연도 목록을 로컬 완독 책 목록에서 계산하는 순수 함수
+- `lib/features/profile/providers/profile_providers.dart` — 프로필 조회·독서 통계 카드 요약(로컬 계산) Riverpod provider
 - `lib/features/profile/providers/my_content_providers.dart` — "내가 작성한 콘텐츠" 4개 목록 커서 무한 스크롤 Riverpod provider
+- `lib/features/profile/providers/reading_stats_providers.dart` — 독서 통계(리포트) 화면 연도 목록·연도별 통계 요약 Riverpod provider(로컬 계산)
 
 ## features/bookshelf
 
@@ -182,3 +185,4 @@
 - `docs/review/20260901-163827-profile-main-edit-review.md` — 프로필 메인·수정 화면의 무반응 이동 메뉴, 로컬 로그아웃 경고, 통계 갱신·이미지 선택 생명주기 리뷰
 - `docs/review/20260901-172506-reflection-viewer-color-review.md` — 독후감 뷰어의 미지원 색상 문자열 렌더링 예외와 입력 정규화 누락 리뷰
 - `docs/review/20260901-174322-profile-content-notices-review.md` — 프로필 하위 콘텐츠·공지사항 구현의 로컬 ID 연결, 로그아웃 경고, 이동·갱신·페이지네이션 리뷰
+- `docs/review/20260902-124339-reading-stats-review.md` — 독서 통계 화면의 연도 선택 취소, 시맨틱스, 요약 카드 오버플로, 공통 로딩 정책 리뷰
