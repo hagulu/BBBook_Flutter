@@ -20,7 +20,7 @@ class BookSearchApi {
 
   final ApiClient _apiClient;
 
-  /// GET /api/books — 키워드로 책 목록 검색(알라딘 Open API 기반).
+  /// GET /api/books — 키워드로 책 목록 검색(카카오 책 검색 API 기반).
   Future<BookSearchPage> searchBooks({
     required String query,
     required int page,

@@ -590,14 +590,44 @@ class BookshelfRepository {
     return refreshCategories();
   }
 
+  /// 진행 중인 [refreshCategories] 호출. 로그인 직후 강제 갱신
+  /// ([AuthNotifier._prefetchCategories])과 [MainShell]의 stale 체크가 거의
+  /// 동시에 들어와도 서버 호출은 한 번만 나가도록 공유한다.
+  Future<List<BookCategory>>? _categoryRefreshInFlight;
+
   /// 로그인 시 호출: 캐시 유무와 상관없이 서버에서 다시 받아와 로컬 캐시를
-  /// 통째로 교체한다. 카테고리는 세션 내내 캐시만 쓰므로(주기적 재조회 없음)
-  /// staleness를 "로그인 시점"으로만 한정하기 위함이다.
-  Future<List<BookCategory>> refreshCategories() async {
+  /// 통째로 교체한다.
+  Future<List<BookCategory>> refreshCategories() {
+    final inFlight = _categoryRefreshInFlight;
+    if (inFlight != null) return inFlight;
+
+    final future = _doRefreshCategories();
+    _categoryRefreshInFlight = future;
+    future.whenComplete(() => _categoryRefreshInFlight = null);
+    return future;
+  }
+
+  Future<List<BookCategory>> _doRefreshCategories() async {
     final categories = await _api.getCategories();
     if (categories.isNotEmpty) {
       await _categoryDao.replaceAll(categories);
     }
     return categories;
+  }
+
+  /// 마지막 갱신이 [throttle]보다 오래됐을 때만 서버에서 다시 받아온다(앱
+  /// 실행/포그라운드 전환용). 카테고리는 거의 바뀌지 않는 전역 데이터라
+  /// 책장 동기화([BookshelfSyncController.syncIfStale])보다 훨씬 긴 주기를
+  /// 쓴다. 실제로 서버를 다시 불렀으면 true를 반환한다.
+  Future<bool> refreshCategoriesIfStale({
+    Duration throttle = const Duration(hours: 24),
+  }) async {
+    final lastRefreshed = await _categoryDao.getLastRefreshedAt();
+    if (lastRefreshed != null &&
+        DateTime.now().difference(lastRefreshed) <= throttle) {
+      return false;
+    }
+    await refreshCategories();
+    return true;
   }
 }

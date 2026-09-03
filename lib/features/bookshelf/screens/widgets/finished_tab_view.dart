@@ -920,7 +920,7 @@ class _StarRow extends StatelessWidget {
         (i) => Icon(
           i < filled ? PhosphorIconsFill.star : PhosphorIconsRegular.star,
           size: 12,
-          // 완독 목록에 표시되는 별점은 알라딘 회원 평점이 아니라 서비스 안에서
+          // 완독 목록에 표시되는 별점은 YES24 회원 평점이 아니라 서비스 안에서
           // 직접 기록한 "내 평점"이라 아이덴티티 컬러로 구분한다.
           color: i < filled ? AppColors.accentGraphic : AppColors.border,
         ),

@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,6 +37,7 @@ class _MainShellState extends ConsumerState<MainShell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(_refreshCategoriesIfStale());
   }
 
   @override
@@ -46,11 +50,28 @@ class _MainShellState extends ConsumerState<MainShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _syncIfStale();
+      unawaited(_refreshCategoriesIfStale());
     }
   }
 
   void _syncIfStale() {
     ref.read(bookshelfSyncControllerProvider.notifier).syncIfStale();
+  }
+
+  /// 카테고리 마스터 목록이 오래됐으면(기본 24시간) 서버에서 다시 받아온다.
+  /// 앱 실행 직후와 포그라운드 복귀 시 모두 호출한다. `unawaited`로 호출되므로
+  /// 오프라인·서버 오류가 앱 전역 처리되지 않은 예외로 새지 않도록 여기서
+  /// 직접 잡아 로그만 남긴다(로그인 시점 강제 갱신인
+  /// [AuthNotifier._prefetchCategories]와 동일한 방침).
+  Future<void> _refreshCategoriesIfStale() async {
+    try {
+      final refreshed = await ref
+          .read(bookshelfRepositoryProvider)
+          .refreshCategoriesIfStale();
+      if (refreshed && mounted) ref.invalidate(bookCategoriesProvider);
+    } catch (e) {
+      developer.log('[카테고리 갱신] result=FAIL reason=${e.runtimeType}');
+    }
   }
 
   Future<void> _handlePopAttempt(bool didPop) async {

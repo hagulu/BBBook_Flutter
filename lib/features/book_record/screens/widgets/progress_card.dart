@@ -39,6 +39,11 @@ class _ProgressCardState extends ConsumerState<ProgressCard>
   // 되돌릴 기준값은 이 필드로 별도 관리한다.
   late int _committedPage = widget.book.currentPage;
   String? _pageHint;
+  // 포커스를 얻은 뒤 키보드가 실제로 한 번이라도 올라왔는지 여부.
+  // 포커스 직후 키보드가 올라오는 애니메이션 중에도 didChangeMetrics가
+  // bottomInset==0인 상태로 먼저 호출될 수 있어, 키보드가 뜨기도 전에
+  // "시스템 제스처로 닫혔다"고 오인해 바로 unfocus되는 것을 막는다.
+  bool _keyboardShown = false;
 
   @override
   void initState() {
@@ -49,8 +54,8 @@ class _ProgressCardState extends ConsumerState<ProgressCard>
 
   /// 스크롤(→ [ScrollViewKeyboardDismissBehavior.onDrag])이 아니라 시스템
   /// 제스처 등으로 키보드가 내려가면 뷰 인셋이 0이 되는데, 그때도 입력
-  /// 포커스(커서)를 그대로 두면 키보드 없이 편집 상태만 남는다 — 뷰 인셋이
-  /// 0이 되는 순간을 감지해 함께 풀어준다.
+  /// 포커스(커서)를 그대로 두면 키보드 없이 편집 상태만 남는다 — 키보드가
+  /// 실제로 올라온 뒤 다시 0이 되는 순간만 감지해 함께 풀어준다.
   @override
   void didChangeMetrics() {
     if (!mounted || !_pageFocus.hasFocus) return;
@@ -61,7 +66,11 @@ class _ProgressCardState extends ConsumerState<ProgressCard>
         .first
         .viewInsets
         .bottom;
-    if (bottomInset == 0) _pageFocus.unfocus();
+    if (bottomInset > 0) {
+      _keyboardShown = true;
+      return;
+    }
+    if (_keyboardShown) _pageFocus.unfocus();
   }
 
   @override
@@ -94,6 +103,7 @@ class _ProgressCardState extends ConsumerState<ProgressCard>
         _pageController.clear();
       });
     } else {
+      _keyboardShown = false;
       // 직접 입력 중 키보드 완료(제출)를 누르지 않고 포커스를 잃으면
       // 마지막으로 적용된 값으로 되돌린다.
       setState(() {

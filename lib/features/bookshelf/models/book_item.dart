@@ -60,7 +60,7 @@ class BookItem {
   final String? author;
   final String? publisher;
 
-  /// 종이책 기준 쪽수(알라딘 책 정보 기준, 통계 계산에 사용).
+  /// 종이책 기준 쪽수(YES24 책 정보 기준, 통계 계산에 사용).
   final int? statsTotalPages;
 
   /// 실제 읽는 판본(전자책 등)의 쪽수 override. null이면 [statsTotalPages]로

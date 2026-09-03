@@ -1,3 +1,5 @@
+import 'package:sqflite/sqflite.dart';
+
 import '../models/book_category.dart';
 import 'bookshelf_database.dart';
 
@@ -6,13 +8,30 @@ import 'bookshelf_database.dart';
 class BookCategoryDao {
   const BookCategoryDao();
 
+  static const _refreshedAtKey = 'category_refreshed_at';
+
   Future<List<BookCategory>> getAll() async {
     final db = await BookshelfDatabase.instance();
     final rows = await db.query('book_category', orderBy: 'sort_order ASC');
     return rows.map(_rowToCategory).toList();
   }
 
-  /// 서버 응답(이미 sort_order 오름차순)을 그대로 로컬 캐시로 교체한다.
+  /// 마지막으로 [replaceAll]이 실행된 시각. 없으면(최초 실행 전) null.
+  Future<DateTime?> getLastRefreshedAt() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'sync_meta',
+      where: 'key = ?',
+      whereArgs: [_refreshedAtKey],
+    );
+    if (rows.isEmpty) return null;
+    return DateTime.tryParse(rows.first['value'] as String);
+  }
+
+  /// 서버 응답(이미 sort_order 오름차순)을 그대로 로컬 캐시로 교체하고,
+  /// 갱신 시각을 `sync_meta`에 남긴다
+  /// ([BookshelfRepository.refreshCategoriesIfStale]가 이 값으로 재조회
+  /// 주기를 판단한다).
   Future<void> replaceAll(List<BookCategory> categories) async {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
@@ -27,6 +46,10 @@ class BookCategoryDao {
           'sort_order': i,
         });
       }
+      await txn.insert('sync_meta', {
+        'key': _refreshedAtKey,
+        'value': DateTime.now().toUtc().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
     });
   }
 

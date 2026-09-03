@@ -7,9 +7,7 @@ class BookSearchItem {
     this.pubDate,
     required this.isbn,
     this.coverUrl,
-    this.productUrl,
-    this.category,
-    this.rating,
+    this.price,
   });
 
   final String title;
@@ -18,14 +16,7 @@ class BookSearchItem {
   final String? pubDate;
   final String isbn;
   final String? coverUrl;
-  final String? productUrl;
-  final String? category;
-
-  /// 0.0 ~ 10.0(회원 평점 원본 스케일). 화면 표시는 `book-search.md` 기준
-  /// 5점 만점으로 변환(`/2`)해야 한다 — [displayRating] 참고.
-  final double? rating;
-
-  double? get displayRating => rating == null ? null : rating! / 2;
+  final num? price;
 
   factory BookSearchItem.fromJson(Map<String, dynamic> json) {
     return BookSearchItem(
@@ -35,9 +26,7 @@ class BookSearchItem {
       pubDate: json['pubDate'] as String?,
       isbn: json['isbn'] as String,
       coverUrl: json['coverUrl'] as String?,
-      productUrl: json['productUrl'] as String?,
-      category: json['category'] as String?,
-      rating: (json['rating'] as num?)?.toDouble(),
+      price: json['price'] as num?,
     );
   }
 }

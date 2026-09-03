@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/author_display.dart';
-import '../../../book_record/screens/widgets/star_rating.dart';
 import '../../../bookshelf/screens/widgets/book_cover.dart';
 import '../../models/book_search_item.dart';
 
-/// 검색 결과 카드(표지/제목/저자/출판사/출간일/평점). book-search.md 기준.
+/// 검색 결과 카드(표지/제목/저자/출판사/출간일). book-search.md 기준.
 class SearchResultCard extends StatelessWidget {
   const SearchResultCard({super.key, required this.item, required this.onTap});
 
@@ -31,7 +30,7 @@ class SearchResultCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 64,
+                width: 56,
                 child: BookCover(imageUrl: item.coverUrl, title: item.title),
               ),
               const SizedBox(width: 12),
@@ -45,7 +44,8 @@ class SearchResultCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                        fontSize: 17,
+                        height: 1.35,
                         color: AppColors.textStrong,
                       ),
                     ),
@@ -77,24 +77,6 @@ class SearchResultCard extends StatelessWidget {
                           fontSize: 11,
                           color: AppColors.textMuted,
                         ),
-                      ),
-                    ],
-                    if (item.displayRating != null) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          StarRatingDisplay(rating: item.displayRating!, size: 13),
-                          const SizedBox(width: 4),
-                          Text(
-                            item.rating!.toStringAsFixed(1),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textStrong,
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ],
