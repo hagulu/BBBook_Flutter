@@ -44,7 +44,7 @@ class SearchResultCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 17,
+                        fontSize: 15,
                         height: 1.35,
                         color: AppColors.textStrong,
                       ),

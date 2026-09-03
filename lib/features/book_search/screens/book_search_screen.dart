@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_bar_title.dart';
+import '../../../shared/widgets/community_content.dart';
 import '../../book_detail/screens/book_detail_screen.dart';
 import '../../book_record/screens/book_record_screen.dart';
 import '../providers/book_search_providers.dart';
@@ -22,11 +23,47 @@ class BookSearchScreen extends ConsumerStatefulWidget {
 
 class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
   final _queryController = TextEditingController();
+  final _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _queryController.dispose();
     super.dispose();
+  }
+
+  /// 목록 맨 끝에 실제로 닿았을 때만 다음 페이지를 가져온다(다른 화면의
+  /// "여유 있게 미리" 로드하는 임계값과 달리, 검색 결과는 숫자 페이지네이션을
+  /// 대체하는 것이라 스크롤이 끝에 닿기 전에는 반응하지 않는다).
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent) {
+      ref.read(bookSearchControllerProvider.notifier).loadMore();
+    }
+  }
+
+  /// 첫 페이지 결과가 화면을 다 채우지 못하면(넓은 화면·태블릿 등)
+  /// `maxScrollExtent`가 0으로 고정돼 스크롤 자체가 발생하지 않아
+  /// [_onScroll]이 다음 페이지를 요청할 기회가 없다. 매 빌드 직후 뷰포트가
+  /// 아직 다 안 찼는지 확인해, 그럴 때만(그리고 더 가져올 페이지가 있을
+  /// 때만) 이어서 요청한다. 응답으로 항목이 늘어나면 다음 빌드에서 다시
+  /// 검사되므로, 뷰포트를 채우거나 마지막 페이지에 닿을 때까지 자연히
+  /// 반복된다.
+  void _fillViewportIfNeeded() {
+    if (!mounted || !_scrollController.hasClients) return;
+    final state = ref.read(bookSearchControllerProvider);
+    if (state.isLoading || state.isLoadingMore || !state.hasMore) return;
+    if (_scrollController.position.maxScrollExtent <= 0) {
+      ref.read(bookSearchControllerProvider.notifier).loadMore();
+    }
   }
 
   void _submit() {
@@ -72,6 +109,9 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(bookSearchControllerProvider);
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _fillViewportIfNeeded(),
+    );
 
     return Scaffold(
       appBar: AppBar(
@@ -109,11 +149,12 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
             Expanded(
               child: _SearchResultsBody(
                 state: state,
+                scrollController: _scrollController,
                 onOpenDetail: _openDetail,
-                onGoToPage: (page) => ref
-                    .read(bookSearchControllerProvider.notifier)
-                    .goToPage(page),
                 onRetry: _submit,
+                onRetryLoadMore: () => ref
+                    .read(bookSearchControllerProvider.notifier)
+                    .retryLoadMore(),
               ),
             )
           else
@@ -219,15 +260,17 @@ class _CompactActionButton extends StatelessWidget {
 class _SearchResultsBody extends StatelessWidget {
   const _SearchResultsBody({
     required this.state,
+    required this.scrollController,
     required this.onOpenDetail,
-    required this.onGoToPage,
     required this.onRetry,
+    required this.onRetryLoadMore,
   });
 
   final BookSearchState state;
+  final ScrollController scrollController;
   final ValueChanged<String> onOpenDetail;
-  final ValueChanged<int> onGoToPage;
   final VoidCallback onRetry;
+  final VoidCallback onRetryLoadMore;
 
   @override
   Widget build(BuildContext context) {
@@ -265,20 +308,26 @@ class _SearchResultsBody extends StatelessWidget {
       );
     }
 
-    return ListView(
+    final showLoadMoreRow = state.isLoadingMore || state.loadMoreError;
+    return ListView.builder(
+      controller: scrollController,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-      children: [
-        for (final item in state.items) ...[
-          SearchResultCard(item: item, onTap: () => onOpenDetail(item.isbn)),
-          const SizedBox(height: 10),
-        ],
-        const SizedBox(height: 8),
-        _PaginationBar(
-          page: state.page,
-          totalPages: state.totalPages,
-          onGoToPage: onGoToPage,
-        ),
-      ],
+      itemCount: state.items.length + (showLoadMoreRow ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index >= state.items.length) {
+          return state.loadMoreError
+              ? _LoadMoreError(onRetry: onRetryLoadMore)
+              : const CommunityContentPageLoader();
+        }
+        final item = state.items[index];
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: SearchResultCard(
+            item: item,
+            onTap: () => onOpenDetail(item.isbn),
+          ),
+        );
+      },
     );
   }
 
@@ -289,113 +338,29 @@ class _SearchResultsBody extends StatelessWidget {
   };
 }
 
-class _PaginationBar extends StatelessWidget {
-  const _PaginationBar({
-    required this.page,
-    required this.totalPages,
-    required this.onGoToPage,
-  });
+class _LoadMoreError extends StatelessWidget {
+  const _LoadMoreError({required this.onRetry});
 
-  final int page;
-  final int totalPages;
-  final ValueChanged<int> onGoToPage;
-
-  /// 최대 3개 페이지 번호 윈도우 + 마지막 페이지 고정 노출 + 말줄임(book-search.md).
-  List<int?> _pageItems() {
-    if (totalPages <= 1) return const [1];
-    var start = page - 1;
-    var end = page + 1;
-    if (start < 1) {
-      end += 1 - start;
-      start = 1;
-    }
-    if (end > totalPages) {
-      start -= end - totalPages;
-      end = totalPages;
-    }
-    start = start < 1 ? 1 : start;
-
-    final items = <int?>[for (var p = start; p <= end; p++) p];
-    if (end < totalPages) {
-      if (end < totalPages - 1) items.add(null);
-      items.add(totalPages);
-    }
-    return items;
-  }
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    if (totalPages <= 1) return const SizedBox.shrink();
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        IconButton(
-          onPressed: page > 1 ? () => onGoToPage(page - 1) : null,
-          icon: const Icon(PhosphorIconsRegular.caretLeft, size: 18),
-        ),
-        for (final item in _pageItems())
-          item == null
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 4),
-                  child: Text(
-                    '···',
-                    style: TextStyle(color: AppColors.textMuted),
-                  ),
-                )
-              : Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 2),
-                  child: _PageNumberButton(
-                    page: item,
-                    selected: item == page,
-                    onTap: () => onGoToPage(item),
-                  ),
-                ),
-        IconButton(
-          onPressed: page < totalPages ? () => onGoToPage(page + 1) : null,
-          icon: const Icon(PhosphorIconsRegular.caretRight, size: 18),
-        ),
-      ],
-    );
-  }
-}
-
-class _PageNumberButton extends StatelessWidget {
-  const _PageNumberButton({
-    required this.page,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final int page;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: selected ? null : onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        width: 32,
-        height: 32,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: selected ? AppColors.accentFill : Colors.transparent,
-          shape: BoxShape.circle,
-          // 선택 배경만으로 구분하기 어려우므로 강조색 보더를 함께 쓴다.
-          border: selected
-              ? Border.all(color: AppColors.accentForeground, width: 1.2)
-              : null,
-        ),
-        child: Text(
-          '$page',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: selected ? AppColors.textStrong : AppColors.textBody,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Flexible(
+            child: Text(
+              '검색 결과를 더 불러오지 못했습니다',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
           ),
-        ),
+          TextButton(
+            onPressed: onRetry,
+            child: const Text('다시 시도', style: TextStyle(fontSize: 12)),
+          ),
+        ],
       ),
     );
   }

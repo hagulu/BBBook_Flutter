@@ -184,3 +184,4 @@
 - `docs/review/20260902-124339-reading-stats-review.md` — 독서 통계 화면의 연도 선택 취소, 시맨틱스, 요약 카드 오버플로, 공통 로딩 정책 리뷰
 - `docs/review/20260902-165631-book-record-bookshelf-ui-review.md` — 책 기록·검색 상세·완독 필터 UI 변경의 iOS 폰트, 좁은 화면 배치, 긴 한줄 평, 초기화·터치 영역 리뷰
 - `docs/review/20260904-011409-book-search-category-refresh-review.md` — 책 검색 공급자 전환·카테고리 주기 갱신·앱 버전 변경의 비동기 예외, 중복 요청, 버전 회귀 리뷰
+- `docs/review/20260904-013659-book-search-infinite-scroll-author-review.md` — 책 검색 무한 스크롤의 짧은 첫 페이지 추가 로드와 큰 글자 오류 행 레이아웃 리뷰

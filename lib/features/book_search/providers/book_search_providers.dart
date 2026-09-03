@@ -22,6 +22,8 @@ class BookSearchState {
     this.items = const [],
     this.totalResults = 0,
     this.isLoading = false,
+    this.isLoadingMore = false,
+    this.loadMoreError = false,
     this.error,
   });
 
@@ -31,12 +33,16 @@ class BookSearchState {
   final List<BookSearchItem> items;
   final int totalResults;
   final bool isLoading;
+  final bool isLoadingMore;
+  final bool loadMoreError;
   final BookSearchErrorType? error;
 
   bool get hasQuery => query.isNotEmpty;
 
   int get totalPages =>
       totalResults <= 0 ? 1 : (totalResults / size).ceil().clamp(1, 1 << 30);
+
+  bool get hasMore => page < totalPages;
 
   BookSearchState copyWith({
     required String query,
@@ -45,6 +51,8 @@ class BookSearchState {
     required List<BookSearchItem> items,
     required int totalResults,
     required bool isLoading,
+    required bool isLoadingMore,
+    required bool loadMoreError,
     BookSearchErrorType? error,
   }) {
     return BookSearchState(
@@ -54,6 +62,8 @@ class BookSearchState {
       items: items,
       totalResults: totalResults,
       isLoading: isLoading,
+      isLoadingMore: isLoadingMore,
+      loadMoreError: loadMoreError,
       error: error,
     );
   }
@@ -90,12 +100,18 @@ class BookSearchController extends AutoDisposeNotifier<BookSearchState> {
     return _fetch(query: trimmed, page: 1);
   }
 
-  Future<void> goToPage(int page) {
-    if (!state.hasQuery || page < 1 || page > state.totalPages) {
+  /// 목록 스크롤이 끝에 닿았을 때만 호출한다(화면의 스크롤 리스너가 판단).
+  Future<void> loadMore() {
+    if (!state.hasQuery ||
+        state.isLoading ||
+        state.isLoadingMore ||
+        !state.hasMore) {
       return Future.value();
     }
-    return _fetch(query: state.query, page: page);
+    return _fetchMore(query: state.query, page: state.page + 1);
   }
+
+  Future<void> retryLoadMore() => loadMore();
 
   /// X 버튼: 검색어/결과를 모두 비운다(book-search.md).
   void clear() {
@@ -112,6 +128,8 @@ class BookSearchController extends AutoDisposeNotifier<BookSearchState> {
       items: state.items,
       totalResults: state.totalResults,
       isLoading: true,
+      isLoadingMore: false,
+      loadMoreError: false,
       error: null,
     );
     try {
@@ -124,18 +142,12 @@ class BookSearchController extends AutoDisposeNotifier<BookSearchState> {
         items: result.items,
         totalResults: result.totalResults,
         isLoading: false,
+        isLoadingMore: false,
+        loadMoreError: false,
         error: null,
       );
     } on ApiException catch (e) {
       if (requestId != _requestId) return;
-      final BookSearchErrorType errorType;
-      if (e.isAuthFailure) {
-        errorType = BookSearchErrorType.auth;
-      } else if (e.statusCode == null) {
-        errorType = BookSearchErrorType.network;
-      } else {
-        errorType = BookSearchErrorType.server;
-      }
       state = state.copyWith(
         query: query,
         page: page,
@@ -143,9 +155,62 @@ class BookSearchController extends AutoDisposeNotifier<BookSearchState> {
         items: const [],
         totalResults: 0,
         isLoading: false,
-        error: errorType,
+        isLoadingMore: false,
+        loadMoreError: false,
+        error: _errorTypeOf(e),
       );
     }
+  }
+
+  /// 다음 페이지를 이어 붙인다. [_fetch]와 달리 실패해도 기존 목록은
+  /// 유지하고 목록 끝의 재시도 UI만 노출한다(`loadMoreError`).
+  Future<void> _fetchMore({required String query, required int page}) async {
+    final requestId = ++_requestId;
+    state = state.copyWith(
+      query: query,
+      page: state.page,
+      size: state.size,
+      items: state.items,
+      totalResults: state.totalResults,
+      isLoading: false,
+      isLoadingMore: true,
+      loadMoreError: false,
+      error: null,
+    );
+    try {
+      final result = await _api.searchBooks(query: query, page: page);
+      if (requestId != _requestId) return;
+      state = state.copyWith(
+        query: query,
+        page: result.page,
+        size: result.size,
+        items: [...state.items, ...result.items],
+        totalResults: result.totalResults,
+        isLoading: false,
+        isLoadingMore: false,
+        loadMoreError: false,
+        error: null,
+      );
+    } on ApiException catch (_) {
+      if (requestId != _requestId) return;
+      state = state.copyWith(
+        query: query,
+        page: state.page,
+        size: state.size,
+        items: state.items,
+        totalResults: state.totalResults,
+        isLoading: false,
+        isLoadingMore: false,
+        loadMoreError: true,
+        error: null,
+      );
+    }
+  }
+
+  BookSearchErrorType _errorTypeOf(ApiException e) {
+    if (e.isAuthFailure) return BookSearchErrorType.auth;
+    if (e.statusCode == null) return BookSearchErrorType.network;
+    return BookSearchErrorType.server;
   }
 }
 
