@@ -16,6 +16,9 @@ import 'package:bbbook/features/bookshelf/data/bookshelf_repository.dart';
 import 'package:bbbook/features/bookshelf/models/book_item.dart';
 import 'package:bbbook/features/bookshelf/models/book_status.dart';
 import 'package:bbbook/features/bookshelf/models/record_patch.dart';
+import 'package:bbbook/features/record_sync/data/record_sync_api.dart';
+import 'package:bbbook/features/tag/data/tag_api.dart';
+import 'package:bbbook/features/tag/data/tag_repository.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as path;
@@ -43,7 +46,8 @@ void main() {
   setUp(() async {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
-      await txn.delete('user_book_tag');
+      await txn.delete('user_book_tag_map');
+      await txn.delete('tag');
       await txn.delete('user_book');
       await txn.delete('sync_meta');
     });
@@ -61,6 +65,11 @@ void main() {
     return BookRecordRepository(
       api: BookRecordApi(apiClient: client),
       bookshelfRepository: bookshelfRepository,
+      tagRepository: TagRepository(
+        api: TagApi(apiClient: client),
+        recordSyncApi: RecordSyncApi(client),
+        bookshelfRepository: bookshelfRepository,
+      ),
     );
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/widgets/app_snackbar.dart';
+import '../../../tag/providers/tag_providers.dart';
 import '../../providers/bookshelf_providers.dart';
 
 /// `MainShell`의 56dp FAB와 기본 여백을 피해 마지막 책까지 온전히 스크롤할
@@ -18,9 +19,14 @@ class BookshelfRefreshIndicator extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return RefreshIndicator(
       onRefresh: () async {
-        await ref.read(bookshelfSyncControllerProvider.notifier).syncNow();
-        final result = ref.read(bookshelfSyncControllerProvider);
-        if (result.hasError && context.mounted) {
+        await Future.wait([
+          ref.read(bookshelfSyncControllerProvider.notifier).syncNow(),
+          ref.read(tagSyncControllerProvider.notifier).syncNow(),
+        ]);
+        final bookshelfResult = ref.read(bookshelfSyncControllerProvider);
+        final tagResult = ref.read(tagSyncControllerProvider);
+        if ((bookshelfResult.hasError || tagResult.hasError) &&
+            context.mounted) {
           AppSnackBar.error(context, '동기화에 실패했습니다. 잠시 후 다시 시도해 주세요.');
         }
       },

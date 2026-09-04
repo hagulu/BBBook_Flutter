@@ -102,12 +102,11 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
     text: widget.initialQuery,
   );
 
-  static const _size = 10;
-
   int _requestId = 0;
   _LoadState _loadState = _LoadState.idle;
   List<BookSearchItem> _items = const [];
   int _page = 1;
+  int _size = 30;
   int _totalResults = 0;
   bool _isSkipping = false;
 
@@ -141,11 +140,12 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
     try {
       final result = await ref
           .read(bookSearchApiProvider)
-          .searchBooks(query: query, page: page, size: _size);
+          .searchBooks(query: query, page: page);
       if (requestId != _requestId || !mounted) return;
       setState(() {
         _items = result.items;
         _page = result.page;
+        _size = result.size;
         _totalResults = result.totalResults;
         _loadState = _LoadState.loaded;
       });

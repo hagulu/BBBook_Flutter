@@ -96,7 +96,8 @@ class BookshelfDao {
     if (filter.tagIds.isNotEmpty) {
       final placeholders = List.filled(filter.tagIds.length, '?').join(', ');
       where.add(
-        'user_book_id IN (SELECT user_book_id FROM user_book_tag WHERE tag_id IN ($placeholders))',
+        'user_book_id IN (SELECT user_book_id FROM user_book_tag_map '
+        'WHERE deleted_at IS NULL AND tag_id IN ($placeholders))',
       );
       args.addAll(filter.tagIds);
     }
@@ -144,18 +145,17 @@ class BookshelfDao {
     final db = await BookshelfDatabase.instance();
     final rows = await db.rawQuery(
       '''
-      SELECT DISTINCT t.tag_id, t.tag_name
-      FROM user_book_tag t
-      INNER JOIN user_book b ON b.user_book_id = t.user_book_id
-      WHERE b.status = ?
-      ORDER BY t.tag_name
+      SELECT DISTINCT t.id, t.name
+      FROM tag t
+      INNER JOIN user_book_tag_map m ON m.tag_id = t.id AND m.deleted_at IS NULL
+      INNER JOIN user_book b ON b.user_book_id = m.user_book_id
+      WHERE t.deleted_at IS NULL AND b.status = ?
+      ORDER BY t.name
       ''',
       [BookStatus.finished.apiValue],
     );
     return rows
-        .map(
-          (r) => BookTag(id: r['tag_id'] as int, name: r['tag_name'] as String),
-        )
+        .map((r) => BookTag(id: r['id'] as int, name: r['name'] as String))
         .toList();
   }
 
@@ -203,16 +203,38 @@ class BookshelfDao {
       onItemSaved?.call();
     }
 
-    if (serverIds.isEmpty) {
-      await txn.delete('user_book', where: 'is_dirty = 0');
-    } else {
-      final placeholders = List.filled(serverIds.length, '?').join(', ');
+    final deletableWhere = serverIds.isEmpty
+        ? 'is_dirty = 0'
+        : '(server_id IS NULL OR server_id NOT IN '
+              '(${List.filled(serverIds.length, '?').join(', ')})) '
+              'AND is_dirty = 0';
+    final deletableRows = await txn.query(
+      'user_book',
+      columns: ['user_book_id'],
+      where: deletableWhere,
+      whereArgs: serverIds.isEmpty ? null : serverIds,
+    );
+    final deletableUserBookIds = deletableRows
+        .map((r) => r['user_book_id'] as int)
+        .toList(growable: false);
+    if (deletableUserBookIds.isNotEmpty) {
+      final idPlaceholders = List.filled(
+        deletableUserBookIds.length,
+        '?',
+      ).join(', ');
       await txn.delete(
         'user_book',
-        where:
-            '(server_id IS NULL OR server_id NOT IN ($placeholders)) '
-            'AND is_dirty = 0',
-        whereArgs: serverIds,
+        where: 'user_book_id IN ($idPlaceholders)',
+        whereArgs: deletableUserBookIds,
+      );
+      // user_book_tag_map은 REPLACE-CASCADE 함정을 피하려 외래 키가 없어
+      // 직접 정리해야 한다([BookshelfDatabase._createTagTables] 참고) —
+      // 그러지 않으면 삭제된 책이 남긴 태그 매핑이 [_nextLocalUserBookId]가
+      // 재사용하는 음수 로컬 ID를 통해 이후 다른 책에 붙는다.
+      await txn.delete(
+        'user_book_tag_map',
+        where: 'user_book_id IN ($idPlaceholders)',
+        whereArgs: deletableUserBookIds,
       );
     }
     await _pruneOrphanedDismissalsTxn(txn);
@@ -243,11 +265,32 @@ class BookshelfDao {
           deletedUserBookIds.length,
           '?',
         ).join(', ');
+        final deletableRows = await txn.query(
+          'user_book',
+          columns: ['user_book_id'],
+          where: 'server_id IN ($placeholders) AND is_dirty = 0',
+          whereArgs: deletedUserBookIds,
+        );
+        final deletableUserBookIds = deletableRows
+            .map((r) => r['user_book_id'] as int)
+            .toList(growable: false);
         await txn.delete(
           'user_book',
           where: 'server_id IN ($placeholders) AND is_dirty = 0',
           whereArgs: deletedUserBookIds,
         );
+        // user_book_tag_map 정리 이유는 [reconcileInTransaction] 문서 참고.
+        if (deletableUserBookIds.isNotEmpty) {
+          final idPlaceholders = List.filled(
+            deletableUserBookIds.length,
+            '?',
+          ).join(', ');
+          await txn.delete(
+            'user_book_tag_map',
+            where: 'user_book_id IN ($idPlaceholders)',
+            whereArgs: deletableUserBookIds,
+          );
+        }
       }
       await _pruneOrphanedDismissalsTxn(txn);
 
@@ -314,7 +357,14 @@ class BookshelfDao {
         where: 'user_book_id = ?',
         whereArgs: [userBookId],
       );
-      // user_book_tag는 ON DELETE CASCADE가 걸려 있어 아래 삭제로 함께 정리된다.
+      // user_book_tag_map도 같은 이유(REPLACE-CASCADE 함정)로 외래 키가 없어
+      // 직접 지워야 한다 — 책이 서버에서 삭제되면 그 아래 매핑도 서버가 함께
+      // soft delete하므로(api-doc), 여기서는 서버 push 없이 로컬 정리만 한다.
+      await txn.delete(
+        'user_book_tag_map',
+        where: 'user_book_id = ?',
+        whereArgs: [userBookId],
+      );
       await txn.delete(
         'user_book',
         where: 'user_book_id = ?',
@@ -414,7 +464,6 @@ class BookshelfDao {
           ...changedFields,
         }),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
-      await _writeTagsTxn(txn, item);
     });
   }
 
@@ -537,7 +586,6 @@ class BookshelfDao {
         'synced_updated_at': syncedUpdatedAt,
         'dirty_fields': null,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
-      await _writeTagsTxn(txn, item);
       return true;
     });
   }
@@ -743,30 +791,12 @@ class BookshelfDao {
               : existing.first['create_thumbnail_path'] as String?),
       'synced_updated_at': resolvedSyncedUpdatedAt,
     }, conflictAlgorithm: ConflictAlgorithm.replace);
-
-    await _writeTagsTxn(txn, item, localUserBookId: localId);
   }
 
-  Future<void> _writeTagsTxn(
-    Transaction txn,
-    BookItem item, {
-    int? localUserBookId,
-  }) async {
-    final userBookId = localUserBookId ?? item.userBookId;
-    await txn.delete(
-      'user_book_tag',
-      where: 'user_book_id = ?',
-      whereArgs: [userBookId],
-    );
-    for (final tag in item.tags) {
-      await txn.insert('user_book_tag', {
-        'user_book_id': userBookId,
-        'tag_id': tag.id,
-        'tag_name': tag.name,
-      });
-    }
-  }
-
+  /// 책 행에 활성 태그를 붙인다. 태그/매핑은 `TagDao`가 전담하는 별도
+  /// 테이블(`tag`, `user_book_tag_map`)에 산다 — 책 upsert(REPLACE)가 태그를
+  /// 함께 지우지 않도록 의도적으로 분리돼 있으므로(`BookshelfDatabase._createTagTables`
+  /// 주석 참고) 여기서는 조회만 한다.
   Future<List<BookItem>> _attachTags(
     Database db,
     List<Map<String, dynamic>> rows,
@@ -775,7 +805,14 @@ class BookshelfDao {
     final ids = rows.map((r) => r['user_book_id'] as int).toList();
     final placeholders = List.filled(ids.length, '?').join(', ');
     final tagRows = await db.rawQuery(
-      'SELECT * FROM user_book_tag WHERE user_book_id IN ($placeholders) ORDER BY tag_name',
+      '''
+      SELECT m.user_book_id AS user_book_id, t.id AS tag_id, t.name AS tag_name
+      FROM user_book_tag_map m
+      INNER JOIN tag t ON t.id = m.tag_id
+      WHERE m.user_book_id IN ($placeholders) AND m.deleted_at IS NULL
+        AND t.deleted_at IS NULL
+      ORDER BY t.name
+      ''',
       ids,
     );
     final tagsByBook = <int, List<BookTag>>{};

@@ -49,8 +49,8 @@
 
 - `lib/features/bookshelf/screens/bookshelf_screen.dart` — 책장 탭 콘텐츠(읽고 싶음/읽는 중/완독/중단 4탭, 기본은 읽는 중)
 - `lib/features/bookshelf/data/bookshelf_api.dart` — 책장 API 호출(전체 동기화, 증분 동기화, 완독 공개 설정 조회/수정, 카테고리 목록 GET)
-- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타·독후감 이미지 매칭·저장 모드, v18)
-- `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호)
+- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타·독후감 이미지 매칭·저장 모드·태그/태그 매핑), 개발 단계라 마이그레이션 없이 `onCreate` 직접 수정 + version 고정
+- `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호), 태그는 `tag`/`user_book_tag_map`을 조인해 조회만 함(쓰기는 `TagDao` 전담)
 - `lib/features/bookshelf/data/book_category_dao.dart` — 카테고리 마스터 목록 로컬 캐시 DAO(계정 무관, 로그아웃 시에도 유지)
 - `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화, 카테고리는 로컬 캐시 우선 조회
 - `lib/features/bookshelf/services/book_cover_image_store.dart` — 로컬 저장 모드에서 사용자가 고른 책 표지를 보관하는 `LocalImageStore` 인스턴스(`book_covers/` 폴더)
@@ -62,11 +62,20 @@
 
 - `lib/features/book_record/screens/book_record_screen.dart` — 책 기록 상세 화면(자체 AppBar, 책장에서 책 선택 시 진입), 정보/노트/독후감/생각나눔 4탭과 진행률/상태/출처/난이도/태그/삭제 조립
 - `lib/features/book_record/screens/book_sharing_list.dart` — 책 기록 상세의 생각나눔 탭(ISBN 있으면 커뮤니티 미리보기 공용 위젯 — 독자평 버튼 항상 노출, 독후감 배지는 내 공개 독후감 수 제외, 없으면 안내용 진입 버튼)
-- `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH(RecordPatch 기준 부분 수정), 책 정보 PATCH(카테고리 포함), ISBN 연결/해제 PATCH, 태그 POST/DELETE, 태그 목록/플랫폼 옵션 GET, 삭제 DELETE)
-- `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth(로컬 조회는 bookshelf 레포지토리 재사용, 기록 필드 수정은 로컬 우선 + 바꾼 필드만 뒤에서 재전송, 그 외는 서버 PATCH 성공 후 로컬 반영), 로컬 저장 모드에서는 책 정보 수정·ISBN 연결·책 삭제를 로컬에만 반영하고 태그 등 서버 전용 기능은 차단
+- `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH(RecordPatch 기준 부분 수정), 책 정보 PATCH(카테고리 포함), ISBN 연결/해제 PATCH, 태그 자동완성 목록/플랫폼 옵션 GET, 삭제 DELETE) — 태그 추가/삭제 자체는 `TagApi`가 전담
+- `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth(로컬 조회는 bookshelf 레포지토리 재사용, 기록 필드 수정과 태그 추가/삭제(`TagRepository` 위임)는 로컬 우선, 그 외는 서버 PATCH 성공 후 로컬 반영), 로컬 저장 모드에서는 책 정보 수정·ISBN 연결·태그·책 삭제를 로컬에만 반영하거나 차단
 - `lib/features/book_record/providers/book_record_providers.dart` — 책 기록 관련 Riverpod provider(단일 책 상태 컨트롤러, 태그 자동완성, 플랫폼 옵션)
 - `lib/features/book_record/screens/widgets/book_thumbnail_field.dart` — 책 표지 이미지 선택/미리보기 공용 위젯(책 정보 수정·직접 등록에서 공유)
 - `lib/features/book_record/screens/widgets/book_category_field.dart` — 카테고리 선택 필드 + 선택 팝업 공용 위젯(책 정보 수정·직접 등록에서 공유)
+
+## features/tag
+
+- `lib/features/tag/data/tag_api.dart` — 태그 추가(POST)/삭제(DELETE) 및 증분 동기화 조회(`/api/me/tags/sync/changes`) API 호출
+- `lib/features/tag/data/tag_dao.dart` — 태그(`tag`)/책-태그 매핑(`user_book_tag_map`) 로컬 DB 쿼리·dirty push 확정(같은 이름 태그 병합 포함)·전체/증분 reconcile(dirty 매핑 보호)
+- `lib/features/tag/data/tag_repository.dart` — 태그 화면 source of truth, 로컬 우선 추가/삭제 직후 조용히 서버 push하고 실패 시 dirty 유지, 최초엔 전체(`/api/me/records`)·이후엔 증분(`/api/me/tags/sync/changes`) 동기화 — 책 하나에 매이지 않는 계정 전체 단위
+- `lib/features/tag/providers/tag_providers.dart` — 태그 동기화 컨트롤러 등 Riverpod provider
+- `lib/features/tag/models/tag_mapping.dart` — 로컬 태그(`LocalTag`)/매핑(`TagMapping`) 값 객체
+- `lib/features/tag/models/tag_sync_changes_result.dart` — `/api/me/tags/sync/changes` 응답 모델
 
 ## features/book_note
 
@@ -185,3 +194,4 @@
 - `docs/review/20260902-165631-book-record-bookshelf-ui-review.md` — 책 기록·검색 상세·완독 필터 UI 변경의 iOS 폰트, 좁은 화면 배치, 긴 한줄 평, 초기화·터치 영역 리뷰
 - `docs/review/20260904-011409-book-search-category-refresh-review.md` — 책 검색 공급자 전환·카테고리 주기 갱신·앱 버전 변경의 비동기 예외, 중복 요청, 버전 회귀 리뷰
 - `docs/review/20260904-013659-book-search-infinite-scroll-author-review.md` — 책 검색 무한 스크롤의 짧은 첫 페이지 추가 로드와 큰 글자 오류 행 레이아웃 리뷰
+- `docs/review/20260904-022040-tag-local-sync-review.md` — 태그 로컬 우선 동기화의 원격 책 삭제 정합성·책장 UI 갱신·전체 동기화 orphan 기준 시각 리뷰

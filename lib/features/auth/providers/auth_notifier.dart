@@ -10,6 +10,7 @@ import '../../book_record/providers/book_record_providers.dart';
 import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
+import '../../tag/providers/tag_providers.dart';
 import '../data/auth_api.dart' show SocialProvider;
 import '../data/auth_repository.dart';
 import 'auth_providers.dart';
@@ -209,6 +210,9 @@ class AuthNotifier extends Notifier<AuthState> {
       ref.invalidate(bookReflectionListProvider);
       ref.invalidate(bookReflectionDetailProvider);
       ref.read(bookReflectionSyncVersionProvider.notifier).state++;
+      // 태그 동기화 컨트롤러도 같은 이유로 비운다.
+      ref.invalidate(tagSyncControllerProvider);
+      ref.read(tagSyncVersionProvider.notifier).state++;
     }
   }
 

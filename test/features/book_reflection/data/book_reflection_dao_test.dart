@@ -38,7 +38,8 @@ void main() {
       await txn.delete('book_reflection');
       await txn.delete('book_note_memo');
       await txn.delete('book_note');
-      await txn.delete('user_book_tag');
+      await txn.delete('user_book_tag_map');
+      await txn.delete('tag');
       await txn.delete('user_book');
       await txn.delete('sync_meta');
     });

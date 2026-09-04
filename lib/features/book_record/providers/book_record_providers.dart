@@ -11,6 +11,7 @@ import '../../bookshelf/models/book_tag.dart';
 import '../../bookshelf/models/record_patch.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../book_search/models/book_search_item.dart';
+import '../../tag/providers/tag_providers.dart';
 import '../data/book_record_api.dart';
 import '../data/book_record_repository.dart';
 
@@ -22,14 +23,16 @@ final bookRecordRepositoryProvider = Provider<BookRecordRepository>((ref) {
   return BookRecordRepository(
     api: ref.watch(bookRecordApiProvider),
     bookshelfRepository: ref.watch(bookshelfRepositoryProvider),
+    tagRepository: ref.watch(tagRepositoryProvider),
   );
 });
 
-/// 책 기록 상세 화면의 단일 책 상태. 로컬 DB 조회로 시작한다. [updateRecord]는
-/// 로컬 우선(즉시 반영, 서버 반영은 뒤에서 조용히 재시도)이라 로딩 상태나
-/// 에러를 노출하지 않고, 그 외 [updateBookInfo]/[addTag]/[removeTag]/
-/// [deleteBook]은 서버 PATCH 성공 → 로컬 반영까지 끝난 뒤에만 상태를 갱신하며
-/// 실패하면 이전 상태로 되돌리고 예외를 다시 던져 화면이 에러를 처리하게 한다.
+/// 책 기록 상세 화면의 단일 책 상태. 로컬 DB 조회로 시작한다. [updateRecord]와
+/// [addTag]/[removeTag]는 로컬 우선(즉시 반영, 서버 반영은 뒤에서 조용히
+/// 재시도)이라 로딩 상태나 에러를 노출하지 않고, 그 외
+/// [updateBookInfo]/[deleteBook]은 서버 PATCH 성공 → 로컬 반영까지 끝난
+/// 뒤에만 상태를 갱신하며 실패하면 이전 상태로 되돌리고 예외를 다시 던져
+/// 화면이 에러를 처리하게 한다.
 ///
 /// `autoDispose` family: 화면을 벗어나 아무도 watch하지 않으면 즉시 폐기된다.
 /// 그러지 않으면 한 번 열어본 책마다 컨트롤러가 앱 종료까지 살아남아, 다시

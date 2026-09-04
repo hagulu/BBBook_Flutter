@@ -18,7 +18,7 @@ class BookSearchState {
   const BookSearchState({
     this.query = '',
     this.page = 1,
-    this.size = 10,
+    this.size = 30,
     this.items = const [],
     this.totalResults = 0,
     this.isLoading = false,

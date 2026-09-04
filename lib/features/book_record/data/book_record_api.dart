@@ -13,9 +13,11 @@ import '../../bookshelf/models/record_patch.dart';
 ///
 /// 문서: ../../../../../../api-doc/api-me-books-userBookId-patch.md,
 /// api-me-books-userBookId-book-info-patch.md, api-me-books-userBookId-link-patch.md,
-/// api-me-books-userBookId-tags-post.md,
-/// api-me-books-userBookId-tags-tagId-delete.md, api-me-tags-get.md,
-/// api-me-books-userBookId-delete.md
+/// api-me-tags-get.md, api-me-books-userBookId-delete.md
+///
+/// 태그 추가/삭제(POST/DELETE `.../tags`)는 로컬 우선 동기화 대상이라
+/// `TagApi`/`TagRepository`가 전담한다 — 이 클래스는 태그 자동완성 제안
+/// 목록 조회(`getMyTags`)만 남아 있다.
 ///
 /// 카테고리 목록(`GET /api/books/categories`)은 계정과 무관한 전역 마스터
 /// 데이터라 `BookshelfApi.getCategories`가 대신 다룬다.
@@ -194,7 +196,10 @@ class BookRecordApi {
     }
   }
 
-  /// GET /api/me/tags — 태그 자동완성 제안 목록.
+  /// GET /api/me/tags — 태그 자동완성 제안 목록. 순수 조회 전용이라 응답의
+  /// `BookTag.id`는 서버 태그 ID 그대로다([BookTag] 문서의 "로컬 ID" 규칙과
+  /// 다름) — 호출부(`tag_section.dart`)는 이 목록에서 `name`만 골라 태그
+  /// 추가에 쓰고 `id`는 쓰지 않는다.
   Future<List<BookTag>> getMyTags({String? status}) async {
     try {
       final response = await _apiClient.dio.get<Map<String, dynamic>>(
@@ -214,40 +219,6 @@ class BookRecordApi {
       rethrow;
     } catch (e) {
       throw ApiException('서버 응답 형식이 올바르지 않습니다.', cause: e);
-    }
-  }
-
-  /// POST /api/me/books/:userBookId/tags — 태그 추가. 이미 추가된 태그면 409.
-  Future<BookTag> postTag({
-    required int userBookId,
-    required String name,
-  }) async {
-    try {
-      final response = await _apiClient.dio.post<Map<String, dynamic>>(
-        '/api/me/books/$userBookId/tags',
-        data: {'name': name},
-      );
-      return BookTag.fromJson(_unwrapMap(response));
-    } on DioException catch (e) {
-      throw _mapError(
-        e,
-        overrides: const {409: '이미 추가된 태그입니다.', 400: '태그명을 확인해주세요.'},
-      );
-    } on ApiException {
-      rethrow;
-    } catch (e) {
-      throw ApiException('서버 응답 형식이 올바르지 않습니다.', cause: e);
-    }
-  }
-
-  /// DELETE /api/me/books/:userBookId/tags/:tagId — 태그 제거.
-  Future<void> deleteTag({required int userBookId, required int tagId}) async {
-    try {
-      await _apiClient.dio.delete<Map<String, dynamic>>(
-        '/api/me/books/$userBookId/tags/$tagId',
-      );
-    } on DioException catch (e) {
-      throw _mapError(e);
     }
   }
 

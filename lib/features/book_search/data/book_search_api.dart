@@ -21,15 +21,15 @@ class BookSearchApi {
   final ApiClient _apiClient;
 
   /// GET /api/books — 키워드로 책 목록 검색(카카오 책 검색 API 기반).
+  /// size는 지정하지 않고 서버 기본값(api-books.md 기준 30)을 따른다.
   Future<BookSearchPage> searchBooks({
     required String query,
     required int page,
-    int size = 10,
   }) async {
     try {
       final response = await _apiClient.dio.get<Map<String, dynamic>>(
         '/api/books',
-        queryParameters: {'query': query, 'page': page, 'size': size},
+        queryParameters: {'query': query, 'page': page},
       );
       return BookSearchPage.fromJson(_unwrapMap(response));
     } on DioException catch (e) {

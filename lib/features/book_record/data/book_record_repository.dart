@@ -12,20 +12,23 @@ import '../../bookshelf/models/book_tag.dart';
 import '../../bookshelf/models/record_patch.dart';
 import '../../bookshelf/services/book_cover_image_store.dart';
 import '../../storage_mode/data/storage_mode_store.dart';
+import '../../tag/data/tag_repository.dart';
 import 'book_record_api.dart';
 
 /// 책 기록 상세 화면의 source of truth. 조회는 [BookshelfRepository]의 로컬
 /// DB만 사용한다.
 ///
-/// [updateRecord](기본 기록 필드 — `PATCH /api/me/books/:userBookId`)는 로컬
-/// 우선이다: 즉시 로컬에 반영해 반환하고, 서버 반영은 뒤에서 조용히
-/// 시도한다 — 실패해도 예외를 던지지 않고 dirty로 남겨 다음 동기화
-/// (`BookshelfRepository.sync()`)가 일괄 재시도하게 한다. 그 외
-/// [updateBookInfo]/[linkBook]/[addTag]/[removeTag]/[deleteBook]은 여전히 서버 PATCH가
-/// 성공한 뒤에만 로컬에 반영한다(서버가 최종 진실 소스 — 서버 실패 시
-/// 로컬은 건드리지 않고 예외를 던져 화면이 에러를 처리하게 한다). 로컬 저장
-/// 모드에서는 그 서버 의존 기능들을 [_requireServerId]가 안내와 함께 막고,
-/// [deleteBook]만 로컬 삭제로 대신한다.
+/// [updateRecord](기본 기록 필드 — `PATCH /api/me/books/:userBookId`)와
+/// [addTag]/[removeTag](`TagRepository`에 위임)는 로컬 우선이다: 즉시 로컬에
+/// 반영해 반환하고, 서버 반영은 뒤에서 조용히 시도한다 — 실패해도 예외를
+/// 던지지 않고 dirty로 남겨 다음 동기화(`BookshelfRepository.sync()`/
+/// `TagRepository.sync()`)가 일괄 재시도하게 한다. 그 외
+/// [updateBookInfo]/[linkBook]/[deleteBook]은 여전히 서버 PATCH가 성공한
+/// 뒤에만 로컬에 반영한다(서버가 최종 진실 소스 — 서버 실패 시 로컬은
+/// 건드리지 않고 예외를 던져 화면이 에러를 처리하게 한다). 로컬 저장
+/// 모드에서는 그 서버 의존 기능들([addTag]/[removeTag] 포함)을
+/// [_requireServerId]/자체 가드가 안내와 함께 막고, [deleteBook]만 로컬
+/// 삭제로 대신한다.
 ///
 /// 각 쓰기 메서드는 API 호출 *전* [BookshelfDatabase.sessionGeneration]을
 /// 기억해 뒀다가, 응답을 받은 뒤 값이 바뀌었으면(그사이 로그아웃 등으로
@@ -43,11 +46,13 @@ class BookRecordRepository {
   BookRecordRepository({
     required this._api,
     required this._bookshelfRepository,
+    required this._tagRepository,
     StorageModeStore? storageMode,
   }) : _storageMode = storageMode ?? storageModeStore;
 
   final BookRecordApi _api;
   final BookshelfRepository _bookshelfRepository;
+  final TagRepository _tagRepository;
   final StorageModeStore _storageMode;
 
   Future<BookItem?> getLocal(int userBookId) =>
@@ -315,44 +320,30 @@ class BookRecordRepository {
     return _persist(current, data, expectedGeneration);
   }
 
-  /// 태그 추가. 서버는 태그 정보(id/name)만 반환하므로, 로컬 행에는 기존
-  /// 태그 목록에 새 태그를 더해 반영한다.
+  /// 태그 추가. 로컬 우선이다 — 즉시 로컬에 반영하고, 서버 push는
+  /// [TagRepository]가 뒤에서 조용히 시도한다(실패해도 dirty로 남아 다음
+  /// 동기화가 재시도한다). [BookItem.tags]는 저장된 값이 아니라 조회 시점에
+  /// `tag`/`user_book_tag_map`을 조인한 값이므로([BookshelfDao._attachTags]),
+  /// 로컬 반영 직후 다시 읽기만 하면 최신 태그가 그대로 보인다.
   Future<BookItem> addTag(int userBookId, String name) async {
-    final expectedGeneration = BookshelfDatabase.sessionGeneration;
-    final current = await _requireLocal(userBookId);
-    final serverUserBookId = await _requireServerId(current);
-    final tag = await _api.postTag(userBookId: serverUserBookId, name: name);
-    if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
-      return current;
+    await _requireLocal(userBookId);
+    if (await _storageMode.isLocal()) {
+      throw const ApiException('로컬 저장 모드에서는 서버가 필요한 기능을 쓸 수 없습니다.');
     }
-    final latest = await _requireLocal(userBookId);
-    final updated = latest.copyWithTags([
-      ...latest.tags.where((existing) => existing.id != tag.id),
-      tag,
-    ], updatedAt: DateTime.now().toUtc());
-    if (BookshelfDatabase.sessionGeneration == expectedGeneration) {
-      await _bookshelfRepository.upsertLocal(updated);
-    }
-    return updated;
+    await _tagRepository.addTag(userBookId: userBookId, name: name);
+    return _requireLocal(userBookId);
   }
 
+  /// [tagId]는 서버 태그 ID가 아니라 로컬 태그 ID다(`BookItem.tags`에 담긴
+  /// [BookTag.id] 그대로) — 오프라인에서 막 추가한 태그는 서버 ID가 아직
+  /// 없을 수 있어, 화면은 항상 로컬 ID로 태그를 가리킨다.
   Future<BookItem> removeTag(int userBookId, int tagId) async {
-    final expectedGeneration = BookshelfDatabase.sessionGeneration;
-    final current = await _requireLocal(userBookId);
-    final serverUserBookId = await _requireServerId(current);
-    await _api.deleteTag(userBookId: serverUserBookId, tagId: tagId);
-    if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
-      return current;
+    await _requireLocal(userBookId);
+    if (await _storageMode.isLocal()) {
+      throw const ApiException('로컬 저장 모드에서는 서버가 필요한 기능을 쓸 수 없습니다.');
     }
-    final latest = await _requireLocal(userBookId);
-    final updated = latest.copyWithTags(
-      latest.tags.where((t) => t.id != tagId).toList(),
-      updatedAt: DateTime.now().toUtc(),
-    );
-    if (BookshelfDatabase.sessionGeneration == expectedGeneration) {
-      await _bookshelfRepository.upsertLocal(updated);
-    }
-    return updated;
+    await _tagRepository.removeTag(userBookId: userBookId, tagLocalId: tagId);
+    return _requireLocal(userBookId);
   }
 
   Future<List<BookTag>> getTagSuggestions() => _api.getMyTags();

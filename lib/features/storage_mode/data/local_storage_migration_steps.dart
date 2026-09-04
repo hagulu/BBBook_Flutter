@@ -3,6 +3,7 @@ import '../../book_note/data/book_note_repository.dart';
 import '../../book_reflection/data/book_reflection_repository.dart';
 import '../../bookshelf/data/bookshelf_repository.dart';
 import '../../record_sync/data/record_sync_api.dart';
+import '../../tag/data/tag_repository.dart';
 import '../services/local_storage_migration_service.dart';
 import 'storage_mode_store.dart';
 
@@ -18,6 +19,7 @@ class LocalStorageMigrationRepositorySteps
     required this.bookshelfRepository,
     required this.noteRepository,
     required this.reflectionRepository,
+    required this.tagRepository,
     required this.recordSyncApi,
     required this.storageMode,
   });
@@ -26,17 +28,24 @@ class LocalStorageMigrationRepositorySteps
   final BookshelfRepository bookshelfRepository;
   final BookNoteRepository noteRepository;
   final BookReflectionRepository reflectionRepository;
+  final TagRepository tagRepository;
   final RecordSyncApi recordSyncApi;
   final StorageModeStore storageMode;
 
   @override
   Future<void> syncAllRecords() async {
-    // 책장부터 맞춰야 노트/독후감이 붙을 로컬 책 행이 존재한다. 각 sync는
-    // dirty push를 먼저 수행하므로 아직 서버에 올리지 못한 로컬 편집도 이
-    // 시점에 함께 반영된다.
+    // 책장부터 맞춰야 노트/독후감/태그가 붙을 로컬 책 행이 존재한다. 각
+    // sync는 dirty push를 먼저 수행하므로 아직 서버에 올리지 못한 로컬
+    // 편집도 이 시점에 함께 반영된다.
+    //
+    // 태그는 `POST /api/me/records/import/*`(로컬 → 서버 재전환 Import)가
+    // 받지 않는 데이터라(api-doc), 로컬 저장 모드로 전환한 뒤 태그를 추가·
+    // 삭제해도 서버 재전환 시 되살아나지 않는다 — 이 함수는 전환 *직전*
+    // 서버 데이터를 로컬에 내려받는 것으로, 그 한계와는 별개다.
     await bookshelfRepository.sync();
     await noteRepository.sync(ownerUserId: ownerUserId);
     await reflectionRepository.sync(ownerUserId: ownerUserId);
+    await tagRepository.sync();
   }
 
   @override

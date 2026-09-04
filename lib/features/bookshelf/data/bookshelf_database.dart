@@ -92,15 +92,6 @@ class BookshelfDatabase {
           'CREATE INDEX idx_user_book_finished_at ON user_book(finished_at)',
         );
         await db.execute('''
-          CREATE TABLE user_book_tag (
-            user_book_id INTEGER NOT NULL,
-            tag_id INTEGER NOT NULL,
-            tag_name TEXT NOT NULL,
-            PRIMARY KEY (user_book_id, tag_id),
-            FOREIGN KEY (user_book_id) REFERENCES user_book(user_book_id) ON DELETE CASCADE
-          )
-        ''');
-        await db.execute('''
           CREATE TABLE sync_meta (
             key TEXT PRIMARY KEY,
             value TEXT
@@ -111,6 +102,7 @@ class BookshelfDatabase {
         await _createRecordTables(db);
         await _createReflectionImageLocalTable(db);
         await _createStorageModeTable(db);
+        await _createTagTables(db);
       },
     );
   }
@@ -286,6 +278,62 @@ class BookshelfDatabase {
     );
   }
 
+  /// 태그(`tag`)와 책-태그 매핑(`user_book_tag_map`)을 담는 로컬 전용
+  /// 태그 동기화 테이블. 책장·노트와 달리 `user_book_id`에 대한 외래 키를
+  /// 일부러 걸지 않는다 — `user_book` 갱신은 `INSERT OR REPLACE`를 흔히
+  /// 쓰는데(기존 행을 지운 뒤 다시 넣는 방식), CASCADE를 걸면 책 하나를
+  /// 동기화할 때마다 그 책의 태그 매핑이 통째로 사라진다(`book_note`가 같은
+  /// 이유로 이 외래 키를 걸지 않는 것과 동일한 함정, `_createDismissedIsbnLinkTable`
+  /// 주석 참고). `tag_id`에도 외래 키를 걸지 않는다 — 오프라인에서 만든
+  /// 태그가 서버 태그로 병합될 때(`TagDao`의 병합 로직) 매핑의 `tag_id`를
+  /// 다른 태그 행으로 갈아 끼우는 트랜잭션과 CASCADE가 겹치면 의도치 않은
+  /// 삭제가 섞일 수 있어, 정리는 `TagDao`가 명시적으로만 한다.
+  ///
+  /// `tag`는 자체 dirty 추적이 없다 — 태그 생성/복원은 항상 매핑 추가
+  /// API(`POST .../tags`)의 부수 효과로만 일어나 별도로 push할 대상이
+  /// 없기 때문이다. `user_book_tag_map`만 `is_dirty`로 로컬 우선 추가/삭제를
+  /// 추적한다.
+  static Future<void> _createTagTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS tag (
+        id INTEGER PRIMARY KEY,
+        server_id INTEGER,
+        name TEXT NOT NULL,
+        deleted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_tag_server_id '
+      'ON tag(server_id) WHERE server_id IS NOT NULL',
+    );
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS user_book_tag_map (
+        id INTEGER PRIMARY KEY,
+        server_id INTEGER,
+        user_book_id INTEGER NOT NULL,
+        tag_id INTEGER NOT NULL,
+        deleted_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        is_dirty INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_user_book_tag_map_server_id '
+      'ON user_book_tag_map(server_id) WHERE server_id IS NOT NULL',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_user_book_tag_map_book '
+      'ON user_book_tag_map(user_book_id) WHERE deleted_at IS NULL',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_user_book_tag_map_tag '
+      'ON user_book_tag_map(tag_id)',
+    );
+  }
+
   /// 로그아웃 시 이전 계정 데이터가 다음 로그인 사용자에게 노출되지 않도록
   /// 책장·기록·동기화 완료 상태를 모두 비운다. `book_category`만 계정과
   /// 무관한 전역 마스터 데이터라 유지한다.
@@ -297,7 +345,8 @@ class BookshelfDatabase {
       await txn.delete('book_note');
       await txn.delete('reflection_image_local');
       await txn.delete('book_reflection');
-      await txn.delete('user_book_tag');
+      await txn.delete('user_book_tag_map');
+      await txn.delete('tag');
       await txn.delete('dismissed_isbn_link');
       await txn.delete('user_book');
       await txn.delete('sync_meta');

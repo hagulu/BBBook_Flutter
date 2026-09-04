@@ -116,6 +116,38 @@ class RecordSyncDao {
         onProgress(++saved, total);
       }
 
+      // tags/tagMaps는 book_note/book_reflection처럼 owner_user_id로 지우고
+      // 다시 채우지 않는다 — `tag`/`user_book_tag_map`에는 소유자 컬럼이
+      // 없다(user_book과 같은 이유, `TagRepository` 문서 참고). 대신
+      // `TagDao.reconcileFullTags`와 같은 upsert 방식으로 반영해, 이 초기
+      // 동기화가 실패 후 재시도되거나 이미 태그가 로컬에 있는 상태에서 다시
+      // 불려도 안전하다.
+      for (final tag in payload.tags) {
+        await txn.insert('tag', {
+          'id': tag.id,
+          'server_id': tag.id,
+          'name': tag.name,
+          'deleted_at': null,
+          'created_at': _date(tag.createdAt),
+          'updated_at': _date(tag.updatedAt),
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+        onProgress(++saved, total);
+      }
+
+      for (final map in payload.tagMaps) {
+        await txn.insert('user_book_tag_map', {
+          'id': map.id,
+          'server_id': map.id,
+          'user_book_id': map.userBookId,
+          'tag_id': map.tagId,
+          'deleted_at': null,
+          'created_at': _date(map.createdAt),
+          'updated_at': _date(map.updatedAt),
+          'is_dirty': 0,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+        onProgress(++saved, total);
+      }
+
       for (final reflection in payload.reflections) {
         await txn.insert('book_reflection', {
           'id': reflection.id,
@@ -160,6 +192,12 @@ class RecordSyncDao {
       // 같은 이유로 함께 시딩한다.
       await txn.insert('sync_meta', {
         'key': 'last_synced_at_reflection',
+        'value': requestedAt.toUtc().toIso8601String(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      // 태그 동기화 기준값(TagRepository.sync()가 쓰는 since)도 같은
+      // 이유로 함께 시딩한다.
+      await txn.insert('sync_meta', {
+        'key': 'last_synced_at_tag',
         'value': requestedAt.toUtc().toIso8601String(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     });

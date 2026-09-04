@@ -8,6 +8,7 @@ import '../../book_note/providers/book_note_providers.dart';
 import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../record_sync/providers/record_sync_providers.dart';
+import '../../tag/providers/tag_providers.dart';
 import '../data/local_storage_migration_steps.dart';
 import '../data/storage_mode_store.dart';
 import '../services/local_storage_migration_service.dart';
@@ -95,6 +96,7 @@ class LocalStorageMigrationController
       bookshelfRepository: ref.read(bookshelfRepositoryProvider),
       noteRepository: ref.read(bookNoteRepositoryProvider),
       reflectionRepository: ref.read(bookReflectionRepositoryProvider),
+      tagRepository: ref.read(tagRepositoryProvider),
       recordSyncApi: ref.read(recordSyncApiProvider),
       storageMode: ref.read(storageModeStoreProvider),
     );
