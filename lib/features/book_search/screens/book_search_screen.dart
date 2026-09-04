@@ -73,6 +73,12 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
         .search(_queryController.text);
   }
 
+  /// 입력마다 호출되어, 검색은 컨트롤러가 디바운스 후 자동으로 실행한다.
+  void _onQueryChanged(String value) {
+    setState(() {});
+    ref.read(bookSearchControllerProvider.notifier).onQueryChanged(value);
+  }
+
   void _clear() {
     _queryController.clear();
     FocusManager.instance.primaryFocus?.unfocus();
@@ -128,7 +134,7 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
               controller: _queryController,
               textInputAction: TextInputAction.search,
               onSubmitted: (_) => _submit(),
-              onChanged: (_) => setState(() {}),
+              onChanged: _onQueryChanged,
               decoration: InputDecoration(
                 isDense: true,
                 hintText: '책, 저자, ISBN으로 검색',
@@ -136,7 +142,18 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
                   PhosphorIconsRegular.magnifyingGlass,
                   size: 18,
                 ),
-                suffixIcon: _queryController.text.isEmpty
+                // 디바운스 대기·요청 중에는 입력을 지우는 대신 진행 중임을
+                // 자연스럽게 보여준다(로딩 상태 표시, 화면 깜빡임 방지).
+                suffixIcon: state.isLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(14),
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    : _queryController.text.isEmpty
                     ? null
                     : IconButton(
                         icon: const Icon(PhosphorIconsRegular.x, size: 18),
@@ -274,10 +291,12 @@ class _SearchResultsBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (state.isLoading) {
-      return const Center(
-        child: Text('검색 중...', style: TextStyle(color: AppColors.textMuted)),
-      );
+    // 이전 검색 결과가 아직 없을 때만 화면을 통째로 로딩으로 바꾼다. 이미
+    // 보여줄 결과가 있으면(디바운스로 다음 검색이 진행 중인 경우 등) 목록을
+    // 그대로 두고 옅게 표시만 해, 검색할 때마다 화면이 비었다 채워지는
+    // 깜빡임을 없앤다.
+    if (state.isLoading && state.items.isEmpty) {
+      return const CommunityContentLoadingState();
     }
 
     final error = state.error;
@@ -309,7 +328,7 @@ class _SearchResultsBody extends StatelessWidget {
     }
 
     final showLoadMoreRow = state.isLoadingMore || state.loadMoreError;
-    return ListView.builder(
+    final list = ListView.builder(
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
       itemCount: state.items.length + (showLoadMoreRow ? 1 : 0),
@@ -328,6 +347,29 @@ class _SearchResultsBody extends StatelessWidget {
           ),
         );
       },
+    );
+
+    // 새 검색어로 다음 결과를 가져오는 동안(디바운스 이후) 기존 목록을
+    // 옅게 보여주며 상단에 진행 표시만 얹는다 — 결과를 비웠다 다시 채우지
+    // 않아 깜빡이지 않는다.
+    if (!state.isLoading) return list;
+    return Stack(
+      children: [
+        Opacity(
+          opacity: 0.5,
+          child: IgnorePointer(child: list),
+        ),
+        const Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: LinearProgressIndicator(
+            minHeight: 2,
+            color: AppColors.accentGraphic,
+            backgroundColor: Colors.transparent,
+          ),
+        ),
+      ],
     );
   }
 

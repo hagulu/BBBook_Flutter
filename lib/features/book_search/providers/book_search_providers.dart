@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -8,6 +10,26 @@ import '../models/book_search_item.dart';
 final bookSearchApiProvider = Provider<BookSearchApi>((ref) {
   return BookSearchApi(apiClient: ref.watch(apiClientProvider));
 });
+
+/// 검색 호출부를 함수 타입으로 감싸 provider 오버라이드만으로
+/// [BookSearchController]의 디바운스·요청 취소 로직을 테스트할 수 있게
+/// 한다(Dio/ApiClient 목킹 없이 순수 로직만 검증).
+typedef BookSearchFetcher =
+    Future<BookSearchPage> Function({required String query, required int page});
+
+final bookSearchFetcherProvider = Provider<BookSearchFetcher>((ref) {
+  final api = ref.watch(bookSearchApiProvider);
+  return api.searchBooks;
+});
+
+/// 입력 후 이 시간만큼 멈추면 자동으로 검색한다(book-search.md).
+const bookSearchDebounceDuration = Duration(milliseconds: 600);
+
+/// 스크롤이 바닥에 닿아도 이 시간만큼 멈칫한 뒤에만 다음 페이지를 가져온다.
+/// 관성 스크롤 중에는 바닥 판정 콜백이 여러 번 연달아 오는데, 그때마다
+/// 새로 미루기(디바운스)만 해도 스크롤이 실제로 멈출 때 한 번만 요청하게
+/// 되어 과호출을 줄인다.
+const bookSearchLoadMoreDebounceDuration = Duration(milliseconds: 500);
 
 /// `book-search.md` 기준 화면 상태 3종(auth/server/network). auth는 이미
 /// [ApiClient]가 401 → refresh 실패 시 로그아웃/온보딩 이동을 처리하므로,
@@ -79,48 +101,112 @@ class BookSearchState {
 /// 화면을 새로 열 때마다 비워지는데(`_queryController`) provider 상태만
 /// 남아, 빈 검색창인데 지난 검색 결과가 그대로 보이는 불일치가 생긴다.
 class BookSearchController extends AutoDisposeNotifier<BookSearchState> {
-  late BookSearchApi _api;
+  late BookSearchFetcher _fetchPage;
 
   /// 겹쳐 들어오는 요청 중 마지막 것만 반영한다(웹의 `AbortController` 취소와
   /// 동일 목적 — common-interactions.md).
   int _requestId = 0;
 
+  Timer? _debounceTimer;
+  Timer? _loadMoreDebounceTimer;
+
   @override
   BookSearchState build() {
-    _api = ref.watch(bookSearchApiProvider);
+    _fetchPage = ref.watch(bookSearchFetcherProvider);
+    ref.onDispose(() {
+      _debounceTimer?.cancel();
+      _loadMoreDebounceTimer?.cancel();
+    });
     return const BookSearchState();
   }
 
+  /// 검색창 입력마다 호출한다. 즉시 요청하지 않고 [bookSearchDebounceDuration]
+  /// 동안 추가 입력이 없을 때만 검색한다(book-search.md). 입력이 비면
+  /// 디바운스 없이 바로 결과를 비운다.
+  ///
+  /// 새 입력을 받는 즉시(타이머가 아니라 여기서) `_requestId`를 올려 이전
+  /// 세대를 무효화한다 — 그러지 않으면 이전 검색어의 요청이 이미 네트워크를
+  /// 타고 있는 상태에서 새 검색어를 입력했을 때, 새 검색의 디바운스가 끝나기
+  /// 전(아직 `_fetch`가 시작되지 않아 `_requestId`가 그대로인 동안) 이전
+  /// 요청의 응답이 먼저 도착하면 검사를 통과해 화면에는 최신 검색어가 떠
+  /// 있는데 결과만 이전 검색어의 것으로 반영되는 경합이 생긴다.
+  void onQueryChanged(String query) {
+    _debounceTimer?.cancel();
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      clear();
+      return;
+    }
+    final requestId = ++_requestId;
+    _debounceTimer = Timer(
+      bookSearchDebounceDuration,
+      () => _fetch(query: trimmed, page: 1, requestId: requestId),
+    );
+  }
+
+  /// 검색창의 완료(엔터/검색 버튼) 액션 등 즉시 검색이 필요할 때 호출한다.
   Future<void> search(String query) {
+    _debounceTimer?.cancel();
+    _loadMoreDebounceTimer?.cancel();
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
       clear();
       return Future.value();
     }
-    return _fetch(query: trimmed, page: 1);
+    final requestId = ++_requestId;
+    return _fetch(query: trimmed, page: 1, requestId: requestId);
   }
 
-  /// 목록 스크롤이 끝에 닿았을 때만 호출한다(화면의 스크롤 리스너가 판단).
-  Future<void> loadMore() {
+  /// 목록 스크롤이 끝에 닿을 때마다 호출한다(화면의 스크롤 리스너가 판단).
+  /// 관성 스크롤 중엔 이 콜백이 연달아 오므로, 매번 새로 미뤄
+  /// [bookSearchLoadMoreDebounceDuration] 동안 스크롤이 실제로 멈춰야만
+  /// 다음 페이지를 요청한다 — 무지성으로 빠르게 내려도 API 호출은 그만큼
+  /// 늘지 않고, 살짝 멈칫하는 느낌으로 다음 페이지가 이어진다.
+  void loadMore() {
     if (!state.hasQuery ||
         state.isLoading ||
         state.isLoadingMore ||
         !state.hasMore) {
-      return Future.value();
+      return;
     }
-    return _fetchMore(query: state.query, page: state.page + 1);
+    _loadMoreDebounceTimer?.cancel();
+    final query = state.query;
+    final page = state.page + 1;
+    final requestId = ++_requestId;
+    _loadMoreDebounceTimer = Timer(
+      bookSearchLoadMoreDebounceDuration,
+      () => _fetchMore(query: query, page: page, requestId: requestId),
+    );
   }
 
-  Future<void> retryLoadMore() => loadMore();
+  /// 목록 끝의 "다시 시도" 버튼: 명시적 액션이니 지연 없이 바로 요청한다.
+  Future<void> retryLoadMore() {
+    if (!state.hasQuery || state.isLoading || state.isLoadingMore) {
+      return Future.value();
+    }
+    _loadMoreDebounceTimer?.cancel();
+    final requestId = ++_requestId;
+    return _fetchMore(
+      query: state.query,
+      page: state.page + 1,
+      requestId: requestId,
+    );
+  }
 
   /// X 버튼: 검색어/결과를 모두 비운다(book-search.md).
   void clear() {
+    _debounceTimer?.cancel();
+    _loadMoreDebounceTimer?.cancel();
     _requestId++;
     state = const BookSearchState();
   }
 
-  Future<void> _fetch({required String query, required int page}) async {
-    final requestId = ++_requestId;
+  Future<void> _fetch({
+    required String query,
+    required int page,
+    required int requestId,
+  }) async {
+    if (requestId != _requestId) return;
     state = state.copyWith(
       query: query,
       page: page,
@@ -133,7 +219,7 @@ class BookSearchController extends AutoDisposeNotifier<BookSearchState> {
       error: null,
     );
     try {
-      final result = await _api.searchBooks(query: query, page: page);
+      final result = await _fetchPage(query: query, page: page);
       if (requestId != _requestId) return;
       state = state.copyWith(
         query: query,
@@ -164,8 +250,12 @@ class BookSearchController extends AutoDisposeNotifier<BookSearchState> {
 
   /// 다음 페이지를 이어 붙인다. [_fetch]와 달리 실패해도 기존 목록은
   /// 유지하고 목록 끝의 재시도 UI만 노출한다(`loadMoreError`).
-  Future<void> _fetchMore({required String query, required int page}) async {
-    final requestId = ++_requestId;
+  Future<void> _fetchMore({
+    required String query,
+    required int page,
+    required int requestId,
+  }) async {
+    if (requestId != _requestId) return;
     state = state.copyWith(
       query: query,
       page: state.page,
@@ -178,7 +268,7 @@ class BookSearchController extends AutoDisposeNotifier<BookSearchState> {
       error: null,
     );
     try {
-      final result = await _api.searchBooks(query: query, page: page);
+      final result = await _fetchPage(query: query, page: page);
       if (requestId != _requestId) return;
       state = state.copyWith(
         query: query,

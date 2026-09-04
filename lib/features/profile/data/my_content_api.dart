@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
 import '../models/my_content_book.dart';
-import '../models/my_discussion_answer_summary.dart';
+import '../models/my_discussion_answer_page.dart';
 import '../models/my_discussion_summary.dart';
 import '../models/my_reflection_summary.dart';
 import '../models/my_review_summary.dart';
@@ -61,17 +61,25 @@ class MyContentApi {
     );
   }
 
-  /// GET /api/me/discussion-answers
-  Future<MyContentPage<MyDiscussionAnswerSummary>> fetchDiscussionAnswers({
-    int? cursor,
+  /// GET /api/me/discussion-answers — 다른 3개 목록과 달리 커서가 아니라
+  /// 0부터 시작하는 페이지 번호로 조회한다(`api-me-discussion-answers-get.md`).
+  Future<MyDiscussionAnswerPage> fetchDiscussionAnswers({
+    required int page,
     required int size,
-  }) {
-    return _fetchPage(
-      '/api/me/discussion-answers',
-      cursor: cursor,
-      size: size,
-      itemFromJson: MyDiscussionAnswerSummary.fromJson,
-    );
+  }) async {
+    try {
+      final response = await _apiClient.dio.get<Map<String, dynamic>>(
+        '/api/me/discussion-answers',
+        queryParameters: {'page': page, 'size': size},
+      );
+      return MyDiscussionAnswerPage.fromJson(_unwrapMap(response));
+    } on DioException catch (e) {
+      throw _mapError(e);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('서버 응답 형식이 올바르지 않습니다.', cause: e);
+    }
   }
 
   Future<MyContentPage<T>> _fetchPage<T>(

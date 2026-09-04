@@ -36,13 +36,13 @@
 - `lib/features/profile/screens/my_reflections_screen.dart` — 내가 작성한 독후감 목록(커서 무한 스크롤), 정상 항목은 서버 reflectionId로 로컬 행을 찾아 기존 `BookReflectionDetailScreen`(수정·삭제 포함)으로 이동
 - `lib/features/profile/screens/my_reviews_screen.dart` — 내가 작성한 독자평 목록(커서 무한 스크롤), 탭해도 이동하는 상세 화면 없음
 - `lib/features/profile/screens/my_discussions_screen.dart` — 내가 작성한 토론 목록(커서 무한 스크롤), 정상 항목은 `DiscussionDetailScreen`으로 이동
-- `lib/features/profile/screens/my_discussion_answers_screen.dart` — 내가 작성한 토론 댓글 목록(커서 무한 스크롤), 항목 탭 시 원본 토론(`DiscussionDetailScreen`)으로 이동
+- `lib/features/profile/screens/my_discussion_answers_screen.dart` — 내가 작성한 토론 댓글 목록(서버가 페이지 번호로 응답해 `AppPagination` 숫자 페이지네이션 사용, 다른 3개 목록과 달리 커서 무한 스크롤 아님), 항목 탭 시 원본 토론(`DiscussionDetailScreen`)으로 이동, 돌아오면 보던 페이지 재조회
 - `lib/features/profile/screens/reading_stats_screen.dart` — 독서 리포트 화면(AppBar 연도 선택, 요약 3종, 장르별 비율 트리맵·토글형 숫자 상세, 월별 완독 선그래프, 추가 지표), 프로필 메인의 독서 리포트 카드 탭 시 진입, `docs/porting-reference/stats-screen.md` 대응, 데이터는 서버 API 대신 로컬 서재·노트 데이터로 직접 계산
 - `lib/features/profile/data/profile_api.dart` — 프로필 API 호출(조회/수정/이미지 업로드/회원 탈퇴), 독서 리포트 카드 요약은 서버 API 대신 로컬 서재 데이터로 직접 계산
-- `lib/features/profile/data/my_content_api.dart` — "내가 작성한 콘텐츠" 4개 목록 API 호출(독후감/리뷰/토론/토론 댓글 커서 조회)
+- `lib/features/profile/data/my_content_api.dart` — "내가 작성한 콘텐츠" 4개 목록 API 호출(독후감/리뷰/토론은 커서 조회, 토론 댓글만 페이지 번호 조회)
 - `lib/features/profile/services/reading_stats_calculator.dart` — 독서 리포트 화면 요약·연도 목록을 로컬 완독 책 목록에서 계산하는 순수 함수
 - `lib/features/profile/providers/profile_providers.dart` — 프로필 조회·독서 리포트 카드 요약(로컬 계산) Riverpod provider
-- `lib/features/profile/providers/my_content_providers.dart` — "내가 작성한 콘텐츠" 4개 목록 커서 무한 스크롤 Riverpod provider
+- `lib/features/profile/providers/my_content_providers.dart` — "내가 작성한 콘텐츠" 4개 목록 Riverpod provider(독후감/리뷰/토론은 커서 무한 스크롤, 토론 댓글만 페이지 번호 기반)
 - `lib/features/profile/providers/reading_stats_providers.dart` — 독서 리포트 화면 연도 목록·연도별 요약 Riverpod provider(로컬 계산)
 
 ## features/bookshelf
@@ -170,6 +170,7 @@
 - `lib/shared/widgets/app_confirm.dart` — 공통 Confirm 팝업(확인/취소, Future<bool> 반환)
 - `lib/shared/widgets/app_loading.dart` — 공통 Loading(전체 화면 `AppLoading`, 영역 단위 `AppLoadingOverlay`)
 - `lib/shared/widgets/app_snackbar.dart` — 공통 SnackBar(pill 형태, 성공/정보는 아이덴티티 컬러·에러는 에러 컬러 반투명 배경 + 상태 아이콘)
+- `lib/shared/widgets/app_pagination.dart` — 공통 숫자 페이지네이션(항상 첫/마지막 페이지 노출, 현재 페이지 주변만 펼치고 나머지는 `···` 생략, `buildPaginationRange` 순수 함수 + `AppPagination` 위젯)
 - `lib/shared/widgets/record_dialog_shell.dart` — 여러 기능의 선택·수정 폼이 공유하는 바텀시트 셸(드래그 핸들·제목·콘텐츠·공통 버튼)
 
 ## shared/image
@@ -195,3 +196,4 @@
 - `docs/review/20260904-011409-book-search-category-refresh-review.md` — 책 검색 공급자 전환·카테고리 주기 갱신·앱 버전 변경의 비동기 예외, 중복 요청, 버전 회귀 리뷰
 - `docs/review/20260904-013659-book-search-infinite-scroll-author-review.md` — 책 검색 무한 스크롤의 짧은 첫 페이지 추가 로드와 큰 글자 오류 행 레이아웃 리뷰
 - `docs/review/20260904-022040-tag-local-sync-review.md` — 태그 로컬 우선 동기화의 원격 책 삭제 정합성·책장 UI 갱신·전체 동기화 orphan 기준 시각 리뷰
+- `docs/review/20260904-132202-search-debounce-discussion-answer-pagination-review.md` — 책 검색 디바운스 요청 경합과 토론 댓글 삭제 후 페이지 범위·파일 인덱스 정합성 리뷰
