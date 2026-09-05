@@ -22,7 +22,11 @@ class RecordFieldTile extends StatelessWidget {
     required this.hasValue,
     required this.onTap,
     this.valueIcon,
+    this.valueIconColor = AppColors.accentForeground,
     this.valueSecondary,
+    this.labelStyle,
+    this.valueStyle,
+    this.placeholderStyle,
   });
 
   final String label;
@@ -30,7 +34,14 @@ class RecordFieldTile extends StatelessWidget {
   final bool hasValue;
   final VoidCallback onTap;
   final IconData? valueIcon;
+
+  /// 값 아이콘 색. 대부분(출처/난이도)은 공통 accent 색이지만, 명작·또 볼래
+  /// 같은 상태 토글은 각자의 강조색(금색/에러색)을 쓴다.
+  final Color valueIconColor;
   final String? valueSecondary;
+  final TextStyle? labelStyle;
+  final TextStyle? valueStyle;
+  final TextStyle? placeholderStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -42,11 +53,13 @@ class RecordFieldTile extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              color: AppColors.textStrong,
-            ),
+            style:
+                labelStyle ??
+                const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: AppColors.textStrong,
+                ),
           ),
           const SizedBox(height: 4),
           Row(
@@ -56,19 +69,25 @@ class RecordFieldTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               if (hasValue && valueIcon != null) ...[
-                Icon(valueIcon, size: 15, color: AppColors.accentForeground),
+                Icon(valueIcon, size: 15, color: valueIconColor),
                 const SizedBox(width: 4),
               ],
               Flexible(
                 child: Text.rich(
                   TextSpan(
-                    style: TextStyle(
-                      fontSize: hasValue ? 15 : 13,
-                      fontWeight: hasValue ? FontWeight.w600 : FontWeight.w500,
-                      color: hasValue
-                          ? AppColors.textStrong
-                          : AppColors.textMuted,
-                    ),
+                    style: hasValue && valueStyle != null
+                        ? valueStyle
+                        : !hasValue && placeholderStyle != null
+                        ? placeholderStyle
+                        : TextStyle(
+                            fontSize: hasValue ? 15 : 13,
+                            fontWeight: hasValue
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                            color: hasValue
+                                ? AppColors.textStrong
+                                : AppColors.textMuted,
+                          ),
                     children: [
                       TextSpan(text: value),
                       if (hasValue && valueSecondary != null)

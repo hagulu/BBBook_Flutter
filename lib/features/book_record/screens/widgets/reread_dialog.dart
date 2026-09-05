@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_confirm.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
-import 'want_to_reread_toggle.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// [showRereadDialog] 결과. 재독 횟수를 바꿨으면 [RereadCountUpdated], 0에서
@@ -55,7 +54,6 @@ class _RereadDialog extends StatefulWidget {
 
 class _RereadDialogState extends State<_RereadDialog> {
   late int _count = widget.initialCount;
-  late bool _wantToReread = widget.initialWantToReread;
 
   Future<void> _decrement() async {
     if (_count > 0) {
@@ -77,11 +75,6 @@ class _RereadDialogState extends State<_RereadDialog> {
   Widget build(BuildContext context) {
     return RecordDialogShell(
       title: '재독 횟수',
-      titleTrailing: WantToRereadToggle(
-        value: _wantToReread,
-        onChanged: (v) => setState(() => _wantToReread = v),
-        compact: true,
-      ),
       content: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -110,9 +103,11 @@ class _RereadDialogState extends State<_RereadDialog> {
       buttons: [
         RecordDialogButton(
           label: '확인',
-          onPressed: () => Navigator.of(
-            context,
-          ).pop(RereadCountUpdated(_count, wantToReread: _wantToReread)),
+          onPressed: () => Navigator.of(context).pop(
+            // 또 볼래는 이제 이 팝업이 아니라 책 기록 화면에서 직접
+            // 토글한다 — 여기서는 그 값을 그대로 되돌려 보낸다.
+            RereadCountUpdated(_count, wantToReread: widget.initialWantToReread),
+          ),
         ),
       ],
     );

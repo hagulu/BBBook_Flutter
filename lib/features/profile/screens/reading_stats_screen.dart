@@ -308,7 +308,13 @@ class _SummaryCard extends StatelessWidget {
 List<_MoreItem> _moreItems(ReadingStatsSummary stats) {
   return [
     if (stats.rereadCount > 0)
-      _MoreItem(value: '${stats.rereadCount}', unit: '회', label: '재독 횟수'),
+      _MoreItem(
+        value: '${stats.rereadCount}',
+        unit: '회',
+        label: '재독 횟수',
+        valueFontSize: 15,
+        valueFontWeight: FontWeight.w500,
+      ),
     if (stats.masterpieceCount > 0)
       _MoreItem(value: '${stats.masterpieceCount}', unit: '권', label: '인생책'),
     if (stats.averageRating != null)
@@ -344,11 +350,19 @@ class _MoreSection extends StatelessWidget {
 }
 
 class _MoreItem {
-  const _MoreItem({required this.value, this.unit, required this.label});
+  const _MoreItem({
+    required this.value,
+    this.unit,
+    required this.label,
+    this.valueFontSize = 17,
+    this.valueFontWeight = FontWeight.bold,
+  });
 
   final String value;
   final String? unit;
   final String label;
+  final double valueFontSize;
+  final FontWeight valueFontWeight;
 }
 
 class _MoreColumn extends StatelessWidget {
@@ -370,9 +384,9 @@ class _MoreColumn extends StatelessWidget {
                 item.value,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
+                style: TextStyle(
+                  fontSize: item.valueFontSize,
+                  fontWeight: item.valueFontWeight,
                   color: AppColors.textStrong,
                 ),
               ),

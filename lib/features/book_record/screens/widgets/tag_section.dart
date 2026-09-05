@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../../bookshelf/models/book_tag.dart';
 import '../../providers/book_record_providers.dart';
@@ -11,9 +10,8 @@ import 'pill_option.dart';
 import 'record_section_card.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
-/// 태그 목록(삭제 포함) + 라벨 오른쪽 위의 추가 아이콘 버튼. 실제 입력(자동
-/// 완성 포함)은 화면에 바로 두지 않고 [_TagInputSheet] 바텀시트에서 받는다
-/// — 사용자 확인 사항.
+/// 책 상세에는 태그명만 간결히 보여주고, 선택/삭제/검색은 태그 관리 시트에서
+/// 한 번에 처리한다.
 class TagSection extends ConsumerWidget {
   const TagSection({super.key, required this.userBookId, required this.tags});
 
@@ -38,13 +36,7 @@ class TagSection extends ConsumerWidget {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              for (final tag in tags)
-                _TagChip(
-                  tag: tag,
-                  onDeleted: () => _remove(context, ref, tag),
-                ),
-            ],
+            children: [for (final tag in tags) _TagChip(tag: tag)],
           ),
         ],
       ],
@@ -58,16 +50,6 @@ class TagSection extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => _TagInputSheet(userBookId: userBookId),
     );
-  }
-
-  Future<void> _remove(BuildContext context, WidgetRef ref, BookTag tag) async {
-    try {
-      await ref
-          .read(bookRecordControllerProvider(userBookId).notifier)
-          .removeTag(tag.id);
-    } on ApiException catch (e) {
-      if (context.mounted) AppSnackBar.error(context, e.message);
-    }
   }
 }
 
@@ -115,8 +97,7 @@ class _AddTagIconButton extends StatelessWidget {
   }
 }
 
-/// 태그 추가 바텀시트. 입력창(자동완성 제안 포함)을 키보드 위에 띄워, 태그를
-/// 여러 개 이어서 추가할 수 있도록 시트를 닫지 않고 입력창만 비운다.
+/// 현재 태그의 삭제, 기존 태그 재사용/검색, 새 태그 생성을 한곳에서 처리한다.
 class _TagInputSheet extends ConsumerStatefulWidget {
   const _TagInputSheet({required this.userBookId});
 
@@ -132,7 +113,15 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
   String? _errorText;
   bool _submitting = false;
 
-  late final Future<List<BookTag>> _suggestionsFuture = ref
+  late Future<List<BookTag>> _suggestionsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _suggestionsFuture = _loadSuggestions();
+  }
+
+  Future<List<BookTag>> _loadSuggestions() => ref
       .read(tagSuggestionsProvider.future)
       .onError<Object>((_, _) => const <BookTag>[]);
 
@@ -146,6 +135,10 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
   Future<void> _submit(String name, List<BookTag> existingTags) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty || _submitting) return;
+    if (existingTags.length >= 10) {
+      setState(() => _errorText = '태그는 책당 최대 10개까지 추가할 수 있습니다.');
+      return;
+    }
     if (existingTags.any((t) => t.name == trimmed)) {
       setState(() => _errorText = '이미 추가된 태그입니다.');
       return;
@@ -160,8 +153,26 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
           .addTag(trimmed);
       if (!mounted) return;
       _controller.clear();
-      setState(() {});
+      setState(() => _suggestionsFuture = _loadSuggestions());
       _focusNode.requestFocus();
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _errorText = e.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _remove(BookTag tag) async {
+    if (_submitting) return;
+    setState(() {
+      _submitting = true;
+      _errorText = null;
+    });
+    try {
+      await ref
+          .read(bookRecordControllerProvider(widget.userBookId).notifier)
+          .removeTag(tag.id);
+      if (mounted) setState(() => _suggestionsFuture = _loadSuggestions());
     } on ApiException catch (e) {
       if (mounted) setState(() => _errorText = e.message);
     } finally {
@@ -172,28 +183,75 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
   @override
   Widget build(BuildContext context) {
     final existingTags =
-        ref.watch(bookRecordControllerProvider(widget.userBookId)).valueOrNull?.tags ??
+        ref
+            .watch(bookRecordControllerProvider(widget.userBookId))
+            .valueOrNull
+            ?.tags ??
         const <BookTag>[];
     final query = _controller.text.trim();
+    final atLimit = existingTags.length >= 10;
 
     return RecordDialogShell(
-      title: '태그 추가',
+      title: '태그 관리',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Text(
+            '현재 태그',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textStrong,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (existingTags.isEmpty)
+            const Text(
+              '적용된 태그가 없습니다.',
+              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+            )
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final tag in existingTags)
+                  _TagChip(
+                    tag: tag,
+                    onDeleted: _submitting ? null : () => _remove(tag),
+                  ),
+              ],
+            ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 18),
+            child: Divider(height: 1, color: AppColors.border),
+          ),
           TextField(
             controller: _controller,
             focusNode: _focusNode,
             autofocus: true,
-            maxLength: 50,
+            enabled: !atLimit,
+            maxLength: 15,
+            buildCounter:
+                (
+                  context, {
+                  required currentLength,
+                  required isFocused,
+                  maxLength,
+                }) => Text(
+                  '$currentLength / ${maxLength ?? 15}자',
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
             textInputAction: TextInputAction.done,
             onChanged: (_) => setState(() => _errorText = null),
             onSubmitted: (name) => _submit(name, existingTags),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               isDense: true,
-              hintText: '태그 추가',
-              counterText: '',
-              prefixIcon: Icon(PhosphorIconsRegular.tag, size: 18),
+              hintText: atLimit ? '태그는 최대 10개까지 추가할 수 있습니다.' : '태그 입력',
+              prefixIcon: const Icon(PhosphorIconsRegular.tag, size: 18),
             ),
           ),
           if (_errorText != null)
@@ -209,6 +267,7 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
             builder: (context, snapshot) {
               final all = snapshot.data;
               if (all == null) return const SizedBox.shrink();
+              if (all.isEmpty) return const SizedBox.shrink();
               final existingNames = existingTags.map((t) => t.name).toSet();
               final queryLower = query.toLowerCase();
               final filtered = all
@@ -218,26 +277,44 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
                         t.name.toLowerCase().contains(queryLower),
                   )
                   .toList();
-              if (filtered.isEmpty) return const SizedBox.shrink();
+              final visible = atLimit
+                  ? <BookTag>[]
+                  : query.isEmpty
+                  ? filtered.take(5).toList()
+                  : filtered;
               return Padding(
                 padding: const EdgeInsets.only(top: 12),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 160),
-                  child: SingleChildScrollView(
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final tag in filtered)
-                          PillOption(
-                            label: tag.name,
-                            icon: PhosphorIconsRegular.plus,
-                            selected: false,
-                            onTap: () => _submit(tag.name, existingTags),
-                          ),
-                      ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '추천 태그',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textStrong,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 160),
+                      child: SingleChildScrollView(
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final tag in visible)
+                              PillOption(
+                                label: tag.name,
+                                icon: PhosphorIconsRegular.plus,
+                                selected: false,
+                                onTap: () => _submit(tag.name, existingTags),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               );
             },
@@ -249,15 +326,20 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
 }
 
 class _TagChip extends StatelessWidget {
-  const _TagChip({required this.tag, required this.onDeleted});
+  const _TagChip({required this.tag, this.onDeleted});
 
   final BookTag tag;
-  final VoidCallback onDeleted;
+  final VoidCallback? onDeleted;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.only(left: 12, right: 4, top: 4, bottom: 4),
+      padding: EdgeInsets.only(
+        left: 12,
+        right: onDeleted == null ? 12 : 4,
+        top: 4,
+        bottom: 4,
+      ),
       decoration: BoxDecoration(
         color: AppColors.surfaceSubtle,
         borderRadius: BorderRadius.circular(999),
@@ -266,32 +348,33 @@ class _TagChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            '#${tag.name}',
+            tag.name,
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.textBody,
             ),
           ),
-          Semantics(
-            button: true,
-            label: '${tag.name} 태그 삭제',
-            child: InkWell(
-              onTap: onDeleted,
-              borderRadius: BorderRadius.circular(999),
-              child: const SizedBox(
-                width: 36,
-                height: 36,
-                child: Center(
-                  child: Icon(
-                    PhosphorIconsRegular.x,
-                    size: 14,
-                    color: AppColors.textMuted,
+          if (onDeleted != null)
+            Semantics(
+              button: true,
+              label: '${tag.name} 태그 삭제',
+              child: InkWell(
+                onTap: onDeleted,
+                borderRadius: BorderRadius.circular(999),
+                child: const SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: Center(
+                    child: Icon(
+                      PhosphorIconsRegular.x,
+                      size: 14,
+                      color: AppColors.textMuted,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );

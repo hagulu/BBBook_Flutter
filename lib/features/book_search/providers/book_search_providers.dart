@@ -12,8 +12,8 @@ final bookSearchApiProvider = Provider<BookSearchApi>((ref) {
 });
 
 /// 검색 호출부를 함수 타입으로 감싸 provider 오버라이드만으로
-/// [BookSearchController]의 디바운스·요청 취소 로직을 테스트할 수 있게
-/// 한다(Dio/ApiClient 목킹 없이 순수 로직만 검증).
+/// [BookSearchController]의 요청 취소 로직을 테스트할 수 있게 한다
+/// (Dio/ApiClient 목킹 없이 순수 로직만 검증).
 typedef BookSearchFetcher =
     Future<BookSearchPage> Function({required String query, required int page});
 
@@ -21,9 +21,6 @@ final bookSearchFetcherProvider = Provider<BookSearchFetcher>((ref) {
   final api = ref.watch(bookSearchApiProvider);
   return api.searchBooks;
 });
-
-/// 입력 후 이 시간만큼 멈추면 자동으로 검색한다(book-search.md).
-const bookSearchDebounceDuration = Duration(milliseconds: 600);
 
 /// 스크롤이 바닥에 닿아도 이 시간만큼 멈칫한 뒤에만 다음 페이지를 가져온다.
 /// 관성 스크롤 중에는 바닥 판정 콜백이 여러 번 연달아 오는데, 그때마다
@@ -107,46 +104,19 @@ class BookSearchController extends AutoDisposeNotifier<BookSearchState> {
   /// 동일 목적 — common-interactions.md).
   int _requestId = 0;
 
-  Timer? _debounceTimer;
   Timer? _loadMoreDebounceTimer;
 
   @override
   BookSearchState build() {
     _fetchPage = ref.watch(bookSearchFetcherProvider);
     ref.onDispose(() {
-      _debounceTimer?.cancel();
       _loadMoreDebounceTimer?.cancel();
     });
     return const BookSearchState();
   }
 
-  /// 검색창 입력마다 호출한다. 즉시 요청하지 않고 [bookSearchDebounceDuration]
-  /// 동안 추가 입력이 없을 때만 검색한다(book-search.md). 입력이 비면
-  /// 디바운스 없이 바로 결과를 비운다.
-  ///
-  /// 새 입력을 받는 즉시(타이머가 아니라 여기서) `_requestId`를 올려 이전
-  /// 세대를 무효화한다 — 그러지 않으면 이전 검색어의 요청이 이미 네트워크를
-  /// 타고 있는 상태에서 새 검색어를 입력했을 때, 새 검색의 디바운스가 끝나기
-  /// 전(아직 `_fetch`가 시작되지 않아 `_requestId`가 그대로인 동안) 이전
-  /// 요청의 응답이 먼저 도착하면 검사를 통과해 화면에는 최신 검색어가 떠
-  /// 있는데 결과만 이전 검색어의 것으로 반영되는 경합이 생긴다.
-  void onQueryChanged(String query) {
-    _debounceTimer?.cancel();
-    final trimmed = query.trim();
-    if (trimmed.isEmpty) {
-      clear();
-      return;
-    }
-    final requestId = ++_requestId;
-    _debounceTimer = Timer(
-      bookSearchDebounceDuration,
-      () => _fetch(query: trimmed, page: 1, requestId: requestId),
-    );
-  }
-
   /// 검색창의 완료(엔터/검색 버튼) 액션 등 즉시 검색이 필요할 때 호출한다.
   Future<void> search(String query) {
-    _debounceTimer?.cancel();
     _loadMoreDebounceTimer?.cancel();
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
@@ -195,7 +165,6 @@ class BookSearchController extends AutoDisposeNotifier<BookSearchState> {
 
   /// X 버튼: 검색어/결과를 모두 비운다(book-search.md).
   void clear() {
-    _debounceTimer?.cancel();
     _loadMoreDebounceTimer?.cancel();
     _requestId++;
     state = const BookSearchState();

@@ -421,5 +421,35 @@ void main() {
       expect(updated.status, BookStatus.reading);
       expect(updated.wantToReread, isTrue);
     });
+
+    test('완독에서 읽는 중으로 바꾸면 진행 쪽수는 0으로 저장된다', () {
+      final item = buildItem(
+        status: BookStatus.finished,
+        currentPage: 300,
+        finishedAt: DateTime.utc(2026, 3, 4),
+      );
+
+      final updated = item.copyWithRecord(
+        const RecordPatch(status: 'READING', currentPage: 0),
+        updatedAt: DateTime.utc(2026, 8, 26),
+      );
+
+      expect(updated.status, BookStatus.reading);
+      expect(updated.currentPage, 0);
+    });
+
+    test('재완독 완료는 기존 완독일을 요청에 포함해 유지한다', () {
+      final item = buildItem(
+        status: BookStatus.reading,
+        finishedAt: DateTime.utc(2026, 3, 4),
+      );
+
+      final body = RecordPatch(
+        status: 'FINISHED',
+        finishedAt: PatchField.value(RecordPatch.formatApiDate(item.finishedAt)!),
+      ).toJson();
+
+      expect(body['finishedAt'], '2026-03-04');
+    });
   });
 }

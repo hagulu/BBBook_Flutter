@@ -73,11 +73,22 @@ class RecordDialogSurface extends StatelessWidget {
           horizontalPadding,
           topPadding,
           horizontalPadding,
-          bottomPadding +
-              MediaQuery.viewInsetsOf(context).bottom +
-              MediaQuery.viewPaddingOf(context).bottom,
+          0,
         ),
-        child: child,
+        // 키보드 인셋만 따로 애니메이션 없는 Padding으로 뺀다 — 이
+        // AnimatedContainer의 180ms 트랜지션과 키보드가 올라오는 시스템
+        // 애니메이션 길이가 서로 달라, 같이 애니메이션시키면 키보드와 시트
+        // 사이에 순간적으로 공백이 보인다. 매 프레임 그대로 따라가는 일반
+        // Padding을 쓰면 키보드 움직임과 항상 정확히 맞아떨어진다.
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom:
+                bottomPadding +
+                MediaQuery.viewInsetsOf(context).bottom +
+                MediaQuery.viewPaddingOf(context).bottom,
+          ),
+          child: child,
+        ),
       ),
     );
   }
@@ -145,6 +156,7 @@ class RecordDialogShell extends StatelessWidget {
     required this.content,
     this.buttons = const [],
     this.titleTrailing,
+    this.scrollController,
   });
 
   final String title;
@@ -155,6 +167,11 @@ class RecordDialogShell extends StatelessWidget {
   /// 제목만 표시한다.
   final Widget? titleTrailing;
 
+  /// 콘텐츠를 감싸는 내부 스크롤을 호출부가 직접 제어해야 할 때(예: 특정
+  /// 입력 필드에 포커스가 가면 맨 아래로 스크롤)만 넘긴다. 지정하지 않으면
+  /// 이 위젯이 자체 컨트롤러를 쓴다.
+  final ScrollController? scrollController;
+
   @override
   Widget build(BuildContext context) {
     // 흰 배경 컨테이너가 화면 맨 아래까지 이어지도록 SafeArea로 감싸 크기를
@@ -163,6 +180,7 @@ class RecordDialogShell extends StatelessWidget {
     // 노출된다.
     return RecordDialogSurface(
       child: SingleChildScrollView(
+        controller: scrollController,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -12,8 +12,8 @@ import 'widgets/custom_book_dialog.dart';
 import 'widgets/search_result_card.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
-/// 책 검색 화면(`/search` 대응, book-search.md). 하단 탭 셸의 "+" 버튼으로
-/// 진입하는 별도 화면이라 `Navigator.push`로 연다(BookRecordScreen과 동일 패턴).
+/// 책 추가 화면(`/search` 대응, book-search.md). 하단 탭 셸의 "+" 버튼에서
+/// 전체 화면으로 열리되, 아래에서 올라오는 전환과 X 닫기로 모달처럼 보인다.
 class BookSearchScreen extends ConsumerStatefulWidget {
   const BookSearchScreen({super.key});
 
@@ -73,12 +73,6 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
         .search(_queryController.text);
   }
 
-  /// 입력마다 호출되어, 검색은 컨트롤러가 디바운스 후 자동으로 실행한다.
-  void _onQueryChanged(String value) {
-    setState(() {});
-    ref.read(bookSearchControllerProvider.notifier).onQueryChanged(value);
-  }
-
   void _clear() {
     _queryController.clear();
     FocusManager.instance.primaryFocus?.unfocus();
@@ -90,7 +84,9 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
     final result = await showCustomBookDialog(context);
     if (result == null || !mounted) return;
     if (result.synced) {
-      Navigator.of(context).push(
+      // 직접 등록도 검색 화면을 대체한다. 기록 상세에서 뒤로 가면 검색
+      // 결과가 아니라 기존 책장으로 돌아간다.
+      Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (_) => BookRecordScreen(userBookId: result.userBookId),
         ),
@@ -121,7 +117,12 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const AppBarTitle('책 검색'),
+        leading: IconButton(
+          icon: const Icon(PhosphorIconsRegular.x),
+          tooltip: '닫기',
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const AppBarTitle('책 추가'),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,
@@ -134,7 +135,9 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
               controller: _queryController,
               textInputAction: TextInputAction.search,
               onSubmitted: (_) => _submit(),
-              onChanged: _onQueryChanged,
+              // 입력 중에는 API를 호출하지 않는다. 키보드의 검색 버튼을
+              // 눌렀을 때만 [_submit]이 첫 페이지를 조회한다.
+              onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 isDense: true,
                 hintText: '책, 저자, ISBN으로 검색',
@@ -142,8 +145,7 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
                   PhosphorIconsRegular.magnifyingGlass,
                   size: 18,
                 ),
-                // 디바운스 대기·요청 중에는 입력을 지우는 대신 진행 중임을
-                // 자연스럽게 보여준다(로딩 상태 표시, 화면 깜빡임 방지).
+                // 실제 검색 요청이 진행 중일 때만 로딩을 표시한다.
                 suffixIcon: state.isLoading
                     ? const Padding(
                         padding: EdgeInsets.all(14),
@@ -355,10 +357,7 @@ class _SearchResultsBody extends StatelessWidget {
     if (!state.isLoading) return list;
     return Stack(
       children: [
-        Opacity(
-          opacity: 0.5,
-          child: IgnorePointer(child: list),
-        ),
+        Opacity(opacity: 0.5, child: IgnorePointer(child: list)),
         const Positioned(
           top: 0,
           left: 0,

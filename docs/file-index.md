@@ -7,7 +7,7 @@
 - `lib/main.dart` — 앱 진입점
 - `lib/app/app.dart` — MaterialApp 루트 위젯
 - `lib/app/router.dart` — go_router 라우팅, 인증 상태 기반 redirect(AuthGuard 대응)
-- `lib/app/main_shell.dart` — 로그인 후 진입하는 하단 탭 셸(BOOKSHELF/PROFILE), 기본 탭은 BOOKSHELF, 책장 탭에서만 노트 상세와 동일한 원형 FAB로 책 검색 진입, 포그라운드 전환 시 동기화 트리거
+- `lib/app/main_shell.dart` — 로그인 후 진입하는 하단 탭 셸(책장/책 추가/마이), 기본 탭은 BOOKSHELF, 가운데 원형 책 추가 버튼으로 아래에서 올라오는 전체 화면 책 추가 진입, 포그라운드 전환 시 동기화 트리거
 
 ## core
 
@@ -121,7 +121,7 @@
 
 ## features/book_search
 
-- `lib/features/book_search/screens/book_search_screen.dart` — 책 검색 화면(하단 탭 셸 "+" 버튼으로 진입), 검색창/결과 목록/페이지네이션/직접 등록·바코드 등록 진입점 조립
+- `lib/features/book_search/screens/book_search_screen.dart` — 책 추가 전체 화면(하단 탭 셸 "+" 버튼으로 아래에서 올라오는 전환), 검색창/결과 목록/페이지네이션/직접 등록·바코드 등록 진입점 조립
 - `lib/features/book_search/screens/barcode_scan_screen.dart` — 카메라로 책 바코드(ISBN-13) 스캔 화면. 기본은 ISBN을 반환해 상세로 이동, "빠른 등록" 체크 시 선택한 상태로 즉시 서재에 담고 연속 스캔
 - `lib/features/book_search/data/book_search_api.dart` — 책 검색 API 호출(키워드 검색, 직접 등록 POST(표지/카테고리 포함 multipart 지원))
 - `lib/features/book_search/providers/book_search_providers.dart` — 검색 화면 상태(검색어/페이지/결과) 관리 Riverpod provider
@@ -182,6 +182,7 @@
 
 ## docs
 
+- `docs/review/20260905-133912-working-tree-review.md` — 미커밋 변경사항의 오프라인 명작 저장 유실·오디오북 완독 진행률·독서 상태 레이아웃 리뷰
 - `docs/review/20260830-185915-book-record-fixed-header-review.md` — 책 기록 상세 고정 헤더의 작은 세로 화면·큰 글자 배율 레이아웃 리뷰
 - `docs/review/20260831-171201-book-progress-source-pages-review.md` — 책 형태별 진행률·전자책 쪽수 저장의 PATCH 경합과 출처 전환 정합성 리뷰
 - `docs/review/20260901-112239-book-progress-source-pages-rereview.md` — 책 형태별 진행률 후속 수정의 쪽수 축소 요청 순서·오디오북 역변환·최신 상태 정합성 재리뷰
@@ -197,3 +198,4 @@
 - `docs/review/20260904-013659-book-search-infinite-scroll-author-review.md` — 책 검색 무한 스크롤의 짧은 첫 페이지 추가 로드와 큰 글자 오류 행 레이아웃 리뷰
 - `docs/review/20260904-022040-tag-local-sync-review.md` — 태그 로컬 우선 동기화의 원격 책 삭제 정합성·책장 UI 갱신·전체 동기화 orphan 기준 시각 리뷰
 - `docs/review/20260904-132202-search-debounce-discussion-answer-pagination-review.md` — 책 검색 디바운스 요청 경합과 토론 댓글 삭제 후 페이지 범위·파일 인덱스 정합성 리뷰
+- `docs/review/20260904-144819-book-record-finish-dialog-ui-review.md` — 책 기록·완독 팝업 UI 변경의 오프라인 명작 유실, 키보드 종료 경합, 날짜 터치 영역·아이콘 시맨틱스 리뷰

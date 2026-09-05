@@ -19,8 +19,8 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 /// 로그인 후 진입하는 하단 탭 셸(BOOKSHELF/PROFILE, `navigation.md` 대응).
 ///
 /// 기본 선택 탭은 BOOKSHELF로 두어 로그인 직후 책장 목록이 바로 보이도록
-/// 한다. PROFILE 탭 전용 설정(저장 방식 전환 등) 진입점은 이 셸의 AppBar
-/// 우측 설정 아이콘으로 연결한다.
+/// 한다. 가운데 "책 추가" 탭은 책 검색으로 연결하고, PROFILE 탭 전용 설정
+/// (저장 방식 전환 등) 진입점은 이 셸의 AppBar 우측 설정 아이콘으로 연결한다.
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
 
@@ -89,6 +89,21 @@ class _MainShellState extends ConsumerState<MainShell>
     }
   }
 
+  Future<void> _openBookSearch() {
+    return Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        pageBuilder: (_, _, _) => const BookSearchScreen(),
+        transitionsBuilder: (_, animation, _, child) => SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 1),
+            end: Offset.zero,
+          ).chain(CurveTween(curve: Curves.easeOutCubic)).animate(animation),
+          child: child,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -115,17 +130,6 @@ class _MainShellState extends ConsumerState<MainShell>
               : null,
         ),
         body: IndexedStack(index: _selectedIndex, children: _tabs),
-        floatingActionButton: _selectedIndex == 0
-            ? FloatingActionButton(
-                shape: const CircleBorder(),
-                backgroundColor: AppColors.accentFill,
-                foregroundColor: AppColors.textStrong,
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const BookSearchScreen()),
-                ),
-                child: const Icon(PhosphorIconsRegular.plus),
-              )
-            : null,
         bottomNavigationBar: DecoratedBox(
           decoration: BoxDecoration(
             color: AppColors.surface,
@@ -143,6 +147,7 @@ class _MainShellState extends ConsumerState<MainShell>
                     selected: _selectedIndex == 0,
                     onTap: () => setState(() => _selectedIndex = 0),
                   ),
+                  _AddBookNavItem(onTap: _openBookSearch),
                   _NavItem(
                     icon: PhosphorIconsRegular.user,
                     selectedIcon: PhosphorIconsFill.user,
@@ -151,6 +156,40 @@ class _MainShellState extends ConsumerState<MainShell>
                     onTap: () => setState(() => _selectedIndex = 1),
                   ),
                 ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AddBookNavItem extends StatelessWidget {
+  const _AddBookNavItem({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Semantics(
+        button: true,
+        label: '책 추가',
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Center(
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: AppColors.accentFill,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                PhosphorIconsRegular.plus,
+                color: AppColors.textStrong,
               ),
             ),
           ),

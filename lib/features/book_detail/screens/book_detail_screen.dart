@@ -9,13 +9,16 @@ import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../book_community/screens/widgets/book_community_preview_section.dart';
+import '../../book_record/providers/book_record_providers.dart';
+import '../../book_record/screens/book_record_screen.dart';
+import '../../book_record/screens/widgets/finish_confirm_dialog.dart';
 import '../../book_record/screens/widgets/star_rating.dart';
 import '../../bookshelf/models/book_status.dart';
+import '../../bookshelf/models/record_patch.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../bookshelf/screens/widgets/book_cover.dart';
 import '../providers/book_detail_providers.dart';
 import 'widgets/add_status_dialog.dart';
-import 'widgets/finish_options_dialog.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 검색 결과 경유 책 상세 화면(`/books/[isbn]` 대응, book-detail.md).
@@ -37,9 +40,15 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
     final status = await showAddStatusDialog(context);
     if (status == null || !mounted) return;
 
-    FinishOptionsResult? options;
+    FinishConfirmResult? options;
     if (status == BookStatus.finished) {
-      options = await showFinishOptionsDialog(context);
+      options = await showFinishConfirmDialog(
+        context,
+        showSource: true,
+        showDifficulty: true,
+        showRatingReview: true,
+        showFinishedAt: true,
+      );
       if (options == null || !mounted) return;
     }
 
@@ -62,12 +71,23 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
             sourceType: options?.sourceType?.apiValue,
             myRating: options?.myRating,
             shortReview: options?.shortReview,
-            difficulty: options?.difficulty?.apiValue,
+            difficulty: options?.difficulty,
             wantToReread: options?.wantToReread ?? false,
             finishedAt: options?.finishedAt == null
                 ? null
                 : _formatDate(options!.finishedAt!),
           );
+      // 명작은 생성 API가 받지 않으므로 생성 직후 로컬 우선 PATCH로 남긴다.
+      // CREATE가 오프라인으로 대기 중이어도 dirty 필드가 보존돼, 생성 확정
+      // 후 이어지는 PATCH 재시도에서 사용자가 고른 값을 반영한다.
+      if (options?.isMasterpiece == true) {
+        await ref
+            .read(bookRecordRepositoryProvider)
+            .updateRecord(
+              result.userBookId,
+              const RecordPatch(isMasterpiece: true),
+            );
+      }
       if (!mounted) return;
       ref.read(bookshelfSyncVersionProvider.notifier).state++;
       ref
@@ -76,6 +96,15 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
       // serverId는 서버 반영 여부일 뿐이라 로컬 저장 모드·오프라인에서는
       // 계속 null이다. 담기 자체는 로컬 저장으로 확정된다.
       AppSnackBar.success(context, '서재에 추가되었습니다.');
+      // 책 검색 → 책 상세 흐름에서 등록까지 끝나면 검색 결과는 다시 볼
+      // 필요가 없다. 검색 화면과 현재 상세를 스택에서 함께 제거해, 기록
+      // 상세에서 뒤로 가도 검색 결과로 돌아가지 않게 한다.
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => BookRecordScreen(userBookId: result.userBookId),
+        ),
+        (route) => route.isFirst,
+      );
     } on ApiException catch (e) {
       if (e.statusCode == 409) {
         ref.invalidate(bookDetailControllerProvider(widget.isbn));
@@ -155,7 +184,7 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const AppBarTitle('검색으로'),
+        title: AppBarTitle(state.value?.detail.title ?? '책 상세'),
         backgroundColor: AppColors.pageBackground,
         foregroundColor: AppColors.textStrong,
         elevation: 0,
@@ -254,7 +283,8 @@ class _HeroSection extends StatelessWidget {
       if (detail.publisher != null && detail.publisher!.isNotEmpty)
         detail.publisher!,
       if (detail.pageCount > 0) '${detail.pageCount}쪽',
-      if (detail.pubDate != null && detail.pubDate!.isNotEmpty) detail.pubDate!,
+      if (detail.pubDate != null && detail.pubDate!.isNotEmpty)
+        _formatPublicationDate(detail.pubDate!),
     ];
 
     return SizedBox(
@@ -334,14 +364,19 @@ class _HeroSection extends StatelessWidget {
               ],
             ),
           ],
-          if (detail.description != null &&
-              detail.description!.isNotEmpty) ...[
+          if (detail.description != null && detail.description!.isNotEmpty) ...[
             const SizedBox(height: 20),
             _DescriptionCard(description: detail.description!),
           ],
         ],
       ),
     );
+  }
+
+  static String _formatPublicationDate(String value) {
+    final date = value.trim();
+    if (!RegExp(r'^\d{8}$').hasMatch(date)) return date;
+    return '${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}';
   }
 }
 

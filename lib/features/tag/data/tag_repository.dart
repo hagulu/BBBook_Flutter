@@ -6,6 +6,7 @@ import '../../bookshelf/data/bookshelf_database.dart';
 import '../../bookshelf/data/bookshelf_repository.dart';
 import '../../record_sync/data/record_sync_api.dart';
 import '../../storage_mode/data/storage_mode_store.dart';
+import '../models/tag_mapping.dart';
 import 'tag_api.dart';
 import 'tag_dao.dart';
 
@@ -60,6 +61,10 @@ class TagRepository {
     );
     if (localMappingId != null) unawaited(pushMapping(localMappingId));
   }
+
+  /// 태그 관리 UI용 계정 전체 태그. 사용 횟수와 마지막 사용 시각은 서버
+  /// 목록 API에 없으므로, 동기화된 로컬 매핑을 기준으로 계산한다.
+  Future<List<LocalTag>> getTagsByUsage() => _dao.getTagsByUsage();
 
   // ---------------------------------------------------------------------
   // 서버 동기화

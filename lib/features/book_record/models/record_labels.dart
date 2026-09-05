@@ -4,16 +4,16 @@ import '../../bookshelf/models/book_status.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 책 기록 화면에서 쓰는 상태/출처/난이도 표시용 한글 라벨 + 아이콘.
-/// `book-record.md` 기준 문구(읽고 싶음/읽는 중/완독/멈춤/중단). 출처 라벨은
+/// 공통 상태 문구(읽을 책/읽는 중/완독/잠시 멈춤/읽기 중단). 출처 라벨은
 /// api-doc의 "종이책 기준 쪽수"(statsTotalPages) 표현과 맞춰 종이책/전자책/
 /// 오디오북으로 통일한다.
 extension BookStatusLabel on BookStatus {
   String get label => switch (this) {
-    BookStatus.wantToRead => '읽고 싶음',
+    BookStatus.wantToRead => '읽을 책',
     BookStatus.reading => '읽는 중',
     BookStatus.finished => '완독',
-    BookStatus.paused => '멈춤',
-    BookStatus.stopped => '중단',
+    BookStatus.paused => '잠시 멈춤',
+    BookStatus.stopped => '읽기 중단',
   };
 
   IconData get icon => switch (this) {

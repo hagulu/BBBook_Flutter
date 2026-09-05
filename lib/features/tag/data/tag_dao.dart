@@ -65,6 +65,24 @@ class TagDao {
     return rows.isEmpty ? null : _tagFromRow(rows.single);
   }
 
+  /// 활성 태그를 사용 횟수, 마지막 사용 시각 순으로 반환한다. 태그 관리
+  /// 시트의 추천과 검색이 같은 로컬 동기화 데이터를 보도록 여기에서 정렬한다.
+  Future<List<LocalTag>> getTagsByUsage() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.rawQuery('''
+      SELECT t.id, t.server_id, t.name,
+             COUNT(m.id) AS usage_count,
+             MAX(m.updated_at) AS last_used_at
+      FROM tag t
+      INNER JOIN user_book_tag_map m
+        ON m.tag_id = t.id AND m.deleted_at IS NULL
+      WHERE t.deleted_at IS NULL
+      GROUP BY t.id, t.server_id, t.name
+      ORDER BY usage_count DESC, last_used_at DESC, t.name COLLATE NOCASE ASC
+    ''');
+    return rows.map(_tagFromRow).toList(growable: false);
+  }
+
   // ---------------------------------------------------------------------
   // 로컬 우선 추가/삭제
   // ---------------------------------------------------------------------
@@ -76,10 +94,16 @@ class TagDao {
   /// [TagRepository.pushMapping]이 dirty 상태를 보고 알아서 스킵한다.
   ///
   /// 반환값은 이번에 만들었거나 재사용한 매핑의 로컬 ID다.
-  Future<int> addTagLocal({required int userBookId, required String name}) async {
+  Future<int> addTagLocal({
+    required int userBookId,
+    required String name,
+  }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
       throw ArgumentError.value(name, 'name', '태그명이 비어있습니다.');
+    }
+    if (trimmed.length > 15) {
+      throw ArgumentError.value(name, 'name', '태그명은 15자까지 입력할 수 있습니다.');
     }
     final db = await BookshelfDatabase.instance();
     return db.transaction((txn) async {
@@ -92,6 +116,21 @@ class TagDao {
         limit: 1,
       );
       if (existing.isNotEmpty) return existing.single['id'] as int;
+
+      final activeMappings = Sqflite.firstIntValue(
+        await txn.rawQuery(
+          'SELECT COUNT(*) FROM user_book_tag_map '
+          'WHERE user_book_id = ? AND deleted_at IS NULL',
+          [userBookId],
+        ),
+      );
+      if ((activeMappings ?? 0) >= 10) {
+        throw ArgumentError.value(
+          userBookId,
+          'userBookId',
+          '책당 태그는 최대 10개입니다.',
+        );
+      }
 
       final id = await _nextLocalId(txn, 'user_book_tag_map');
       final now = DateTime.now().toUtc().toIso8601String();
@@ -138,7 +177,10 @@ class TagDao {
     });
   }
 
-  Future<int> _findOrCreateLocalTagForAddTxn(Transaction txn, String name) async {
+  Future<int> _findOrCreateLocalTagForAddTxn(
+    Transaction txn,
+    String name,
+  ) async {
     final active = await txn.query(
       'tag',
       columns: ['id'],

@@ -379,6 +379,7 @@ class BookshelfRepository {
     String? shortReview,
     String? difficulty,
     bool wantToReread = false,
+    DateTime? startedAt,
     String? finishedAt,
   }) async {
     final existing = await _dao.getByIsbn13(isbn13);
@@ -408,6 +409,7 @@ class BookshelfRepository {
         rereadCount: 0,
         wantToReread: wantToReread,
         difficulty: difficulty,
+        startedAt: startedAt,
         finishedAt: _createFinishedAt(status, finishedAt),
         tags: const [],
         createdAt: now,

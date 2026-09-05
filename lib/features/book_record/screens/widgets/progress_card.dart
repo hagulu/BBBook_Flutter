@@ -8,7 +8,8 @@ import '../../../bookshelf/models/record_patch.dart';
 import '../../providers/book_record_providers.dart';
 import 'record_section_card.dart';
 
-/// 읽는 중/멈춤 상태에서만 노출되는 진행률 카드.
+/// 전체 페이지(또는 오디오북 진행률 상한)를 아는 책에서만 노출되는 진행률
+/// 카드 — 노출 여부 자체는 호출부(`book_record_screen.dart`)가 결정한다.
 ///
 /// 진행률 바(Slider)는 표시 전용이며 드래그로 수정할 수 없다. 쪽수 입력은
 /// 포커스를 얻으면 기존 값을 플레이스홀더로 보여주고 입력창은 비워, 지우지
@@ -151,9 +152,9 @@ class _ProgressCardState extends ConsumerState<ProgressCard>
     // 없다 — 페이지 기반 총쪽수는 종이책/전자책에서만 의미가 있다.
     final totalPages = isAudioBook ? null : widget.book.effectiveTotalPages;
     final ratio = widget.book.progressRatio;
-    // 진행률 바에 쓸 상한. 오디오북은 항상 100(%), 그 외는 총쪽수를 알 때만.
-    final showBar = isAudioBook || (totalPages != null && totalPages > 0);
-    final barMax = isAudioBook ? 100 : totalPages;
+    // 진행률 바에 쓸 상한. 이 카드는 호출부가 상한을 아는 책에서만 그려
+    // 항상 값이 있다 — 오디오북은 100(%), 그 외는 총쪽수.
+    final barMax = isAudioBook ? 100 : totalPages!;
 
     return RecordSectionCard(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
@@ -220,34 +221,33 @@ class _ProgressCardState extends ConsumerState<ProgressCard>
           // 오디오북은 페이지가 아니라 0~100 퍼센트 상한으로 같은 바를
           // 그대로 쓴다 — "페이지 기반 슬라이더"가 아니라 퍼센트 진행 바라
           // 오디오북에도 자연스럽다.
-          if (showBar) const SizedBox(height: 6),
-          if (showBar)
-            SizedBox(
-              // 표시 전용(드래그 불가)이라 손잡이 터치 영역이 필요 없어,
-              // 트랙 두께에 맞춰 세로 여백을 최소화했다.
-              height: 14,
-              child: SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: 4,
-                  // 표시 전용 진행률 바 — 손잡이를 없애 드래그 가능한
-                  // 컨트롤처럼 보이지 않게 한다.
-                  thumbShape: SliderComponentShape.noThumb,
-                  overlayShape: SliderComponentShape.noOverlay,
-                  activeTrackColor: AppColors.progressFill,
-                  inactiveTrackColor: AppColors.border,
-                  disabledActiveTrackColor: AppColors.progressFill,
-                  disabledInactiveTrackColor: AppColors.border,
-                ),
-                child: Slider(
-                  padding: EdgeInsets.zero,
-                  value: _sliderValue.clamp(0, barMax!.toDouble()),
-                  min: 0,
-                  max: barMax.toDouble(),
-                  // onChanged를 주지 않아 수정을 막는다(표시 전용).
-                  onChanged: null,
-                ),
+          const SizedBox(height: 6),
+          SizedBox(
+            // 표시 전용(드래그 불가)이라 손잡이 터치 영역이 필요 없어,
+            // 트랙 두께에 맞춰 세로 여백을 최소화했다.
+            height: 14,
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 4,
+                // 표시 전용 진행률 바 — 손잡이를 없애 드래그 가능한
+                // 컨트롤처럼 보이지 않게 한다.
+                thumbShape: SliderComponentShape.noThumb,
+                overlayShape: SliderComponentShape.noOverlay,
+                activeTrackColor: AppColors.progressFill,
+                inactiveTrackColor: AppColors.border,
+                disabledActiveTrackColor: AppColors.progressFill,
+                disabledInactiveTrackColor: AppColors.border,
+              ),
+              child: Slider(
+                padding: EdgeInsets.zero,
+                value: _sliderValue.clamp(0, barMax.toDouble()),
+                min: 0,
+                max: barMax.toDouble(),
+                // onChanged를 주지 않아 수정을 막는다(표시 전용).
+                onChanged: null,
               ),
             ),
+          ),
         ],
       ),
     );

@@ -7,13 +7,15 @@ import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../book_detail/screens/widgets/add_status_dialog.dart';
-import '../../../book_detail/screens/widgets/finish_options_dialog.dart';
 import '../../../book_record/models/record_labels.dart';
+import '../../../book_record/providers/book_record_providers.dart';
 import '../../../book_record/screens/widgets/book_category_field.dart';
 import '../../../book_record/screens/widgets/book_thumbnail_field.dart';
+import '../../../book_record/screens/widgets/finish_confirm_dialog.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../../book_record/screens/widgets/record_field_tile.dart';
 import '../../../bookshelf/models/book_status.dart';
+import '../../../bookshelf/models/record_patch.dart';
 import '../../../bookshelf/providers/bookshelf_providers.dart';
 
 /// "직접 등록" 모달(book-search.md, `CustomBookModal` add 모드 대응). 항목은
@@ -52,7 +54,7 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
   File? _pickedThumbnail;
   int? _selectedCategoryId;
   BookStatus _status = BookStatus.reading;
-  FinishOptionsResult? _finishOptions;
+  FinishConfirmResult? _finishOptions;
   String? _errorText;
 
   static const _labelStyle = TextStyle(
@@ -92,7 +94,13 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
     if (status == null || !mounted) return;
 
     if (status == BookStatus.finished) {
-      final options = await showFinishOptionsDialog(context);
+      final options = await showFinishConfirmDialog(
+        context,
+        showSource: true,
+        showDifficulty: true,
+        showRatingReview: true,
+        showFinishedAt: true,
+      );
       if (options == null || !mounted) return;
       setState(() {
         _status = status;
@@ -152,12 +160,23 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
             sourceType: options?.sourceType?.apiValue,
             myRating: options?.myRating,
             shortReview: options?.shortReview,
-            difficulty: options?.difficulty?.apiValue,
+            difficulty: options?.difficulty,
             wantToReread: options?.wantToReread ?? false,
             finishedAt: options?.finishedAt == null
                 ? null
                 : _formatDate(options!.finishedAt!),
           );
+      // 명작은 생성 API가 받지 않으므로 생성 직후 로컬 우선 PATCH로 남긴다.
+      // CREATE가 오프라인으로 대기 중이어도 dirty 필드가 보존돼, 생성 확정
+      // 후 이어지는 PATCH 재시도에서 사용자가 고른 값을 반영한다.
+      if (options?.isMasterpiece == true) {
+        await ref
+            .read(bookRecordRepositoryProvider)
+            .updateRecord(
+              book.userBookId,
+              const RecordPatch(isMasterpiece: true),
+            );
+      }
       ref.read(bookshelfSyncVersionProvider.notifier).state++;
       if (mounted) {
         Navigator.of(context).pop((userBookId: book.userBookId, synced: true));

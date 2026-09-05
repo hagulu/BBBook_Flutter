@@ -8,7 +8,7 @@ import 'widgets/finished_tab_view.dart';
 import 'widgets/reading_tab_view.dart';
 import 'widgets/simple_grid_tab_view.dart';
 
-/// 내 책장(BOOKSHELF) 하단 탭 콘텐츠. 상태별 4탭(읽고 싶음/읽는 중/완독/중단),
+/// 내 책장(BOOKSHELF) 하단 탭 콘텐츠. 상태별 4탭(읽을 책/읽는 중/완독/읽기 중단),
 /// 기본 선택 탭은 읽는 중.
 ///
 /// `bookshelf.md`: 탭 선택은 웹에서 sessionStorage로 유지되지만, 모바일에서는
@@ -23,7 +23,7 @@ class BookshelfScreen extends ConsumerStatefulWidget {
 
 class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
     with SingleTickerProviderStateMixin {
-  // 탭 순서(읽고 싶음/읽는 중/완독/중단)상 읽는 중이 index 1이라 기본 선택
+  // 탭 순서(읽을 책/읽는 중/완독/읽기 중단)상 읽는 중이 index 1이라 기본 선택
   // 탭으로 삼는다.
   late final TabController _tabController = TabController(
     length: 4,
@@ -121,10 +121,10 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
             padding: EdgeInsets.zero,
             labelPadding: const EdgeInsets.symmetric(horizontal: 4),
             tabs: const [
-              _PillTabLabel('읽고 싶음'),
+              _PillTabLabel('읽을 책'),
               _PillTabLabel('읽는 중'),
               _PillTabLabel('완독'),
-              _PillTabLabel('중단'),
+              _PillTabLabel('읽기 중단'),
             ],
           ),
         ),
@@ -134,13 +134,13 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
             children: const [
               SimpleGridTabView(
                 status: BookStatus.wantToRead,
-                emptyText: '읽고 싶은 책이 없습니다.',
+                emptyText: '읽을 책이 없습니다.',
               ),
               ReadingTabView(),
               FinishedTabView(),
               SimpleGridTabView(
                 status: BookStatus.stopped,
-                emptyText: '중단한 책이 없습니다.',
+                emptyText: '읽기 중단한 책이 없습니다.',
               ),
             ],
           ),

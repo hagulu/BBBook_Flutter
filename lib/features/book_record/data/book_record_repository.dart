@@ -326,11 +326,19 @@ class BookRecordRepository {
   /// `tag`/`user_book_tag_map`을 조인한 값이므로([BookshelfDao._attachTags]),
   /// 로컬 반영 직후 다시 읽기만 하면 최신 태그가 그대로 보인다.
   Future<BookItem> addTag(int userBookId, String name) async {
-    await _requireLocal(userBookId);
+    final current = await _requireLocal(userBookId);
     if (await _storageMode.isLocal()) {
       throw const ApiException('로컬 저장 모드에서는 서버가 필요한 기능을 쓸 수 없습니다.');
     }
-    await _tagRepository.addTag(userBookId: userBookId, name: name);
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) throw const ApiException('태그명을 입력해주세요.');
+    if (trimmed.length > 15) {
+      throw const ApiException('태그명은 최대 15자까지 입력할 수 있습니다.');
+    }
+    if (current.tags.length >= 10) {
+      throw const ApiException('태그는 책당 최대 10개까지 추가할 수 있습니다.');
+    }
+    await _tagRepository.addTag(userBookId: userBookId, name: trimmed);
     return _requireLocal(userBookId);
   }
 
@@ -346,7 +354,10 @@ class BookRecordRepository {
     return _requireLocal(userBookId);
   }
 
-  Future<List<BookTag>> getTagSuggestions() => _api.getMyTags();
+  Future<List<BookTag>> getTagSuggestions() async {
+    final tags = await _tagRepository.getTagsByUsage();
+    return tags.map((tag) => BookTag(id: tag.id, name: tag.name)).toList();
+  }
 
   Future<Map<String, List<String>>> getPlatformOptions() =>
       _api.getPlatformOptions();

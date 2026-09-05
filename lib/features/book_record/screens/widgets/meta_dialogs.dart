@@ -12,7 +12,8 @@ import 'pill_option.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
-/// 독서 상태 선택 팝업. 정사각형 카드를 고르면 바로 그 상태를 반환하며 닫힌다.
+/// 독서 상태 선택 팝업. 책 검색 상세의 서재 담기 시트와 같은 아이콘 카드
+/// 디자인을 쓰되, 책 기록 상세에서 관리하는 5개 상태를 모두 노출한다.
 Future<BookStatus?> showReadingStatusDialog(
   BuildContext context, {
   required BookStatus initialStatus,
@@ -23,89 +24,20 @@ Future<BookStatus?> showReadingStatusDialog(
     backgroundColor: Colors.transparent,
     builder: (context) => RecordDialogShell(
       title: '독서 상태',
-      content: GridView.count(
+      content: IconOptionSelector<BookStatus>(
         crossAxisCount: 3,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 1,
-        children: [
+        // 상태 카드에는 상·하단 패딩, 아이콘, 라벨이 함께 들어간다. 좁은
+        // 화면에서도 고정 콘텐츠가 넘치지 않도록 충분한 행 높이를 준다.
+        childAspectRatio: 1.2,
+        options: [
           for (final status in BookStatus.values)
-            _StatusCard(
-              status: status,
-              selected: status == initialStatus,
-              onTap: () => Navigator.of(context).pop(status),
-            ),
+            IconOption(value: status, icon: status.icon, label: status.label),
         ],
+        selected: initialStatus,
+        onSelected: (status) => Navigator.of(context).pop(status),
       ),
     ),
   );
-}
-
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.status,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final BookStatus status;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: status.label,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          decoration: BoxDecoration(
-            color: selected
-                ? AppColors.accentSurface.withValues(alpha: 0.35)
-                : AppColors.surface,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? AppColors.accentForeground : AppColors.border,
-              width: selected ? 1.5 : 1,
-            ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                status.icon,
-                size: 28,
-                color: selected
-                    ? AppColors.accentForeground
-                    : AppColors.controlInactive,
-              ),
-              const SizedBox(height: 8),
-              Flexible(
-                child: Text(
-                  status.label,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: selected ? FontWeight.bold : FontWeight.w600,
-                    color: selected
-                        ? AppColors.accentForeground
-                        : AppColors.textBody,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// [showSourcePlatformDialog] 결과. [platformName]이 null이면 요청에서
@@ -287,7 +219,8 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
         // 0으로 초기화하므로(사용자에게는 출처 선택 시점에 미리 경고) 이
         // 비교 자체가 필요 없다 — 어떤 총쪽수를 입력해도 항상 유효하다.
         setState(() {
-          _ebookPagesError = '현재 읽은 쪽수(${widget.initialCurrentPage}쪽)보다 작을 수 없어요.';
+          _ebookPagesError =
+              '현재 읽은 쪽수(${widget.initialCurrentPage}쪽)보다 작을 수 없어요.';
         });
         return;
       } else if (parsed != null && parsed != widget.initialDisplayTotalPages) {
@@ -320,8 +253,8 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
     if (source != widget.initialSource && widget.initialCurrentPage > 0) {
       final confirmed = await AppConfirm.show(
         context,
-        title: '출처 변경',
-        message: '출처를 바꾸면 현재 읽은 기록이 0으로 초기화됩니다. 계속할까요?',
+        title: '책 유형 변경',
+        message: '책 유형을 바꾸면 현재 읽은 기록이 0으로 초기화됩니다. 계속할까요?',
         confirmText: '변경',
         destructive: true,
       );
@@ -345,7 +278,7 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
   @override
   Widget build(BuildContext context) {
     return RecordDialogShell(
-      title: '출처',
+      title: '책 유형',
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -406,7 +339,7 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
           if (_isEbookSelected) ...[
             const SizedBox(height: 16),
             const Text(
-              '전자책 전체 쪽수',
+              '전자책 페이지 수',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
@@ -425,7 +358,7 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
               },
               decoration: const InputDecoration(
                 isDense: true,
-                hintText: '선택 사항 — 비워두면 종이책 기준 쪽수를 사용해요',
+                hintText: '입력하지 않으면 종이책 페이지 사용',
                 counterText: '',
               ),
             ),
@@ -434,6 +367,12 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
               Text(
                 _ebookPagesError!,
                 style: const TextStyle(color: AppColors.error, fontSize: 12),
+              ),
+            ] else ...[
+              const SizedBox(height: 6),
+              const Text(
+                '보는 기기에 맞는 쪽수를 입력하세요',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
               ),
             ],
           ],
@@ -476,10 +415,12 @@ Future<String?> showDifficultyDialog(
   );
 }
 
-/// 알게 된 경로(자유 텍스트, 최대 50자) 입력 팝업. 저장을 누르면 trim된
-/// 텍스트를, 취소/배경 닫기면 null을 반환한다. 입력을 비운 채 저장하면 빈
-/// 문자열이 돌아오고, 호출부가 그것을 "지움"(명시적 null)으로 옮긴다 —
-/// 빈 문자열을 그대로 보내면 서버는 삭제가 아니라 빈 값으로 저장한다.
+/// 알게 된 경로(자유 텍스트, 최대 50자) 입력 팝업. 입력 필드 하나뿐이라
+/// 별도 저장 버튼이 없다 — 키보드를 내리면(완료 버튼이든 시스템 제스처든)
+/// 그 순간 입력값을 trim해 반환하며 시트도 함께 닫힌다. 배경을 탭해 닫으면
+/// null을 반환한다. 입력을 비운 채 닫으면 빈 문자열이 돌아오고, 호출부가
+/// 그것을 "지움"(명시적 null)으로 옮긴다 — 빈 문자열을 그대로 보내면 서버는
+/// 삭제가 아니라 빈 값으로 저장한다.
 Future<String?> showDiscoverySourceDialog(
   BuildContext context, {
   required String? initialValue,
@@ -706,14 +647,65 @@ class _DiscoverySourceDialog extends StatefulWidget {
   State<_DiscoverySourceDialog> createState() => _DiscoverySourceDialogState();
 }
 
-class _DiscoverySourceDialogState extends State<_DiscoverySourceDialog> {
+class _DiscoverySourceDialogState extends State<_DiscoverySourceDialog>
+    with WidgetsBindingObserver {
   late final _controller = TextEditingController(
     text: widget.initialValue ?? '',
   );
+  final _focusNode = FocusNode();
+  // 포커스를 얻은 뒤 키보드가 실제로 한 번이라도 올라왔는지 여부
+  // (progress_card.dart와 같은 패턴) — 포커스 직후 키보드가 올라오는
+  // 애니메이션 중에도 didChangeMetrics가 bottomInset==0인 상태로 먼저
+  // 호출될 수 있어, 키보드가 뜨기도 전에 "닫혔다"고 오인해 바로 저장하며
+  // 닫히는 것을 막는다.
+  bool _keyboardShown = false;
+  // onSubmitted(키보드 완료 액션)로 이미 pop을 시작했는데, 그 직후 키보드가
+  // 내려가면서 didChangeMetrics가 다시 _save()를 부를 수 있다 — 첫 pop의
+  // 역방향 전환이 끝나기 전까지는 위젯이 여전히 mounted라 두 번째 pop이
+  // 그 아래 라우트(책 기록 화면 등)까지 닫을 수 있다. 한 번만 저장하도록
+  // 막는다.
+  bool _saved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// 저장 버튼이 따로 없다 — 필드가 하나뿐이라 키보드를 내리는 동작 자체를
+  /// "다 됐다"는 신호로 보고, 그때 입력값을 저장하며 시트도 함께 닫는다.
+  @override
+  void didChangeMetrics() {
+    if (!mounted || !_focusNode.hasFocus) return;
+    final bottomInset = WidgetsBinding
+        .instance
+        .platformDispatcher
+        .views
+        .first
+        .viewInsets
+        .bottom;
+    if (bottomInset > 0) {
+      _keyboardShown = true;
+      return;
+    }
+    if (_keyboardShown) _save();
+  }
+
+  void _save() {
+    if (!mounted || _saved) return;
+    // 배경 탭 등으로 이 시트가 이미 닫히는 중이면(현재 라우트가 아니면)
+    // 여기서 또 pop하지 않는다 — 그 pop은 아래 라우트를 닫혀 버린다.
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
+    _saved = true;
+    Navigator.of(context).pop(_controller.text.trim());
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -723,20 +715,17 @@ class _DiscoverySourceDialogState extends State<_DiscoverySourceDialog> {
       title: '알게 된 경로',
       content: TextField(
         controller: _controller,
+        focusNode: _focusNode,
         autofocus: true,
         maxLength: 50,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _save(),
         decoration: const InputDecoration(
           isDense: true,
           hintText: '예: 친구 추천, SNS, 서점',
           counterText: '',
         ),
       ),
-      buttons: [
-        RecordDialogButton(
-          label: '저장',
-          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
-        ),
-      ],
     );
   }
 }

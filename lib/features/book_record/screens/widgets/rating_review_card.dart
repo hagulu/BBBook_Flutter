@@ -12,9 +12,9 @@ import 'star_rating.dart';
 
 /// 내 평점(탭 즉시 저장) + 한줄 평(바텀시트 입력, 저장 시 반영).
 ///
-/// `book-record.md` 스크린샷 기준 독서 상태(읽는 중이든 완독이든)와 무관하게
-/// 항상 노출·편집 가능하다 — 완독 확인 팝업에서 입력한 값도 결국 이 필드에
-/// 반영되므로, 완독 이후에도 여기서 계속 고쳐 쓸 수 있어야 자연스럽다.
+/// 완독 상태에서만 노출된다(호출부 `book_record_screen.dart` 참고) — 완독
+/// 확인 팝업에서 입력한 값도 결국 이 필드에 반영되므로, 완독 이후에는 여기서
+/// 계속 고쳐 쓸 수 있다.
 class RatingReviewCard extends ConsumerWidget {
   const RatingReviewCard({
     super.key,
