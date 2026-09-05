@@ -47,34 +47,39 @@ class MyDiscussionCard extends StatelessWidget {
                 '숨김 처리된 토론입니다.',
                 style: TextStyle(fontSize: 14, color: AppColors.textMuted),
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    discussion.title ?? '',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textStrong,
+            // 마감 표시는 썸네일 오버레이만으로 하고, 텍스트 영역은 딤
+            // 처리로만 마감 상태를 함께 드러낸다(별도 배지는 두지 않는다).
+            : Opacity(
+                opacity: discussion.isClosed ? 0.5 : 1,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      discussion.title ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textStrong,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    discussion.isSpoiler
-                        ? '스포일러가 포함된 토론입니다'
-                        : (discussion.previewText ?? ''),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textMuted,
-                      height: 1.4,
+                    const SizedBox(height: 4),
+                    Text(
+                      discussion.isSpoiler
+                          ? '스포일러가 포함된 토론입니다'
+                          : (discussion.previewText ?? ''),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                        height: 1.4,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
       ),
     );

@@ -49,10 +49,10 @@ class SearchResultCard extends StatelessWidget {
                         color: AppColors.textStrong,
                       ),
                     ),
-                    if (item.author != null && item.author!.isNotEmpty) ...[
+                    if (item.author.displayedAuthorOrNull case final author?) ...[
                       const SizedBox(height: 4),
                       Text(
-                        displayAuthor(item.author!),
+                        author,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -62,15 +62,22 @@ class SearchResultCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                    if (item.publisher != null || item.pubDate != null) ...[
+                    if (item.publisher != null && item.publisher!.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
-                        [
-                          if (item.publisher != null && item.publisher!.isNotEmpty)
-                            item.publisher!,
-                          if (item.pubDate != null && item.pubDate!.isNotEmpty)
-                            item.pubDate!,
-                        ].join(' · '),
+                        item.publisher!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textMuted,
+                        ),
+                      ),
+                    ],
+                    if (item.pubDate != null && item.pubDate!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        item.pubDate!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/author_display.dart';
 import '../../../bookshelf/screens/widgets/book_cover.dart';
 import '../../models/my_content_book.dart';
 
@@ -103,7 +104,7 @@ class _BookTitleRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = Text(
-      [book.title, ?book.author].join(' · '),
+      [book.title, ?book.author.displayedAuthorOrNull].join(' · '),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: const TextStyle(

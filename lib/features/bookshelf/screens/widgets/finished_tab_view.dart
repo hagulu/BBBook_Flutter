@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/author_display.dart';
 import '../../../../shared/widgets/app_alert.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
@@ -34,10 +36,19 @@ const _kFinishedIconBarHeight = 48.0;
 /// 실제 콘텐츠 합계(88)보다 여유를 둔 값이라 RenderFlex 오버플로우 없이 안전하다.
 const _kFinishedSearchBarHeight = 96.0;
 
-/// 완독 탭 월 그룹 헤더 고정 높이. `_groupedSlivers`의 헤더 위젯과
-/// `_FinishedTabViewState._offsetForGroupIndex`의 스크롤 오프셋 계산이
-/// 항상 같은 값을 쓰도록 상수 하나로 공유한다(값이 어긋나면 인덱스 점프가 밀림).
+/// 완독 탭 월 그룹 헤더 고정 높이(시스템 글자 배율 1.0 기준). `_groupedSlivers`의
+/// 헤더 위젯과 `_FinishedTabViewState._offsetForGroupIndex`의 스크롤 오프셋
+/// 계산이 항상 같은 값을 쓰도록 [_scaledFinishedGroupHeaderHeight]로만 참조한다
+/// (값이 어긋나면 인덱스 점프가 밀림). 위 16dp + 아래 8dp 패딩을 뺀 20dp가
+/// 라벨 몫인데, 배율 1.4 이상에서 라벨 줄 높이가 이를 넘어 잘리므로 배율만큼
+/// 함께 키운다.
 const _kFinishedGroupHeaderHeight = 44.0;
+const _kFinishedGroupHeaderHeightGrowth = 20.0;
+
+double _scaledFinishedGroupHeaderHeight(double textScale) {
+  final growth = (textScale - 1.0).clamp(0.0, double.infinity);
+  return _kFinishedGroupHeaderHeight + growth * _kFinishedGroupHeaderHeightGrowth;
+}
 
 /// 완독 탭 상단 컨트롤과 콘텐츠 사이 여백(스크롤 오프셋 계산에도 사용).
 const _kFinishedContentSpacing = 4.0;
@@ -46,6 +57,54 @@ const _kFinishedContentSpacing = 4.0;
 /// 여유를 둔 비율. 0.56이면 좁은 화면에서 텍스트가 넘쳐 RenderFlex 오버플로우
 /// (디버그 모드의 노란/검정 빗금)가 발생해 0.46으로 낮췄다.
 const _kFinishedGridAspectRatio = 0.46;
+
+/// 리스트 모드 한 행의 고정 높이(시스템 글자 배율 1.0 기준). `_offsetForGroupIndex`의
+/// 스크롤 오프셋 계산과 `SliverFixedExtentList`의 `itemExtent`, 실제 행 위젯의
+/// 높이가 항상 같은 값을 참조해야 한다 — [_scaledFinishedListRowHeight]로만
+/// 읽는다. 배율을 강제로 낮추는 대신(그러면 이 화면만 사용자가 고른 글자
+/// 크기를 못 받는다) 배율이 커지는 만큼 행 높이도 함께 늘려 제목/작가/칩
+/// 한 줄이 꽉 찬 상태에서도 `Column` 오버플로우가 나지 않게 한다.
+const _kFinishedListRowHeight = 92.0;
+const _kFinishedListRowHeightGrowth = 54.0;
+
+double _scaledFinishedListRowHeight(double textScale) {
+  final growth = (textScale - 1.0).clamp(0.0, double.infinity);
+  return _kFinishedListRowHeight + growth * _kFinishedListRowHeightGrowth;
+}
+
+/// 리스트 행의 태그/카테고리 칩 영역 높이(시스템 글자 배율 1.0 기준). 위
+/// [_kFinishedListRowHeight]와 같은 이유로 고정값 대신 배율에 맞춰 늘린다.
+const _kFinishedListChipRowHeight = 22.0;
+const _kFinishedListChipRowHeightGrowth = 13.0;
+
+double _scaledFinishedListChipRowHeight(double textScale) {
+  final growth = (textScale - 1.0).clamp(0.0, double.infinity);
+  return _kFinishedListChipRowHeight + growth * _kFinishedListChipRowHeightGrowth;
+}
+
+/// 완독 탭 목록 표시 방식. 그리드(썸네일 위주)와 리스트(제목/작가/출판사/
+/// 카테고리·태그 위주, 표지는 작게) 중 사용자가 고를 수 있다. 마지막으로
+/// 고른 값은 `SharedPreferences`([_kFinishedViewModePrefKey])에 저장해 다음에
+/// 완독 탭을 열 때도 그대로 유지한다.
+enum _FinishedViewMode {
+  grid,
+  list;
+
+  static _FinishedViewMode fromPref(String? value) {
+    return _FinishedViewMode.values.firstWhere(
+      (mode) => mode.name == value,
+      orElse: () => _FinishedViewMode.grid,
+    );
+  }
+}
+
+/// [_FinishedViewMode] 저장에 쓰는 `SharedPreferences` 키.
+const _kFinishedViewModePrefKey = 'finished_view_mode';
+
+/// 리스트 모드의 책 사이 구분선과 카테고리/태그 알약 사이 구분선이 같은
+/// 색을 쓰도록 하나로 통일한 값. `AppColors.border`(불투명)보다는 옅고,
+/// 완전 무채색 흐림보다는 살짝 진해 "보일랑 말랑" 정도로 보이게 한다.
+final _kFinishedDividerColor = AppColors.border.withValues(alpha: 0.7);
 
 /// 완독 탭: 검색/필터가 없는 기본 모드에서는 월별 그룹 그리드 + 우측 연/월
 /// 인덱스(Google 포토 사진 스크러버 참고: 평소엔 얇은 트랙만 보이다 드래그 시
@@ -79,6 +138,12 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
   final _unlinkedBannerKey = GlobalKey();
   Timer? _searchDebounce;
   bool _searchOpen = false;
+  _FinishedViewMode _viewMode = _FinishedViewMode.grid;
+  // 저장된 보기 방식 로딩이 끝나기 전에 사용자가 직접 토글했는지 추적한다
+  // ([_loadViewMode] 참고) — true가 되면 이후 늦게 도착하는 저장값 복원은
+  // 무시한다.
+  bool _viewModeUserSet = false;
+  Map<String, Color> _categoryColors = const {};
 
   // 월별 그룹 결과 캐시. `_groupByMonth`는 완독 전체 목록을 순회하는데,
   // 검색/필터 패널 토글처럼 books와 무관한 setState에도 build()가 다시
@@ -103,6 +168,31 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
   // 다시 만들지 않도록 유지한다.
   @override
   bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadViewMode();
+  }
+
+  /// 마지막으로 본 보기 방식을 불러온다. 기본값(그리드)으로 이미 그려진
+  /// 뒤 도착하므로, 저장된 값이 그리드와 다를 때만 다시 그린다.
+  ///
+  /// 이 조회가 끝나기 전에 사용자가 [_toggleViewMode]로 직접 보기를 바꾸면
+  /// 그 선택이 우선이다 — 늦게 도착한 저장값으로 되돌리면 방금 고른 화면이
+  /// 다시 뒤집히고, 그 뒤에도 이 값으로 저장을 덮어써 다음 진입 때도
+  /// 사용자가 고르지 않은 모드가 남는다.
+  Future<void> _loadViewMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_viewModeUserSet) return;
+    final mode = _FinishedViewMode.fromPref(
+      prefs.getString(_kFinishedViewModePrefKey),
+    );
+    if (mounted && !_viewModeUserSet && mode != _viewMode) {
+      setState(() => _viewMode = mode);
+      _resetScroll();
+    }
+  }
 
   @override
   void dispose() {
@@ -156,6 +246,20 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     _searchController.clear();
     ref.read(finishedFilterProvider.notifier).setKeyword('');
     _resetScroll();
+  }
+
+  /// 그리드/리스트 행 높이 계산 방식이 서로 달라 인덱스 스크러버의 오프셋이
+  /// 어긋날 수 있으므로, 보기 방식을 바꿀 때는 맨 위로 되돌린다.
+  void _toggleViewMode() {
+    final next = _viewMode == _FinishedViewMode.grid
+        ? _FinishedViewMode.list
+        : _FinishedViewMode.grid;
+    _viewModeUserSet = true;
+    setState(() => _viewMode = next);
+    _resetScroll();
+    SharedPreferences.getInstance().then(
+      (prefs) => prefs.setString(_kFinishedViewModePrefKey, next.name),
+    );
   }
 
   void _resetFilter() {
@@ -226,6 +330,25 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     int index,
     double contentWidth,
   ) {
+    final headerHeight = _scaledFinishedGroupHeaderHeight(_textScale);
+    double offset = 0;
+    for (var i = 0; i < index; i++) {
+      offset += headerHeight + _groupContentHeight(groups[i], contentWidth);
+    }
+    return offset;
+  }
+
+  /// 현재 화면의 시스템 글자 배율. 리스트 행/헤더 고정 높이 계산이 실제
+  /// 렌더링과 어긋나지 않도록 이 값 하나로 통일해서 쓴다.
+  double get _textScale => MediaQuery.textScalerOf(context).scale(1.0);
+
+  /// 그리드는 열 수·비율에 따라, 리스트는 고정 행 높이(`_scaledFinishedListRowHeight`)에
+  /// 따라 그룹 한 덩어리의 높이를 계산한다. `SliverGrid`/`SliverFixedExtentList`가
+  /// 실제로 그리는 방식과 이 계산이 어긋나면 인덱스 점프 위치가 밀린다.
+  double _groupContentHeight(_MonthGroup group, double contentWidth) {
+    if (_viewMode == _FinishedViewMode.list) {
+      return group.items.length * _scaledFinishedListRowHeight(_textScale);
+    }
     const crossAxisCount = 3;
     const crossAxisSpacing = 12.0;
     const mainAxisSpacing = 16.0;
@@ -235,16 +358,8 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     final tileWidth =
         (gridWidth - crossAxisSpacing * (crossAxisCount - 1)) / crossAxisCount;
     final tileHeight = tileWidth / _kFinishedGridAspectRatio;
-
-    double offset = 0;
-    for (var i = 0; i < index; i++) {
-      final rows = (groups[i].items.length / crossAxisCount).ceil();
-      final gridHeight = rows <= 0
-          ? 0.0
-          : rows * tileHeight + (rows - 1) * mainAxisSpacing;
-      offset += _kFinishedGroupHeaderHeight + gridHeight;
-    }
-    return offset;
+    final rows = (group.items.length / crossAxisCount).ceil();
+    return rows <= 0 ? 0.0 : rows * tileHeight + (rows - 1) * mainAxisSpacing;
   }
 
   @override
@@ -253,6 +368,13 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     final filter = ref.watch(finishedFilterProvider);
     final books = ref.watch(finishedBooksProvider);
     final isDefaultMode = filter.isDefaultMode;
+    // BookItem.category는 이름 문자열이라(id 아님) 색은 마스터 목록에서
+    // 이름으로 매핑한다 — finished_filter_panel.dart와 같은 방식.
+    _categoryColors = {
+      for (final category
+          in ref.watch(bookCategoriesProvider).valueOrNull ?? const [])
+        category.name: category.color,
+    };
 
     // 실제로 그릴 목록을 여기서 한 번만 정한다.
     // - AsyncData(확정된 성공 응답)면 그 값을 쓰고, 이 필터의 결과로 캐시해 둔다.
@@ -294,6 +416,8 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
                     child: _FinishedIconBar(
                       searchOpen: _searchOpen,
                       onSearchTap: _toggleSearch,
+                      viewMode: _viewMode,
+                      onViewModeTap: _toggleViewMode,
                     ),
                   ),
                   SliverToBoxAdapter(
@@ -419,62 +543,62 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
             16,
             bookshelfFabBottomPadding,
           ),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 16,
-              childAspectRatio: _kFinishedGridAspectRatio,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _FinishedBookCard(book: items[index]),
-              childCount: items.length,
-            ),
-          ),
+          sliver: _bookSliver(items),
         ),
       ];
     }
     return _groupedSlivers(groups);
   }
 
+  Widget _bookSliver(List<BookItem> items) {
+    if (_viewMode == _FinishedViewMode.list) {
+      return SliverFixedExtentList(
+        itemExtent: _scaledFinishedListRowHeight(_textScale),
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => _FinishedBookListRow(
+            book: items[index],
+            categoryColor: _categoryColors[items[index].category],
+            showDivider: index != items.length - 1,
+          ),
+          childCount: items.length,
+        ),
+      );
+    }
+    return SliverGrid(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 16,
+        childAspectRatio: _kFinishedGridAspectRatio,
+      ),
+      delegate: SliverChildBuilderDelegate(
+        (context, index) => _FinishedBookCard(book: items[index]),
+        childCount: items.length,
+      ),
+    );
+  }
+
   List<Widget> _groupedSlivers(List<_MonthGroup> groups) {
     return [
-      for (final group in groups) ...[
-        SliverToBoxAdapter(
-          child: SizedBox(
-            height: _kFinishedGroupHeaderHeight,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  group.label,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: AppColors.textStrong,
-                  ),
-                ),
+      // 헤더+콘텐츠를 SliverMainAxisGroup으로 묶어야 pinned 헤더가 "이
+      // 그룹 범위 안에서만" 고정된다 — 묶지 않으면 이전 달 헤더들이 화면에
+      // 계속 쌓여 남는다(각자 독립적으로 고정되어 버리기 때문).
+      for (final group in groups)
+        SliverMainAxisGroup(
+          slivers: [
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _MonthHeaderDelegate(
+                group.label,
+                height: _scaledFinishedGroupHeaderHeight(_textScale),
               ),
             ),
-          ),
-        ),
-        SliverPadding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 16,
-              childAspectRatio: _kFinishedGridAspectRatio,
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: _bookSliver(group.items),
             ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _FinishedBookCard(book: group.items[index]),
-              childCount: group.items.length,
-            ),
-          ),
+          ],
         ),
-      ],
       const SliverToBoxAdapter(
         child: SizedBox(height: bookshelfFabBottomPadding),
       ),
@@ -553,20 +677,74 @@ class _MonthGroup {
   String get label => isDated ? '$year년 $month월' : '날짜 미지정';
 }
 
+/// 월 그룹 헤더를 스크롤 시 상단에 고정(sticky)한다. 그리드/리스트 모드
+/// 공통이며, 배경을 불투명하게 칠해 뒤로 스크롤되는 카드/행이 비쳐 보이지
+/// 않게 한다. `pinned: true`인 `SliverPersistentHeader`를 여러 개 이어
+/// 붙이면 다음 헤더가 상단에 닿는 순간 이전 헤더를 자연스럽게 밀어낸다.
+class _MonthHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _MonthHeaderDelegate(this.label, {required this.height});
+
+  final String label;
+
+  /// 호출부(`_groupedSlivers`)가 현재 시스템 글자 배율로 계산해 넘긴 헤더
+  /// 높이. `_offsetForGroupIndex`의 스크롤 오프셋 계산과 항상 같은 값이어야
+  /// 한다.
+  final double height;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      alignment: Alignment.centerLeft,
+      color: AppColors.pageBackground,
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+          color: AppColors.textStrong,
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _MonthHeaderDelegate oldDelegate) =>
+      label != oldDelegate.label || height != oldDelegate.height;
+}
+
 /// 완독 탭 상단 아이콘 바(검색 / 공개 토글 / 도움말). 고정되지 않은 일반
 /// sliver 콘텐츠라 목록과 함께 스크롤되어 사라진다. 높이는 항상
 /// [_kFinishedIconBarHeight]에 맞춰 `_contentStartOffset`의 계산과
 /// 어긋나지 않게 한다.
 class _FinishedIconBar extends ConsumerWidget {
-  const _FinishedIconBar({required this.searchOpen, required this.onSearchTap});
+  const _FinishedIconBar({
+    required this.searchOpen,
+    required this.onSearchTap,
+    required this.viewMode,
+    required this.onViewModeTap,
+  });
 
   final bool searchOpen;
   final VoidCallback onSearchTap;
+  final _FinishedViewMode viewMode;
+  final VoidCallback onViewModeTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final privacyState = ref.watch(privacySettingControllerProvider);
     final isPublic = privacyState.valueOrNull ?? false;
+    final isListMode = viewMode == _FinishedViewMode.list;
 
     return SizedBox(
       height: _kFinishedIconBarHeight,
@@ -590,6 +768,22 @@ class _FinishedIconBar extends ConsumerWidget {
             ),
             Row(
               children: [
+                IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: 44,
+                    minHeight: 44,
+                  ),
+                  padding: EdgeInsets.zero,
+                  tooltip: isListMode ? '그리드로 보기' : '리스트로 보기',
+                  icon: Icon(
+                    isListMode
+                        ? PhosphorIconsRegular.squaresFour
+                        : PhosphorIconsRegular.listBullets,
+                    color: AppColors.accentForeground,
+                    size: 20,
+                  ),
+                  onPressed: onViewModeTap,
+                ),
                 IconButton(
                   constraints: const BoxConstraints(
                     minWidth: 44,
@@ -669,9 +863,7 @@ class _FilterSheetResetButton extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10),
         foregroundColor: AppColors.accentForeground,
         backgroundColor: AppColors.accentSurface.withValues(alpha: 0.4),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(999),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       ),
       onPressed: () {
         ref.read(finishedFilterProvider.notifier).resetCriteria();
@@ -901,6 +1093,233 @@ class _FinishedBookCard extends StatelessWidget {
           ),
           if (book.myRating != null) _StarRow(rating: book.myRating!),
         ],
+      ),
+    );
+  }
+}
+
+/// 리스트 모드 한 줄: 표지는 작게(제목 대체용으로만) 두고 제목·작가/출판사·
+/// 카테고리/태그를 한눈에 훑어볼 수 있게 구성한다. 태그가 많아도 행 높이가
+/// 흔들리지 않도록 태그 줄은 감싸지 않고 가로 스크롤로 흡수한다.
+/// 표지 폭(리스트 모드). 텍스트 위주 행이라 작게 유지하되 축소판으로서
+/// 알아볼 수 있을 정도는 되도록 살짝만 키운다.
+const _kFinishedListThumbWidth = 44.0;
+
+class _FinishedBookListRow extends StatelessWidget {
+  const _FinishedBookListRow({
+    required this.book,
+    this.categoryColor,
+    this.showDivider = true,
+  });
+
+  final BookItem book;
+
+  /// 카테고리 이름으로 마스터 목록에서 매핑한 실제 카테고리 색(없으면 null).
+  final Color? categoryColor;
+
+  /// 그룹(월)의 마지막 행에는 구분선을 그리지 않는다 — 바로 다음이 헤더라
+  /// 이중으로 선이 겹쳐 보이지 않도록.
+  final bool showDivider;
+
+  @override
+  Widget build(BuildContext context) {
+    final author = book.author.displayedAuthorOrNull;
+    final publisher = book.publisher != null && book.publisher!.isNotEmpty
+        ? book.publisher!
+        : null;
+    final hasChips = book.category != null || book.tags.isNotEmpty;
+    final textScale = MediaQuery.textScalerOf(context).scale(1.0);
+
+    final row = InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BookRecordScreen(userBookId: book.userBookId),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: _kFinishedListThumbWidth,
+              child: BookCover(
+                imageUrl: book.coverImageUrl,
+                title: book.title,
+                borderRadius: 6,
+                useDiskCache: true,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      if (book.isMasterpiece) ...[
+                        const Icon(
+                          PhosphorIconsFill.crown,
+                          size: 14,
+                          color: AppColors.highlightGold,
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                      Expanded(
+                        child: Text(
+                          book.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: AppColors.textStrong,
+                          ),
+                        ),
+                      ),
+                      if (book.isbn13 == null) ...[
+                        const SizedBox(width: 4),
+                        Semantics(
+                          label: 'ISBN 미연결',
+                          child: const Icon(
+                            PhosphorIconsFill.linkBreak,
+                            size: 12,
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (author != null || publisher != null) ...[
+                    const SizedBox(height: 2),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          // 작가/번역가는 출판사와 구분되도록 진한 색을 쓴다
+                          // (글자 크기·굵기는 그대로 두고 색만 바꾼다).
+                          if (author != null)
+                            TextSpan(
+                              text: author,
+                              style: const TextStyle(
+                                color: AppColors.textStrong,
+                              ),
+                            ),
+                          if (author != null && publisher != null)
+                            const TextSpan(text: ' · '),
+                          if (publisher != null) TextSpan(text: publisher),
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                  if (hasChips) ...[
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      height: _scaledFinishedListChipRowHeight(textScale),
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const ClampingScrollPhysics(),
+                        children: [
+                          if (book.category != null)
+                            _ListChip(
+                              label: book.category!,
+                              color: categoryColor,
+                            ),
+                          // 카테고리와 태그는 성격이 달라 구분선을
+                          // 두어야(체감상) 한눈에 훑기 쉽다.
+                          if (book.category != null && book.tags.isNotEmpty)
+                            const _ChipDivider(),
+                          for (final tag in book.tags)
+                            _ListChip(label: tag.name),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return SizedBox(
+      height: _scaledFinishedListRowHeight(textScale),
+      child: Stack(
+        children: [
+          Positioned.fill(child: row),
+          if (showDivider)
+            Positioned(
+              left: _kFinishedListThumbWidth + 12,
+              right: 8,
+              bottom: 0,
+              child: Container(height: 1, color: _kFinishedDividerColor),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 카테고리 알약과 태그 알약 무리 사이를 구분하는 얇은 세로선. 카테고리
+/// 알약이 이미 오른쪽에 6dp 여백(`_ListChip`의 margin)을 갖고 있으므로,
+/// 여기서는 왼쪽 여백을 더하지 않고 오른쪽에만 같은 6dp를 둬 양옆 간격을
+/// 맞춘다.
+class _ChipDivider extends StatelessWidget {
+  const _ChipDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    // 가로 스크롤 ListView는 자식에게 세로(cross axis) 방향으로 꽉 찬 tight
+    // 제약을 주므로, Container에 height를 직접 줘도 무시되고 항상 부모
+    // 높이(22)만큼 늘어난다. Center로 감싸 느슨한 제약을 만들어야 실제
+    // 지정한 높이(4)만큼만 짧게 그려진다.
+    return Center(
+      child: Container(
+        width: 1,
+        height: 12,
+        margin: const EdgeInsets.only(right: 6),
+        color: _kFinishedDividerColor,
+      ),
+    );
+  }
+}
+
+/// 리스트 행의 카테고리/태그 알약. 카테고리는 실제 카테고리 색(마스터 목록
+/// 기준, `reading_tab_view.dart`의 `_CategoryBadge`와 같은 방식 — 배경만
+/// 옅게 물들이고 글자색은 그대로 유지)으로 구분하고, 매핑되는 색이 없으면
+/// 일반 태그와 같은 중립색으로 보인다.
+class _ListChip extends StatelessWidget {
+  const _ListChip({required this.label, this.color});
+
+  final String label;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+      decoration: BoxDecoration(
+        color: color == null
+            ? AppColors.surfaceSubtle
+            : color!.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textBody,
+        ),
       ),
     );
   }

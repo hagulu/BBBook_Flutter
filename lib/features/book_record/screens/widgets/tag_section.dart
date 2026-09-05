@@ -112,18 +112,39 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
   final _focusNode = FocusNode();
   String? _errorText;
   bool _submitting = false;
+  bool _keyboardWasVisible = false;
+  // 저장 중에 키보드 인셋이 잠깐 0으로 찍히는 걸 봤다는 표시. 저장이 끝난
+  // 뒤에도 키보드가 아직 다시 올라오지 않은 프레임이 있을 수 있어,
+  // `_submitting`만으로는 그 프레임에 종료 감지가 다시 걸리는 걸 막지
+  // 못한다 — 키보드가 실제로 다시 보일 때까지 억제한다.
+  bool _suppressKeyboardClose = false;
 
-  late Future<List<BookTag>> _suggestionsFuture;
+  // 추천 태그는 시트를 여는 시점에 한 번만 불러온다. 태그를 추가·삭제할
+  // 때마다 서버에서 다시 불러오면 FutureBuilder가 매번 데이터 없는 상태로
+  // 리셋되면서 추천 영역이 통째로 사라졌다 다시 채워지는 덜컹거림이
+  // 생긴다. 이미 받아둔 목록에서 현재 태그명만 걸러내면 충분하다.
+  List<BookTag> _allSuggestions = const [];
+  bool _suggestionsLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _suggestionsFuture = _loadSuggestions();
+    _loadSuggestions();
   }
 
-  Future<List<BookTag>> _loadSuggestions() => ref
-      .read(tagSuggestionsProvider.future)
-      .onError<Object>((_, _) => const <BookTag>[]);
+  Future<void> _loadSuggestions() async {
+    List<BookTag> result;
+    try {
+      result = await ref.read(tagSuggestionsProvider.future);
+    } catch (_) {
+      result = const [];
+    }
+    if (!mounted) return;
+    setState(() {
+      _allSuggestions = result;
+      _suggestionsLoaded = true;
+    });
+  }
 
   @override
   void dispose() {
@@ -153,7 +174,6 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
           .addTag(trimmed);
       if (!mounted) return;
       _controller.clear();
-      setState(() => _suggestionsFuture = _loadSuggestions());
       _focusNode.requestFocus();
     } on ApiException catch (e) {
       if (mounted) setState(() => _errorText = e.message);
@@ -172,7 +192,6 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
       await ref
           .read(bookRecordControllerProvider(widget.userBookId).notifier)
           .removeTag(tag.id);
-      if (mounted) setState(() => _suggestionsFuture = _loadSuggestions());
     } on ApiException catch (e) {
       if (mounted) setState(() => _errorText = e.message);
     } finally {
@@ -190,6 +209,38 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
         const <BookTag>[];
     final query = _controller.text.trim();
     final atLimit = existingTags.length >= 10;
+
+    // 키보드가 내려가면(사용자가 스와이프나 뒤로가기로 직접 닫은 경우)
+    // 시트도 함께 닫는다. 태그 추가 직후 포커스를 다시 잡아 키보드를 유지할
+    // 때는 인셋이 0으로 떨어지지 않으므로 여기서 걸리지 않는다.
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    if (bottomInset > 0) {
+      // 키보드가 실제로 다시 보였다 — 이제부터는 다음에 내려갈 때 정상
+      // 종료 감지를 다시 적용한다.
+      _keyboardWasVisible = true;
+      _suppressKeyboardClose = false;
+    } else if (_keyboardWasVisible) {
+      _keyboardWasVisible = false;
+      if (_submitting) {
+        // 태그 추가 직후 iOS는 완료(done) 액션으로 키보드를 먼저 내렸다가
+        // _focusNode.requestFocus()로 다시 올린다. 그 사이에 낀 이 프레임을
+        // "사용자가 직접 닫았다"로 오인하지 않도록 표시만 해두고, 저장이
+        // 끝난 뒤에도 키보드가 다시 뜨기 전까지는 계속 억제한다.
+        _suppressKeyboardClose = true;
+      } else if (!_suppressKeyboardClose) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _submitting) return;
+          // 바깥(배리어)을 탭해 시트가 이미 스스로 닫히는 중일 때도 포커스가
+          // 풀리며 키보드가 내려가 이 콜백이 걸린다. 그때 다시 한번 pop하면
+          // 시트 아래의 화면까지 닫혀버리므로, 이 시트 라우트가 여전히
+          // 최상단(current)일 때만 닫는다.
+          final route = ModalRoute.of(context);
+          if (route != null && route.isCurrent) {
+            Navigator.of(context).maybePop();
+          }
+        });
+      }
+    }
 
     return RecordDialogShell(
       title: '태그 관리',
@@ -217,8 +268,9 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
               children: [
                 for (final tag in existingTags)
                   _TagChip(
+                    key: ValueKey('current-${tag.id}'),
                     tag: tag,
-                    onDeleted: _submitting ? null : () => _remove(tag),
+                    onDeleted: () => _remove(tag),
                   ),
               ],
             ),
@@ -262,15 +314,14 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
                 style: const TextStyle(color: AppColors.error, fontSize: 12),
               ),
             ),
-          FutureBuilder<List<BookTag>>(
-            future: _suggestionsFuture,
-            builder: (context, snapshot) {
-              final all = snapshot.data;
-              if (all == null) return const SizedBox.shrink();
-              if (all.isEmpty) return const SizedBox.shrink();
+          Builder(
+            builder: (context) {
+              if (!_suggestionsLoaded || _allSuggestions.isEmpty) {
+                return const SizedBox.shrink();
+              }
               final existingNames = existingTags.map((t) => t.name).toSet();
               final queryLower = query.toLowerCase();
-              final filtered = all
+              final filtered = _allSuggestions
                   .where(
                     (t) =>
                         !existingNames.contains(t.name) &&
@@ -305,6 +356,7 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
                           children: [
                             for (final tag in visible)
                               PillOption(
+                                key: ValueKey('suggestion-${tag.id}'),
                                 label: tag.name,
                                 icon: PhosphorIconsRegular.plus,
                                 selected: false,
@@ -326,7 +378,7 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
 }
 
 class _TagChip extends StatelessWidget {
-  const _TagChip({required this.tag, this.onDeleted});
+  const _TagChip({super.key, required this.tag, this.onDeleted});
 
   final BookTag tag;
   final VoidCallback? onDeleted;

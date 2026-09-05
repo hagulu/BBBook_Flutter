@@ -324,10 +324,10 @@ class _HeroSection extends StatelessWidget {
               color: AppColors.textStrong,
             ),
           ),
-          if (detail.author != null && detail.author!.isNotEmpty) ...[
+          if (detail.author.displayedAuthorOrNull case final author?) ...[
             const SizedBox(height: 6),
             Text(
-              displayAuthor(detail.author!),
+              author,
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 13,
@@ -380,14 +380,34 @@ class _HeroSection extends StatelessWidget {
   }
 }
 
-/// 책 설명을 카드 형태로 보여준다.
-class _DescriptionCard extends StatelessWidget {
+/// 책 설명을 카드 형태로 보여준다. 기본 5줄까지만 노출하고, 넘치면 더보기/접기로 펼친다.
+class _DescriptionCard extends StatefulWidget {
   const _DescriptionCard({required this.description});
 
   final String description;
 
+  static const int _collapsedMaxLines = 7;
+
+  @override
+  State<_DescriptionCard> createState() => _DescriptionCardState();
+}
+
+class _DescriptionCardState extends State<_DescriptionCard> {
+  bool _expanded = false;
+
+  static const TextStyle _textStyle = TextStyle(
+    fontSize: 14,
+    color: AppColors.textBody,
+    height: 1.5,
+  );
+
   @override
   Widget build(BuildContext context) {
+    final span = TextSpan(
+      style: _textStyle,
+      children: _parseBoldSpans(widget.description),
+    );
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -402,28 +422,102 @@ class _DescriptionCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            '책 소개',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textStrong,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            description,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textBody,
-              height: 1.5,
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final textScaler = MediaQuery.textScalerOf(context);
+          final painter = TextPainter(
+            text: span,
+            maxLines: _DescriptionCard._collapsedMaxLines,
+            textDirection: TextDirection.ltr,
+            textScaler: textScaler,
+          )..layout(maxWidth: constraints.maxWidth);
+          final isOverflowing = painter.didExceedMaxLines;
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              RichText(
+                text: span,
+                textScaler: textScaler,
+                maxLines: _expanded
+                    ? null
+                    : _DescriptionCard._collapsedMaxLines,
+                overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+              ),
+              if (isOverflowing) ...[
+                const SizedBox(height: 8),
+                Semantics(
+                  button: true,
+                  expanded: _expanded,
+                  label: _expanded ? '설명 접기' : '설명 더보기',
+                  excludeSemantics: true,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => setState(() => _expanded = !_expanded),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 44),
+                        child: Align(
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _expanded ? '접기' : '더보기',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                              const SizedBox(width: 2),
+                              Icon(
+                                _expanded
+                                    ? PhosphorIconsRegular.caretUp
+                                    : PhosphorIconsRegular.caretDown,
+                                size: 14,
+                                color: AppColors.textMuted,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
+  }
+
+  static final RegExp _boldTagPattern = RegExp(
+    r'<b>(.*?)</b>',
+    caseSensitive: false,
+    dotAll: true,
+  );
+
+  /// `<b>` 태그만 진하게 표시하고 나머지 텍스트는 그대로 표시한다.
+  static List<TextSpan> _parseBoldSpans(String text) {
+    final spans = <TextSpan>[];
+    var lastEnd = 0;
+    for (final match in _boldTagPattern.allMatches(text)) {
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
+      }
+      spans.add(
+        TextSpan(
+          text: match.group(1),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      );
+      lastEnd = match.end;
+    }
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(text: text.substring(lastEnd)));
+    }
+    return spans;
   }
 }

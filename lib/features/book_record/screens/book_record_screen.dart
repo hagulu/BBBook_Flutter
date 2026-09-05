@@ -127,8 +127,7 @@ class _BookRecordBody extends ConsumerWidget {
 
     return DefaultTabController(
       length: isWantToRead ? 2 : 4,
-      // 읽을 책은 노트·독후감 대신 생각 나눔을 기본 탭으로 연다.
-      initialIndex: isWantToRead ? 1 : 0,
+      initialIndex: 0,
       child: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           // 책 표지·제목 헤더는 스크롤과 함께 말려 올라가고(사용자 확인
@@ -952,10 +951,10 @@ class _Header extends ConsumerWidget {
                         color: AppColors.textStrong,
                       ),
                     ),
-                    if (book.author != null && book.author!.isNotEmpty) ...[
+                    if (book.author.displayedAuthorOrNull case final author?) ...[
                       const SizedBox(height: 4),
                       Text(
-                        displayAuthor(book.author!),
+                        author,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(

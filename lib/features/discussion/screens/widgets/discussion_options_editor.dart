@@ -42,6 +42,11 @@ class DiscussionOptionsEditor extends StatelessWidget {
       children: [
         for (var i = 0; i < controllers.length; i++) ...[
           _OptionRow(
+            // 컨트롤러 identity를 key로 써서, 목록 중간 항목을 삭제해도
+            // Flutter가 엘리먼트를 위치 기준으로 잘못 재사용하지 않게 한다
+            // (재사용되면 이전 행의 포커스·커서 오버레이가 다른 컨트롤러의
+            // 입력창에 그대로 남는 버그가 생긴다).
+            key: ValueKey(controllers[i]),
             controller: controllers[i],
             color: discussionOptionColorAt(i),
             index: i,
@@ -90,6 +95,7 @@ class DiscussionOptionsEditor extends StatelessWidget {
 
 class _OptionRow extends StatelessWidget {
   const _OptionRow({
+    super.key,
     required this.controller,
     required this.color,
     required this.index,

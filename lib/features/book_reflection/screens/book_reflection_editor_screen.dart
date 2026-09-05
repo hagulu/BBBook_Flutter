@@ -617,9 +617,9 @@ class _BookReflectionEditorScreenState
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.fromLTRB(
-                                    18,
+                                    16,
                                     12,
-                                    18,
+                                    16,
                                     0,
                                   ),
                                   child: TextField(
@@ -630,15 +630,15 @@ class _BookReflectionEditorScreenState
                                         _editorFocusNode.requestFocus(),
                                     style: const TextStyle(
                                       color: AppColors.textStrong,
-                                      fontSize: 19,
+                                      fontSize: 17,
                                       fontWeight: FontWeight.bold,
                                     ),
                                     decoration: const InputDecoration(
                                       hintText: '이 기록에 제목을 붙여보세요',
                                       hintStyle: TextStyle(
                                         color: AppColors.textMuted,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.normal,
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                       counterText: '',
                                       filled: false,
@@ -650,7 +650,7 @@ class _BookReflectionEditorScreenState
                                   ),
                                 ),
                                 const ReflectionTitleBodyDivider(
-                                  horizontalInset: 18,
+                                  horizontalInset: 16,
                                 ),
                                 ReflectionQuillEditor(
                                   controller: _quillController,
@@ -659,9 +659,9 @@ class _BookReflectionEditorScreenState
                                   config: QuillEditorConfig(
                                     scrollable: false,
                                     padding: const EdgeInsets.fromLTRB(
-                                      18,
+                                      16,
                                       0,
-                                      18,
+                                      16,
                                       16,
                                     ),
                                     placeholder: '책을 읽고 느낀 점을 기록해 보세요.',

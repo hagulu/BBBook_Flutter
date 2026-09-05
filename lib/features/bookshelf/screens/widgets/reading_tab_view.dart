@@ -151,10 +151,7 @@ class _ReadingBookCard extends ConsumerWidget {
     return card;
   }
 
-  static String? _subtitle(BookItem book) {
-    final author = book.author;
-    return author != null && author.isNotEmpty ? displayAuthor(author) : null;
-  }
+  static String? _subtitle(BookItem book) => book.author.displayedAuthorOrNull;
 }
 
 class _CategoryBadge extends StatelessWidget {

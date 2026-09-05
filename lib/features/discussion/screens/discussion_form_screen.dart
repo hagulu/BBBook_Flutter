@@ -300,6 +300,13 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
     final newOptionFocusNode = FocusNode();
     int? autofocusIndex;
 
+    // 선택지가 하나도 없는 최초 진입일 때만 빈 선택지 하나를 기본으로
+    // 미리 넣어둔다. 이미 선택지가 있다면(수정 등) 자동으로 추가하지 않는다.
+    if (draftControllers.isEmpty) {
+      draftControllers.add(TextEditingController());
+      autofocusIndex = 0;
+    }
+
     final saved = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
