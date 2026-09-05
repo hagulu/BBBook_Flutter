@@ -182,6 +182,7 @@
 
 ## docs
 
+- `docs/review/20260906-004203-last-commit-review.md` — 마지막 커밋의 기존 로컬 DB 태그 테이블 보완·서재 추가 예외 처리 리뷰
 - `docs/review/20260905-171808-bookshelf-description-tag-rereview.md` — 완독 목록 큰 글자 배율과 책 소개 토글 semantics 후속 리뷰
 - `docs/review/20260905-170252-bookshelf-description-tag-review.md` — 완독 리스트·책 소개 큰 글자 배율, 태그 시트 종료, 보기 모드 복원 경합 리뷰
 - `docs/review/20260905-133912-working-tree-review.md` — 미커밋 변경사항의 오프라인 명작 저장 유실·오디오북 완독 진행률·독서 상태 레이아웃 리뷰
