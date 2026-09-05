@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -110,6 +112,12 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
         ref.invalidate(bookDetailControllerProvider(widget.isbn));
       }
       if (mounted) AppSnackBar.error(context, e.message);
+    } catch (e) {
+      // ApiException만 잡으면 로컬 DB 예외 등은 안내 없이 조용히 사라진다
+      // (finally의 AppLoading.hide()만 실행되고 화면은 그대로 멈춘 것처럼
+      // 보인다) — 서버 요청까지 가지 못한 실패도 사용자에게 알린다.
+      developer.log('[서재 추가] result=FAIL reason=${e.runtimeType}');
+      if (mounted) AppSnackBar.error(context, '서재에 추가하지 못했습니다.');
     } finally {
       AppLoading.hide();
     }

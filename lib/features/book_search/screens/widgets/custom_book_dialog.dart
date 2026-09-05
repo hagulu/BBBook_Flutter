@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -183,6 +184,10 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
       }
     } on ApiException catch (e) {
       if (mounted) setState(() => _errorText = e.message);
+    } catch (e) {
+      // ApiException만 잡으면 로컬 DB 예외 등은 안내 없이 조용히 사라진다.
+      developer.log('[서재 추가] result=FAIL reason=${e.runtimeType}');
+      if (mounted) setState(() => _errorText = '서재에 추가하지 못했습니다.');
     } finally {
       AppLoading.hide();
     }

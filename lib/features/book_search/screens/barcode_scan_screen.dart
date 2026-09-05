@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -151,6 +152,18 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
         AppSnackBar.error(
           context,
           e.message,
+          duration: const Duration(seconds: 2),
+          replaceCurrent: true,
+        );
+      }
+    } catch (e) {
+      // ApiException만 잡으면 로컬 DB 예외 등은 안내 없이 조용히 사라진다.
+      _lastProcessedIsbn = null;
+      developer.log('[서재 추가] result=FAIL reason=${e.runtimeType}');
+      if (mounted) {
+        AppSnackBar.error(
+          context,
+          '서재에 추가하지 못했습니다.',
           duration: const Duration(seconds: 2),
           replaceCurrent: true,
         );

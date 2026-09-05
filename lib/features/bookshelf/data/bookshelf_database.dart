@@ -104,6 +104,22 @@ class BookshelfDatabase {
         await _createStorageModeTable(db);
         await _createTagTables(db);
       },
+      // `onCreate`는 DB 파일이 처음 만들어질 때만 실행된다. 이 프로젝트는
+      // 마이그레이션을 쓰지 않고 `onCreate`만 계속 수정해 왔는데, 그러면
+      // `onCreate`에 나중에 추가된 테이블(예: 태그 기능의 `tag`/
+      // `user_book_tag_map`)이 그 이전에 이미 DB 파일을 만든 기존 설치에는
+      // 영원히 생기지 않는다 — 앱을 지우고 다시 설치해도 시스템 백업/복원
+      // 등으로 옛 DB 파일이 되살아나면 마찬가지다. 이 6개 헬퍼는 모두
+      // `CREATE TABLE IF NOT EXISTS`라 매번 다시 불러도 안전하므로, DB를 열
+      // 때마다 실행해 옛 설치에도 최신 테이블이 채워지게 한다.
+      onOpen: (db) async {
+        await _createBookCategoryTable(db);
+        await _createDismissedIsbnLinkTable(db);
+        await _createRecordTables(db);
+        await _createReflectionImageLocalTable(db);
+        await _createStorageModeTable(db);
+        await _createTagTables(db);
+      },
     );
   }
 
