@@ -38,10 +38,12 @@ class LocalStorageMigrationRepositorySteps
     // sync는 dirty push를 먼저 수행하므로 아직 서버에 올리지 못한 로컬
     // 편집도 이 시점에 함께 반영된다.
     //
-    // 태그는 `POST /api/me/records/import/*`(로컬 → 서버 재전환 Import)가
-    // 받지 않는 데이터라(api-doc), 로컬 저장 모드로 전환한 뒤 태그를 추가·
-    // 삭제해도 서버 재전환 시 되살아나지 않는다 — 이 함수는 전환 *직전*
-    // 서버 데이터를 로컬에 내려받는 것으로, 그 한계와는 별개다.
+    // `POST /api/me/records/import/*`(로컬 → 서버 재전환 Import, §
+    // `server_storage_migration`)는 태그(tags/tagMaps)도 함께 보내므로,
+    // 로컬 저장 모드에서 추가·삭제한 태그도 서버 재전환 시 그대로
+    // 반영된다. 그래도 여기서 태그까지 동기화하는 이유는 전환 *직전*
+    // 서버 데이터를 로컬에 최신으로 맞춰야 해서다(재전환 시 태그 반영
+    // 여부와는 별개의 목적).
     await bookshelfRepository.sync();
     await noteRepository.sync(ownerUserId: ownerUserId);
     await reflectionRepository.sync(ownerUserId: ownerUserId);

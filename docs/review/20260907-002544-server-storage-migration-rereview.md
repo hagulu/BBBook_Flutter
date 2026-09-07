@@ -1,0 +1,16 @@
+# 리뷰 결과
+
+## 요약
+- 이전 리뷰의 기존 PHOTO 재첨부, Import 후 충돌 기준값, 노트 제목 제한은 수정됐고 도메인 결과 반영도 단일 트랜잭션으로 보강됐지만, 완료 후 복구 불능 문제 1건이 남아 있으며 장기 로컬 보관과 태그 삭제 경로에서 데이터 정합성 문제 2건이 추가로 확인됐다.
+
+## 문제점
+- [문제][높음] `/complete` 성공과 로컬 확정 사이의 상태가 여전히 메모리에만 있어 앱 종료·응답 유실 후 안전하게 수습할 수 없다. `lib/features/server_storage_migration/services/server_storage_migration_service.dart:249`에서 서버 세션을 먼저 확정한 뒤 `:264`에서 메모리의 ID·이미지 매핑을 로컬 DB에 반영하고 `:275`에서 저장 모드를 별도로 바꾼다. `lib/features/server_storage_migration/data/server_storage_migration_repository_steps.dart:128`이 네 도메인 반영을 한 트랜잭션으로 묶은 것은 부분 반영을 막지만, `/complete` 직후 중단된 경우와 그 트랜잭션 커밋 후 `resetToServer()` 전에 중단된 경우는 막지 못한다. 특히 전자는 새 세션 재시도 시 서버에는 이미 이미지가 연결된 활성 메모·독후감이 존재하지만 로컬에는 이전 상태가 남아 다시 첨부를 시도하므로 API 계약상 400과 세션 전체 정리가 반복될 수 있다. 코드도 `server_storage_migration_repository_steps.dart:113`에서 이 경로를 인정하면서 사용자에게 독후감을 수정하거나 서버 정리를 요청하도록 남겨 두고 있어 자동 복구 수단이 없다.
+- [문제][높음] 로컬 저장 모드가 30일을 넘으면 물리 삭제된 서버 레코드를 계속 “기존 실제 서버 ID”로 보내고, PHOTO 메모의 로컬 원본까지 업로드 후보에서 제외한다. `lib/features/server_storage_migration/data/record_import_payload_builder.dart:11`, `:54`, `:63`, `:83`은 책·노트·메모·독후감의 과거 `serverId`를 조건 없이 전송하지만, `api-me-records-delete.md`는 로컬 전환 때 soft delete한 기록이 30일 후 물리 삭제된다고 명시하고 Import 문서는 `serverId`를 현재 존재하는 실제 서버 ID일 때만 보내도록 정의한다. 동시에 `lib/features/server_storage_migration/data/record_import_snapshot_builder.dart:79`는 `imageUrl != null`인 PHOTO 메모를 서버에 이미지가 남아 있다고 간주해 로컬 파일을 버린다. 따라서 장기 로컬 사용 후에는 stale `serverId`로 `/items`가 거부되거나, 서버가 다른 멱등 키로 행을 새로 만들더라도 PHOTO 첨부가 생략되어 `/complete`의 이미지 연결 검증이 실패한다. 로컬 모드는 기간 제한이 없으므로 정상 사용만으로 도달하는 경로다.
+- [문제][중간] 로컬 모드에서 삭제한 태그 매핑은 Import 완료 시점의 서버 상태에 반영되지 않는다. `lib/features/tag/data/tag_dao.dart:154`는 삭제한 매핑을 `deleted_at`과 `is_dirty=1`로 남기고, `lib/features/server_storage_migration/data/record_import_snapshot_builder.dart:61`과 `lib/features/tag/data/tag_dao.dart:711`은 활성 매핑만 Import에 포함한다. 그런데 `DELETE /api/me/records`는 태그·태그 매핑을 즉시 soft delete하지 않으므로, 책이 복구되는 순간 기존 활성 매핑도 다시 노출된다. 일반 태그 동기화가 나중에 dirty 삭제를 push하면 수습될 수 있지만, `lib/features/server_storage_migration/providers/server_storage_migration_providers.dart:63`은 전환 완료 후 태그 동기화를 시작하지도 않아 다른 기기에서는 사용자가 지운 태그가 다시 보이는 기간이 생긴다. `lib/features/storage_mode/data/local_storage_migration_steps.dart:41`의 “추가·삭제한 태그도 서버 재전환 시 그대로 반영”된다는 설명과 실제 완료 상태가 다르다.
+- [문제][중간] 첨부 사전 검증이 0바이트 파일을 허용한다. `lib/features/server_storage_migration/data/record_import_snapshot_builder.dart:206`은 파일 존재 여부·확장자·5MB 상한만 확인하고 `length == 0`은 성공으로 처리한다. 정상 저장·다운로드 경로는 빈 파일을 막지만, 저장 후 파일이 손상된 경우에는 세션을 시작한 뒤 `/attachments`가 문서상 400을 반환해 전체 Import가 정리된다. 이 빌더가 복구 불가능한 첨부를 세션 시작 전에 거르는 역할인 만큼 빈 파일도 동일하게 차단해야 한다.
+
+## 개선 제안
+- `/complete` 이후 복구 불능 → `importId`, 청크 응답 매핑, 업로드 결과와 최종 본문을 로컬에 내구성 있게 저장한 뒤 완료를 호출하고, 재실행 시 이전 `importId`의 `/complete` 재호출 결과(성공 또는 이미 완료된 409)를 기준으로 로컬 반영을 재개한다. 도메인 반영과 `storage_mode` 변경도 같은 로컬 트랜잭션 또는 명시적인 완료 마커로 묶고, 앱 종료·완료 응답 유실·모드 변경 실패 시나리오를 검증한다.
+- 30일 물리 삭제 경계 → 서버 정리 완료 시각을 기준으로 stale 가능성이 있는 `serverId`를 그대로 보내지 말고 신규 Import 식별자로 재생성할 수 있게 처리한다. PHOTO 로컬 파일은 `/items` 결과로 기존 이미지 유지가 확정될 때까지 보존하고, 30일 이전 복구와 30일 이후 재생성 양쪽에서 사진 연결이 완료되는 계약 테스트를 추가한다.
+- 태그 삭제 → Import API가 삭제 tombstone을 함께 받도록 하거나, 최소한 전환 완료를 알리기 전에 로컬 dirty 삭제 매핑을 새 서버 책·태그 ID로 명시적으로 반영한다. 기존 서버 매핑이 남아 있는 책에서 로컬로 태그를 제거한 뒤 재전환하는 통합 시나리오를 검증한다.
+- 빈 이미지 파일 → `_isUploadableImage()`를 `size > 0 && size <= maxBytes`로 검사하고 0바이트 메모·독후감 이미지의 preflight 실패를 검증한다.

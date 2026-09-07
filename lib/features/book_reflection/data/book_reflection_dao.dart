@@ -638,4 +638,92 @@ class BookReflectionDao {
     final current = rows.single['min_id'] as int?;
     return current != null && current <= 0 ? current - 1 : -1;
   }
+
+  // ---------------------------------------------------------------------
+  // 로컬 → 서버 저장 모드 재전환 Import 전용
+  // ---------------------------------------------------------------------
+
+  /// Import 대상 조회: 활성이고 숨김 처리되지 않은 독후감 전체. 관리자가
+  /// 숨긴 독후감은 이미 title/contentJson/contentText가 null인 채로
+  /// 로컬에 반영돼 있어(서버 정책), Import 신규/복구 필수값을 만족할 수
+  /// 없으므로 애초에 대상에서 뺀다.
+  Future<List<BookReflection>> getAllActiveForImport({
+    required int ownerUserId,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'book_reflection',
+      where: 'owner_user_id = ? AND deleted_at IS NULL AND is_hidden = 0',
+      whereArgs: [ownerUserId],
+    );
+    return rows.map(_reflectionFromRow).toList(growable: false);
+  }
+
+  /// Import 전 멱등 키를 한 번 발급해 고정한다([BookReflection.clientRequestId]가
+  /// 없는 행 — 서버 동기화로만 내려온 옛 데이터 등). 이미 있는 값은 건드리지 않는다.
+  Future<void> ensureClientRequestIds() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'book_reflection',
+      columns: ['id'],
+      where: 'client_request_id IS NULL',
+    );
+    if (rows.isEmpty) return;
+    await db.transaction((txn) async {
+      for (final row in rows) {
+        await txn.update(
+          'book_reflection',
+          {'client_request_id': const Uuid().v4()},
+          where: 'id = ?',
+          whereArgs: [row['id']],
+        );
+      }
+    });
+  }
+
+  /// Import `/complete` 성공 후에만 독후감의 서버 ID와 최종 본문(placeholder가
+  /// 서버 URL로 치환된 결과)을 확정하고, 새로 업로드한 이미지의 로컬↔서버
+  /// 매칭([reflection_image_local])을 남긴다 — 전환 뒤에도 방금 올린
+  /// 사진을 오프라인에서 계속 로컬 파일로 보여주기 위함이다(청크 응답 즉시
+  /// 반영하지 않는 이유는 `BookshelfDao.applyImportResults` 참고).
+  ///
+  /// [executor]는 다른 도메인과 하나의 트랜잭션을 공유하기 위한 것이다
+  /// ([BookshelfDao.applyImportResults] 문서 참고).
+  Future<void> applyImportResults(
+    DatabaseExecutor executor, {
+    required Map<int, ReflectionImportResult> resultsByLocalId,
+  }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    for (final entry in resultsByLocalId.entries) {
+      final result = entry.value;
+      await executor.update(
+        'book_reflection',
+        {
+          'server_id': result.serverId,
+          'is_dirty': 0,
+          if (result.finalContentJson != null)
+            'content_json': jsonEncode(result.finalContentJson),
+        },
+        where: 'id = ?',
+        whereArgs: [entry.key],
+      );
+      for (final image in result.uploadedImages) {
+        await executor.insert('reflection_image_local', {
+          'reflection_id': entry.key,
+          'remote_image_url': image.remoteUrl,
+          'local_image_path': image.localImagePath,
+          'created_at': now,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+    }
+  }
 }
+
+/// Import `/complete` 확정 시 독후감 한 건에 반영할 결과
+/// ([BookReflectionDao.applyImportResults]). [finalContentJson]은
+/// `local://` placeholder가 하나라도 있었을 때만 채운다(치환된 최종 본문).
+typedef ReflectionImportResult = ({
+  int serverId,
+  Map<String, dynamic>? finalContentJson,
+  List<({String remoteUrl, String localImagePath})> uploadedImages,
+});

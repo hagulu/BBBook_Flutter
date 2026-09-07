@@ -200,6 +200,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
                 TextField(
                   controller: _titleController,
                   focusNode: _titleFocusNode,
+                  maxLength: 255,
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => unawaited(_saveTitle()),
                   style: const TextStyle(

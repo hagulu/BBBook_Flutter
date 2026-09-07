@@ -7,6 +7,7 @@ import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../server_storage_migration/screens/server_storage_migration_screen.dart';
 import '../../storage_mode/data/storage_mode_store.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../../storage_mode/screens/local_storage_migration_screen.dart';
@@ -38,6 +39,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
               isLocal &&
               (ref.watch(serverDeletePendingProvider).valueOrNull ?? false),
           onSwitchToLocal: () => _startMigration(context, ref),
+          onSwitchToServer: () => _startReverseMigration(context, ref),
           onRetryServerCleanup: () => _retryServerCleanup(context, ref),
         ),
       ),
@@ -80,6 +82,27 @@ class ProfileSettingsScreen extends ConsumerWidget {
     );
   }
 
+  Future<void> _startReverseMigration(BuildContext context, WidgetRef ref) async {
+    final confirmed = await AppConfirm.show(
+      context,
+      title: '서버 저장으로 전환',
+      message:
+          '이 기기에만 있는 기록과 메모 사진·독후감 이미지를 서버로 올립니다.\n\n'
+          '· 직접 등록한 책의 표지는 서버로 올라가지 않아 나중에 다시 설정해야 할 수 있습니다.\n'
+          '· 데이터 양에 따라 시간이 걸리고 데이터 통신이 발생합니다.\n'
+          '· 하나라도 실패하면 전체가 실패 처리되며, 이 기기의 기록은 그대로 유지됩니다.\n'
+          '· 전환 후에는 기록이 서버에 저장되어 다른 기기에서도 볼 수 있습니다.\n\n'
+          '계속할까요?',
+      confirmText: '전환 시작',
+    );
+    if (!confirmed || !context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const ServerStorageMigrationScreen(),
+      ),
+    );
+  }
+
   Future<void> _retryServerCleanup(BuildContext context, WidgetRef ref) async {
     AppLoading.show(context);
     final bool cleaned;
@@ -104,6 +127,7 @@ class _StorageModeCard extends StatelessWidget {
     required this.isLocal,
     required this.serverCleanupPending,
     required this.onSwitchToLocal,
+    required this.onSwitchToServer,
     required this.onRetryServerCleanup,
   });
 
@@ -112,6 +136,7 @@ class _StorageModeCard extends StatelessWidget {
   /// 로컬 전환은 끝났지만 서버 기록 정리가 남은 상태.
   final bool serverCleanupPending;
   final VoidCallback onSwitchToLocal;
+  final VoidCallback onSwitchToServer;
   final VoidCallback onRetryServerCleanup;
 
   @override
@@ -158,6 +183,12 @@ class _StorageModeCard extends StatelessWidget {
             OutlinedButton(
               onPressed: onSwitchToLocal,
               child: const Text('로컬 저장으로 전환'),
+            ),
+          ] else ...[
+            const SizedBox(height: 14),
+            OutlinedButton(
+              onPressed: onSwitchToServer,
+              child: const Text('서버 저장으로 전환'),
             ),
           ],
           if (serverCleanupPending) ...[

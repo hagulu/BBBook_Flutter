@@ -1065,6 +1065,89 @@ class BookNoteDao {
     );
   }
 
+  // ---------------------------------------------------------------------
+  // 로컬 → 서버 저장 모드 재전환 Import 전용
+  // ---------------------------------------------------------------------
+
+  /// Import 대상 조회: 활성 노트 전체.
+  Future<List<BookNote>> getAllActiveNotes({required int ownerUserId}) async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'book_note',
+      where: 'owner_user_id = ? AND deleted_at IS NULL',
+      whereArgs: [ownerUserId],
+    );
+    return rows.map(_noteFromRow).toList(growable: false);
+  }
+
+  /// Import 대상 조회: 활성 노트에 속한 활성 메모 전체.
+  Future<List<BookNoteMemo>> getAllActiveMemos({required int ownerUserId}) async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.rawQuery(
+      '''
+      SELECT m.* FROM book_note_memo m
+      INNER JOIN book_note n ON n.id = m.note_id
+      WHERE m.deleted_at IS NULL AND n.deleted_at IS NULL AND n.owner_user_id = ?
+      ''',
+      [ownerUserId],
+    );
+    return rows.map(_memoFromRow).toList(growable: false);
+  }
+
+  /// Import 전 멱등 키를 한 번 발급해 고정한다([BookNoteMemo.clientRequestId]가
+  /// 없는 행 — 서버 동기화로만 내려온 옛 데이터 등). 이미 있는 값은 건드리지 않는다.
+  Future<void> ensureMemoClientRequestIds() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'book_note_memo',
+      columns: ['id'],
+      where: 'client_request_id IS NULL',
+    );
+    if (rows.isEmpty) return;
+    await db.transaction((txn) async {
+      for (final row in rows) {
+        await txn.update(
+          'book_note_memo',
+          {'client_request_id': const Uuid().v4()},
+          where: 'id = ?',
+          whereArgs: [row['id']],
+        );
+      }
+    });
+  }
+
+  /// Import `/complete` 성공 후에만 노트/메모의 서버 ID를 확정한다(청크
+  /// 응답 즉시 반영하지 않는 이유는 [BookshelfDao.applyImportResults] 참고).
+  /// [memoImageUrlByLocalId]는 이번 세션에서 새로 업로드한 사진의 R2 키만
+  /// 담는다(있는 메모만).
+  ///
+  /// [executor]는 다른 도메인과 하나의 트랜잭션을 공유하기 위한 것이다
+  /// ([BookshelfDao.applyImportResults] 문서 참고).
+  Future<void> applyImportResults(
+    DatabaseExecutor executor, {
+    required Map<int, int> noteServerIdByLocalId,
+    required Map<int, int> memoServerIdByLocalId,
+    required Map<int, String> memoImageUrlByLocalId,
+  }) async {
+    for (final entry in noteServerIdByLocalId.entries) {
+      await executor.update(
+        'book_note',
+        {'server_id': entry.value, 'is_dirty': 0},
+        where: 'id = ?',
+        whereArgs: [entry.key],
+      );
+    }
+    for (final entry in memoServerIdByLocalId.entries) {
+      final imageUrl = memoImageUrlByLocalId[entry.key];
+      await executor.update(
+        'book_note_memo',
+        {'server_id': entry.value, 'is_dirty': 0, 'image_url': ?imageUrl},
+        where: 'id = ?',
+        whereArgs: [entry.key],
+      );
+    }
+  }
+
   Future<int> _nextLocalId(Transaction txn, String table) async {
     final rows = await txn.rawQuery('SELECT MIN(id) AS min_id FROM $table');
     final current = rows.single['min_id'] as int?;

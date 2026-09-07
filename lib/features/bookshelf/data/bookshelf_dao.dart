@@ -1,4 +1,5 @@
 import 'package:sqflite/sqflite.dart';
+import 'package:uuid/uuid.dart';
 
 import '../models/book_item.dart';
 import '../models/book_status.dart';
@@ -911,6 +912,77 @@ class BookshelfDao {
 
   DateTime? _parseDate(String? value) =>
       value == null ? null : DateTime.parse(value);
+
+  // ---------------------------------------------------------------------
+  // 로컬 → 서버 저장 모드 재전환 Import 전용
+  // ---------------------------------------------------------------------
+
+  /// Import 전 멱등 키를 한 번 발급해 로컬 DB에 고정한다
+  /// ([BookItem.clientRequestId]가 없는 행 — 서버 동기화로만 내려온 옛
+  /// 데이터 등). api-doc(items) 기준 이 키는 "최초 Import 전에 생성해 로컬
+  /// DB에 고정 저장"해야 하므로, 이미 값이 있는 행은 건드리지 않는다.
+  Future<void> ensureClientRequestIds() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'user_book',
+      columns: ['user_book_id'],
+      where: 'client_request_id IS NULL',
+    );
+    if (rows.isEmpty) return;
+    await db.transaction((txn) async {
+      for (final row in rows) {
+        await txn.update(
+          'user_book',
+          {'client_request_id': const Uuid().v4()},
+          where: 'user_book_id = ?',
+          whereArgs: [row['user_book_id']],
+        );
+      }
+    });
+  }
+
+  /// Import `/complete` 성공 후 서버 ID를 확정하고 dirty를 해제한다.
+  ///
+  /// 로컬 저장 모드에서 만든 책은 [insertLocalCreate]가 항상 `is_dirty = 1`로
+  /// 남겨 둔다(로컬 모드는 서버로 push하지 않는다). 여기서 풀지 않으면 서버
+  /// 모드로 돌아간 뒤 평소 동기화가 "아직 push 못한 로컬 생성"으로 오인해
+  /// 이미 Import로 서버에 만든 책을 다시 만들려고 시도한다.
+  ///
+  /// 매핑은 `/complete`가 성공한 뒤에만 반영한다 — 청크 응답을 받는 즉시
+  /// 반영하면, 이후 청크나 attachments·complete가 실패해 서버가 세션
+  /// 전체를 정리했을 때 로컬에는 더 이상 존재하지 않는 서버 행의 ID가 남아,
+  /// 다음 전체 동기화([reconcile])가 "서버에서 사라진 정상 행"으로 오인해
+  /// 로컬 원본까지 지워버릴 수 있다.
+  ///
+  /// `synced_updated_at`은 일부러 null로 남긴다 — `/items` 응답은 서버
+  /// ID만 줄 뿐 Import로 생성·복구된 행의 실제 서버 `updated_at`은 내려주지
+  /// 않는다. 여기서 로컬(과거) `updated_at`을 대신 채우면, 전환 직후 첫
+  /// 책 정보 PATCH가 그 값을 충돌 검사 기준으로 보내는데 서버의 실제
+  /// `updated_at`(Import 시각)과 달라 409가 나고 사용자의 첫 수정이
+  /// 반영되지 않는다. null이면 [BookRecordApi.patchBookInfo]가 `updatedAt`
+  /// 필드 자체를 생략해 그 검사를 건너뛴다.
+  ///
+  /// [executor]는 다른 도메인(노트·독후감·태그)의 같은 이름 메서드와 하나의
+  /// 트랜잭션을 공유하기 위한 것이다(`ServerStorageMigrationRepositorySteps.applyResults`)
+  /// — 네 테이블 중 일부만 반영된 채 중간에 실패하는 상태를 줄인다.
+  Future<void> applyImportResults(
+    DatabaseExecutor executor,
+    Map<int, int> serverIdByLocalId,
+  ) async {
+    for (final entry in serverIdByLocalId.entries) {
+      await executor.update(
+        'user_book',
+        {
+          'server_id': entry.value,
+          'is_dirty': 0,
+          'dirty_fields': null,
+          'synced_updated_at': null,
+        },
+        where: 'user_book_id = ?',
+        whereArgs: [entry.key],
+      );
+    }
+  }
 
   Future<int> _nextLocalUserBookId(Transaction txn) async {
     final rows = await txn.rawQuery(

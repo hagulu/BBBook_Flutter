@@ -696,6 +696,53 @@ class TagDao {
     return current != null && current <= 0 ? current - 1 : -1;
   }
 
+  // ---------------------------------------------------------------------
+  // 로컬 → 서버 저장 모드 재전환 Import 전용
+  // ---------------------------------------------------------------------
+
+  /// Import 대상 조회: 활성 태그 전체.
+  Future<List<LocalTag>> getAllActiveTags() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query('tag', where: 'deleted_at IS NULL');
+    return rows.map(_tagFromRow).toList(growable: false);
+  }
+
+  /// Import 대상 조회: 활성 책-태그 매핑 전체.
+  Future<List<TagMapping>> getAllActiveMappings() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query('user_book_tag_map', where: 'deleted_at IS NULL');
+    return rows.map(_mappingFromRow).toList(growable: false);
+  }
+
+  /// Import `/complete` 성공 후에만 태그/매핑의 서버 ID를 확정한다(청크
+  /// 응답 즉시 반영하지 않는 이유는 `BookshelfDao.applyImportResults` 참고).
+  /// `tag`는 자체 dirty 추적이 없어 여기서도 건드리지 않는다.
+  ///
+  /// [executor]는 다른 도메인과 하나의 트랜잭션을 공유하기 위한 것이다
+  /// (`BookshelfDao.applyImportResults` 문서 참고).
+  Future<void> applyImportResults(
+    DatabaseExecutor executor, {
+    required Map<int, int> tagServerIdByLocalId,
+    required Map<int, int> mappingServerIdByLocalId,
+  }) async {
+    for (final entry in tagServerIdByLocalId.entries) {
+      await executor.update(
+        'tag',
+        {'server_id': entry.value},
+        where: 'id = ?',
+        whereArgs: [entry.key],
+      );
+    }
+    for (final entry in mappingServerIdByLocalId.entries) {
+      await executor.update(
+        'user_book_tag_map',
+        {'server_id': entry.value, 'is_dirty': 0},
+        where: 'id = ?',
+        whereArgs: [entry.key],
+      );
+    }
+  }
+
   static TagMapping _mappingFromRow(Map<String, Object?> row) {
     return TagMapping(
       id: row['id'] as int,

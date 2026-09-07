@@ -112,6 +112,18 @@
 - `lib/features/storage_mode/providers/storage_mode_providers.dart` — 현재 저장 모드 및 이전 진행 상태 Riverpod provider
 - `lib/features/storage_mode/screens/local_storage_migration_screen.dart` — 서버 → 로컬 이전 진행률·결과 화면(진행 중 뒤로 가기 차단)
 
+## features/server_storage_migration
+
+- `lib/features/server_storage_migration/data/record_import_api.dart` — 로컬 → 서버 저장 모드 재전환 Import 세션 API 호출(start/items/attachments/complete/cancel)
+- `lib/features/server_storage_migration/data/record_import_snapshot_builder.dart` — Import 직전 로컬 DB 스냅샷 구성(clientRequestId 백필, 이미지 파일 확보·형식/용량 확인, 독후감 이미지 `local://` placeholder 치환)
+- `lib/features/server_storage_migration/data/record_import_validation.dart` — 서버 400/롤백을 부르는 조합(글자 수·범위·중복 clientRequestId·태그 1:1 규칙 등)을 미리 걸러내는 순수 검증 함수
+- `lib/features/server_storage_migration/data/record_import_payload_builder.dart` — 로컬 모델 → items 요청 JSON 변환과 `maxChunkItemCount` 기준 청크 분할(순수 함수)
+- `lib/features/server_storage_migration/data/server_storage_migration_steps.dart` — Import 단계 인터페이스(테스트가 가짜 구현으로 순서·중단 조건 검증)
+- `lib/features/server_storage_migration/data/server_storage_migration_repository_steps.dart` — 단계 인터페이스를 실제 DAO·API로 구현
+- `lib/features/server_storage_migration/services/server_storage_migration_service.dart` — 준비→시작→청크 업로드→이미지 업로드→완료→로컬 반영 순서를 보장하는 오케스트레이터(로컬 DB 반영은 `/complete` 성공 후에만)
+- `lib/features/server_storage_migration/providers/server_storage_migration_providers.dart` — 전환 실행/진행 상태 Riverpod provider
+- `lib/features/server_storage_migration/screens/server_storage_migration_screen.dart` — 전환 진행 화면(기록 준비/기록 업로드/이미지 업로드/완료 처리 단계 표시), 프로필 설정 화면에서 진입
+
 ## features/record_sync
 
 - `lib/features/record_sync/screens/initial_record_sync_screen.dart` — 인증 후 일반 화면 진입을 막고 최초 기록 다운로드·저장 진행 상태와 재시도를 표시하는 게이트 화면
@@ -182,6 +194,8 @@
 
 ## docs
 
+- `docs/review/20260907-002544-server-storage-migration-rereview.md` — 로컬 → 서버 저장 전환 후속 수정의 완료 복구, 30일 물리 삭제, 태그 삭제 반영, 빈 이미지 검증 재리뷰
+- `docs/review/20260906-233230-server-storage-migration-review.md` — 로컬 → 서버 저장 전환의 기존 PHOTO 재첨부, Import 후 충돌 기준값, 완료 후 복구 구간, 노트 제목 검증 리뷰
 - `docs/review/20260906-004203-last-commit-review.md` — 마지막 커밋의 기존 로컬 DB 태그 테이블 보완·서재 추가 예외 처리 리뷰
 - `docs/review/20260905-171808-bookshelf-description-tag-rereview.md` — 완독 목록 큰 글자 배율과 책 소개 토글 semantics 후속 리뷰
 - `docs/review/20260905-170252-bookshelf-description-tag-review.md` — 완독 리스트·책 소개 큰 글자 배율, 태그 시트 종료, 보기 모드 복원 경합 리뷰
