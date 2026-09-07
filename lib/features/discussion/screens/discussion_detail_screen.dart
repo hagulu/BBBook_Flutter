@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
+import '../../../shared/widgets/app_pagination.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
@@ -54,9 +55,13 @@ class _DiscussionDetailScreenState
   final _scrollController = ScrollController();
   final _pendingAnswerLikeIds = <int>{};
   final _highlightedAnswerKey = GlobalKey();
+  final _answerSectionKey = GlobalKey();
   bool _isTogglingTopicLike = false;
-  bool _hasScrolledToHighlight = false;
   bool _isSearchingForHighlight = false;
+  // 스캔이 찾았든 포기했든 한 번 끝나면 다시 시작하지 않는다. `_buildBody`가
+  // 리빌드마다 스캔을 재호출하는데, 이 표시가 없으면 중단된 스캔이 이후
+  // 리빌드(공감 토글 등)마다 되살아나 페이지를 계속 앞으로 넘겨버린다.
+  bool _highlightSearchDone = false;
 
   void _scrollToHighlightedAnswer() {
     final context = _highlightedAnswerKey.currentContext;
@@ -69,12 +74,29 @@ class _DiscussionDetailScreenState
     );
   }
 
-  /// 강조 대상 답변이 첫 페이지에 없으면 있을 때까지(또는 더 이상 페이지가
+  /// 답변 목록에서 다른 페이지로 이동하면 그 목록 상단이 보이게 스크롤한다.
+  void _scrollToAnswerSectionTop() {
+    final context = _answerSectionKey.currentContext;
+    if (context == null) return;
+    Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// 강조 대상 답변이 현재 페이지에 없으면 있을 때까지(또는 더 이상 페이지가
   /// 없을 때까지) 다음 페이지를 순차 조회한 뒤 스크롤한다.
   Future<void> _ensureHighlightVisible() async {
     final highlightAnswerId = widget.highlightAnswerId;
     if (highlightAnswerId == null ||
-        _hasScrolledToHighlight ||
+        _highlightSearchDone ||
         _isSearchingForHighlight) {
       return;
     }
@@ -86,38 +108,28 @@ class _DiscussionDetailScreenState
             .valueOrNull;
         if (state == null) return;
         if (state.items.any((answer) => answer.id == highlightAnswerId)) {
-          _hasScrolledToHighlight = true;
+          _highlightSearchDone = true;
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => _scrollToHighlightedAnswer(),
           );
           return;
         }
-        if (!state.hasNext) return;
-        await _answersController.loadMore();
+        if (state.page >= state.totalPages || state.isChangingPage) return;
+        final pageBeforeLoad = state.page;
+        try {
+          await _answersController.goToPage(pageBeforeLoad + 1);
+        } catch (_) {
+          return;
+        }
+        final latest = ref
+            .read(discussionAnswersControllerProvider(widget.topicId))
+            .valueOrNull;
+        // 페이지가 실제로 넘어가지 않았다면(동시 요청 등) 더 진행하지 않는다.
+        if (latest == null || latest.page == pageBeforeLoad) return;
       }
     } finally {
       _isSearchingForHighlight = false;
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  void _onScroll() {
-    if (!_scrollController.hasClients) return;
-    final position = _scrollController.position;
-    if (position.pixels >= position.maxScrollExtent - 200) {
-      _answersController.loadMore();
+      _highlightSearchDone = true;
     }
   }
 
@@ -205,6 +217,19 @@ class _DiscussionDetailScreenState
       await _detailController.reload();
     } on ApiException catch (e) {
       if (mounted) AppSnackBar.error(context, e.message);
+    }
+  }
+
+  Future<void> _goToAnswerPage(int page) async {
+    try {
+      await _answersController.goToPage(page);
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _scrollToAnswerSectionTop(),
+        );
+      }
+    } catch (_) {
+      if (mounted) AppSnackBar.error(context, '답변을 불러오지 못했습니다');
     }
   }
 
@@ -379,7 +404,13 @@ class _DiscussionDetailScreenState
     );
 
     if (widget.highlightAnswerId != null && answersState.valueOrNull != null) {
-      unawaited(_ensureHighlightVisible());
+      // build 도중 바로 실행하면 `_ensureHighlightVisible`이 첫 await 전에
+      // 동기적으로 `goToPage`(→ provider state 변경)까지 진행해 "위젯 트리를
+      // 빌드하는 동안 provider를 수정할 수 없다"는 Riverpod 제약을 위반한다.
+      // 프레임이 끝난 뒤로 미룬다.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_ensureHighlightVisible());
+      });
     }
 
     return RefreshIndicator(
@@ -423,7 +454,7 @@ class _DiscussionDetailScreenState
                   onOpen: _openFreeAnswerSheet,
                 ),
               ],
-              const SizedBox(height: 16),
+              SizedBox(key: _answerSectionKey, height: 16),
               switch (answersState) {
                 AsyncData(:final value) => _AnswerList(
                   state: value,
@@ -434,6 +465,7 @@ class _DiscussionDetailScreenState
                   onDelete: _deleteAnswer,
                   onReport: _reportAnswer,
                   onToggleLike: _toggleAnswerLike,
+                  onPageChanged: _goToAnswerPage,
                   highlightAnswerId: widget.highlightAnswerId,
                   highlightKey: _highlightedAnswerKey,
                 ),
@@ -722,11 +754,12 @@ class _AnswerList extends StatelessWidget {
     required this.onDelete,
     required this.onReport,
     required this.onToggleLike,
+    required this.onPageChanged,
     this.highlightAnswerId,
     this.highlightKey,
   });
 
-  final DiscussionListState<DiscussionAnswer> state;
+  final DiscussionAnswerPageState state;
   final List<DiscussionOption> options;
   final bool canEditAnswers;
   final Set<int> pendingLikeIds;
@@ -734,6 +767,7 @@ class _AnswerList extends StatelessWidget {
   final void Function(int answerId) onDelete;
   final void Function(int answerId) onReport;
   final void Function(DiscussionAnswer answer) onToggleLike;
+  final ValueChanged<int> onPageChanged;
 
   /// "내가 작성한 토론 댓글" 목록에서 진입했을 때 스크롤·강조할 답변 ID.
   final int? highlightAnswerId;
@@ -744,7 +778,7 @@ class _AnswerList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        DiscussionSectionLabel('답변 ${state.items.length}개'),
+        DiscussionSectionLabel('답변 ${state.totalElements}개'),
         const SizedBox(height: 12),
         if (state.items.isEmpty)
           const Padding(
@@ -757,28 +791,55 @@ class _AnswerList extends StatelessWidget {
             ),
           )
         else
-          for (final answer in state.items) ...[
-            _MaybeHighlightedAnswer(
-              isHighlighted: answer.id == highlightAnswerId,
-              highlightKey: answer.id == highlightAnswerId
-                  ? highlightKey
-                  : null,
-              child: DiscussionAnswerItem(
-                key: ValueKey(answer.id),
-                answer: answer,
-                options: options,
-                canEdit: canEditAnswers,
-                onSubmitEdit: (content) => onSubmitEdit(answer.id, content),
-                onDelete: () => onDelete(answer.id),
-                onReport: () => onReport(answer.id),
-                onToggleLike: pendingLikeIds.contains(answer.id)
-                    ? null
-                    : () => onToggleLike(answer),
+          AnimatedOpacity(
+            opacity: state.isChangingPage ? 0.5 : 1,
+            duration: const Duration(milliseconds: 150),
+            child: IgnorePointer(
+              ignoring: state.isChangingPage,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final answer in state.items) ...[
+                    _MaybeHighlightedAnswer(
+                      isHighlighted: answer.id == highlightAnswerId,
+                      highlightKey: answer.id == highlightAnswerId
+                          ? highlightKey
+                          : null,
+                      child: DiscussionAnswerItem(
+                        key: ValueKey(answer.id),
+                        answer: answer,
+                        options: options,
+                        canEdit: canEditAnswers,
+                        onSubmitEdit: (content) =>
+                            onSubmitEdit(answer.id, content),
+                        onDelete: () => onDelete(answer.id),
+                        onReport: () => onReport(answer.id),
+                        onToggleLike: pendingLikeIds.contains(answer.id)
+                            ? null
+                            : () => onToggleLike(answer),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 10),
-          ],
-        if (state.isLoadingMore) const CommunityContentPageLoader(),
+          ),
+        if (state.totalPages > 1)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Center(
+              child: AppPagination(
+                currentPage: state.page,
+                totalPages: state.totalPages,
+                onPageChanged: onPageChanged,
+                // 다른 3개 "내 콘텐츠" 페이지네이션(전체 폭)과 달리 이 화면은
+                // 토론 본문 옆 좁은 폭에 놓이므로 양쪽 끝이 스크롤 없이 보이게
+                // 좌우로 펼치는 개수를 줄인다.
+                siblingCount: 1,
+              ),
+            ),
+          ),
       ],
     );
   }

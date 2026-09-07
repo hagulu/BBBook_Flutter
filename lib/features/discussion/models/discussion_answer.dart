@@ -80,25 +80,30 @@ class DiscussionAnswer {
   }
 }
 
-/// `GET /api/discussions/{topicId}/answers` 커서 기반 목록 페이지(최신순).
+/// `GET /api/discussions/{topicId}/answers` 페이지 기반 목록 페이지(최신순).
 class DiscussionAnswersPage {
   const DiscussionAnswersPage({
     required this.items,
-    required this.nextCursor,
-    required this.hasNext,
+    required this.page,
+    required this.totalElements,
+    required this.totalPages,
   });
 
   final List<DiscussionAnswer> items;
-  final int? nextCursor;
-  final bool hasNext;
+
+  /// 0부터 시작하는 서버 페이지 번호.
+  final int page;
+  final int totalElements;
+  final int totalPages;
 
   factory DiscussionAnswersPage.fromJson(Map<String, dynamic> json) {
     return DiscussionAnswersPage(
       items: (json['items'] as List<dynamic>? ?? const [])
           .map((e) => DiscussionAnswer.fromJson(e as Map<String, dynamic>))
           .toList(),
-      nextCursor: json['nextCursor'] as int?,
-      hasNext: json['hasNext'] as bool? ?? false,
+      page: json['page'] as int? ?? 0,
+      totalElements: json['totalElements'] as int? ?? 0,
+      totalPages: json['totalPages'] as int? ?? 0,
     );
   }
 }

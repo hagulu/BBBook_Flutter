@@ -223,16 +223,16 @@ class DiscussionApi {
     }
   }
 
-  /// GET /api/discussions/{topicId}/answers — 커서 기반 답변 목록(최신순).
+  /// GET /api/discussions/{topicId}/answers — 페이지 기반 답변 목록(최신순).
   Future<DiscussionAnswersPage> getAnswers({
     required int topicId,
-    int? cursor,
+    int page = 0,
     int size = 20,
   }) async {
     try {
       final response = await _apiClient.dio.get<Map<String, dynamic>>(
         '/api/discussions/$topicId/answers',
-        queryParameters: {'cursor': ?cursor, 'size': size},
+        queryParameters: {'page': page, 'size': size},
       );
       return DiscussionAnswersPage.fromJson(_unwrapMap(response));
     } on DioException catch (e) {

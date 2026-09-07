@@ -36,13 +36,13 @@
 - `lib/features/profile/screens/my_reflections_screen.dart` — 내가 작성한 독후감 목록(커서 무한 스크롤), 정상 항목은 서버 reflectionId로 로컬 행을 찾아 기존 `BookReflectionDetailScreen`(수정·삭제 포함)으로 이동
 - `lib/features/profile/screens/my_reviews_screen.dart` — 내가 작성한 독자평 목록(커서 무한 스크롤), 탭해도 이동하는 상세 화면 없음
 - `lib/features/profile/screens/my_discussions_screen.dart` — 내가 작성한 토론 목록(커서 무한 스크롤), 정상 항목은 `DiscussionDetailScreen`으로 이동
-- `lib/features/profile/screens/my_discussion_answers_screen.dart` — 내가 작성한 토론 댓글 목록(서버가 페이지 번호로 응답해 `AppPagination` 숫자 페이지네이션 사용, 다른 3개 목록과 달리 커서 무한 스크롤 아님), 항목 탭 시 원본 토론(`DiscussionDetailScreen`)으로 이동, 돌아오면 보던 페이지 재조회
+- `lib/features/profile/screens/my_discussion_answers_screen.dart` — 내가 작성한 토론 댓글 목록(커서 무한 스크롤, 다른 3개 목록과 동일), 항목 탭 시 원본 토론(`DiscussionDetailScreen`)으로 이동, 돌아오면 목록 재조회
 - `lib/features/profile/screens/reading_stats_screen.dart` — 독서 리포트 화면(AppBar 연도 선택, 요약 3종, 장르별 비율 트리맵·토글형 숫자 상세, 월별 완독 선그래프, 추가 지표), 프로필 메인의 독서 리포트 카드 탭 시 진입, `docs/porting-reference/stats-screen.md` 대응, 데이터는 서버 API 대신 로컬 서재·노트 데이터로 직접 계산
 - `lib/features/profile/data/profile_api.dart` — 프로필 API 호출(조회/수정/이미지 업로드/회원 탈퇴), 독서 리포트 카드 요약은 서버 API 대신 로컬 서재 데이터로 직접 계산
-- `lib/features/profile/data/my_content_api.dart` — "내가 작성한 콘텐츠" 4개 목록 API 호출(독후감/리뷰/토론은 커서 조회, 토론 댓글만 페이지 번호 조회)
+- `lib/features/profile/data/my_content_api.dart` — "내가 작성한 콘텐츠" 4개 목록 API 호출(독후감/리뷰/토론/토론 댓글 모두 커서 조회)
 - `lib/features/profile/services/reading_stats_calculator.dart` — 독서 리포트 화면 요약·연도 목록을 로컬 완독 책 목록에서 계산하는 순수 함수
 - `lib/features/profile/providers/profile_providers.dart` — 프로필 조회·독서 리포트 카드 요약(로컬 계산) Riverpod provider
-- `lib/features/profile/providers/my_content_providers.dart` — "내가 작성한 콘텐츠" 4개 목록 Riverpod provider(독후감/리뷰/토론은 커서 무한 스크롤, 토론 댓글만 페이지 번호 기반)
+- `lib/features/profile/providers/my_content_providers.dart` — "내가 작성한 콘텐츠" 4개 목록 Riverpod provider(모두 커서 무한 스크롤)
 - `lib/features/profile/providers/reading_stats_providers.dart` — 독서 리포트 화면 연도 목록·연도별 요약 Riverpod provider(로컬 계산)
 
 ## features/bookshelf
@@ -157,7 +157,7 @@
 - `lib/features/discussion/screens/discussion_detail_screen.dart` — 토론 상세(선택지 결과 바·답변 작성/목록·공감·작성자 메뉴(수정/마감일/닫기·재오픈/삭제))
 - `lib/features/discussion/screens/discussion_form_screen.dart` — 토론 주제 작성/수정 폼(자유 토론·선택지 토론 전환, 수정 시 기존 선택지 append-only 잠금)
 - `lib/features/discussion/data/discussion_api.dart` — 토론 API 호출(주제 목록/상세/작성/수정/마감일/닫기/재오픈/삭제, 답변 CRUD, 공감, 신고)
-- `lib/features/discussion/providers/discussion_providers.dart` — 토론 관련 Riverpod provider(목록·상세·답변 목록 컨트롤러, 낙관적 공감 토글)
+- `lib/features/discussion/providers/discussion_providers.dart` — 토론 관련 Riverpod provider(주제 목록은 커서 무한 스크롤, 답변 목록은 서버가 페이지 번호로 응답해 `AppPagination` 숫자 페이지네이션 사용, 상세·낙관적 공감 토글)
 - `lib/features/discussion/utils/discussion_poll.dart` — 선택지 색 팔레트 배정·append-only 검증·퍼센트 포맷
 
 ## features/public_reflection
@@ -194,6 +194,7 @@
 
 ## docs
 
+- `docs/review/20260908-005905-discussion-pagination-review.md` — 토론 답변 페이지네이션 전환의 빌드 중 provider 변경, 누적 토론 목록 갱신, 삭제 후 메타데이터 정합성 리뷰
 - `docs/review/20260907-002544-server-storage-migration-rereview.md` — 로컬 → 서버 저장 전환 후속 수정의 완료 복구, 30일 물리 삭제, 태그 삭제 반영, 빈 이미지 검증 재리뷰
 - `docs/review/20260906-233230-server-storage-migration-review.md` — 로컬 → 서버 저장 전환의 기존 PHOTO 재첨부, Import 후 충돌 기준값, 완료 후 복구 구간, 노트 제목 검증 리뷰
 - `docs/review/20260906-004203-last-commit-review.md` — 마지막 커밋의 기존 로컬 DB 태그 테이블 보완·서재 추가 예외 처리 리뷰

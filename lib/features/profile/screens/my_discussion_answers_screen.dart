@@ -3,26 +3,49 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_bar_title.dart';
-import '../../../shared/widgets/app_pagination.dart';
-import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../discussion/screens/discussion_detail_screen.dart';
 import '../models/my_discussion_answer_summary.dart';
 import '../providers/my_content_providers.dart';
 import 'widgets/my_discussion_answer_card.dart';
 
-/// "내가 작성한 토론 댓글" 목록(`my-content-screens.md` §5). 서버가 이
-/// 엔드포인트만 페이지 번호로 응답해(`api-me-discussion-answers-get.md`),
-/// 다른 3개 "내가 작성한 콘텐츠" 목록(커서 무한 스크롤)과 달리 숫자
-/// 페이지네이션으로 보여준다.
-class MyDiscussionAnswersScreen extends ConsumerWidget {
+/// "내가 작성한 토론 댓글" 목록(`my-content-screens.md` §5, cursor 기반
+/// `api-me-discussion-answers-get.md`). 다른 3개 "내가 작성한 콘텐츠" 목록과
+/// 동일하게 무한 스크롤로 보여준다.
+class MyDiscussionAnswersScreen extends ConsumerStatefulWidget {
   const MyDiscussionAnswersScreen({super.key});
 
-  Future<void> _openTopic(
-    BuildContext context,
-    WidgetRef ref,
-    MyDiscussionAnswerSummary answer,
-  ) async {
+  @override
+  ConsumerState<MyDiscussionAnswersScreen> createState() =>
+      _MyDiscussionAnswersScreenState();
+}
+
+class _MyDiscussionAnswersScreenState
+    extends ConsumerState<MyDiscussionAnswersScreen> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 240) {
+      ref.read(myDiscussionAnswerListControllerProvider.notifier).loadMore();
+    }
+  }
+
+  Future<void> _openTopic(MyDiscussionAnswerSummary answer) async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => DiscussionDetailScreen(
@@ -31,28 +54,13 @@ class MyDiscussionAnswersScreen extends ConsumerWidget {
         ),
       ),
     );
-    // 상세에서 답변 수정·삭제가 있었을 수 있으니 돌아오면 보던 페이지를
-    // 다시 조회한다(전체를 1페이지부터 다시 불러오면 위치를 잃는다).
-    ref
-        .read(myDiscussionAnswerPageControllerProvider.notifier)
-        .reloadCurrentPage();
-  }
-
-  Future<void> _goToPage(BuildContext context, WidgetRef ref, int page) async {
-    try {
-      await ref
-          .read(myDiscussionAnswerPageControllerProvider.notifier)
-          .goToPage(page);
-    } catch (_) {
-      if (context.mounted) {
-        AppSnackBar.error(context, '페이지를 불러오지 못했습니다');
-      }
-    }
+    // 상세에서 답변 수정·삭제가 있었을 수 있으니 돌아오면 목록을 다시 조회한다.
+    if (mounted) ref.invalidate(myDiscussionAnswerListControllerProvider);
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(myDiscussionAnswerPageControllerProvider);
+  Widget build(BuildContext context) {
+    final state = ref.watch(myDiscussionAnswerListControllerProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -64,15 +72,16 @@ class MyDiscussionAnswersScreen extends ConsumerWidget {
       body: SafeArea(
         top: false,
         child: switch (state) {
-          AsyncData(:final value) => _AnswerPage(
-            state: value,
-            onOpen: (answer) => _openTopic(context, ref, answer),
-            onPageChanged: (page) => _goToPage(context, ref, page),
+          AsyncData(:final value) => _AnswerList(
+            scrollController: _scrollController,
+            items: value.items,
+            isLoadingMore: value.isLoadingMore,
+            onOpen: _openTopic,
           ),
           AsyncError() => CommunityContentErrorState(
             message: '불러오기에 실패했습니다',
             onRetry: () =>
-                ref.invalidate(myDiscussionAnswerPageControllerProvider),
+                ref.invalidate(myDiscussionAnswerListControllerProvider),
           ),
           _ => const CommunityContentLoadingState(),
         },
@@ -81,62 +90,54 @@ class MyDiscussionAnswersScreen extends ConsumerWidget {
   }
 }
 
-class _AnswerPage extends StatelessWidget {
-  const _AnswerPage({
-    required this.state,
+class _AnswerList extends StatelessWidget {
+  const _AnswerList({
+    required this.scrollController,
+    required this.items,
+    required this.isLoadingMore,
     required this.onOpen,
-    required this.onPageChanged,
   });
 
-  final MyDiscussionAnswerPageState state;
+  final ScrollController scrollController;
+  final List<MyDiscussionAnswerSummary> items;
+  final bool isLoadingMore;
   final void Function(MyDiscussionAnswerSummary answer) onOpen;
-  final ValueChanged<int> onPageChanged;
 
   @override
   Widget build(BuildContext context) {
-    if (state.items.isEmpty) {
-      return const Center(
-        child: Text(
-          '작성한 토론 댓글이 없습니다',
-          style: TextStyle(color: AppColors.textMuted),
-        ),
+    if (items.isEmpty) {
+      return ListView(
+        controller: scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 80),
+          Center(
+            child: Text(
+              '작성한 토론 댓글이 없습니다',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
+          ),
+        ],
       );
     }
 
-    final list = ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      physics: const NeverScrollableScrollPhysics(),
-      shrinkWrap: true,
-      itemCount: state.items.length,
+    return ListView.separated(
+      controller: scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      itemCount: items.length + (isLoadingMore ? 1 : 0),
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
-        final answer = state.items[index];
+        if (index >= items.length) {
+          return const CommunityContentPageLoader();
+        }
+        final answer = items[index];
         return MyDiscussionAnswerCard(
           key: ValueKey(answer.id),
           answer: answer,
           onTap: () => onOpen(answer),
         );
       },
-    );
-
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          AnimatedOpacity(
-            opacity: state.isChangingPage ? 0.5 : 1,
-            duration: const Duration(milliseconds: 150),
-            child: IgnorePointer(ignoring: state.isChangingPage, child: list),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
-            child: AppPagination(
-              currentPage: state.page,
-              totalPages: state.totalPages,
-              onPageChanged: onPageChanged,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

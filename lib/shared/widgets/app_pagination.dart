@@ -70,11 +70,17 @@ class AppPagination extends StatelessWidget {
     required this.currentPage,
     required this.totalPages,
     required this.onPageChanged,
+    this.siblingCount = 2,
   });
 
   final int currentPage;
   final int totalPages;
   final ValueChanged<int> onPageChanged;
+
+  /// 현재 페이지 좌우로 펼쳐 보일 개수. 좁은 폭에 놓일 때(예: 화면 안에
+  /// 다른 콘텐츠와 함께 배치되는 경우) 줄여서 양쪽 끝이 스크롤 없이 보이게
+  /// 할 수 있다.
+  final int siblingCount;
 
   @override
   Widget build(BuildContext context) {
@@ -83,6 +89,7 @@ class AppPagination extends StatelessWidget {
     final range = buildPaginationRange(
       currentPage: currentPage,
       totalPages: totalPages,
+      siblingCount: siblingCount,
     );
 
     return SingleChildScrollView(

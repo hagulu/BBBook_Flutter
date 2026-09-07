@@ -104,21 +104,34 @@ class DiscussionListController
     }
   }
 
-  /// 상세에서 돌아왔을 때(작성/삭제/닫기 등)와 당겨서 새로고침에서 첫 페이지부터
-  /// 다시 조회한다. 실패해도 이미 보고 있던 목록을 지우지 않는다.
+  /// 상세에서 돌아왔을 때(작성/수정/닫기·재오픈/삭제 등)와 당겨서 새로고침에서
+  /// 목록을 최신 상태로 재구성한다. 첫 페이지만 다시 읽어 기존 뒷페이지와
+  /// 단순히 이어 붙이면, 상세에서 삭제·닫기한 항목이나 "열린 토론" 필터에서
+  /// 제외돼야 할 항목이 뒷페이지에 남아 화면과 서버 상태가 어긋난다. 대신
+  /// 이전에 불러온 만큼(또는 그 이상)을 커서 처음부터 다시 순회해 전체
+  /// 목록을 서버 기준으로 새로 만든다 — 스크롤로 여러 페이지를 불러온
+  /// 상태에서도 그만큼은 다시 채워져 스크롤 위치가 크게 흔들리지 않는다.
+  /// 실패해도 이미 보고 있던 목록을 지우지 않는다.
   Future<void> refresh() async {
+    final priorCount = state.valueOrNull?.items.length ?? 0;
     try {
-      final page = await _api.getTopics(
-        isbn13: arg.isbn13,
-        includeClosed: arg.includeClosed,
-        size: _kPageSize,
-      );
+      final items = <DiscussionTopic>[];
+      int? cursor;
+      var hasNext = true;
+      do {
+        final page = await _api.getTopics(
+          isbn13: arg.isbn13,
+          includeClosed: arg.includeClosed,
+          cursor: cursor,
+          size: _kPageSize,
+        );
+        items.addAll(page.items);
+        cursor = page.nextCursor;
+        hasNext = page.hasNext;
+      } while (items.length < priorCount && hasNext);
+
       state = AsyncValue.data(
-        DiscussionListState(
-          items: page.items,
-          nextCursor: page.nextCursor,
-          hasNext: page.hasNext,
-        ),
+        DiscussionListState(items: items, nextCursor: cursor, hasNext: hasNext),
       );
     } catch (_) {
       // 화면에 남아 있는 목록을 유지한다(다시 시도는 사용자가 결정).
@@ -259,57 +272,73 @@ final discussionDetailControllerProvider =
       int
     >(DiscussionDetailController.new);
 
-/// 토론 답변 목록(최신순, "더 보기" 커서 페이지네이션) + 답변 단위 액션.
+/// 토론 답변 목록 상태(페이지 번호 기반, `api-discussions-topicId-answers-get.md`).
+///
+/// [page]는 화면에 노출하는 1부터 시작하는 페이지 번호다(서버는 0부터 시작).
+class DiscussionAnswerPageState {
+  const DiscussionAnswerPageState({
+    required this.items,
+    required this.page,
+    required this.totalPages,
+    required this.totalElements,
+    this.isChangingPage = false,
+  });
+
+  final List<DiscussionAnswer> items;
+  final int page;
+  final int totalPages;
+  final int totalElements;
+  final bool isChangingPage;
+
+  DiscussionAnswerPageState copyWith({
+    List<DiscussionAnswer>? items,
+    int? page,
+    int? totalPages,
+    int? totalElements,
+    bool? isChangingPage,
+  }) {
+    return DiscussionAnswerPageState(
+      items: items ?? this.items,
+      page: page ?? this.page,
+      totalPages: totalPages ?? this.totalPages,
+      totalElements: totalElements ?? this.totalElements,
+      isChangingPage: isChangingPage ?? this.isChangingPage,
+    );
+  }
+}
+
+/// 토론 답변 목록(숫자 페이지네이션) + 답변 단위 액션.
 class DiscussionAnswersController
-    extends
-        AutoDisposeFamilyAsyncNotifier<
-          DiscussionListState<DiscussionAnswer>,
-          int
-        > {
+    extends AutoDisposeFamilyAsyncNotifier<DiscussionAnswerPageState, int> {
   late DiscussionApi _api;
 
   @override
-  FutureOr<DiscussionListState<DiscussionAnswer>> build(int arg) async {
+  FutureOr<DiscussionAnswerPageState> build(int arg) async {
     _api = ref.watch(discussionApiProvider);
-    final page = await _api.getAnswers(topicId: arg, size: _kPageSize);
-    return DiscussionListState(
-      items: page.items,
-      nextCursor: page.nextCursor,
-      hasNext: page.hasNext,
-    );
+    return _loadPage(0);
   }
 
-  Future<void> loadMore() async {
+  /// [uiPage]는 1부터 시작하는 화면 페이지 번호.
+  Future<void> goToPage(int uiPage) async {
     final current = state.valueOrNull;
-    if (current == null || !current.hasNext || current.isLoadingMore) return;
-
-    state = AsyncValue.data(current.copyWith(isLoadingMore: true));
+    if (current == null || current.isChangingPage || uiPage == current.page) {
+      return;
+    }
+    state = AsyncValue.data(current.copyWith(isChangingPage: true));
     try {
-      final page = await _api.getAnswers(
-        topicId: arg,
-        cursor: current.nextCursor,
-        size: _kPageSize,
-      );
-      final latest = state.valueOrNull;
-      if (latest == null) return;
-      state = AsyncValue.data(
-        latest.copyWith(
-          items: [...latest.items, ...page.items],
-          nextCursor: page.nextCursor,
-          hasNext: page.hasNext,
-          isLoadingMore: false,
-        ),
-      );
+      final next = await _loadPage(uiPage - 1);
+      state = AsyncValue.data(next);
     } catch (_) {
       final latest = state.valueOrNull;
       if (latest != null) {
-        state = AsyncValue.data(latest.copyWith(isLoadingMore: false));
+        state = AsyncValue.data(latest.copyWith(isChangingPage: false));
       }
+      rethrow;
     }
   }
 
-  /// 답변 작성. 등록 후 첫 페이지를 다시 불러오되, 이미 "더 보기"로 읽어 둔
-  /// 뒷페이지는 유지한다(웹과 동일 — 등록 때문에 목록이 접히지 않게 한다).
+  /// 답변 작성. 최신순 정렬이라 새 답변은 항상 1페이지에 나타나므로, 등록 후
+  /// 1페이지를 다시 불러온다.
   ///
   /// 등록(POST)과 새로고침(GET)의 성공 여부를 분리한다(`ReviewsController`와
   /// 동일한 규약) — 등록은 됐는데 새로고침만 실패한 경우까지 예외로 던지면,
@@ -328,7 +357,7 @@ class DiscussionAnswersController
       optionId: optionId,
     );
     try {
-      await _reloadFirstPageKeepingRest();
+      state = AsyncValue.data(await _loadPage(0));
       return true;
     } catch (_) {
       return false;
@@ -340,33 +369,43 @@ class DiscussionAnswersController
     required String content,
   }) async {
     await _api.patchAnswer(topicId: arg, answerId: answerId, content: content);
-    final current = state.valueOrNull;
-    if (current == null) return;
-    state = AsyncValue.data(
-      current.copyWith(
-        items: [
-          for (final answer in current.items)
-            if (answer.id == answerId)
-              answer.copyWith(
-                content: content,
-                updatedAt: DateTime.now().toUtc(),
-              )
-            else
-              answer,
-        ],
-      ),
+    _updateItem(
+      answerId,
+      (a) => a.copyWith(content: content, updatedAt: DateTime.now().toUtc()),
     );
   }
 
+  /// 삭제 후 화면에서 즉시 항목을 지우고 전체 개수·페이지 수도 함께
+  /// 낙관적으로 보정한 뒤, 그 페이지의 마지막 답변을 지워 전체 페이지 수가
+  /// 줄었을 수 있으니 백그라운드로 페이지를 다시 불러와 경계를 맞춘다
+  /// ([_loadPage]가 새로워진 마지막 페이지로 보정). 보정 조회가 실패해도
+  /// 개수·페이지 수까지 이미 맞춰둔 낙관적 상태를 유지해 화면에 "삭제됐는데
+  /// 총 개수·마지막 페이지는 그대로"인 불일치가 남지 않게 한다.
   Future<void> deleteAnswer(int answerId) async {
     await _api.deleteAnswer(topicId: arg, answerId: answerId);
     final current = state.valueOrNull;
     if (current == null) return;
+    final newTotalElements = current.totalElements > 0
+        ? current.totalElements - 1
+        : 0;
+    final newTotalPages = newTotalElements == 0
+        ? 0
+        : (newTotalElements + _kPageSize - 1) ~/ _kPageSize;
     state = AsyncValue.data(
       current.copyWith(
         items: current.items.where((a) => a.id != answerId).toList(),
+        totalElements: newTotalElements,
+        totalPages: newTotalPages,
+        page: newTotalPages == 0
+            ? current.page
+            : current.page.clamp(1, newTotalPages),
       ),
     );
+    try {
+      state = AsyncValue.data(await _loadPage(current.page - 1));
+    } catch (_) {
+      // 개수·페이지 수까지 보정된 낙관적 삭제 상태를 그대로 유지한다.
+    }
   }
 
   Future<void> report(
@@ -416,33 +455,29 @@ class DiscussionAnswersController
     }
   }
 
-  Future<void> _reloadFirstPageKeepingRest() async {
-    final page = await _api.getAnswers(topicId: arg, size: _kPageSize);
-    final current = state.valueOrNull;
-    if (current == null) {
-      state = AsyncValue.data(
-        DiscussionListState(
-          items: page.items,
-          nextCursor: page.nextCursor,
-          hasNext: page.hasNext,
-        ),
+  Future<DiscussionAnswerPageState> _loadPage(int serverPage) async {
+    var result = await _api.getAnswers(
+      topicId: arg,
+      page: serverPage,
+      size: _kPageSize,
+    );
+    if (result.items.isEmpty &&
+        result.totalPages > 0 &&
+        result.page >= result.totalPages) {
+      // 그 페이지의 마지막 답변을 지워 전체 페이지 수가 줄면 방금 요청한
+      // 페이지가 범위를 벗어날 수 있다. 새로워진 마지막 페이지로 한 번 더
+      // 조회해 빈 목록으로 고립되지 않게 한다.
+      result = await _api.getAnswers(
+        topicId: arg,
+        page: result.totalPages - 1,
+        size: _kPageSize,
       );
-      return;
     }
-
-    // 첫 페이지에 이미 포함된 항목은 빼고 기존 뒷페이지를 이어 붙인다.
-    final firstPageIds = page.items.map((a) => a.id).toSet();
-    final rest = current.items
-        .where((a) => !firstPageIds.contains(a.id))
-        .toList();
-    // 뒷페이지를 유지하는 동안에도 "더 보기" 커서는 기존 값이 유효하다.
-    // 첫 페이지만 다시 읽었으므로 뒤쪽 페이지 정보는 그대로 둔다.
-    state = AsyncValue.data(
-      DiscussionListState(
-        items: [...page.items, ...rest],
-        nextCursor: rest.isEmpty ? page.nextCursor : current.nextCursor,
-        hasNext: rest.isEmpty ? page.hasNext : current.hasNext,
-      ),
+    return DiscussionAnswerPageState(
+      items: result.items,
+      page: result.page + 1,
+      totalPages: result.totalPages,
+      totalElements: result.totalElements,
     );
   }
 
@@ -466,6 +501,6 @@ class DiscussionAnswersController
 final discussionAnswersControllerProvider =
     AsyncNotifierProvider.autoDispose.family<
       DiscussionAnswersController,
-      DiscussionListState<DiscussionAnswer>,
+      DiscussionAnswerPageState,
       int
     >(DiscussionAnswersController.new);
