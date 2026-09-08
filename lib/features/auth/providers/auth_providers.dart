@@ -7,6 +7,7 @@ import '../../../core/storage/client_id_storage.dart';
 import '../../../core/storage/token_storage.dart';
 import '../data/auth_api.dart';
 import '../data/auth_repository.dart';
+import '../data/local_auth_store.dart';
 import '../data/social_auth_service.dart';
 
 /// 로그인/refresh/logout 전용 Dio. Authorization 헤더나 401 재시도 로직을
@@ -22,6 +23,10 @@ final apiClientProvider = Provider<ApiClient>((ref) {
 
 final tokenStorageProvider = Provider<TokenStorage>((ref) {
   return TokenStorage();
+});
+
+final localAuthStoreProvider = Provider<LocalAuthStore>((ref) {
+  return const LocalAuthStore();
 });
 
 final clientIdStorageProvider = Provider<ClientIdStorage>((ref) {

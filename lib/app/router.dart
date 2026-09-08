@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/auth/providers/auth_notifier.dart';
-import '../features/auth/providers/auth_state.dart';
 import '../features/auth/screens/onboarding_screen.dart';
 import '../features/auth/widgets/auth_loading_gate.dart';
 import '../features/record_sync/screens/initial_record_sync_screen.dart';
@@ -34,7 +33,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       }
 
       final isOnboarding = state.matchedLocation == '/';
-      final isLoggedIn = authState.status == AuthStatus.authenticated;
+      final isLoggedIn = authState.canUseApp;
 
       if (!isLoggedIn && !isOnboarding) {
         return '/';
@@ -47,8 +46,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) =>
-            const AuthLoadingGate(child: OnboardingScreen()),
+        builder: (context, state) => const AuthLoadingGate(
+          requiresAuthentication: false,
+          child: OnboardingScreen(),
+        ),
       ),
       GoRoute(
         path: '/feed',

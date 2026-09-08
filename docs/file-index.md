@@ -12,7 +12,7 @@
 ## core
 
 - `lib/core/theme/app_theme.dart` — 역할 기반 색상 토큰(AppColors: "햇빛 드는 밝은 숲" 그린 팔레트)/브랜드 고정색(AppBrandColors)/ThemeData 정의(app·feature가 공통 참조, 색상은 여기 외에 하드코딩 금지)
-- `lib/core/network/api_client.dart` — 공통 API 클라이언트, 401 시 refresh 1회 재시도 후 실패하면 로그아웃 처리
+- `lib/core/network/api_client.dart` — 공통 API 클라이언트, 요청 전 세션 복구·401 refresh 1회 재시도·일시 오류 재시도 간격·이전 세션 응답 차단
 - `lib/core/network/api_base_options.dart` — API 공통 base URL/timeout 정의(ApiClient·인증 전용 Dio 공유)
 - `lib/core/network/patch_field.dart` — PATCH 필드 3-상태(생략=유지 / PatchField.value=수정 / PatchField.clear=명시적 null 삭제) 표현
 - `lib/core/storage/token_storage.dart` — refreshToken 시큐어 스토리지 래퍼
@@ -22,11 +22,12 @@
 ## features/auth
 
 - `lib/features/auth/screens/onboarding_screen.dart` — 온보딩(로그인) 화면
-- `lib/features/auth/providers/auth_notifier.dart` — 전역 인증 상태(AuthProvider 대응), 앱 시작 시 자동 refresh
+- `lib/features/auth/providers/auth_notifier.dart` — 로컬 계정으로 먼저 진입하고 뒤에서 인증 복구, 인증 무효 시 로컬 기록 보존·재로그인, 다른 계정은 확인 후 로컬 초기화
+- `lib/features/auth/data/local_auth_store.dart` — 기록 DB에 계정 소유자 캐시, 기존 설치의 동기화 메타데이터에서 오프라인 계정 복원
 - `lib/features/auth/data/auth_repository.dart` — 인증 세션 source of truth(API·시큐어 스토리지·소셜 SDK 오케스트레이션)
 - `lib/features/auth/data/auth_api.dart` — 인증 API 호출(로그인/refresh/logout/getMe)
 - `lib/features/auth/data/social_auth_service.dart` — Google/Apple 네이티브 로그인
-- `lib/features/auth/widgets/auth_loading_gate.dart` — 인증 확인 중 빈 배경 표시(AuthGuard 대응)
+- `lib/features/auth/widgets/auth_loading_gate.dart` — 인증 확인·라우터 전환 사이 빈 배경 표시, 로그인 사용자의 온보딩 순간 노출 방지
 
 ## features/profile
 
@@ -49,7 +50,7 @@
 
 - `lib/features/bookshelf/screens/bookshelf_screen.dart` — 책장 탭 콘텐츠(읽고 싶음/읽는 중/완독/중단 4탭, 기본은 읽는 중)
 - `lib/features/bookshelf/data/bookshelf_api.dart` — 책장 API 호출(전체 동기화, 증분 동기화, 완독 공개 설정 조회/수정, 카테고리 목록 GET)
-- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마(책장·기록·동기화 메타·독후감 이미지 매칭·저장 모드·태그/태그 매핑), 개발 단계라 마이그레이션 없이 `onCreate` 직접 수정 + version 고정
+- `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마, 기존 데이터 보존하며 오프라인 삭제·CREATE 전송 여부·표지 사본 컬럼 보강
 - `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호), 태그는 `tag`/`user_book_tag_map`을 조인해 조회만 함(쓰기는 `TagDao` 전담)
 - `lib/features/bookshelf/data/book_category_dao.dart` — 카테고리 마스터 목록 로컬 캐시 DAO(계정 무관, 로그아웃 시에도 유지)
 - `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화, 카테고리는 로컬 캐시 우선 조회
@@ -63,7 +64,7 @@
 - `lib/features/book_record/screens/book_record_screen.dart` — 책 기록 상세 화면(자체 AppBar, 책장에서 책 선택 시 진입), 정보/노트/독후감/생각나눔 4탭과 진행률/상태/출처/난이도/태그/삭제 조립
 - `lib/features/book_record/screens/book_sharing_list.dart` — 책 기록 상세의 생각나눔 탭(ISBN 있으면 커뮤니티 미리보기 공용 위젯 — 독자평 버튼 항상 노출, 독후감 배지는 내 공개 독후감 수 제외, 없으면 안내용 진입 버튼)
 - `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH(RecordPatch 기준 부분 수정), 책 정보 PATCH(카테고리 포함), ISBN 연결/해제 PATCH, 태그 자동완성 목록/플랫폼 옵션 GET, 삭제 DELETE) — 태그 추가/삭제 자체는 `TagApi`가 전담
-- `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth(로컬 조회는 bookshelf 레포지토리 재사용, 기록 필드 수정과 태그 추가/삭제(`TagRepository` 위임)는 로컬 우선, 그 외는 서버 PATCH 성공 후 로컬 반영), 로컬 저장 모드에서는 책 정보 수정·ISBN 연결·태그·책 삭제를 로컬에만 반영하거나 차단
+- `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth, 기록·책 정보·표지·출처 수정과 삭제는 로컬 우선/서버 재시도, ISBN 연결은 미전송 편집 동기화 후 직렬 처리
 - `lib/features/book_record/providers/book_record_providers.dart` — 책 기록 관련 Riverpod provider(단일 책 상태 컨트롤러, 태그 자동완성, 플랫폼 옵션)
 - `lib/features/book_record/screens/widgets/book_thumbnail_field.dart` — 책 표지 이미지 선택/미리보기 공용 위젯(책 정보 수정·직접 등록에서 공유)
 - `lib/features/book_record/screens/widgets/book_category_field.dart` — 카테고리 선택 필드 + 선택 팝업 공용 위젯(책 정보 수정·직접 등록에서 공유)
@@ -126,7 +127,8 @@
 
 ## features/record_sync
 
-- `lib/features/record_sync/screens/initial_record_sync_screen.dart` — 인증 후 일반 화면 진입을 막고 최초 기록 다운로드·저장 진행 상태와 재시도를 표시하는 게이트 화면
+- `lib/features/record_sync/screens/initial_record_sync_screen.dart` — 사용 가능한 로컬 기록이 없을 때만 최초 기록 다운로드·저장 진행 상태와 재시도를 표시하는 게이트 화면
+- `lib/features/record_sync/providers/background_record_sync_provider.dart` — 앱 사용 중 인증→책→노트→독후감→태그 복구 조율, 앱 복귀·통신 성공·주기 확인으로 dirty 재전송, 저장 방식 전환 중 중단
 - `lib/features/record_sync/providers/record_sync_providers.dart` — 사용자별 최초 기록 동기화 단계·진행률·재시도 상태 관리
 - `lib/features/record_sync/data/record_sync_api.dart` — 전체 책장·기록 조회(`/api/me/records`)와 로컬 전환 시 서버 기록 일괄 소프트 삭제(DELETE) API 호출
 - `lib/features/record_sync/data/record_sync_repository.dart` — 전체 책장·기록 조회와 원자적 로컬 저장을 조율하는 초기 동기화 source of truth
@@ -194,6 +196,7 @@
 
 ## docs
 
+- `docs/policies/offline-records.md` — 오프라인 진입·인증 복구·재전송·계정 변경 삭제 정책과 검증 항목
 - `docs/review/20260908-005905-discussion-pagination-review.md` — 토론 답변 페이지네이션 전환의 빌드 중 provider 변경, 누적 토론 목록 갱신, 삭제 후 메타데이터 정합성 리뷰
 - `docs/review/20260907-002544-server-storage-migration-rereview.md` — 로컬 → 서버 저장 전환 후속 수정의 완료 복구, 30일 물리 삭제, 태그 삭제 반영, 빈 이미지 검증 재리뷰
 - `docs/review/20260906-233230-server-storage-migration-review.md` — 로컬 → 서버 저장 전환의 기존 PHOTO 재첨부, Import 후 충돌 기준값, 완료 후 복구 구간, 노트 제목 검증 리뷰

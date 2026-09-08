@@ -62,6 +62,7 @@ class BookshelfApi {
     try {
       final response = await _apiClient.dio.get<Map<String, dynamic>>(
         '/api/me/privacy-setting',
+        options: ApiClient.recordDependentOptions(),
       );
       final data = _unwrapMap(response);
       return data['isFinishedBooksPublic'] as bool;
@@ -82,6 +83,7 @@ class BookshelfApi {
       final response = await _apiClient.dio.patch<Map<String, dynamic>>(
         '/api/me/privacy-setting',
         data: {'isFinishedBooksPublic': isFinishedBooksPublic},
+        options: ApiClient.recordDependentOptions(),
       );
       final data = _unwrapMap(response);
       return data['isFinishedBooksPublic'] as bool;

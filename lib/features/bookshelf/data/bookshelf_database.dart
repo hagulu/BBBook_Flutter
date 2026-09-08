@@ -113,6 +113,7 @@ class BookshelfDatabase {
       // `CREATE TABLE IF NOT EXISTS`라 매번 다시 불러도 안전하므로, DB를 열
       // 때마다 실행해 옛 설치에도 최신 테이블이 채워지게 한다.
       onOpen: (db) async {
+        await _ensureOfflineBookColumns(db);
         await _createBookCategoryTable(db);
         await _createDismissedIsbnLinkTable(db);
         await _createRecordTables(db);
@@ -121,6 +122,35 @@ class BookshelfDatabase {
         await _createTagTables(db);
       },
     );
+  }
+
+  static Future<void> _ensureOfflineBookColumns(Database db) async {
+    final columns = (await db.rawQuery(
+      'PRAGMA table_info(user_book)',
+    )).map((row) => row['name']).toSet();
+    for (final entry in const {
+      'pending_delete': 'INTEGER NOT NULL DEFAULT 0',
+      'create_attempted': 'INTEGER NOT NULL DEFAULT 0',
+      'local_cover_path': 'TEXT',
+      'local_cover_url': 'TEXT',
+      'sync_retry_after': 'TEXT',
+      'sync_failure_count': 'INTEGER NOT NULL DEFAULT 0',
+      'sync_failure_reason': 'TEXT',
+    }.entries) {
+      if (!columns.contains(entry.key)) {
+        await db.execute(
+          'ALTER TABLE user_book ADD COLUMN ${entry.key} ${entry.value}',
+        );
+        if (entry.key == 'create_attempted') {
+          // 구버전의 미확정 CREATE는 이미 서버에 도착했을 수도 있다.
+          await db.update(
+            'user_book',
+            {'create_attempted': 1},
+            where: 'server_id IS NULL AND client_request_id IS NOT NULL',
+          );
+        }
+      }
+    }
   }
 
   /// `sort_order`는 서버 응답 배열의 위치를 그대로 저장한다(API가 `sort_order`

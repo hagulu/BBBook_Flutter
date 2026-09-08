@@ -48,7 +48,7 @@ final readingStatsSummaryProvider = FutureProvider.autoDispose
       // 집계 자체는 책에 저장된 이름으로 이뤄진다 — `reading_stats_calculator.dart`
       // 참고) 조회에 실패해도(오프라인 등) 화면 전체를 에러로 빠뜨리지 않고
       // 빈 목록으로 대체한다.
-      final categories = await repository.getCategories().catchError(
+      final categories = await repository.getCachedCategories().catchError(
         (_) => const <BookCategory>[],
       );
 

@@ -4,9 +4,11 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/config/api_config.dart';
+import '../../auth/providers/auth_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../auth/providers/auth_notifier.dart';
+import '../../auth/screens/onboarding_screen.dart';
 import '../../notices/screens/notices_list_screen.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../models/profile_me.dart';
@@ -29,16 +31,32 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profileAsync = ref.watch(profileMeProvider);
+    final user = ref.watch(authNotifierProvider.select((auth) => auth.user));
+    final localProfile = user == null
+        ? null
+        : ProfileMe(
+            id: user.id,
+            nickname: user.nickname,
+            email: null,
+            profileImageUrl: user.profileImageUrl,
+          );
 
     return profileAsync.when(
-      loading: () => const _CenteredMessage(text: '불러오는 중...'),
-      error: (error, stackTrace) => _CenteredMessage(
-        text: '프로필을 불러오지 못했습니다',
-        action: TextButton(
-          onPressed: () => ref.invalidate(profileMeProvider),
-          child: const Text('다시 시도'),
-        ),
-      ),
+      loading: () => localProfile == null
+          ? const _CenteredMessage(text: '불러오는 중...')
+          : _ProfileContent(profile: localProfile),
+      error: (error, stackTrace) => localProfile != null
+          ? _ProfileContent(profile: localProfile)
+          : _CenteredMessage(
+              text: '프로필을 불러오지 못했습니다',
+              action: TextButton(
+                onPressed: () {
+                  ref.read(apiClientProvider).requestUserRetry();
+                  ref.invalidate(profileMeProvider);
+                },
+                child: const Text('다시 시도'),
+              ),
+            ),
       data: (profile) => _ProfileContent(profile: profile),
     );
   }
@@ -64,19 +82,35 @@ class _CenteredMessage extends StatelessWidget {
   }
 }
 
-class _ProfileContent extends StatelessWidget {
+class _ProfileContent extends ConsumerWidget {
   const _ProfileContent({required this.profile});
 
   final ProfileMe profile;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final requiresLogin = ref.watch(
+      authNotifierProvider.select((auth) => auth.requiresLogin),
+    );
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _ProfileCard(profile: profile),
+          if (requiresLogin) ...[
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      const OnboardingScreen(reauthentication: true),
+                ),
+              ),
+              icon: const Icon(PhosphorIconsRegular.signIn),
+              label: const Text('기록 동기화를 위해 다시 로그인'),
+            ),
+          ],
           const SizedBox(height: 16),
           const _StatsCard(),
           const SizedBox(height: 16),

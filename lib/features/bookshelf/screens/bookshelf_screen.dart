@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../models/book_status.dart';
-import '../providers/bookshelf_providers.dart';
 import 'widgets/finished_tab_view.dart';
 import 'widgets/reading_tab_view.dart';
 import 'widgets/simple_grid_tab_view.dart';
@@ -58,37 +57,8 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
 
   @override
   Widget build(BuildContext context) {
-    // 탭들은 각자 로컬 DB 조회 provider만 보고 있어, 로컬에 아직 아무 데이터도
-    // 없는 최초 동기화 중에는 그냥 "없습니다"로 보이고 실패해도 원인을 알 수
-    // 없다. 최초 동기화(lastSyncedAt == null)가 진행 중이거나 실패한 동안만
-    // 이 화면에서 로딩/에러로 대체한다 — 최초 동기화가 끝난 뒤의 갱신은 기존
-    // 로컬 목록/RefreshIndicator SnackBar로 계속 처리한다.
-    final syncState = ref.watch(bookshelfSyncControllerProvider);
-    final isInitialSync = syncState.valueOrNull == null;
-
-    if (isInitialSync && syncState.hasError) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              '책장을 불러오지 못했습니다.',
-              style: TextStyle(color: AppColors.textMuted),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () =>
-                  ref.read(bookshelfSyncControllerProvider.notifier).syncNow(),
-              child: const Text('다시 시도'),
-            ),
-          ],
-        ),
-      );
-    }
-    if (isInitialSync && syncState.isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
+    // 최초 다운로드는 InitialRecordSyncGate가 맡는다. 진입 이후에는
+    // 동기화 메타/오류와 무관하게 각 탭의 로컬 목록을 계속 보여준다.
     return Column(
       children: [
         Padding(

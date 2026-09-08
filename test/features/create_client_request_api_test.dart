@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -12,6 +13,102 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   const clientRequestId = '22222222-2222-4222-8222-222222222222';
+
+  test('선행 동기화가 멈춰도 대기 상한 후 원래 요청을 전송한다', () async {
+    final adapter = _CaptureAdapter({'success': true, 'data': {}});
+    final client = ApiClient(
+      baseUrl: 'https://example.test',
+      recordSyncWait: Duration.zero,
+    );
+    client.dio.httpClientAdapter = adapter;
+    final sync = Completer<void>();
+    client.prepareRecordSync = () => sync.future;
+    await client.dio.get<dynamic>(
+      '/api/me/books/exists',
+      options: ApiClient.recordDependentOptions(),
+    );
+    expect(adapter.options?.path, '/api/me/books/exists');
+    expect(sync.isCompleted, isFalse);
+    sync.complete();
+  });
+
+  test('자동 재시도는 백오프를 지키고 명시적 재시도는 즉시 요청한다', () async {
+    final adapter = _CaptureAdapter({'success': false})..statusCode = 503;
+    final client = _client(adapter);
+    var authRetryRequested = false;
+    client.configureAuth(
+      readAccessToken: () => null,
+      refreshAccessToken: () async => null,
+      onUnauthorized: () async {},
+      onUserRetry: () => authRetryRequested = true,
+    );
+    await expectLater(
+      client.dio.get<dynamic>('/api/me'),
+      throwsA(isA<DioException>()),
+    );
+    adapter.statusCode = 200;
+    await expectLater(
+      client.dio.get<dynamic>('/api/me'),
+      throwsA(isA<DioException>()),
+    );
+    expect(adapter.requestCount, 1);
+    client.requestUserRetry();
+    await client.dio.get<dynamic>('/api/me');
+    expect(adapter.requestCount, 2);
+    expect(authRetryRequested, isTrue);
+  });
+
+  test('기록 의존 요청은 인증과 선행 동기화가 끝난 뒤 전송한다', () async {
+    final adapter = _CaptureAdapter({'success': true, 'data': {}});
+    final client = _client(adapter);
+    final order = <String>[];
+    client.configureAuth(
+      readAccessToken: () => 'test-token',
+      refreshAccessToken: () async => 'test-token',
+      onUnauthorized: () async {},
+      prepareSession: () async => order.add('auth'),
+    );
+    client.prepareRecordSync = () async {
+      expect(adapter.options, isNull);
+      order.add('sync');
+    };
+    await client.dio.get<dynamic>(
+      '/api/me/books/exists',
+      options: ApiClient.recordDependentOptions(),
+    );
+    expect(order, ['auth', 'sync']);
+    expect(adapter.options?.headers['Authorization'], 'Bearer test-token');
+  });
+
+  test('동기화 내부 요청은 다시 선행 동기화를 기다리지 않는다', () async {
+    final adapter = _CaptureAdapter({'success': true, 'data': []});
+    final client = _client(adapter);
+    var syncCount = 0;
+    client.prepareRecordSync = () async {
+      syncCount++;
+      await client.dio.get<dynamic>('/api/me/books/sync');
+    };
+    await client.dio.get<dynamic>(
+      '/api/me/books/exists',
+      options: ApiClient.recordDependentOptions(),
+    );
+    expect(syncCount, 1);
+    expect(adapter.options?.path, '/api/me/books/exists');
+  });
+
+  test('선행 동기화 중 계정이 바뀌면 원래 요청을 전송하지 않는다', () async {
+    final adapter = _CaptureAdapter({'success': true, 'data': {}});
+    final client = _client(adapter);
+    client.prepareRecordSync = () async => client.invalidateSession();
+    await expectLater(
+      client.dio.get<dynamic>(
+        '/api/me/books/exists',
+        options: ApiClient.recordDependentOptions(),
+      ),
+      throwsA(isA<DioException>()),
+    );
+    expect(adapter.options, isNull);
+  });
 
   test('일반 책 CREATE JSON에 clientRequestId를 전달하고 created=false도 파싱한다', () async {
     final adapter = _CaptureAdapter(_bookResponse(created: false));
@@ -162,6 +259,8 @@ class _CaptureAdapter implements HttpClientAdapter {
   _CaptureAdapter(this.response);
 
   final Map<String, dynamic> response;
+  int statusCode = 200;
+  int requestCount = 0;
   RequestOptions? options;
   String requestBody = '';
 
@@ -172,6 +271,7 @@ class _CaptureAdapter implements HttpClientAdapter {
     Future<void>? cancelFuture,
   ) async {
     this.options = options;
+    requestCount++;
     if (requestStream != null) {
       final bytes = await requestStream.fold<List<int>>(
         <int>[],
@@ -181,7 +281,7 @@ class _CaptureAdapter implements HttpClientAdapter {
     }
     return ResponseBody.fromString(
       jsonEncode(response),
-      200,
+      statusCode,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
       },

@@ -20,7 +20,9 @@ class BookshelfRefreshIndicator extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async {
         await Future.wait([
-          ref.read(bookshelfSyncControllerProvider.notifier).syncNow(),
+          ref
+              .read(bookshelfSyncControllerProvider.notifier)
+              .syncNow(userInitiated: true),
           ref.read(tagSyncControllerProvider.notifier).syncNow(),
         ]);
         final bookshelfResult = ref.read(bookshelfSyncControllerProvider);
@@ -28,6 +30,14 @@ class BookshelfRefreshIndicator extends ConsumerWidget {
         if ((bookshelfResult.hasError || tagResult.hasError) &&
             context.mounted) {
           AppSnackBar.error(context, '동기화에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+        } else if (await ref
+                .read(bookshelfRepositoryProvider)
+                .hasSyncFailures() &&
+            context.mounted) {
+          AppSnackBar.error(
+            context,
+            '일부 기록은 서버에 반영되지 않았습니다. 로컬 기록은 유지되며, 내용 수정 후 또는 새로고침으로 재시도할 수 있습니다.',
+          );
         }
       },
       child: child,

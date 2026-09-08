@@ -193,7 +193,8 @@ void main() {
 
   test('user_book CREATE 응답 유실 재시도는 DB에 저장된 같은 UUID를 전송한다', () async {
     final adapter = _RetryCreateAdapter();
-    final client = ApiClient(baseUrl: 'https://example.test');
+    var now = DateTime.utc(2026, 9, 8);
+    final client = ApiClient(baseUrl: 'https://example.test', now: () => now);
     client.dio.httpClientAdapter = adapter;
     final repository = BookshelfRepository(
       api: BookshelfApi(apiClient: client),
@@ -207,8 +208,11 @@ void main() {
       title: '재시도 책',
       status: BookStatus.reading,
     );
-    // createIsbnBook의 즉시 push(응답 유실 모의)가 끝난 뒤 같은 dirty 행을
-    // 한 번 더 push한다. 책별 체인이 두 호출을 순서대로 실행한다.
+    await repository.runSerializedForBook(local.userBookId, () async {});
+    // 재시도 제한 중에는 추가 요청이 나가지 않는다.
+    await repository.pushDirtyRecord(local.userBookId);
+    expect(adapter.clientRequestIds, hasLength(1));
+    now = now.add(const Duration(seconds: 16));
     await repository.pushDirtyRecord(local.userBookId);
 
     expect(adapter.clientRequestIds, hasLength(2));
@@ -265,9 +269,10 @@ void main() {
     expect((await dao.getById(local.userBookId))?.serverId, 92);
   });
 
-  test('영구 CREATE 오류는 임시 로컬 행을 제거하고 호출부에 전달한다', () async {
+  test('서버가 CREATE를 거부해도 이미 저장 완료한 로컬 기록은 보존한다', () async {
     final client = ApiClient(baseUrl: 'https://example.test');
-    client.dio.httpClientAdapter = _ErrorCreateAdapter(statusCode: 404);
+    final adapter = _ErrorCreateAdapter(statusCode: 404);
+    client.dio.httpClientAdapter = adapter;
     final repository = BookshelfRepository(
       api: BookshelfApi(apiClient: client),
       recordApi: BookRecordApi(apiClient: client),
@@ -275,21 +280,54 @@ void main() {
       bookSearchApi: BookSearchApi(apiClient: client),
     );
 
-    await expectLater(
-      repository.createIsbnBook(
-        isbn13: '9782222222222',
-        title: '없는 책',
-        status: BookStatus.reading,
-      ),
-      throwsA(
-        isA<ApiException>().having(
-          (error) => error.statusCode,
-          'statusCode',
-          404,
-        ),
-      ),
+    final local = await repository.createIsbnBook(
+      isbn13: '9782222222222',
+      title: '없는 책',
+      status: BookStatus.reading,
     );
-    expect(await const BookshelfDao().getByIsbn13('9782222222222'), isNull);
+    await repository.pushDirtyRecord(local.userBookId);
+    expect(adapter.requestCount, 1);
+    expect(await const BookshelfDao().hasRetryableChanges(), isFalse);
+    await const BookshelfDao().resetRetryDelays();
+    await repository.pushDirtyRecord(local.userBookId);
+    expect(adapter.requestCount, 2);
+    expect(await const BookshelfDao().getByIsbn13('9782222222222'), isNotNull);
+    expect(
+      await const BookshelfDao().getDirtyRecord(local.userBookId),
+      isNotNull,
+    );
+  });
+
+  test('CREATE 응답 유실 후 삭제하면 동일 UUID로 복구한 서버 책까지 삭제한다', () async {
+    var now = DateTime.utc(2026, 9, 8);
+    final adapter = _RetryCreateAdapter();
+    final client = ApiClient(baseUrl: 'https://example.test', now: () => now);
+    client.dio.httpClientAdapter = adapter;
+    final repository = BookshelfRepository(
+      api: BookshelfApi(apiClient: client),
+      recordApi: BookRecordApi(apiClient: client),
+      bookDetailApi: BookDetailApi(apiClient: client),
+      bookSearchApi: BookSearchApi(apiClient: client),
+    );
+    final local = await repository.createIsbnBook(
+      isbn13: '9781234567890',
+      title: '삭제할 책',
+      status: BookStatus.reading,
+    );
+    await repository.runSerializedForBook(local.userBookId, () async {});
+    await const BookshelfDao().deleteOne(
+      local.userBookId,
+      queueServerDelete: true,
+    );
+    now = now.add(const Duration(seconds: 16));
+    await repository.pushDirtyRecord(local.userBookId);
+    expect(adapter.clientRequestIds, [
+      local.clientRequestId,
+      local.clientRequestId,
+    ]);
+    expect(adapter.deletedPaths, ['/api/me/books/91']);
+    expect(await repository.getById(local.userBookId), isNull);
+    expect(await const BookshelfDao().getDirtyRecord(local.userBookId), isNull);
   });
 
   test('이미 로컬에 있는 ISBN은 요청 상태를 무시하지 않고 409로 알린다', () async {
@@ -346,6 +384,7 @@ final _uuidPattern = RegExp(
 
 class _RetryCreateAdapter implements HttpClientAdapter {
   final List<String?> clientRequestIds = [];
+  final List<String> deletedPaths = [];
 
   @override
   Future<ResponseBody> fetch(
@@ -353,6 +392,16 @@ class _RetryCreateAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    if (options.method == 'DELETE') {
+      deletedPaths.add(options.path);
+      return ResponseBody.fromString(
+        '{"success":true}',
+        200,
+        headers: {
+          Headers.contentTypeHeader: [Headers.jsonContentType],
+        },
+      );
+    }
     final data = options.data as Map<String, dynamic>;
     clientRequestIds.add(data['clientRequestId'] as String?);
     if (clientRequestIds.length == 1) {
@@ -396,6 +445,7 @@ class _ErrorCreateAdapter implements HttpClientAdapter {
   _ErrorCreateAdapter({required this.statusCode});
 
   final int statusCode;
+  int requestCount = 0;
 
   @override
   Future<ResponseBody> fetch(
@@ -403,6 +453,7 @@ class _ErrorCreateAdapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
+    requestCount++;
     return ResponseBody.fromString(
       jsonEncode({'success': false, 'message': '책을 찾을 수 없습니다.'}),
       statusCode,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:developer' as developer;
 import 'dart:io';
 
@@ -6,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/storage/local_image_store.dart';
 import '../../book_detail/data/book_detail_api.dart';
 import '../../book_record/data/book_record_api.dart';
 import '../../book_search/data/book_search_api.dart';
@@ -52,6 +54,7 @@ class BookshelfRepository {
   /// 충돌이 아닌데도) 409로 거부해 그 로컬 편집을 잃을 수 있다 — 자세한
   /// 내용은 [pushDirtyRecord] 참고.
   final Map<int, Future<void>> _dirtyPushChains = {};
+  Future<bool>? _syncInFlight;
 
   /// 서버 동기화. dirty 로컬 행(책 기록 화면에서 로컬 우선 반영한 뒤 아직
   /// 서버에 반영되지 못한 수정)이 있으면 먼저 일괄 push한 뒤, 로컬에 동기화
@@ -66,12 +69,17 @@ class BookshelfRepository {
   /// 응답을 받은 뒤 값이 바뀌었으면(그 사이 로그아웃 등으로 [clearLocal]이
   /// 실행됨) 결과를 로컬 DB에 쓰지 않고 버린다. 그러지 않으면 이전 세션의
   /// 응답이 clear 이후 되살아나 다음 로그인 사용자에게 노출될 수 있다.
-  Future<bool> sync() async {
+  Future<bool> sync({bool retryDeferred = false}) => _syncInFlight ??= _runSync(
+    retryDeferred: retryDeferred,
+  ).whenComplete(() => _syncInFlight = null);
+
+  Future<bool> _runSync({required bool retryDeferred}) async {
     // 로컬 저장 모드에서는 로컬이 원본이다 — 올리지도, 서버 변경을 받지도
     // 않는다(서버 기록은 이전 완료 시점에 소프트 삭제됐다).
     if (await _storageMode.isLocal()) return false;
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
 
+    if (retryDeferred) await _dao.resetRetryDelays();
     await _pushDirtyRecords(expectedGeneration);
     if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
       return false;
@@ -154,11 +162,14 @@ class BookshelfRepository {
     bool reportPermanentCreateFailure = false,
   }) {
     final previous = _dirtyPushChains[userBookId] ?? Future<void>.value();
+    final generation = BookshelfDatabase.sessionGeneration;
     final operation = previous.then(
-      (_) => _pushOneDirtyRecord(
-        userBookId,
-        reportPermanentCreateFailure: reportPermanentCreateFailure,
-      ),
+      (_) => generation != BookshelfDatabase.sessionGeneration
+          ? Future<void>.value()
+          : _pushOneDirtyRecord(
+              userBookId,
+              reportPermanentCreateFailure: reportPermanentCreateFailure,
+            ),
     );
     // 호출부에 영구 CREATE 오류를 전달하더라도 내부 큐는 성공 Future로
     // 이어서 다음 dirty push가 건너뛰어지지 않게 한다.
@@ -182,7 +193,13 @@ class BookshelfRepository {
     Future<T> Function() action,
   ) {
     final previous = _dirtyPushChains[userBookId] ?? Future<void>.value();
-    final operation = previous.then((_) => action());
+    final generation = BookshelfDatabase.sessionGeneration;
+    final operation = previous.then((_) {
+      if (generation != BookshelfDatabase.sessionGeneration) {
+        throw const ApiException('로그인 상태가 변경되었습니다.');
+      }
+      return action();
+    });
     _dirtyPushChains[userBookId] = operation.then((_) {}).catchError((_, _) {});
     return operation;
   }
@@ -200,7 +217,17 @@ class BookshelfRepository {
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
     final dirty = await _dao.getDirtyRecord(userBookId);
     if (dirty == null) return;
+    if (!await _dao.canRetryPush(userBookId)) return;
     if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+    final pending = await _dao.pendingOperation(userBookId);
+    if (pending.deleted) {
+      await _pushDeletedBook(
+        dirty.item,
+        expectedGeneration,
+        createAttempted: pending.createAttempted,
+      );
+      return;
+    }
     await _pushDirtyItem(
       dirty,
       expectedGeneration,
@@ -235,6 +262,18 @@ class BookshelfRepository {
     try {
       if (item.serverId == null) {
         await _createDirtyItem(item, expectedGeneration);
+        if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+        final next = await _dao.getDirtyRecord(item.userBookId);
+        if (next?.item.serverId != null) {
+          await _pushOneDirtyRecord(
+            item.userBookId,
+            reportPermanentCreateFailure: reportPermanentCreateFailure,
+          );
+        }
+        return;
+      }
+      if (record.changedFields?.contains(bookInfoDirtyField) ?? false) {
+        await _pushBookInfo(record, expectedGeneration);
         return;
       }
       final data = await _recordApi.patchRecord(
@@ -265,14 +304,33 @@ class BookshelfRepository {
     } on ApiException catch (e) {
       if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
       if (item.serverId == null && _isPermanentCreateFailure(e)) {
-        await _dao.deleteOne(item.userBookId);
-        await _deleteManagedPendingThumbnail(item.createThumbnailPath);
+        if (reportPermanentCreateFailure) {
+          await _dao.deleteOne(item.userBookId);
+          await _deleteManagedPendingThumbnail(item.createThumbnailPath);
+        }
         developer.log(
           '[책 CREATE 더티 push] localUserBookId=${item.userBookId} '
           'result=FAIL reason=permanent_api_error status=${e.statusCode}',
         );
         if (reportPermanentCreateFailure) rethrow;
+        await _dao.deferPush(
+          item.userBookId,
+          capturedUpdatedAt: item.updatedAt,
+          reason: 'create_rejected_${e.statusCode}',
+        );
       } else if (e.statusCode == 409 && item.serverId != null) {
+        if (record.changedFields?.contains(bookInfoDirtyField) ?? false) {
+          await _dao.updatePushBaseline(item.userBookId, null);
+          await _dao.deferPush(
+            item.userBookId,
+            capturedUpdatedAt: item.updatedAt,
+            reason: 'conflict',
+          );
+          developer.log(
+            '[책 정보 동기화] userBookId=${item.userBookId} result=FAIL reason=conflict_retry_pending',
+          );
+          return;
+        }
         final reverted = await _dao.resolveConflict(
           item.userBookId,
           capturedUpdatedAt: item.updatedAt,
@@ -282,6 +340,13 @@ class BookshelfRepository {
           'result=FAIL reason=conflict reverted=$reverted',
         );
       } else {
+        if (e.statusCode == 400 || e.statusCode == 404) {
+          await _dao.deferPush(
+            item.userBookId,
+            capturedUpdatedAt: item.updatedAt,
+            reason: 'record_rejected_${e.statusCode}',
+          );
+        }
         developer.log(
           '[책 기록 더티 push] userBookId=${item.userBookId} result=FAIL reason=${e.statusCode ?? "network"}',
         );
@@ -306,6 +371,24 @@ class BookshelfRepository {
     if (clientRequestId == null) {
       throw StateError('Pending user_book has no clientRequestId');
     }
+    if (item.isbn13 != null &&
+        !(await _dao.pendingOperation(item.userBookId)).deleted) {
+      for (final id in await _dao.pendingDeletesForIsbn(item.isbn13!)) {
+        await pushDirtyRecord(id);
+      }
+      if ((await _dao.pendingDeletesForIsbn(item.isbn13!)).isNotEmpty) {
+        if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+        await _dao.deferPush(
+          item.userBookId,
+          capturedUpdatedAt: item.updatedAt,
+          reason: 'predecessor_delete_pending',
+        );
+        throw const ApiException('이전 책 삭제를 서버에 반영한 뒤 재시도합니다.');
+      }
+    }
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
+    if (!await _dao.markCreateAttempted(item.userBookId)) return;
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) return;
 
     final response = item.isbn13 == null
         ? await _bookSearchApi.postCustomBook(
@@ -352,6 +435,162 @@ class BookshelfRepository {
     );
   }
 
+  Future<void> _pushDeletedBook(
+    BookItem item,
+    int generation, {
+    required bool createAttempted,
+  }) async {
+    try {
+      var serverId = item.serverId;
+      if (serverId == null && createAttempted) {
+        // 응답을 잃었거나 삭제와 겹친 CREATE를 같은 clientRequestId로 복구.
+        await _createDirtyItem(item, generation);
+        if (BookshelfDatabase.sessionGeneration != generation) return;
+        serverId = (await _dao.getDirtyRecord(item.userBookId))?.item.serverId;
+        if (serverId == null) return;
+      }
+      if (serverId != null) {
+        if (BookshelfDatabase.sessionGeneration != generation) return;
+        try {
+          await _recordApi.deleteUserBook(serverId);
+        } on ApiException catch (e) {
+          if (e.statusCode != 404) rethrow;
+        }
+      }
+      if (BookshelfDatabase.sessionGeneration != generation) return;
+      await _dao.confirmDelete(item.userBookId);
+      await _deleteManagedPendingThumbnail(item.createThumbnailPath);
+    } on ApiException catch (error) {
+      if (BookshelfDatabase.sessionGeneration == generation &&
+          _isPermanentCreateFailure(error)) {
+        await _dao.deferPush(
+          item.userBookId,
+          capturedUpdatedAt: item.updatedAt,
+          reason: 'delete_rejected_${error.statusCode}',
+        );
+      }
+      developer.log(
+        '[책 삭제 동기화] userBookId=${item.userBookId} result=FAIL reason=retry_pending',
+      );
+    } catch (_) {
+      developer.log(
+        '[책 삭제 동기화] userBookId=${item.userBookId} result=FAIL reason=retry_pending',
+      );
+    }
+  }
+
+  Future<void> _pushBookInfo(DirtyRecord record, int generation) async {
+    final item = record.item;
+    final patch = RecordPatch.fromSnapshot(
+      item,
+      changedFields: record.changedFields,
+    );
+    var baseline = record.baseUpdatedAt;
+    Map<String, dynamic>? result;
+    var retryRecordAfterInfo = false;
+
+    Future<void> saveBaseline(Map<String, dynamic> data) async {
+      if (BookshelfDatabase.sessionGeneration != generation) {
+        throw const ApiException('로그인 상태가 변경되었습니다.');
+      }
+      baseline = DateTime.parse(data['updatedAt'] as String);
+      await _dao.updatePushBaseline(item.userBookId, baseline);
+    }
+
+    if (!patch.isEmpty) {
+      try {
+        result = await _recordApi.patchRecord(
+          userBookId: item.serverId!,
+          patch: patch,
+          updatedAt: baseline,
+        );
+        await saveBaseline(result);
+      } on ApiException catch (e) {
+        // 쪽수를 늘린 뒤 읽은 페이지도 늘렸다면, 기존 서버 쪽수의 상한에
+        // 걸릴 수 있다. 책 정보를 먼저 반영한 다음 같은 기록을 재시도한다.
+        // API 문서에 세부 오류 코드가 없으므로 실제 진행률 변경이 있고
+        // 그 값이 새 총쪽수 범위에 들어오는 경우에만 순서를 바꿔 재시도한다.
+        if (e.statusCode != 400 ||
+            item.isAudioBook ||
+            patch.currentPage == null ||
+            item.currentPage < 0 ||
+            (item.effectiveTotalPages != null &&
+                item.currentPage > item.effectiveTotalPages!)) {
+          rethrow;
+        }
+        retryRecordAfterInfo = true;
+      }
+    }
+    if ((await _dao.pendingOperation(item.userBookId)).deleted) return;
+    final coverChanged = record.changedFields!.contains(bookCoverDirtyField);
+    final localCoverPath =
+        coverChanged &&
+            item.coverImageUrl != null &&
+            !LocalImageStore.isRemote(item.coverImageUrl!)
+        ? item.coverImageUrl
+        : null;
+    var thumbnail = localCoverPath == null
+        ? null
+        : await bookCoverImageStore.resolve(localCoverPath);
+    final missingCover =
+        localCoverPath != null &&
+        (thumbnail == null || !await thumbnail.exists());
+    if (missingCover) {
+      thumbnail = null;
+      developer.log(
+        '[책 표지 동기화] userBookId=${item.userBookId} result=FAIL reason=local_cover_missing',
+      );
+    }
+    if (BookshelfDatabase.sessionGeneration != generation) return;
+    result = await _recordApi.patchBookInfo(
+      userBookId: item.serverId!,
+      title: item.title,
+      author: item.author,
+      publisher: item.publisher,
+      statsTotalPages: item.statsTotalPages,
+      displayTotalPages: item.displayTotalPages,
+      categoryId: item.displayCategoryId,
+      coverImageUrl: coverChanged && localCoverPath == null
+          ? item.coverImageUrl
+          : null,
+      thumbnailFile: thumbnail,
+      removeThumbnail: coverChanged && item.coverImageUrl == null,
+    );
+    await saveBaseline(result);
+    if (retryRecordAfterInfo) {
+      if ((await _dao.pendingOperation(item.userBookId)).deleted) return;
+      if (BookshelfDatabase.sessionGeneration != generation) return;
+      result = await _recordApi.patchRecord(
+        userBookId: item.serverId!,
+        patch: patch,
+        updatedAt: baseline,
+      );
+      await saveBaseline(result);
+    }
+    final serverItem = BookItem.fromDetailJson(
+      result,
+      createdAt: item.createdAt,
+      localUserBookId: item.userBookId,
+      clientRequestId: item.clientRequestId,
+    );
+    if (BookshelfDatabase.sessionGeneration != generation) return;
+    final applied = await _dao.confirmPush(
+      serverItem,
+      capturedUpdatedAt: item.updatedAt,
+      localCoverPath: missingCover ? null : localCoverPath,
+      retainPendingCover: missingCover,
+    );
+    if (applied &&
+        missingCover &&
+        BookshelfDatabase.sessionGeneration == generation) {
+      await _dao.deferPush(
+        item.userBookId,
+        capturedUpdatedAt: item.updatedAt,
+        reason: 'local_cover_missing',
+      );
+    }
+  }
+
   String? _formatDate(DateTime? date) =>
       date?.toIso8601String().substring(0, 10);
 
@@ -360,6 +599,22 @@ class BookshelfRepository {
   }
 
   Future<BookItem?> getById(int userBookId) => _dao.getById(userBookId);
+
+  Future<bool> hasPendingChanges(int userBookId) async =>
+      await _dao.getDirtyRecord(userBookId) != null;
+
+  Future<bool> hasSyncFailures() => _dao.hasSyncFailures();
+
+  Future<void> confirmLink(
+    BookItem item, {
+    required DateTime capturedUpdatedAt,
+  }) async {
+    await _dao.confirmPush(
+      item,
+      capturedUpdatedAt: capturedUpdatedAt,
+      updateLink: true,
+    );
+  }
 
   /// ISBN 책을 로컬에 먼저 생성하고 같은 clientRequestId로 즉시 push를
   /// 시도한다. 네트워크 실패 시에도 로컬 행과 UUID는 dirty 상태로 남아 다음
@@ -416,8 +671,8 @@ class BookshelfRepository {
         updatedAt: now,
       ),
     );
-    await pushDirtyRecord(local.userBookId, reportPermanentCreateFailure: true);
-    return await _dao.getById(local.userBookId) ?? local;
+    _pushCreatedBook(local.userBookId);
+    return local;
   }
 
   /// 사용자 직접 등록도 일반 책과 동일한 local-first/dirty 정책을 쓴다.
@@ -443,7 +698,7 @@ class BookshelfRepository {
     // (`create_thumbnail_path`)를 만들어 봐야 올라가지도, 정리되지도 않는다.
     // 고른 표지를 곧바로 표지 저장소에 넣고 그 경로를 표지 값으로 쓴다.
     final isLocalMode = await _storageMode.isLocal();
-    final localCoverPath = isLocalMode && thumbnailFile != null
+    final localCoverPath = thumbnailFile != null
         ? await bookCoverImageStore.saveSelected(thumbnailFile.path)
         : null;
     final thumbnailPath = isLocalMode
@@ -483,8 +738,18 @@ class BookshelfRepository {
       await bookCoverImageStore.delete(localCoverPath);
       rethrow;
     }
-    await pushDirtyRecord(local.userBookId, reportPermanentCreateFailure: true);
-    return await _dao.getById(local.userBookId) ?? local;
+    _pushCreatedBook(local.userBookId);
+    return local;
+  }
+
+  void _pushCreatedBook(int userBookId) {
+    unawaited(
+      pushDirtyRecord(userBookId).catchError((Object e) {
+        developer.log(
+          '[책 생성 동기화] userBookId=$userBookId result=FAIL reason=push_failed',
+        );
+      }),
+    );
   }
 
   DateTime? _createFinishedAt(BookStatus status, String? value) {
@@ -534,9 +799,14 @@ class BookshelfRepository {
   /// 서재에서 책을 삭제한 뒤(서버 DELETE 성공 또는 로컬 저장 모드) 로컬
   /// 행과 그 아래 기록·이미지 파일까지 정리한다. 파일 경로는 행을 지우면
   /// 알 수 없으므로 먼저 모은다.
-  Future<void> deleteLocal(int userBookId) async {
+  Future<void> deleteLocal(
+    int userBookId, {
+    bool queueServerDelete = false,
+  }) async {
+    final generation = BookshelfDatabase.sessionGeneration;
     final images = await _dao.findLocalImagePathsForBook(userBookId);
-    await _dao.deleteOne(userBookId);
+    if (generation != BookshelfDatabase.sessionGeneration) return;
+    await _dao.deleteOne(userBookId, queueServerDelete: queueServerDelete);
     for (final path in images.memoImages) {
       await noteMemoImageStore.delete(path);
     }
@@ -544,6 +814,7 @@ class BookshelfRepository {
       await reflectionImageStore.delete(path);
     }
     await bookCoverImageStore.delete(images.coverImage);
+    if (queueServerDelete) _pushCreatedBook(userBookId);
   }
 
   /// 책 기록 화면의 필드 수정을 로컬에 즉시 반영하고 dirty로 표시한다.
@@ -592,6 +863,8 @@ class BookshelfRepository {
     return refreshCategories();
   }
 
+  Future<List<BookCategory>> getCachedCategories() => _categoryDao.getAll();
+
   /// 진행 중인 [refreshCategories] 호출. 로그인 직후 강제 갱신
   /// ([AuthNotifier._prefetchCategories])과 [MainShell]의 stale 체크가 거의
   /// 동시에 들어와도 서버 호출은 한 번만 나가도록 공유한다.
@@ -603,9 +876,10 @@ class BookshelfRepository {
     final inFlight = _categoryRefreshInFlight;
     if (inFlight != null) return inFlight;
 
-    final future = _doRefreshCategories();
+    final future = _doRefreshCategories().whenComplete(
+      () => _categoryRefreshInFlight = null,
+    );
     _categoryRefreshInFlight = future;
-    future.whenComplete(() => _categoryRefreshInFlight = null);
     return future;
   }
 

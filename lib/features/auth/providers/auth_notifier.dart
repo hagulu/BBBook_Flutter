@@ -9,6 +9,7 @@ import '../../book_note/providers/book_note_providers.dart';
 import '../../book_record/providers/book_record_providers.dart';
 import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
+import '../../bookshelf/data/bookshelf_database.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../../tag/providers/tag_providers.dart';
 import '../data/auth_api.dart' show SocialProvider;
@@ -25,6 +26,13 @@ import 'auth_state.dart';
 ///   그 결과를 상태로 옮기는 역할만 한다.
 class AuthNotifier extends Notifier<AuthState> {
   late final AuthRepository _repository;
+  final _localReady = Completer<void>();
+  Future<void>? _restoring;
+  Future<String?>? _refreshing;
+  Future<void>? _unauthorizing;
+  DateTime? _retryAfter;
+  bool _changingSession = false;
+  int _generation = 0;
 
   @override
   AuthState build() {
@@ -35,6 +43,8 @@ class AuthNotifier extends Notifier<AuthState> {
       readAccessToken: () => state.accessToken,
       refreshAccessToken: _refreshAccessToken,
       onUnauthorized: _handleUnauthorized,
+      prepareSession: ensureSession,
+      onUserRetry: () => _retryAfter = null,
     );
 
     Future.microtask(_bootstrap);
@@ -44,54 +54,145 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> _bootstrap() async {
     try {
-      final accessToken = await _refreshAccessToken();
-      if (accessToken == null) {
-        // refresh token이 없거나(최초 설치) 무효화된 경우 모두 포함한다. 후자를
-        // 놓치면 이전 세션의 책장이 로컬 DB에 남은 채로 다음 로그인 사용자에게
-        // 노출될 수 있어(계정 데이터 격리), 로그아웃과 동일하게 비운다.
-        await _clearLocalBookshelfUnlessLocalMode();
-        state = const AuthState(status: AuthStatus.unauthenticated);
-        return;
-      }
-      await _loadCurrentUser(accessToken);
+      final store = ref.read(localAuthStoreProvider);
+      final user = await store.readUser();
+      state = AuthState(
+        status: user != null && await store.canUseRecords(user.id)
+            ? AuthStatus.localOnly
+            : AuthStatus.authLoading,
+        user: user,
+      );
     } catch (e) {
-      // secure storage 등 ApiException이 아닌 예외까지 포함해 부트스트랩이
-      // authLoading에 영원히 머무르지 않도록 막는다.
-      developer.log('[부트스트랩] result=FAIL reason=${e.runtimeType}');
-      state = const AuthState(status: AuthStatus.unauthenticated);
+      developer.log('[로컬 세션 복원] result=FAIL reason=storage_error');
+      state = const AuthState();
+    } finally {
+      _localReady.complete();
+    }
+    await recoverSession();
+    if (state.isAuthLoading) {
+      state = AuthState(status: AuthStatus.unauthenticated, user: state.user);
     }
   }
 
-  Future<void> _loadCurrentUser(String accessToken) async {
+  /// 로컬 화면은 이 작업을 기다리지 않는다. 모든 인증 API는 이 Future를
+  /// 공유해 계정 확인 이전에 기록을 다른 계정으로 전송하지 않는다.
+  Future<void> ensureSession() async {
+    await _localReady.future;
+    if (_changingSession || state.requiresLogin) {
+      throw const ApiException('같은 계정으로 다시 로그인해 주세요.');
+    }
+    if (_refreshing case final refreshing?) {
+      final token = await refreshing;
+      if (token == null) {
+        await _handleUnauthorized();
+        throw const ApiException('같은 계정으로 다시 로그인해 주세요.');
+      }
+    }
+    if (_retryAfter case final retryAfter?
+        when DateTime.now().isBefore(retryAfter)) {
+      throw const ApiException('네트워크 연결 후 다시 시도해 주세요.');
+    }
+    if (state.accessToken != null) {
+      if (_repository.accessTokenNeedsRefresh) {
+        if (await _refreshAccessToken() == null) {
+          await _handleUnauthorized();
+          throw const ApiException('같은 계정으로 다시 로그인해 주세요.');
+        }
+      }
+      return;
+    }
+    return _restoring ??= _restoreSession().whenComplete(
+      () => _restoring = null,
+    );
+  }
+
+  Future<void> recoverSession() async {
     try {
-      final user = await _repository.fetchCurrentUser();
-      await _resetLocalDataIfOwnerChanged(user.id);
+      await ensureSession();
+    } catch (_) {
+      developer.log('[세션 복원] result=FAIL reason=session_unavailable');
+    }
+  }
+
+  Future<void> _restoreSession() async {
+    final generation = _generation;
+    try {
+      final accessToken = await _repository.refreshAccessToken();
+      if (generation != _generation) return;
+      if (accessToken == null) {
+        await _handleUnauthorized();
+        throw const ApiException('같은 계정으로 다시 로그인해 주세요.');
+      }
+      final user = await _repository.fetchCurrentUser(accessToken: accessToken);
+      if (generation != _generation) return;
+      await _verifyLocalOwner(user.id);
+      await ref.read(localAuthStoreProvider).saveUser(user);
+      if (generation != _generation) return;
       state = AuthState(
         status: AuthStatus.authenticated,
         user: user,
         accessToken: accessToken,
       );
-      unawaited(_prefetchCategories());
+      _retryAfter = null;
     } on ApiException catch (e) {
-      if (e.isAuthFailure) {
+      if (generation != _generation) rethrow;
+      if (e.isAuthFailure || e.statusCode == 404) {
         await _handleUnauthorized();
       } else {
-        // 일시적인 네트워크/서버 오류: 세션(refresh token)은 유지하고 다음 진입 시
-        // 재시도할 수 있도록 로그인 화면으로만 전환한다.
-        state = const AuthState(status: AuthStatus.unauthenticated);
+        _retryAfter = DateTime.now().add(const Duration(seconds: 15));
       }
+      rethrow;
+    } catch (_) {
+      _retryAfter = DateTime.now().add(const Duration(seconds: 15));
+      rethrow;
     }
   }
 
-  Future<void> loginWithGoogle() => _login(SocialProvider.google);
+  Future<bool> loginWithGoogle({
+    Future<bool> Function()? confirmAccountChange,
+  }) =>
+      _login(SocialProvider.google, confirmAccountChange: confirmAccountChange);
 
-  Future<void> loginWithApple() => _login(SocialProvider.apple);
+  Future<bool> loginWithApple({
+    Future<bool> Function()? confirmAccountChange,
+  }) =>
+      _login(SocialProvider.apple, confirmAccountChange: confirmAccountChange);
 
   /// [SocialAuthException], [ApiException]은 그대로 던져 화면(SnackBar)에서 처리한다.
-  Future<void> _login(SocialProvider provider) async {
+  Future<bool> _login(
+    SocialProvider provider, {
+    Future<bool> Function()? confirmAccountChange,
+  }) async {
+    await _localReady.future;
+    if (_changingSession) return false;
+    _changingSession = true;
     try {
+      // 토큰 회전 중 새 로그인 토큰을 저장하는 경합을 막는다.
+      try {
+        await _restoring;
+        await _refreshing;
+      } catch (_) {}
+      await _unauthorizing;
       final session = await _repository.loginWithProvider(provider);
-      await _resetLocalDataIfOwnerChanged(session.user.id);
+      final localStore = ref.read(localAuthStoreProvider);
+      final owner = await localStore.readUser();
+      // 소유자 정보가 유실된 구형 기록도 새 로그인 계정에 임의로 합치지 않는다.
+      final needsReset = owner != null
+          ? owner.id != session.user.id
+          : await localStore.hasLocalRecords();
+      if (needsReset) {
+        if (confirmAccountChange == null || !await confirmAccountChange()) {
+          return false;
+        }
+        _generation++;
+        ref.read(apiClientProvider).invalidateSession();
+        await _clearLocalBookshelf();
+      }
+      await ref.read(localAuthStoreProvider).saveUser(session.user);
+      await _repository.saveSession(session);
+      _generation++;
+      ref.read(apiClientProvider).invalidateSession();
+      _retryAfter = null;
       state = AuthState(
         status: AuthStatus.authenticated,
         user: session.user,
@@ -99,20 +200,41 @@ class AuthNotifier extends Notifier<AuthState> {
       );
       developer.log('[소셜 로그인] provider=${provider.apiValue} result=SUCCESS');
       unawaited(_prefetchCategories());
+      return true;
     } on ApiException catch (e) {
       developer.log(
         '[소셜 로그인] provider=${provider.apiValue} result=FAIL reason=${_reasonOf(e)}',
       );
       rethrow;
+    } finally {
+      _changingSession = false;
     }
   }
 
   /// null은 "저장된 refresh token 없음" 또는 "실제 인증 실패(401/403)"일 때만
   /// 반환한다. 네트워크/서버 오류 등 일시적인 실패는 [ApiException]을 그대로
   /// 던져, 호출부(ApiClient)가 이를 로그아웃과 구분해서 처리하게 한다.
-  Future<String?> _refreshAccessToken() async {
+  Future<String?> _refreshAccessToken() {
+    if (_changingSession || state.requiresLogin) {
+      return Future.error(const ApiException('로그인 상태가 변경되었습니다.'));
+    }
+    if (_retryAfter case final retryAfter?
+        when DateTime.now().isBefore(retryAfter)) {
+      return Future.error(const ApiException('네트워크 연결 후 다시 시도해 주세요.'));
+    }
+    if (_restoring case final restoring?) {
+      return restoring.then((_) => state.accessToken);
+    }
+    return _refreshing ??= _runRefresh().whenComplete(() => _refreshing = null);
+  }
+
+  Future<String?> _runRefresh() async {
+    final generation = _generation;
     try {
       final accessToken = await _repository.refreshAccessToken();
+      if (generation != _generation || _changingSession) {
+        throw const ApiException('로그인 상태가 변경되었습니다.');
+      }
       if (accessToken != null) {
         state = AuthState(
           status: state.status,
@@ -125,6 +247,15 @@ class AuthNotifier extends Notifier<AuthState> {
       );
       return accessToken;
     } on ApiException catch (e) {
+      _retryAfter = DateTime.now().add(const Duration(seconds: 15));
+      if (generation == _generation && !_changingSession) {
+        state = AuthState(
+          status: state.user == null
+              ? AuthStatus.unauthenticated
+              : AuthStatus.localOnly,
+          user: state.user,
+        );
+      }
       developer.log(
         '[토큰 갱신] result=FAIL reason=${_reasonOf(e)} (일시 오류, 세션 유지)',
       );
@@ -135,46 +266,59 @@ class AuthNotifier extends Notifier<AuthState> {
   /// 서버 로그아웃 요청이나 소셜 SDK 로그아웃이 실패해도, 상태 초기화는
   /// finally로 항상 보장한다(둘 중 하나가 막혀 로그아웃이 안 되는 상황 방지).
   Future<void> logout() async {
+    _changingSession = true;
+    _generation++;
+    ref.read(apiClientProvider).invalidateSession();
+    BookshelfDatabase.sessionGeneration++;
     try {
+      try {
+        await _restoring;
+        await _refreshing;
+      } catch (_) {}
+      await _unauthorizing;
       await _repository.logout();
       developer.log('[로그아웃] result=SUCCESS');
     } finally {
-      await _clearLocalBookshelf();
-      state = const AuthState(status: AuthStatus.unauthenticated);
+      try {
+        await _clearLocalBookshelf();
+      } finally {
+        state = const AuthState(status: AuthStatus.unauthenticated);
+        _changingSession = false;
+      }
     }
   }
 
-  Future<void> _handleUnauthorized() async {
+  Future<void> _handleUnauthorized() => _unauthorizing ??= _revokeSession()
+      .whenComplete(() => _unauthorizing = null);
+
+  Future<void> _revokeSession() async {
+    if (state.requiresLogin || _changingSession) return;
+    _generation++;
+    ref.read(apiClientProvider).invalidateSession();
+    BookshelfDatabase.sessionGeneration++;
+    final previous = state;
+    // 서버 저장 모드에도 아직 업로드하지 못한 유일본이 있을 수 있다.
+    // 자동 인증 해제는 토큰만 비우고 기록/소유자/dirty 큐는 보존한다.
+    state = AuthState(
+      status: previous.canUseApp
+          ? AuthStatus.localOnly
+          : AuthStatus.unauthenticated,
+      user: previous.user,
+      requiresLogin: true,
+    );
     try {
       await _repository.clearLocalSession();
-    } finally {
-      await _clearLocalBookshelfUnlessLocalMode();
-      state = const AuthState(status: AuthStatus.unauthenticated);
+    } catch (_) {
+      developer.log('[인증 해제] result=FAIL reason=storage_error');
     }
   }
 
-  /// 사용자가 선택하지 않은 로그아웃(토큰 만료·refresh 실패)에서는 로컬
-  /// 저장 모드의 데이터를 지우지 않는다 — 그 데이터는 서버에 사본이 없는
-  /// 유일본이라, 확인도 없이 사라지면 복구할 방법이 없다. 계정 격리는
-  /// 다음 로그인 시점에 [_resetLocalDataIfOwnerChanged]가 맡는다.
-  Future<void> _clearLocalBookshelfUnlessLocalMode() async {
-    if (await ref.read(storageModeStoreProvider).isLocal()) {
-      developer.log('[로컬 DB 초기화] result=SKIP reason=local_storage_mode');
-      return;
-    }
-    await _clearLocalBookshelf();
-  }
-
-  /// 로컬 저장 모드의 데이터를 만든 계정이 아닌 다른 계정이 로그인하면
-  /// 그 데이터를 비운다(로컬 데이터는 계정 구분 없이 한 벌만 존재한다).
-  Future<void> _resetLocalDataIfOwnerChanged(int userId) async {
-    final store = ref.read(storageModeStoreProvider);
-    if (!await store.isLocal()) return;
-    if (await store.ownerUserId() == userId) return;
-    developer.log('[로컬 DB 초기화] reason=owner_changed userId=$userId');
-    await _clearLocalBookshelf();
-    await store.resetToServer();
-    ref.invalidate(storageModeProvider);
+  /// 로컬 기록 소유자를 검증한다. 계정 변경은 명시적 로그아웃 후 가능하다.
+  Future<void> _verifyLocalOwner(int userId) async {
+    final owner = await ref.read(localAuthStoreProvider).readUser();
+    if (owner == null || owner.id == userId) return;
+    // 보류 중인 로컬 기록을 자동 삭제하거나 새 계정으로 전송하지 않는다.
+    throw const ApiException('기록을 보관한 기존 계정으로 로그인해 주세요.');
   }
 
   /// 다음 로그인 사용자에게 이전 계정의 책장이 남아있지 않도록 로그아웃 시
@@ -188,7 +332,10 @@ class AuthNotifier extends Notifier<AuthState> {
       await ref.read(bookshelfRepositoryProvider).clearLocal();
     } catch (e) {
       developer.log('[책장 로컬 DB 초기화] result=FAIL reason=${e.runtimeType}');
+      rethrow;
     } finally {
+      ref.invalidate(storageModeProvider);
+      ref.invalidate(serverDeletePendingProvider);
       ref.invalidate(bookshelfSyncControllerProvider);
       ref.invalidate(privacySettingControllerProvider);
       ref.invalidate(finishedFilterProvider);

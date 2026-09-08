@@ -88,11 +88,17 @@ class AuthApi {
   }
 
   /// GET /api/users/me
-  Future<AuthUser> getMe() async {
+  Future<AuthUser> getMe({String? accessToken}) async {
     try {
-      final response = await _apiClient.dio.get<Map<String, dynamic>>(
-        '/api/users/me',
-      );
+      // 세션 복원 중에는 아직 공통 클라이언트의 인증 준비가 완료되지
+      // 않았다. 명시한 토큰으로 조회해 준비 콜백의 재귀 대기를 피한다.
+      final response = await (accessToken == null ? _apiClient.dio : _authDio)
+          .get<Map<String, dynamic>>(
+            '/api/users/me',
+            options: accessToken == null
+                ? null
+                : Options(headers: {'Authorization': 'Bearer $accessToken'}),
+          );
       return AuthUser.fromJson(_unwrap(response));
     } on DioException catch (e) {
       throw _mapError(e);

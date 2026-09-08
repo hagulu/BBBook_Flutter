@@ -15,7 +15,9 @@ class BookNoteRefreshIndicator extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return RefreshIndicator(
       onRefresh: () async {
-        await ref.read(bookNoteSyncControllerProvider.notifier).syncNow();
+        await ref
+            .read(bookNoteSyncControllerProvider.notifier)
+            .syncNow(userInitiated: true);
         final result = ref.read(bookNoteSyncControllerProvider);
         if (result.hasError && context.mounted) {
           AppSnackBar.error(context, '동기화에 실패했습니다. 잠시 후 다시 시도해 주세요.');

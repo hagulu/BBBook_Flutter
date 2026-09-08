@@ -55,6 +55,7 @@ class BookReflectionRepository {
   final Map<int, Future<void>> _dirtyPushChains = {};
 
   Future<void>? _sweepInFlight;
+  Future<bool>? _syncInFlight;
   final Set<String> _unavailableImageUrls = {};
   int? _unavailableSessionGeneration;
 
@@ -238,7 +239,11 @@ class BookReflectionRepository {
   /// 같은 구조다.
   ///
   /// 반환값은 실제로 로컬 DB가 바뀌었는지 여부.
-  Future<bool> sync({required int ownerUserId}) async {
+  Future<bool> sync({required int ownerUserId}) => _syncInFlight ??= _runSync(
+    ownerUserId: ownerUserId,
+  ).whenComplete(() => _syncInFlight = null);
+
+  Future<bool> _runSync({required int ownerUserId}) async {
     // 로컬 저장 모드에서는 서버와 주고받지 않는다(로컬 파일 정리만 계속한다).
     if (await _storageMode.isLocal()) {
       unawaited(sweepLocalImages());
@@ -319,10 +324,15 @@ class BookReflectionRepository {
   }
 
   Future<void> pushReflection(int localReflectionId) {
+    final generation = BookshelfDatabase.sessionGeneration;
     final previous =
         _dirtyPushChains[localReflectionId] ?? Future<void>.value();
     final chained = previous
-        .then((_) => _pushOne(localReflectionId))
+        .then(
+          (_) => generation != BookshelfDatabase.sessionGeneration
+              ? Future<void>.value()
+              : _pushOne(localReflectionId),
+        )
         .catchError((_, _) {});
     _dirtyPushChains[localReflectionId] = chained;
     return chained;

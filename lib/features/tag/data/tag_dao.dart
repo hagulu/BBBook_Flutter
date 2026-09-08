@@ -666,7 +666,7 @@ class TagDao {
     final rows = await txn.query(
       'user_book',
       columns: ['user_book_id'],
-      where: 'server_id = ? OR user_book_id = ?',
+      where: '(server_id = ? OR user_book_id = ?) AND pending_delete = 0',
       whereArgs: [serverUserBookId, serverUserBookId],
       limit: 1,
     );
@@ -710,7 +710,10 @@ class TagDao {
   /// Import 대상 조회: 활성 책-태그 매핑 전체.
   Future<List<TagMapping>> getAllActiveMappings() async {
     final db = await BookshelfDatabase.instance();
-    final rows = await db.query('user_book_tag_map', where: 'deleted_at IS NULL');
+    final rows = await db.query(
+      'user_book_tag_map',
+      where: 'deleted_at IS NULL',
+    );
     return rows.map(_mappingFromRow).toList(growable: false);
   }
 

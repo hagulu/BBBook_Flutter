@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_providers.dart';
+import '../../auth/providers/auth_notifier.dart';
 import '../../bookshelf/models/book_status.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../data/profile_api.dart';
@@ -15,6 +16,9 @@ final profileApiProvider = Provider<ProfileApi>((ref) {
 ///
 /// 실패하면 화면 전체가 에러 상태로 전환된다(§2-2, profile_screen.dart 참고).
 final profileMeProvider = FutureProvider.autoDispose<ProfileMe>((ref) {
+  ref.watch(
+    authNotifierProvider.select((auth) => (auth.user?.id, auth.isLoggedIn)),
+  );
   return ref.watch(profileApiProvider).getMyProfile();
 });
 
@@ -58,7 +62,7 @@ final profileStatsSummaryProvider =
             bestCount = entry.value;
           }
         }
-        final categories = await repository.getCategories();
+        final categories = await repository.getCachedCategories();
         for (final category in categories) {
           if (category.id == bestId) {
             mostReadCategory = ProfileMostReadCategory(

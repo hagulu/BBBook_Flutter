@@ -57,6 +57,7 @@ class BookNoteRepository {
   static const _maxConsecutiveDownloadFailures = 3;
 
   Future<void>? _sweepInFlight;
+  Future<bool>? _syncInFlight;
 
   final Set<String> _unavailableImageUrls = {};
   int? _unavailableSessionGeneration;
@@ -307,7 +308,11 @@ class BookNoteRepository {
   /// [BookshelfRepository.sync]와 같은 구조다.
   ///
   /// 반환값은 실제로 로컬 DB가 바뀌었는지 여부.
-  Future<bool> sync({required int ownerUserId}) async {
+  Future<bool> sync({required int ownerUserId}) => _syncInFlight ??= _runSync(
+    ownerUserId: ownerUserId,
+  ).whenComplete(() => _syncInFlight = null);
+
+  Future<bool> _runSync({required int ownerUserId}) async {
     // 로컬 저장 모드에서는 서버와 주고받지 않는다. 로컬 파일 정리(네트워크
     // 없음)는 계속 해야 하므로 그것만 실행한다.
     if (await _storageMode.isLocal()) {
@@ -407,9 +412,14 @@ class BookNoteRepository {
   /// 동기화 시점([pushAllDirty]) 모두에서 호출되며, 같은 노트에 대한 동시
   /// 호출은 [_dirtyPushChains]로 직렬화한다.
   Future<void> pushNote(int localNoteId) {
+    final generation = BookshelfDatabase.sessionGeneration;
     final previous = _dirtyPushChains[localNoteId] ?? Future<void>.value();
     final chained = previous
-        .then((_) => _pushOneNote(localNoteId))
+        .then(
+          (_) => generation != BookshelfDatabase.sessionGeneration
+              ? Future<void>.value()
+              : _pushOneNote(localNoteId),
+        )
         // 체인에 쌓인 Future가 에러로 완료되면 뒤에 이어붙는 호출들이 전부
         // 건너뛰어지므로 여기서 삼켜 체인이 끊기지 않게 한다(실패는 이미
         // 내부에서 로그로만 남기고 dirty를 유지한다).

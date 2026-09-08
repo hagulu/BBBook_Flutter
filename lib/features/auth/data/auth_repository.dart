@@ -5,10 +5,17 @@ import 'auth_api.dart';
 import 'social_auth_service.dart';
 
 class AuthSession {
-  const AuthSession({required this.user, required this.accessToken});
+  const AuthSession({
+    required this.user,
+    required this.accessToken,
+    required this.refreshToken,
+    required this.expiresIn,
+  });
 
   final AuthUser user;
   final String accessToken;
+  final String refreshToken;
+  final int expiresIn;
 }
 
 /// 인증 세션의 source of truth. [AuthApi], [SocialAuthService], [TokenStorage]
@@ -24,6 +31,14 @@ class AuthRepository {
   final AuthApi _authApi;
   final TokenStorage _tokenStorage;
   final SocialAuthService _socialAuthService;
+  Future<String?>? _refreshInFlight;
+  DateTime? _accessTokenExpiresAt;
+
+  bool get accessTokenNeedsRefresh =>
+      _accessTokenExpiresAt == null ||
+      DateTime.now()
+          .add(const Duration(seconds: 30))
+          .isAfter(_accessTokenExpiresAt!);
 
   Future<AuthSession> loginWithProvider(SocialProvider provider) async {
     final idToken = await _idTokenFor(provider);
@@ -31,10 +46,11 @@ class AuthRepository {
       provider: provider,
       idToken: idToken,
     );
-    await _tokenStorage.saveRefreshToken(result.tokens.refreshToken);
     return AuthSession(
       user: result.user,
       accessToken: result.tokens.accessToken,
+      refreshToken: result.tokens.refreshToken,
+      expiresIn: result.tokens.expiresIn,
     );
   }
 
@@ -50,7 +66,10 @@ class AuthRepository {
   /// 저장된 토큰이 없거나 인증이 실제로 무효화(401/403)된 경우 null을 반환하고
   /// 저장된 토큰도 지운다. 네트워크 오류/5xx 등 일시적인 실패는 토큰을 지우지
   /// 않고 [ApiException]을 그대로 던져 호출부가 구분해서 처리하게 한다.
-  Future<String?> refreshAccessToken() async {
+  Future<String?> refreshAccessToken() => _refreshInFlight ??= _refresh()
+      .whenComplete(() => _refreshInFlight = null);
+
+  Future<String?> _refresh() async {
     final refreshToken = await _tokenStorage.readRefreshToken();
     if (refreshToken == null) {
       return null;
@@ -59,6 +78,9 @@ class AuthRepository {
     try {
       final tokens = await _authApi.postRefresh(refreshToken: refreshToken);
       await _tokenStorage.saveRefreshToken(tokens.refreshToken);
+      _accessTokenExpiresAt = DateTime.now().add(
+        Duration(seconds: tokens.expiresIn),
+      );
       return tokens.accessToken;
     } on ApiException catch (e) {
       if (e.isAuthFailure) {
@@ -69,7 +91,15 @@ class AuthRepository {
     }
   }
 
-  Future<AuthUser> fetchCurrentUser() => _authApi.getMe();
+  Future<void> saveSession(AuthSession session) async {
+    await _tokenStorage.saveRefreshToken(session.refreshToken);
+    _accessTokenExpiresAt = DateTime.now().add(
+      Duration(seconds: session.expiresIn),
+    );
+  }
+
+  Future<AuthUser> fetchCurrentUser({String? accessToken}) =>
+      _authApi.getMe(accessToken: accessToken);
 
   /// 사용자가 직접 요청한 로그아웃. 서버 로그아웃이 실패해도 로컬 세션은 정리한다.
   Future<void> logout() async {
@@ -87,6 +117,7 @@ class AuthRepository {
   /// refresh token 삭제(우리 앱의 로그인 상태 판단 기준)가 핵심이므로, 소셜
   /// SDK 쪽 로그아웃이 실패해도 이 메서드는 실패하지 않는다.
   Future<void> clearLocalSession() async {
+    _accessTokenExpiresAt = null;
     await _tokenStorage.clearRefreshToken();
     try {
       await _socialAuthService.signOutGoogle();

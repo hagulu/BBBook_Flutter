@@ -52,6 +52,7 @@ class InitialRecordSyncController
 
   Future<void> retry() {
     if (_disposed) return Future<void>.value();
+    if (_inFlight == null) ref.read(apiClientProvider).requestUserRetry();
     return _startSync(arg);
   }
 
@@ -60,7 +61,8 @@ class InitialRecordSyncController
       // 로컬 저장 모드에서는 서버에서 내려받을 기록이 없다(전환 시점에
       // 모두 로컬로 옮기고 서버 기록은 정리했다).
       if (await ref.read(storageModeStoreProvider).isLocal() ||
-          await _repository.isInitialSyncCompleted(userId)) {
+          await _repository.isInitialSyncCompleted(userId) ||
+          await ref.read(localAuthStoreProvider).canUseRecords(userId)) {
         if (!_disposed) {
           state = const InitialRecordSyncState(
             phase: InitialRecordSyncPhase.completed,

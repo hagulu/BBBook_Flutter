@@ -11,7 +11,7 @@ import '../features/bookshelf/providers/bookshelf_providers.dart';
 import '../features/bookshelf/screens/bookshelf_screen.dart';
 import '../features/profile/screens/profile_screen.dart';
 import '../features/profile/screens/profile_settings_screen.dart';
-import '../features/tag/providers/tag_providers.dart';
+import '../features/record_sync/providers/background_record_sync_provider.dart';
 import '../shared/widgets/app_bar_title.dart';
 import '../shared/widgets/app_confirm.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
@@ -50,14 +50,8 @@ class _MainShellState extends ConsumerState<MainShell>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _syncIfStale();
       unawaited(_refreshCategoriesIfStale());
     }
-  }
-
-  void _syncIfStale() {
-    ref.read(bookshelfSyncControllerProvider.notifier).syncIfStale();
-    ref.read(tagSyncControllerProvider.notifier).syncIfStale();
   }
 
   /// 카테고리 마스터 목록이 오래됐으면(기본 24시간) 서버에서 다시 받아온다.
@@ -106,6 +100,7 @@ class _MainShellState extends ConsumerState<MainShell>
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(backgroundRecordSyncProvider);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) => _handlePopAttempt(didPop),

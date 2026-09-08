@@ -42,6 +42,7 @@ class TagRepository {
   /// [pushMapping] 호출을 매핑별로 순서대로 실행시키는 체인
   /// (`BookNoteRepository._dirtyPushChains`와 같은 이유).
   final Map<int, Future<void>> _dirtyPushChains = {};
+  Future<bool>? _syncInFlight;
 
   Future<void> addTag({required int userBookId, required String name}) async {
     final localMappingId = await _dao.addTagLocal(
@@ -72,7 +73,10 @@ class TagRepository {
 
   Future<DateTime?> getLastSyncedAtTag() => _dao.getLastSyncedAtTag();
 
-  Future<bool> sync() async {
+  Future<bool> sync() =>
+      _syncInFlight ??= _runSync().whenComplete(() => _syncInFlight = null);
+
+  Future<bool> _runSync() async {
     if (await _storageMode.isLocal()) return false;
     final expectedGeneration = BookshelfDatabase.sessionGeneration;
 
@@ -134,9 +138,14 @@ class TagRepository {
   }
 
   Future<void> pushMapping(int localMappingId) {
+    final generation = BookshelfDatabase.sessionGeneration;
     final previous = _dirtyPushChains[localMappingId] ?? Future<void>.value();
     final chained = previous
-        .then((_) => _pushOneMapping(localMappingId))
+        .then(
+          (_) => generation != BookshelfDatabase.sessionGeneration
+              ? Future<void>.value()
+              : _pushOneMapping(localMappingId),
+        )
         .catchError((_, _) {});
     _dirtyPushChains[localMappingId] = chained;
     return chained;

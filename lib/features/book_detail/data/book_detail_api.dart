@@ -43,6 +43,7 @@ class BookDetailApi {
     try {
       final response = await _apiClient.dio.get<Map<String, dynamic>>(
         '/api/me/books/exists',
+        options: ApiClient.recordDependentOptions(),
         queryParameters: {'isbn13': isbn13},
       );
       final data = _unwrapMap(response);

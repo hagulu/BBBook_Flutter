@@ -544,7 +544,7 @@ class BookReflectionDao {
     final rows = await txn.query(
       'user_book',
       columns: ['user_book_id'],
-      where: 'server_id = ? OR user_book_id = ?',
+      where: '(server_id = ? OR user_book_id = ?) AND pending_delete = 0',
       whereArgs: [serverUserBookId, serverUserBookId],
       limit: 1,
     );

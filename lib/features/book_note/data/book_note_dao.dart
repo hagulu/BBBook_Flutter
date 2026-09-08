@@ -968,7 +968,7 @@ class BookNoteDao {
     final rows = await txn.query(
       'user_book',
       columns: ['user_book_id'],
-      where: 'server_id = ? OR user_book_id = ?',
+      where: '(server_id = ? OR user_book_id = ?) AND pending_delete = 0',
       whereArgs: [serverUserBookId, serverUserBookId],
       limit: 1,
     );
@@ -1081,7 +1081,9 @@ class BookNoteDao {
   }
 
   /// Import 대상 조회: 활성 노트에 속한 활성 메모 전체.
-  Future<List<BookNoteMemo>> getAllActiveMemos({required int ownerUserId}) async {
+  Future<List<BookNoteMemo>> getAllActiveMemos({
+    required int ownerUserId,
+  }) async {
     final db = await BookshelfDatabase.instance();
     final rows = await db.rawQuery(
       '''

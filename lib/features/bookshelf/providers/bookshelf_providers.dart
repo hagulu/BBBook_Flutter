@@ -76,8 +76,13 @@ class BookshelfSyncController extends AsyncNotifier<DateTime?> {
 
   /// 포그라운드 전환·Pull to Refresh가 겹쳐 호출돼도 진행 중인 동기화
   /// Future를 그대로 공유해, 중복 네트워크 요청과 상태 덮어쓰기를 막는다.
-  Future<void> syncNow() {
-    return _inFlight ??= _runSync().whenComplete(() => _inFlight = null);
+  Future<void> syncNow({bool userInitiated = false}) {
+    if (_inFlight == null && userInitiated) {
+      ref.read(apiClientProvider).requestUserRetry();
+    }
+    return _inFlight ??= _runSync(
+      userInitiated: userInitiated,
+    ).whenComplete(() => _inFlight = null);
   }
 
   /// 책 검색/상세에서 방금 서버에 추가한 [userBookId]가 로컬 DB에 반영될
@@ -92,14 +97,14 @@ class BookshelfSyncController extends AsyncNotifier<DateTime?> {
     return await _repository.getById(userBookId) != null;
   }
 
-  Future<void> _runSync() async {
+  Future<void> _runSync({required bool userInitiated}) async {
     // 이전 값(마지막 동기화 시각)을 유지한 채 loading으로 전환한다. 화면이
     // valueOrNull로 "최초 동기화 여부"를 판단하므로(BookshelfScreen), 여기서
     // 값을 날리면 이미 데이터가 있는데도 매 갱신마다 최초 동기화로 오인해
     // 전체 화면 로딩/에러로 덮어써 버린다.
     state = const AsyncValue<DateTime?>.loading().copyWithPrevious(state);
     try {
-      final changed = await _repository.sync();
+      final changed = await _repository.sync(retryDeferred: userInitiated);
       final syncedAt = await _repository.getLastSyncedAt();
       // 로그아웃(ref.invalidate)이 await 도중 이 notifier를 폐기했을 수 있다.
       // 폐기된 notifier에 state를 쓰면 예외가 나므로, 그 결과는 버린다 —

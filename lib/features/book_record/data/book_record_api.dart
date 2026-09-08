@@ -34,6 +34,8 @@ class BookRecordApi {
 
   final ApiClient _apiClient;
 
+  Future<void> prepareLink() => _apiClient.prepareRecordOperation();
+
   /// PATCH /api/me/books/:userBookId — 독서 상태/진행률/평가 등 기본 기록 필드 수정.
   ///
   /// 어떤 필드를 어떻게 바꿀지는 [RecordPatch]가 전부 담는다 — 요청 body에

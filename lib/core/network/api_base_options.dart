@@ -8,6 +8,7 @@ BaseOptions buildApiBaseOptions({String baseUrl = ApiConfig.baseUrl}) {
   return BaseOptions(
     baseUrl: baseUrl,
     connectTimeout: const Duration(seconds: 10),
+    sendTimeout: const Duration(seconds: 15),
     receiveTimeout: const Duration(seconds: 10),
   );
 }

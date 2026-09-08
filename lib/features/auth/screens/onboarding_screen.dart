@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/app_confirm.dart';
 import '../data/social_auth_service.dart';
 import '../providers/auth_notifier.dart';
 import '../providers/auth_providers.dart';
@@ -19,7 +20,9 @@ enum _LoadingProvider { none, google, apple }
 ///
 /// 카카오/네이버는 원본과 동일하게 UI만 노출하고 비활성화된 목업 버튼으로 둔다.
 class OnboardingScreen extends ConsumerStatefulWidget {
-  const OnboardingScreen({super.key});
+  const OnboardingScreen({super.key, this.reauthentication = false});
+
+  final bool reauthentication;
 
   @override
   ConsumerState<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -33,28 +36,37 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Future<void> _handleGoogleLogin() {
     return _handleLogin(
       _LoadingProvider.google,
-      () => ref.read(authNotifierProvider.notifier).loginWithGoogle(),
+      () => ref
+          .read(authNotifierProvider.notifier)
+          .loginWithGoogle(confirmAccountChange: _confirmAccountChange),
     );
   }
 
   Future<void> _handleAppleLogin() {
     return _handleLogin(
       _LoadingProvider.apple,
-      () => ref.read(authNotifierProvider.notifier).loginWithApple(),
+      () => ref
+          .read(authNotifierProvider.notifier)
+          .loginWithApple(confirmAccountChange: _confirmAccountChange),
     );
   }
 
   Future<void> _handleLogin(
     _LoadingProvider provider,
-    Future<void> Function() action,
+    Future<bool> Function() action,
   ) async {
     setState(() => _loading = provider);
     try {
-      await action();
+      final loggedIn = await action();
+      if (loggedIn && widget.reauthentication && mounted) {
+        Navigator.of(context).pop();
+      }
     } on SocialAuthException catch (e) {
       _showError(e.message);
     } on ApiException catch (e) {
       _showError(e.message);
+    } catch (_) {
+      _showError('로그인하지 못했습니다. 다시 시도해 주세요.');
     } finally {
       if (mounted) {
         setState(() => _loading = _LoadingProvider.none);
@@ -67,6 +79,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     AppSnackBar.error(context, message);
   }
 
+  Future<bool> _confirmAccountChange() async {
+    if (!mounted) return false;
+    return AppConfirm.show(
+      context,
+      title: '다른 계정으로 로그인',
+      message:
+          '로그인하면 이 기기에 저장된 기존 계정의 책, 노트, 메모, 독후감과 이미지가 모두 삭제됩니다. 서버에 동기화하지 못한 기록은 복구할 수 없습니다. 계속할까요?',
+      confirmText: '모두 삭제하고 로그인',
+      destructive: true,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAppleSignInSupported = ref
@@ -74,6 +98,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         .isAppleSignInSupported;
 
     return Scaffold(
+      appBar: widget.reauthentication
+          ? AppBar(title: const Text('다시 로그인'))
+          : null,
       backgroundColor: AppColors.pageBackground,
       body: SafeArea(
         child: Center(
@@ -120,9 +147,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      '로그인하고 기록을 시작하세요.',
-                      style: TextStyle(
+                    Text(
+                      widget.reauthentication
+                          ? '기록을 동기화하려면 같은 계정으로 로그인해 주세요.'
+                          : '로그인하고 기록을 시작하세요.',
+                      style: const TextStyle(
                         fontSize: 14,
                         color: AppColors.textMuted,
                       ),

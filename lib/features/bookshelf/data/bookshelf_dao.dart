@@ -21,6 +21,9 @@ typedef DirtyRecord = ({
   Set<String>? changedFields,
 });
 
+const bookInfoDirtyField = '__book_info';
+const bookCoverDirtyField = '__book_cover';
+
 /// 책장 로컬 DB 쿼리/쓰기 전담.
 ///
 /// `is_dirty = 1`인 로컬 행은 [reconcile](전체 동기화)/[applyChanges](증분
@@ -35,7 +38,7 @@ class BookshelfDao {
     final db = await BookshelfDatabase.instance();
     final rows = await db.query(
       'user_book',
-      where: 'user_book_id = ?',
+      where: 'user_book_id = ? AND pending_delete = 0',
       whereArgs: [userBookId],
     );
     if (rows.isEmpty) return null;
@@ -47,7 +50,7 @@ class BookshelfDao {
     final db = await BookshelfDatabase.instance();
     final rows = await db.query(
       'user_book',
-      where: 'isbn13 = ?',
+      where: 'isbn13 = ? AND pending_delete = 0',
       whereArgs: [isbn13],
       limit: 1,
     );
@@ -60,7 +63,7 @@ class BookshelfDao {
     final placeholders = List.filled(statuses.length, '?').join(', ');
     final rows = await db.query(
       'user_book',
-      where: 'status IN ($placeholders)',
+      where: 'status IN ($placeholders) AND pending_delete = 0',
       whereArgs: statuses.map((s) => s.apiValue).toList(),
       orderBy: 'user_book_id DESC',
     );
@@ -71,7 +74,7 @@ class BookshelfDao {
 
   Future<List<BookItem>> searchFinished(FinishedFilter filter) async {
     final db = await BookshelfDatabase.instance();
-    final where = <String>['status = ?'];
+    final where = <String>['status = ?', 'pending_delete = 0'];
     final args = <Object?>[BookStatus.finished.apiValue];
 
     if (filter.keyword.isNotEmpty) {
@@ -135,7 +138,7 @@ class BookshelfDao {
   Future<List<String>> getDistinctCategories() async {
     final db = await BookshelfDatabase.instance();
     final rows = await db.rawQuery(
-      'SELECT DISTINCT category FROM user_book WHERE status = ? AND category IS NOT NULL '
+      'SELECT DISTINCT category FROM user_book WHERE pending_delete = 0 AND status = ? AND category IS NOT NULL '
       'ORDER BY category',
       [BookStatus.finished.apiValue],
     );
@@ -150,7 +153,7 @@ class BookshelfDao {
       FROM tag t
       INNER JOIN user_book_tag_map m ON m.tag_id = t.id AND m.deleted_at IS NULL
       INNER JOIN user_book b ON b.user_book_id = m.user_book_id
-      WHERE t.deleted_at IS NULL AND b.status = ?
+      WHERE t.deleted_at IS NULL AND b.status = ? AND b.pending_delete = 0
       ORDER BY t.name
       ''',
       [BookStatus.finished.apiValue],
@@ -333,7 +336,10 @@ class BookshelfDao {
   /// [_nextLocalUserBookId]가 `MIN(user_book_id) - 1`로 발급하므로 지운 책이
   /// 가장 작은 음수였다면 그 ID가 다음 책에 재사용되면서 남은 노트·독후감이
   /// 엉뚱한 책에 다시 붙는다.
-  Future<void> deleteOne(int userBookId) async {
+  Future<void> deleteOne(
+    int userBookId, {
+    bool queueServerDelete = false,
+  }) async {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
       await txn.delete(
@@ -366,11 +372,27 @@ class BookshelfDao {
         where: 'user_book_id = ?',
         whereArgs: [userBookId],
       );
-      await txn.delete(
-        'user_book',
-        where: 'user_book_id = ?',
-        whereArgs: [userBookId],
-      );
+      if (queueServerDelete) {
+        await txn.update(
+          'user_book',
+          {
+            'pending_delete': 1,
+            'sync_retry_after': null,
+            'sync_failure_count': 0,
+            'sync_failure_reason': null,
+            'is_dirty': 1,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          },
+          where: 'user_book_id = ?',
+          whereArgs: [userBookId],
+        );
+      } else {
+        await txn.delete(
+          'user_book',
+          where: 'user_book_id = ?',
+          whereArgs: [userBookId],
+        );
+      }
       await txn.delete(
         'dismissed_isbn_link',
         where: 'user_book_id = ?',
@@ -397,7 +419,7 @@ class BookshelfDao {
     );
     final coverRows = await db.query(
       'user_book',
-      columns: ['cover_image_url'],
+      columns: ['cover_image_url', 'local_cover_path', 'local_cover_url'],
       where: 'user_book_id = ?',
       whereArgs: [userBookId],
       limit: 1,
@@ -411,7 +433,12 @@ class BookshelfDao {
           .toList(growable: false),
       coverImage: coverRows.isEmpty
           ? null
-          : coverRows.single['cover_image_url'] as String?,
+          : (coverRows.single['local_cover_url'] ==
+                        coverRows.single['cover_image_url']
+                    ? coverRows.single['local_cover_path'] ??
+                          coverRows.single['cover_image_url']
+                    : coverRows.single['cover_image_url'])
+                as String?,
     );
   }
 
@@ -452,19 +479,34 @@ class BookshelfDao {
   }) async {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
+      final rows = await txn.query(
+        'user_book',
+        columns: ['pending_delete'],
+        where: 'user_book_id = ?',
+        whereArgs: [item.userBookId],
+      );
+      if (rows.isEmpty || rows.single['pending_delete'] == 1) return;
       final existing = await _readDirtyState(txn, item.userBookId);
       final pendingFields = existing.isDirty
           ? (existing.dirtyFields ?? RecordPatch.nonNullFieldsOf(item))
           : const <String>{};
-      await txn.insert('user_book', {
-        ..._bookItemToRow(item),
-        'is_dirty': 1,
-        'synced_updated_at': existing.syncedUpdatedAt,
-        'dirty_fields': _encodeDirtyFields({
-          ...pendingFields,
-          ...changedFields,
-        }),
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      await txn.update(
+        'user_book',
+        {
+          ..._bookItemToRow(item),
+          'is_dirty': 1,
+          'sync_retry_after': null,
+          'sync_failure_count': 0,
+          'sync_failure_reason': null,
+          'synced_updated_at': existing.syncedUpdatedAt,
+          'dirty_fields': _encodeDirtyFields({
+            ...pendingFields,
+            ...changedFields,
+          }),
+        },
+        where: 'user_book_id = ?',
+        whereArgs: [item.userBookId],
+      );
     });
   }
 
@@ -504,14 +546,30 @@ class BookshelfDao {
     return db.transaction((txn) async {
       final rows = await txn.query(
         'user_book',
-        columns: ['updated_at'],
+        columns: [
+          'updated_at',
+          'pending_delete',
+          'dirty_fields',
+          'cover_image_url',
+        ],
         where: 'user_book_id = ?',
         whereArgs: [localId],
         limit: 1,
       );
       if (rows.isEmpty) return false;
       final current = DateTime.parse(rows.single['updated_at'] as String);
-      final unchanged = current.isAtSameMomentAs(capturedUpdatedAt);
+      final unchanged =
+          current.isAtSameMomentAs(capturedUpdatedAt) &&
+          rows.single['pending_delete'] != 1 &&
+          rows.single['dirty_fields'] == null;
+      // 같은 ISBN 재등록 시 서버가 삭제된 ID를 재사용할 수 있다.
+      // 삭제가 확인된 이전 행만 정리하며 미전송 삭제는 건드리지 않는다.
+      await txn.delete(
+        'user_book',
+        where:
+            'server_id = ? AND user_book_id != ? AND pending_delete = 1 AND is_dirty = 0',
+        whereArgs: [response.userBookId, localId],
+      );
       await txn.update(
         'user_book',
         {
@@ -519,6 +577,20 @@ class BookshelfDao {
           'book_id': response.bookId,
           'isbn13': response.isbn13,
           'create_thumbnail_path': null,
+          'sync_retry_after': null,
+          'sync_failure_count': 0,
+          'sync_failure_reason': null,
+          if (!(_decodeDirtyFields(
+                    rows.single['dirty_fields'] as String?,
+                  )?.contains(bookCoverDirtyField) ??
+                  false) &&
+              (rows.single['cover_image_url'] as String?)?.startsWith(
+                    'book_covers/',
+                  ) ==
+                  true) ...{
+            'local_cover_path': rows.single['cover_image_url'],
+            'local_cover_url': response.coverImageUrl,
+          },
           if (unchanged) ...{
             'title': response.title,
             'author': response.author,
@@ -557,12 +629,22 @@ class BookshelfDao {
   Future<bool> confirmPush(
     BookItem item, {
     required DateTime capturedUpdatedAt,
+    String? localCoverPath,
+    bool updateLink = false,
+    bool retainPendingCover = false,
   }) async {
     final db = await BookshelfDatabase.instance();
     return db.transaction((txn) async {
       final rows = await txn.query(
         'user_book',
-        columns: ['updated_at'],
+        columns: [
+          'updated_at',
+          'pending_delete',
+          'local_cover_path',
+          'local_cover_url',
+          'cover_image_url',
+          'sync_failure_count',
+        ],
         where: 'user_book_id = ?',
         whereArgs: [item.userBookId],
         limit: 1,
@@ -570,12 +652,21 @@ class BookshelfDao {
       // push가 오가는 사이 이 책이 로컬에서 사라졌다(동시 삭제 등) — 이미
       // 지워진 책을 응답으로 되살리지 않는다.
       if (rows.isEmpty) return false;
+      if (rows.single['pending_delete'] == 1) return false;
       final syncedUpdatedAt = item.updatedAt.toUtc().toIso8601String();
       final current = DateTime.parse(rows.single['updated_at'] as String);
       if (!current.isAtSameMomentAs(capturedUpdatedAt)) {
         await txn.update(
           'user_book',
-          {'synced_updated_at': syncedUpdatedAt},
+          {
+            'synced_updated_at': syncedUpdatedAt,
+            if (updateLink) ...{'isbn13': item.isbn13, 'book_id': item.bookId},
+            if (localCoverPath != null &&
+                rows.single['cover_image_url'] == localCoverPath) ...{
+              'local_cover_path': localCoverPath,
+              'local_cover_url': item.coverImageUrl,
+            },
+          },
           where: 'user_book_id = ?',
           whereArgs: [item.userBookId],
         );
@@ -583,9 +674,30 @@ class BookshelfDao {
       }
       await txn.insert('user_book', {
         ..._bookItemToRow(item),
+        'local_cover_path':
+            localCoverPath ??
+            (rows.single['local_cover_url'] == item.coverImageUrl
+                ? rows.single['local_cover_path']
+                : null),
+        'local_cover_url': localCoverPath != null
+            ? item.coverImageUrl
+            : rows.single['local_cover_url'],
         'is_dirty': 0,
         'synced_updated_at': syncedUpdatedAt,
         'dirty_fields': null,
+        if (retainPendingCover) ...{
+          // 유실된 표지의 교체 의도만 남기고 전송된 다른 편집은 확정한다.
+          'cover_image_url': rows.single['cover_image_url'],
+          'local_cover_path': null,
+          'local_cover_url': null,
+          'updated_at': capturedUpdatedAt.toIso8601String(),
+          'is_dirty': 1,
+          'dirty_fields': _encodeDirtyFields({
+            bookInfoDirtyField,
+            bookCoverDirtyField,
+          }),
+          'sync_failure_count': rows.single['sync_failure_count'],
+        },
       }, conflictAlgorithm: ConflictAlgorithm.replace);
       return true;
     });
@@ -615,11 +727,12 @@ class BookshelfDao {
     return db.transaction((txn) async {
       final rows = await txn.query(
         'user_book',
-        columns: ['updated_at'],
+        columns: ['updated_at', 'pending_delete'],
         where: 'user_book_id = ?',
         whereArgs: [userBookId],
         limit: 1,
       );
+      if (rows.isNotEmpty && rows.single['pending_delete'] == 1) return false;
       final current = rows.isEmpty
           ? null
           : DateTime.parse(rows.single['updated_at'] as String);
@@ -686,6 +799,147 @@ class BookshelfDao {
     );
   }
 
+  static const _retryableDirty =
+      'is_dirty = 1 AND (sync_retry_after IS NULL OR sync_retry_after <= ?)';
+
+  Future<bool> hasRetryableChanges({DateTime? now}) async {
+    final db = await BookshelfDatabase.instance();
+    return (await db.query(
+      'user_book',
+      columns: ['user_book_id'],
+      where: _retryableDirty,
+      whereArgs: [(now ?? DateTime.now()).toUtc().toIso8601String()],
+      limit: 1,
+    )).isNotEmpty;
+  }
+
+  Future<bool> canRetryPush(int userBookId, {DateTime? now}) async {
+    final db = await BookshelfDatabase.instance();
+    return (await db.query(
+      'user_book',
+      columns: ['user_book_id'],
+      where: 'user_book_id = ? AND $_retryableDirty',
+      whereArgs: [
+        userBookId,
+        (now ?? DateTime.now()).toUtc().toIso8601String(),
+      ],
+      limit: 1,
+    )).isNotEmpty;
+  }
+
+  /// 늦은 실패가 사용자의 새 편집을 지연시키지 않도록 전송 스냅샷과 비교한다.
+  Future<void> deferPush(
+    int userBookId, {
+    required DateTime capturedUpdatedAt,
+    required String reason,
+    DateTime? now,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    await db.transaction((txn) async {
+      final rows = await txn.query(
+        'user_book',
+        columns: ['sync_failure_count'],
+        where: 'user_book_id = ? AND is_dirty = 1 AND updated_at = ?',
+        whereArgs: [userBookId, capturedUpdatedAt.toIso8601String()],
+      );
+      if (rows.isEmpty) return;
+      final count = (rows.single['sync_failure_count'] as int) + 1;
+      final minutes = (10 * (1 << (count - 1).clamp(0, 6))).clamp(10, 360);
+      await txn.update(
+        'user_book',
+        {
+          'sync_failure_count': count,
+          'sync_failure_reason': reason,
+          'sync_retry_after': (now ?? DateTime.now())
+              .toUtc()
+              .add(Duration(minutes: minutes))
+              .toIso8601String(),
+        },
+        where: 'user_book_id = ?',
+        whereArgs: [userBookId],
+      );
+    });
+  }
+
+  Future<void> resetRetryDelays() async {
+    final db = await BookshelfDatabase.instance();
+    await db.update('user_book', {
+      'sync_retry_after': null,
+    }, where: 'is_dirty = 1');
+  }
+
+  Future<bool> hasSyncFailures() async {
+    final db = await BookshelfDatabase.instance();
+    return (await db.query(
+      'user_book',
+      columns: ['user_book_id'],
+      where: 'is_dirty = 1 AND sync_failure_reason IS NOT NULL',
+      limit: 1,
+    )).isNotEmpty;
+  }
+
+  Future<({bool deleted, bool createAttempted})> pendingOperation(
+    int userBookId,
+  ) async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'user_book',
+      columns: ['pending_delete', 'create_attempted'],
+      where: 'user_book_id = ?',
+      whereArgs: [userBookId],
+    );
+    return (
+      deleted: rows.isNotEmpty && rows.single['pending_delete'] == 1,
+      createAttempted: rows.isNotEmpty && rows.single['create_attempted'] == 1,
+    );
+  }
+
+  Future<List<int>> pendingDeletesForIsbn(String isbn13) async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'user_book',
+      columns: ['user_book_id'],
+      where: 'isbn13 = ? AND pending_delete = 1 AND is_dirty = 1',
+      whereArgs: [isbn13],
+    );
+    return rows.map((row) => row['user_book_id'] as int).toList();
+  }
+
+  /// 요청을 보내기 전에 기록한다. 응답을 잃은 CREATE도 같은 멱등 키로
+  /// 복구한 뒤 삭제할 수 있어야 한다.
+  Future<bool> markCreateAttempted(int userBookId) async {
+    final db = await BookshelfDatabase.instance();
+    return await db.update(
+          'user_book',
+          {'create_attempted': 1},
+          where:
+              'user_book_id = ? AND (pending_delete = 0 OR create_attempted = 1)',
+          whereArgs: [userBookId],
+        ) >
+        0;
+  }
+
+  Future<void> confirmDelete(int userBookId) async {
+    final db = await BookshelfDatabase.instance();
+    // 다음 pull이 오래된 스냅샷을 반환해도 삭제 의도가 우선한다.
+    await db.update(
+      'user_book',
+      {'is_dirty': 0, 'dirty_fields': null},
+      where: 'user_book_id = ? AND pending_delete = 1',
+      whereArgs: [userBookId],
+    );
+  }
+
+  Future<void> updatePushBaseline(int userBookId, DateTime? updatedAt) async {
+    final db = await BookshelfDatabase.instance();
+    await db.update(
+      'user_book',
+      {'synced_updated_at': updatedAt?.toUtc().toIso8601String()},
+      where: 'user_book_id = ? AND pending_delete = 0',
+      whereArgs: [userBookId],
+    );
+  }
+
   /// 로컬 우선 편집을 덮어쓰기 전에 필요한 기존 행의 상태(충돌 검사 기준값과
   /// 아직 push되지 못한 편집 목록). 행이 없으면 모두 비어 있는 상태다.
   Future<({bool isDirty, String? syncedUpdatedAt, Set<String>? dirtyFields})>
@@ -743,6 +997,9 @@ class BookshelfDao {
         'synced_updated_at',
         'client_request_id',
         'create_thumbnail_path',
+        'pending_delete',
+        'local_cover_path',
+        'local_cover_url',
       ],
       where: incomingServerId == null
           ? 'user_book_id = ?'
@@ -754,7 +1011,10 @@ class BookshelfDao {
     );
     final isDirtyLocally =
         existing.isNotEmpty && existing.first['is_dirty'] == 1;
-    if (isDirtyLocally) return;
+    if (isDirtyLocally ||
+        (existing.isNotEmpty && existing.first['pending_delete'] == 1)) {
+      return;
+    }
 
     // 호출부가 [syncedUpdatedAt]을 채워 보낼 때만(서버 GET 응답 —
     // reconcile/applyChanges, 또는 실제 서버 updated_at을 응답으로 받은
@@ -780,6 +1040,11 @@ class BookshelfDao {
       ..._bookItemToRow(item),
       'user_book_id': localId,
       'server_id': resolvedServerId,
+      if (existing.isNotEmpty &&
+          existing.first['local_cover_url'] == item.coverImageUrl) ...{
+        'local_cover_path': existing.first['local_cover_path'],
+        'local_cover_url': existing.first['local_cover_url'],
+      },
       'client_request_id':
           item.clientRequestId ??
           (existing.isEmpty
@@ -805,17 +1070,14 @@ class BookshelfDao {
     if (rows.isEmpty) return const [];
     final ids = rows.map((r) => r['user_book_id'] as int).toList();
     final placeholders = List.filled(ids.length, '?').join(', ');
-    final tagRows = await db.rawQuery(
-      '''
+    final tagRows = await db.rawQuery('''
       SELECT m.user_book_id AS user_book_id, t.id AS tag_id, t.name AS tag_name
       FROM user_book_tag_map m
       INNER JOIN tag t ON t.id = m.tag_id
       WHERE m.user_book_id IN ($placeholders) AND m.deleted_at IS NULL
         AND t.deleted_at IS NULL
       ORDER BY t.name
-      ''',
-      ids,
-    );
+      ''', ids);
     final tagsByBook = <int, List<BookTag>>{};
     for (final t in tagRows) {
       final bookId = t['user_book_id'] as int;
@@ -883,7 +1145,11 @@ class BookshelfDao {
       publisher: row['publisher'] as String?,
       statsTotalPages: row['stats_total_pages'] as int?,
       displayTotalPages: row['display_total_pages'] as int?,
-      coverImageUrl: row['cover_image_url'] as String?,
+      coverImageUrl:
+          row['local_cover_path'] != null &&
+              row['local_cover_url'] == row['cover_image_url']
+          ? row['local_cover_path'] as String
+          : row['cover_image_url'] as String?,
       displayCategoryId: row['display_category_id'] as int?,
       category: row['category'] as String?,
       status: BookStatus.fromApiValue(row['status'] as String),

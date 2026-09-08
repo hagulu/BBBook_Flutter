@@ -1,6 +1,6 @@
 import '../models/auth_user.dart';
 
-enum AuthStatus { authLoading, authenticated, unauthenticated }
+enum AuthStatus { authLoading, authenticated, localOnly, unauthenticated }
 
 /// 앱 전역 인증 상태.
 ///
@@ -11,12 +11,15 @@ class AuthState {
     this.status = AuthStatus.authLoading,
     this.user,
     this.accessToken,
+    this.requiresLogin = false,
   });
 
   final AuthStatus status;
   final AuthUser? user;
   final String? accessToken;
+  final bool requiresLogin;
 
   bool get isAuthLoading => status == AuthStatus.authLoading;
   bool get isLoggedIn => status == AuthStatus.authenticated;
+  bool get canUseApp => isLoggedIn || status == AuthStatus.localOnly;
 }
