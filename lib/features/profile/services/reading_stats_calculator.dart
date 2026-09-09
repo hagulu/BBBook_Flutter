@@ -86,11 +86,15 @@ ReadingStatsSummary computeReadingStatsSummary({
       ReadingStatsMonthly(month: month, count: monthlyCounts[month - 1]),
   ];
 
-  // [BookItem.rereadCount]는 최초 완독을 제외한 0-based 재독 횟수다.
-  // 최초 완독은 0, 두 번째 완독부터 1씩 저장되므로 값을 그대로 합산한다.
+  // [BookItem.rereadCount]는 서버가 관리하는 "완독 횟수"(1-based)다 — 최초
+  // 완독은 1, 재독 1회(두 번째 완독)부터 2, 3...으로 커진다
+  // (`api-me-reading-stats-summary-get.md`의 "rereadCount - 1 기준, 처음
+  // 읽은 책은 0" 규칙과 동일). 순수 재독 횟수만 집계해야 하므로 책마다 1을
+  // 뺀 값을 더하되, 아직 재독하지 않은 책(1 이하)은 0으로 처리해 음수가
+  // 되지 않게 한다.
   final rereadCount = yearFiltered.fold<int>(
     0,
-    (sum, item) => sum + item.rereadCount,
+    (sum, item) => sum + (item.rereadCount > 1 ? item.rereadCount - 1 : 0),
   );
   final masterpieceCount = yearFiltered
       .where((item) => item.isMasterpiece)

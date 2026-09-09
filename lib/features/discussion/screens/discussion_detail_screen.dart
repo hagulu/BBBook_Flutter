@@ -581,9 +581,9 @@ class _TopicCard extends StatelessWidget {
           Text(
             topic.content ?? '',
             style: const TextStyle(
-              fontSize: 14,
+              fontSize: 16,
               color: AppColors.textBody,
-              height: 1.6,
+              height: 1.65,
             ),
           ),
           if (pollSection != null) ...[

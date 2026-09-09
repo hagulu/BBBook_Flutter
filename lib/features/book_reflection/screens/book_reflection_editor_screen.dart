@@ -29,14 +29,14 @@ const _reflectionQuoteLeftSpacing = 14.0;
 const _reflectionQuoteRightSpacing = 8.0;
 const _reflectionQuoteMarkInset = -6.0;
 
-/// 본문 기본 글자 크기. flutter_quill 기본값(16)은 이 앱의 기록 본문
-/// (노트 메모 14)보다 커서 한 단계 줄여 쓴다. `paragraph`를 비워 두면
-/// 패키지 기본값이 그대로 적용되므로 `lists`까지 함께 지정해야 목록
-/// 줄에서 크기가 되돌아가지 않는다.
+/// 본문 기본 글자 크기·행간. 작성/리더 화면 간 일치를 위해 공개 독후감
+/// 리더(`public_reflection_reader_screen.dart`)와 같은 값을 쓴다.
+/// `paragraph`를 비워 두면 패키지 기본값이 그대로 적용되므로 `lists`까지
+/// 함께 지정해야 목록 줄에서 크기가 되돌아가지 않는다.
 const _reflectionBodyTextStyle = TextStyle(
   color: AppColors.textBody,
-  fontSize: 15,
-  height: 1.15,
+  fontSize: 16,
+  height: 1.65,
 );
 
 const bookReflectionQuillStyles = DefaultStyles(
@@ -65,7 +65,7 @@ const bookReflectionQuillStyles = DefaultStyles(
     null,
   ),
   placeHolder: DefaultTextBlockStyle(
-    TextStyle(color: AppColors.textMuted, fontSize: 15, height: 1.5),
+    TextStyle(color: AppColors.textMuted, fontSize: 16, height: 1.65),
     HorizontalSpacing.zero,
     VerticalSpacing.zero,
     VerticalSpacing.zero,
@@ -630,14 +630,16 @@ class _BookReflectionEditorScreenState
                                         _editorFocusNode.requestFocus(),
                                     style: const TextStyle(
                                       color: AppColors.textStrong,
-                                      fontSize: 17,
+                                      fontSize: 19,
+                                      height: 1.35,
                                       fontWeight: FontWeight.bold,
                                     ),
                                     decoration: const InputDecoration(
                                       hintText: '이 기록에 제목을 붙여보세요',
                                       hintStyle: TextStyle(
                                         color: AppColors.textMuted,
-                                        fontSize: 17,
+                                        fontSize: 19,
+                                        height: 1.35,
                                         fontWeight: FontWeight.bold,
                                       ),
                                       counterText: '',

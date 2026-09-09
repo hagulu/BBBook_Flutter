@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
+import '../../book_reflection/screens/widgets/reflection_title_body_divider.dart';
 import '../models/discussion_topic.dart';
 import '../providers/discussion_providers.dart';
 import '../utils/discussion_poll.dart';
@@ -232,7 +233,8 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                           ),
                         ],
                         style: const TextStyle(
-                          fontSize: 17,
+                          fontSize: 19,
+                          height: 1.35,
                           fontWeight: FontWeight.bold,
                           color: AppColors.textStrong,
                         ),
@@ -246,20 +248,22 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                           focusedBorder: InputBorder.none,
                           hintText: '토론 주제 제목을 입력하세요',
                           hintStyle: TextStyle(
-                            fontSize: 17,
+                            fontSize: 19,
+                            height: 1.35,
                             fontWeight: FontWeight.bold,
                             color: AppColors.textMuted,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const ReflectionTitleBodyDivider(horizontalInset: 0),
                       TextField(
                         controller: _contentController,
                         enabled: !_isLocked,
                         minLines: 8,
                         maxLines: 16,
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 16,
+                          height: 1.65,
                           color: AppColors.textBody,
                         ),
                         decoration: const InputDecoration(
