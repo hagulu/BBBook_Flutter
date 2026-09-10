@@ -41,10 +41,10 @@ class AuthRepository {
           .isAfter(_accessTokenExpiresAt!);
 
   Future<AuthSession> loginWithProvider(SocialProvider provider) async {
-    final idToken = await _idTokenFor(provider);
+    final token = await _socialTokenFor(provider);
     final result = await _authApi.postProviderLogin(
       provider: provider,
-      idToken: idToken,
+      token: token,
     );
     return AuthSession(
       user: result.user,
@@ -54,10 +54,12 @@ class AuthRepository {
     );
   }
 
-  Future<String> _idTokenFor(SocialProvider provider) {
+  /// google/apple: ID 토큰, kakao: Access Token (`api-auth-mobile-provider-login-post.md` 기준).
+  Future<String> _socialTokenFor(SocialProvider provider) {
     return switch (provider) {
       SocialProvider.google => _socialAuthService.signInWithGoogle(),
       SocialProvider.apple => _socialAuthService.signInWithApple(),
+      SocialProvider.kakao => _socialAuthService.signInWithKakao(),
     };
   }
 
@@ -124,5 +126,6 @@ class AuthRepository {
     } catch (_) {
       // 다음 Google 로그인 시도에서 계정 선택 화면이 다시 뜨는 정도의 영향만 있다.
     }
+    await _socialAuthService.signOutKakao();
   }
 }

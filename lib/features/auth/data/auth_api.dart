@@ -8,7 +8,8 @@ import '../models/auth_user.dart';
 
 enum SocialProvider {
   google,
-  apple;
+  apple,
+  kakao;
 
   String get apiValue => name;
 }
@@ -35,12 +36,12 @@ class AuthApi {
   /// POST /api/auth/mobile/{provider}/login
   Future<({AuthTokens tokens, AuthUser user})> postProviderLogin({
     required SocialProvider provider,
-    required String idToken,
+    required String token,
   }) async {
     try {
       final response = await _authDio.post<Map<String, dynamic>>(
         '/api/auth/mobile/${provider.apiValue}/login',
-        data: {'token': idToken},
+        data: {'token': token},
         options: Options(headers: await _clientIdHeader()),
       );
       final data = _unwrap(response);

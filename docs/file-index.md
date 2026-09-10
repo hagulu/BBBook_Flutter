@@ -205,6 +205,7 @@
 
 ## docs
 
+- `docs/review/20260910-181343-kakao-login-review.md` — 카카오 로그인 연동의 릴리스 키 주입, iOS 설정 재현성, SDK 초기화 경합·예외 분류 리뷰
 - `docs/review/20260910-132050-import-book-cover-review.md` — 로컬 책 표지 Import의 완료 후 재시도 시 기존 서버 표지 재첨부 실패 리뷰
 - `docs/policies/offline-records.md` — 오프라인 진입·인증 복구·재전송·계정 변경 삭제 정책과 검증 항목
 - `docs/review/20260910-124921-local-migration-simplification-review.md` — 로컬 전환 단순화(동기화·이미지 다운로드 단계 삭제) 리뷰(서버 이미지 무고지 유실, 실패 테스트 5개, 반대쪽 결과 문구, 계정 전환 시 컨트롤러 상태 잔존)

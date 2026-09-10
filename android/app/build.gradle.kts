@@ -1,8 +1,21 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Kakao 로그인 Redirect URI(kakao${NATIVE_APP_KEY}://oauth)에 쓰는 네이티브 앱 키.
+// 코드/버전관리에 올리지 않고 local.properties(gitignore 대상)에
+// `kakao.nativeAppKey=실제-네이티브-앱-키`로 각자 설정한다.
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+val kakaoNativeAppKey: String = localProperties.getProperty("kakao.nativeAppKey", "")
 
 android {
     namespace = "com.hagulu.nook.bbbook"
@@ -23,6 +36,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["kakaoNativeAppKey"] = kakaoNativeAppKey
     }
 
     buildTypes {

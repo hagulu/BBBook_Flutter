@@ -11,14 +11,14 @@ import '../providers/auth_providers.dart';
 import '../widgets/social_login_button.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
-enum _LoadingProvider { none, google, apple }
+enum _LoadingProvider { none, google, apple, kakao }
 
 /// 온보딩(로그인) 화면.
 ///
 /// 문서: docs/porting-reference/features/auth.md,
 /// docs/porting-reference/screenshots/onboarding.jpg
 ///
-/// 카카오/네이버는 원본과 동일하게 UI만 노출하고 비활성화된 목업 버튼으로 둔다.
+/// 네이버는 원본과 동일하게 UI만 노출하고 비활성화된 목업 버튼으로 둔다.
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key, this.reauthentication = false});
 
@@ -39,6 +39,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       () => ref
           .read(authNotifierProvider.notifier)
           .loginWithGoogle(confirmAccountChange: _confirmAccountChange),
+    );
+  }
+
+  Future<void> _handleKakaoLogin() {
+    return _handleLogin(
+      _LoadingProvider.kakao,
+      () => ref
+          .read(authNotifierProvider.notifier)
+          .loginWithKakao(confirmAccountChange: _confirmAccountChange),
     );
   }
 
@@ -157,16 +166,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       ),
                     ),
                     const SizedBox(height: 28),
-                    const SocialLoginButton(
+                    SocialLoginButton(
                       label: '카카오로 시작하기',
-                      icon: Icon(
+                      icon: const Icon(
                         PhosphorIconsRegular.chatCircle,
                         color: AppBrandColors.kakaoLabel,
                         size: 20,
                       ),
                       backgroundColor: AppBrandColors.kakao,
                       foregroundColor: AppBrandColors.kakaoLabel,
-                      onPressed: null,
+                      isLoading: _loading == _LoadingProvider.kakao,
+                      onPressed: _isBusy ? null : _handleKakaoLogin,
                     ),
                     const SizedBox(height: 12),
                     const SocialLoginButton(

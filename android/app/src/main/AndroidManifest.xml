@@ -37,6 +37,19 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- 카카오 로그인 Redirect URI(kakao${kakaoNativeAppKey}://oauth) 처리용.
+             네이티브 앱 키는 build.gradle.kts가 local.properties에서 주입한다. -->
+        <activity
+            android:name="com.kakao.sdk.flutter.auth.AuthCodeHandlerActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:host="oauth" android:scheme="kakao${kakaoNativeAppKey}"/>
+            </intent-filter>
+        </activity>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
@@ -55,5 +68,7 @@
             <category android:name="android.intent.category.BROWSABLE"/>
             <data android:scheme="https"/>
         </intent>
+        <!-- 카카오톡 설치 여부 확인(isKakaoTalkInstalled)에 필요한 패키지 가시성. -->
+        <package android:name="com.kakao.talk"/>
     </queries>
 </manifest>

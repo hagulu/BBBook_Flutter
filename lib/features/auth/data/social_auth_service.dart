@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show PlatformException;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 /// 소셜 로그인 실패 시 화면에 노출할 메시지를 담는 예외.
@@ -82,6 +84,57 @@ class SocialAuthService {
   Future<void> signOutGoogle() async {
     if (_googleInitialized) {
       await GoogleSignIn.instance.signOut();
+    }
+  }
+
+  /// 카카오톡 설치 시 카카오톡으로, 아니면 카카오계정으로 로그인해 Kakao
+  /// Access Token을 반환한다. 백엔드 검증 용도로만 쓰이며 서비스 자체
+  /// 인증 토큰으로 사용하지 않는다.
+  Future<String> signInWithKakao() async {
+    try {
+      final talkInstalled = await isKakaoTalkInstalled();
+      final token = talkInstalled
+          ? await _loginWithKakaoTalkOrAccount()
+          : await UserApi.instance.loginWithKakaoAccount();
+      return token.accessToken;
+    } catch (e) {
+      if (_isKakaoLoginCanceled(e)) {
+        throw const SocialAuthException('로그인이 취소되었습니다.');
+      }
+      throw const SocialAuthException('카카오 로그인 중 오류가 발생했습니다.');
+    }
+  }
+
+  /// 카카오톡 로그인이 (설치되어 있음에도) 실패하면 카카오계정 로그인으로
+  /// 대체한다. 단, 사용자가 취소한 경우까지 대체 로그인으로 넘어가지 않는다.
+  Future<OAuthToken> _loginWithKakaoTalkOrAccount() async {
+    try {
+      return await UserApi.instance.loginWithKakaoTalk();
+    } catch (e) {
+      if (_isKakaoLoginCanceled(e)) rethrow;
+      return UserApi.instance.loginWithKakaoAccount();
+    }
+  }
+
+  /// 카카오톡 로그인은 [PlatformException]('CANCELED'), 카카오계정 로그인(동의
+  /// 화면)은 [KakaoAuthException](accessDenied), SDK 클라이언트 단 취소는
+  /// [KakaoClientException](cancelled)으로 각각 다르게 취소를 알려준다.
+  bool _isKakaoLoginCanceled(Object error) {
+    return switch (error) {
+      PlatformException(:final code) => code == 'CANCELED',
+      KakaoAuthException(error: final cause) =>
+        cause == AuthErrorCause.accessDenied,
+      KakaoClientException(:final reason) =>
+        reason == ClientErrorCause.cancelled,
+      _ => false,
+    };
+  }
+
+  Future<void> signOutKakao() async {
+    try {
+      await UserApi.instance.logout();
+    } catch (_) {
+      // 다음 카카오 로그인 시도에서 계정 선택 화면이 다시 뜨는 정도의 영향만 있다.
     }
   }
 }

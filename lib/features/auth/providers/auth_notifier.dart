@@ -159,6 +159,11 @@ class AuthNotifier extends Notifier<AuthState> {
   }) =>
       _login(SocialProvider.apple, confirmAccountChange: confirmAccountChange);
 
+  Future<bool> loginWithKakao({
+    Future<bool> Function()? confirmAccountChange,
+  }) =>
+      _login(SocialProvider.kakao, confirmAccountChange: confirmAccountChange);
+
   /// [SocialAuthException], [ApiException]은 그대로 던져 화면(SnackBar)에서 처리한다.
   Future<bool> _login(
     SocialProvider provider, {

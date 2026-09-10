@@ -1,0 +1,3 @@
+// Kakao 로그인 네이티브 앱 키 설정 템플릿.
+// 이 파일을 Kakao.xcconfig로 복사하고 실제 값을 채운다(Kakao.xcconfig는 git에 올리지 않는다).
+KAKAO_NATIVE_APP_KEY = 실제-네이티브-앱-키

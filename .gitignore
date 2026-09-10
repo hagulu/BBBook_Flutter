@@ -18,10 +18,9 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# .vscode/launch.json에 카카오 네이티브 앱 키 등 로컬 실행용 dart-define 값을
+# 직접 넣어 쓰므로 더 이상 버전 관리하지 않는다.
+.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
