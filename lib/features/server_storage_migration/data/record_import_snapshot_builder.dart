@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:path/path.dart' as path;
@@ -11,7 +12,9 @@ import '../../book_reflection/services/book_reflection_content_adapter.dart';
 import '../../book_reflection/services/reflection_image_store.dart';
 import '../../bookshelf/data/bookshelf_dao.dart';
 import '../../bookshelf/models/book_status.dart';
+import '../../bookshelf/services/book_cover_image_store.dart';
 import '../../tag/data/tag_dao.dart';
+import 'record_import_payload_builder.dart';
 import 'record_import_snapshot.dart';
 import 'record_import_validation.dart';
 
@@ -24,8 +27,9 @@ import 'record_import_validation.dart';
 ///    되찾을 수 없는 이미지 등)을 미리 걸러낸다 — API 문서의 실패 정책상
 ///    이런 조합 하나가 세션 전체를 죽이므로, 시작 전에 잡는 게 유일하게
 ///    안전한 방법이다.
-/// 3. 독후감 본문의 로컬 이미지를 `local://` placeholder로 바꾼다(§ items
-///    문서 "독후감 이미지 처리").
+/// 3. 독후감 본문의 로컬 이미지와 로컬 커스텀 책 표지를 `local://`
+///    placeholder로 바꾼다(§ items 문서 "독후감 이미지 처리",
+///    "커스텀 책 표지 처리").
 ///
 /// 필드 길이 등 나머지 서버 제약은 [validateRecordImportSnapshot]이 문서에
 /// 명시된, 로컬/과거 데이터에서 실제로 위반될 수 있는 항목만 다룬다(전체
@@ -75,6 +79,38 @@ class RecordImportSnapshotBuilder {
     }).toList(growable: false);
 
     final missingImageReasons = <String>[];
+
+    // 표지는 화면 표시용으로 접힌 [BookItem.coverImageUrl]이 아니라 원본
+    // `cover_image_url` 값으로 판단한다 — 서버 표지를 로컬에 사본으로 들고
+    // 있는 책은 앞의 값이 로컬 경로라서, 그대로 믿으면 이미 서버에 있는
+    // 표지를 다시 올리게 되고 "기존 HTTP(S) 표지가 있으면 400"(§ attachments
+    // 문서)에 걸릴 수 있다.
+    final rawCoverImageUrls = await bookshelfDao.getRawCoverImageUrls();
+    final coverImageUrlByBook = <int, String>{};
+    final pendingBookCovers = <int, File>{};
+    for (final book in books) {
+      final rawCover = rawCoverImageUrls[book.userBookId];
+      if (rawCover == null || rawCover.isEmpty) continue;
+      if (LocalImageStore.isRemote(rawCover)) {
+        coverImageUrlByBook[book.userBookId] = rawCover;
+        continue;
+      }
+      final file = await bookCoverImageStore.resolve(rawCover);
+      if (file == null || !await _isUploadableImage(file)) {
+        // 표지 파일이 사라졌거나 형식·용량이 맞지 않으면 표지 없이(null)
+        // 보내고 계속 진행한다 — 메모 사진·독후감 이미지와 달리 기록 자체가
+        // 사라지는 게 아니고, 표지는 책 정보 수정 화면에서 다시 고를 수
+        // 있다. 여기서 걸러 두지 않고 placeholder를 보내면 attachments가
+        // 400을 내 세션 전체가 정리된다.
+        developer.log('[Import 표지 준비] result=SKIP reason=unusable_local_file');
+        continue;
+      }
+      pendingBookCovers[book.userBookId] = file;
+      coverImageUrlByBook[book.userBookId] = localCoverPlaceholder(
+        book.userBookId,
+      );
+    }
+
     final pendingMemoImages = <int, File>{};
     final fallbackMemoImages = <int, File>{};
     for (final memo in memos) {
@@ -210,6 +246,8 @@ class RecordImportSnapshotBuilder {
         noteMemos: memos,
         reflections: reflectionsForImport,
         tagMaps: tagMaps,
+        coverImageUrlByBook: coverImageUrlByBook,
+        pendingBookCovers: pendingBookCovers,
         pendingMemoImages: pendingMemoImages,
         fallbackMemoImages: fallbackMemoImages,
         pendingReflectionImages: pendingReflectionImages,

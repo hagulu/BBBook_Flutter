@@ -41,17 +41,29 @@ class RecordImportEntityResult {
     required this.localId,
     required this.serverId,
     required this.created,
+    this.coverUploadRequired = false,
   });
 
   final int localId;
   final int serverId;
   final bool created;
 
+  /// `books` 배열에만 있는 값(다른 배열은 항상 false).
+  ///
+  /// 이 세션이 만들거나 복구한 책에 아직 `local://` 표지가 남아 true일 때만
+  /// `/attachments`로 표지를 올린다. 기존 활성 책은 매칭 기준과 무관하게
+  /// 서버가 기존 표지를 그대로 유지하므로 false로 내려오며, 그때 첨부하면
+  /// 400이 나고 세션 전체가 정리된다(§ items 문서 "커스텀 책 표지 처리").
+  /// `created`나 placeholder 전송 여부로는 이 판단을 대신할 수 없다 —
+  /// 복구된 책은 `created=false`여도 true다.
+  final bool coverUploadRequired;
+
   factory RecordImportEntityResult.fromJson(Map<String, dynamic> json) {
     return RecordImportEntityResult(
       localId: json['localId'] as int,
       serverId: json['serverId'] as int,
       created: json['created'] as bool,
+      coverUploadRequired: json['coverUploadRequired'] as bool? ?? false,
     );
   }
 }
@@ -103,6 +115,7 @@ class RecordImportChunkResult {
 
 /// `/attachments` 대상 종류.
 enum RecordImportAttachmentEntityType {
+  userBook('USER_BOOK'),
   noteMemo('NOTE_MEMO'),
   reflection('REFLECTION');
 

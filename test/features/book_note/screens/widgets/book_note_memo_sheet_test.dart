@@ -1,3 +1,4 @@
+import 'package:bbbook/core/theme/app_theme.dart';
 import 'package:bbbook/features/book_note/screens/widgets/book_note_memo_sheet.dart';
 import 'package:bbbook/features/book_note/screens/widgets/highlight_text_field.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +8,9 @@ void main() {
   testWidgets('강조 버튼 탭이 텍스트 선택 영역을 죽이지 않고 강조를 적용한다', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
+        // 화면이 `AppColors.of`로 색상 토큰을 읽으므로 `AppPalette`가 실린
+        // 앱 테마로 띄운다(맨 `ThemeData`에는 확장이 없어 assert에 걸린다).
+        theme: buildAppTheme(),
         home: Builder(
           builder: (context) => Scaffold(
             body: Center(

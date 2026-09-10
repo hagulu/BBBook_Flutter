@@ -47,6 +47,8 @@ class RecordImportSnapshot {
     required this.noteMemos,
     required this.reflections,
     required this.tagMaps,
+    this.coverImageUrlByBook = const {},
+    this.pendingBookCovers = const {},
     required this.pendingMemoImages,
     this.fallbackMemoImages = const {},
     required this.pendingReflectionImages,
@@ -58,6 +60,21 @@ class RecordImportSnapshot {
   final List<BookNoteMemo> noteMemos;
   final List<ReflectionForImport> reflections;
   final List<TagMapping> tagMaps;
+
+  /// 책 localId → `/items`의 `coverImageUrl`에 실어 보낼 값(표지가 있는
+  /// 책만). 서버에 이미 표지가 있으면 그 HTTP(S) URL 그대로, 로컬에만
+  /// 있으면 `local://cover/{localId}` placeholder다.
+  final Map<int, String> coverImageUrlByBook;
+
+  /// 책 localId → 올릴 준비가 된 로컬 표지 파일.
+  ///
+  /// [coverImageUrlByBook]에 placeholder를 넣는 판단과 여기 담는 판단은
+  /// 반드시 같은 자리에서 함께 내려야 한다 — 파일을 열어 볼 수 없어 표지를
+  /// 포기한 책에 placeholder만 보내면 올릴 파일이 없어 `/complete`가
+  /// 실패한다. 실제로 올릴지는 `/items` 응답의 `coverUploadRequired`가
+  /// 최종 결정한다(기존 활성 책은 서버가 기존 표지를 유지하므로 올리지
+  /// 않는다 — [ServerStorageMigrationService]).
+  final Map<int, File> pendingBookCovers;
 
   /// PHOTO 메모 localId → 다시 올릴 로컬 사진 파일. 로컬 `imageUrl`이 없어
   /// 무조건 새로 올려야 하는 메모만 담는다.

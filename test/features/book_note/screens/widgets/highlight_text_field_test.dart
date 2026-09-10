@@ -98,6 +98,9 @@ void main() {
       late BuildContext capturedContext;
       await tester.pumpWidget(
         MaterialApp(
+          // `buildTextSpan`이 `AppColors.of`로 강조 색을 읽으므로 `AppPalette`가
+          // 실린 앱 테마로 띄운다(맨 `ThemeData`에는 확장이 없어 assert에 걸린다).
+          theme: buildAppTheme(),
           home: Builder(
             builder: (context) {
               capturedContext = context;

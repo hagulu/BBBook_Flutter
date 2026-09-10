@@ -72,6 +72,20 @@ class ServerStorageMigrationRepositorySteps
   }
 
   @override
+  Future<RecordImportAttachmentResult> uploadBookCover(
+    int importId,
+    int bookLocalId,
+    File file,
+  ) {
+    return recordImportApi.uploadAttachment(
+      importId: importId,
+      entityType: RecordImportAttachmentEntityType.userBook,
+      localId: bookLocalId,
+      file: file,
+    );
+  }
+
+  @override
   Future<RecordImportAttachmentResult> uploadMemoImage(
     int importId,
     int memoLocalId,
@@ -128,7 +142,11 @@ class ServerStorageMigrationRepositorySteps
   Future<void> applyResults(RecordImportAppliedResults results) async {
     final db = await BookshelfDatabase.instance();
     await db.transaction((txn) async {
-      await bookshelfDao.applyImportResults(txn, results.bookServerIdByLocalId);
+      await bookshelfDao.applyImportResults(
+        txn,
+        results.bookServerIdByLocalId,
+        coverImageUrlByLocalId: results.bookCoverUrlByLocalId,
+      );
       await noteDao.applyImportResults(
         txn,
         noteServerIdByLocalId: results.noteServerIdByLocalId,

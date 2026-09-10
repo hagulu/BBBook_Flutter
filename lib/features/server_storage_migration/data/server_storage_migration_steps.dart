@@ -11,6 +11,7 @@ import '../models/record_import_models.dart';
 class RecordImportAppliedResults {
   const RecordImportAppliedResults({
     required this.bookServerIdByLocalId,
+    required this.bookCoverUrlByLocalId,
     required this.noteServerIdByLocalId,
     required this.memoServerIdByLocalId,
     required this.memoImageUrlByLocalId,
@@ -20,6 +21,9 @@ class RecordImportAppliedResults {
   });
 
   final Map<int, int> bookServerIdByLocalId;
+
+  /// 이번 세션에 로컬 표지 파일을 올린 책의 서버 표지 URL(있는 책만).
+  final Map<int, String> bookCoverUrlByLocalId;
   final Map<int, int> noteServerIdByLocalId;
   final Map<int, int> memoServerIdByLocalId;
   final Map<int, String> memoImageUrlByLocalId;
@@ -55,6 +59,15 @@ abstract class ServerStorageMigrationSteps {
   Future<RecordImportChunkResult> uploadChunk(
     int importId,
     RecordImportChunk chunk,
+  );
+
+  /// 로컬 커스텀 책 표지를 올려 서버 책에 연결한다(§ items 문서 "커스텀 책
+  /// 표지 처리"). `/items`에서 `local://cover/{localId}` placeholder를 보낸
+  /// 책은 예외 없이 이 업로드까지 끝나야 `/complete`가 통과한다.
+  Future<RecordImportAttachmentResult> uploadBookCover(
+    int importId,
+    int bookLocalId,
+    File file,
   );
 
   Future<RecordImportAttachmentResult> uploadMemoImage(

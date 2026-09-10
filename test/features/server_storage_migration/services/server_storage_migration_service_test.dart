@@ -224,6 +224,73 @@ void main() {
     );
   });
 
+  test('로컬 커스텀 표지는 placeholder로 보내고 기록 업로드 이후에 파일을 올린다', () async {
+    // placeholder를 보내고 첨부를 빠뜨리면 `/complete`의 표지 검증이 실패해
+    // 세션 전체가 정리되므로, 이 둘은 반드시 함께 나가야 한다.
+    final book = _bookItem(userBookId: -1);
+    final snapshot = RecordImportSnapshot(
+      books: [book],
+      tags: const [],
+      notes: const [],
+      noteMemos: const [],
+      reflections: const [],
+      tagMaps: const [],
+      coverImageUrlByBook: const {-1: 'local://cover/-1'},
+      pendingBookCovers: {-1: File('cover.jpg')},
+      pendingMemoImages: const {},
+      pendingReflectionImages: const {},
+    );
+    final steps = _FakeSteps(
+      outcome: RecordImportPreflightOutcome.success(snapshot),
+    );
+
+    final result = await ServerStorageMigrationService(steps).run();
+
+    expect(result.stage, ServerStorageMigrationStage.completed);
+    expect(
+      steps.uploadedChunks.single.books.single['coverImageUrl'],
+      'local://cover/-1',
+    );
+    expect(steps.bookCoverUploads, [-1]);
+    expect(
+      steps.calls.indexOf('uploadChunk'),
+      lessThan(steps.calls.indexOf('uploadBookCover')),
+    );
+    expect(
+      steps.calls.indexOf('uploadBookCover'),
+      lessThan(steps.calls.indexOf('complete')),
+    );
+    expect(steps.appliedResults!.bookCoverUrlByLocalId[-1], isNotNull);
+  });
+
+  test('서버 표지가 이미 있는 책은 URL만 보내고 파일을 올리지 않는다', () async {
+    final book = _bookItem(userBookId: -1);
+    final snapshot = RecordImportSnapshot(
+      books: [book],
+      tags: const [],
+      notes: const [],
+      noteMemos: const [],
+      reflections: const [],
+      tagMaps: const [],
+      coverImageUrlByBook: const {-1: 'https://cdn.example.com/cover.jpg'},
+      pendingMemoImages: const {},
+      pendingReflectionImages: const {},
+    );
+    final steps = _FakeSteps(
+      outcome: RecordImportPreflightOutcome.success(snapshot),
+    );
+
+    final result = await ServerStorageMigrationService(steps).run();
+
+    expect(result.stage, ServerStorageMigrationStage.completed);
+    expect(
+      steps.uploadedChunks.single.books.single['coverImageUrl'],
+      'https://cdn.example.com/cover.jpg',
+    );
+    expect(steps.bookCoverUploads, isEmpty);
+    expect(steps.appliedResults!.bookCoverUrlByLocalId, isEmpty);
+  });
+
   test(
     '이미 imageUrl이 있던 PHOTO 메모가 실제로는 새로 생성되면 예비 파일을 올린다',
     () async {
@@ -428,6 +495,8 @@ class _FakeSteps implements ServerStorageMigrationSteps {
   final Set<int> notCreatedMemoLocalIds;
 
   final calls = <String>[];
+  final uploadedChunks = <RecordImportChunk>[];
+  final bookCoverUploads = <int>[];
   final memoImageUploads = <int>[];
   RecordImportAppliedResults? appliedResults;
   var _nextServerId = 100;
@@ -467,6 +536,7 @@ class _FakeSteps implements ServerStorageMigrationSteps {
     RecordImportChunk chunk,
   ) async {
     _record('uploadChunk');
+    uploadedChunks.add(chunk);
     RecordImportEntityResult map(Map<String, dynamic> item) {
       return RecordImportEntityResult(
         localId: item['localId'] as int,
@@ -492,6 +562,21 @@ class _FakeSteps implements ServerStorageMigrationSteps {
       tags: chunk.tags.map(map).toList(),
       tagMaps: chunk.tagMaps.map(map).toList(),
       importedCount: 0,
+    );
+  }
+
+  @override
+  Future<RecordImportAttachmentResult> uploadBookCover(
+    int importId,
+    int bookLocalId,
+    File file,
+  ) async {
+    _record('uploadBookCover');
+    bookCoverUploads.add(bookLocalId);
+    return RecordImportAttachmentResult(
+      localId: bookLocalId,
+      serverId: 1,
+      imageUrl: 'https://cdn.example.com/user-books/1/thumbnail/imports/1/c.jpg',
     );
   }
 

@@ -16,7 +16,7 @@ enum ServerStorageMigrationStage {
   /// 책·노트·메모·독후감·태그를 청크로 업로드하는 중(§ "기록 업로드").
   uploadingRecords,
 
-  /// 메모 사진·독후감 이미지를 업로드하는 중(§ "이미지 업로드").
+  /// 책 표지·메모 사진·독후감 이미지를 업로드하는 중(§ "이미지 업로드").
   uploadingImages,
 
   /// `/complete` 호출과 로컬 DB 확정 반영 중(§ "완료 처리").
@@ -131,7 +131,14 @@ class ServerStorageMigrationService {
 
       final session = await _steps.startSession();
       final chunks = buildRecordImportChunks(
-        books: snapshot.books.map(bookToImportJson).toList(),
+        books: snapshot.books
+            .map(
+              (book) => bookToImportJson(
+                book,
+                coverImageUrl: snapshot.coverImageUrlByBook[book.userBookId],
+              ),
+            )
+            .toList(),
         tags: snapshot.tags.map(tagToImportJson).toList(),
         notes: snapshot.notes.map(noteToImportJson).toList(),
         noteMemos: snapshot.noteMemos.map(noteMemoToImportJson).toList(),
@@ -156,10 +163,16 @@ class ServerStorageMigrationService {
       // 연결돼 있지 않다 — `RecordImportSnapshot.fallbackMemoImages`에
       // 예비로 들고 있던 파일을 실제로 올려야 하는지 판단하는 데 쓴다.
       final createdMemoLocalIds = <int>{};
+      // 표지를 실제로 올려야 하는 책은 서버만 안다 — 기존 활성 책은 표지를
+      // 그대로 유지하므로(§ items 문서 "커스텀 책 표지 처리") 첨부하면 400이고
+      // 세션 전체가 정리된다. `created`로는 복구된 책(첨부 대상)과 구분되지
+      // 않아 응답의 `coverUploadRequired`만 근거로 삼는다.
+      final coverUploadRequiredLocalIds = <int>{};
       for (var i = 0; i < chunks.length; i++) {
         final result = await _steps.uploadChunk(session.importId, chunks[i]);
         for (final r in result.books) {
           bookServerIds[r.localId] = r.serverId;
+          if (r.coverUploadRequired) coverUploadRequiredLocalIds.add(r.localId);
         }
         for (final r in result.notes) {
           noteServerIds[r.localId] = r.serverId;
@@ -196,7 +209,13 @@ class ServerStorageMigrationService {
         for (final entry in snapshot.fallbackMemoImages.entries)
           if (createdMemoLocalIds.contains(entry.key)) entry.key: entry.value,
       };
+      final bookCoversToUpload = <int, File>{
+        for (final entry in snapshot.pendingBookCovers.entries)
+          if (coverUploadRequiredLocalIds.contains(entry.key))
+            entry.key: entry.value,
+      };
       final totalImages =
+          bookCoversToUpload.length +
           memoImagesToUpload.length +
           snapshot.pendingReflectionImages.values.fold<int>(
             0,
@@ -210,6 +229,22 @@ class ServerStorageMigrationService {
         ),
       );
       var imagesDone = 0;
+      // 서버가 `coverUploadRequired=true`로 알려준 책은 예외 없이 여기서
+      // 표지를 올려야 한다 — 하나라도 빠지면 본문에 남은 `local://` 표지를
+      // `/complete`의 이미지 검증이 잡아 세션 전체가 정리된다(§ complete
+      // 문서 "이미지 연결").
+      final bookCoverUrls = <int, String>{};
+      for (final entry in bookCoversToUpload.entries) {
+        final attachment = await _steps.uploadBookCover(
+          session.importId,
+          entry.key,
+          entry.value,
+        );
+        bookCoverUrls[entry.key] = attachment.imageUrl;
+        imagesDone++;
+        emit(state.copyWith(imagesDone: imagesDone, imagesTotal: totalImages));
+      }
+
       final memoImageUrls = <int, String>{};
       for (final entry in memoImagesToUpload.entries) {
         // 청크 응답에 없으면(이론상 없어야 함) 올릴 서버 메모가 없다는
@@ -277,6 +312,7 @@ class ServerStorageMigrationService {
       await _steps.applyResults(
         RecordImportAppliedResults(
           bookServerIdByLocalId: bookServerIds,
+          bookCoverUrlByLocalId: bookCoverUrls,
           noteServerIdByLocalId: noteServerIds,
           memoServerIdByLocalId: memoServerIds,
           memoImageUrlByLocalId: memoImageUrls,

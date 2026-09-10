@@ -72,6 +72,27 @@ class BookshelfDao {
 
   Future<List<BookItem>> getGrid(BookStatus status) => getByStatuses([status]);
 
+  /// 책 localId → `cover_image_url` 컬럼 원본 값(표지가 있는 책만).
+  ///
+  /// [_rowToBookItem]은 화면 표시를 위해 서버 표지 URL 대신 로컬 사본
+  /// 경로(`local_cover_path`)를 돌려주기 때문에, [BookItem.coverImageUrl]만
+  /// 봐서는 "서버에 이미 표지가 있는 책"과 "로컬에만 표지가 있는 책"을
+  /// 구분할 수 없다. Import는 앞의 경우 서버 URL을 그대로 보내고 뒤의
+  /// 경우에만 파일을 새로 올려야 하므로(§ attachments 문서 — 기존 HTTP(S)
+  /// 표지에는 첨부하지 않는다) 원본 컬럼이 필요하다.
+  Future<Map<int, String>> getRawCoverImageUrls() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'user_book',
+      columns: ['user_book_id', 'cover_image_url'],
+      where: 'cover_image_url IS NOT NULL AND pending_delete = 0',
+    );
+    return {
+      for (final row in rows)
+        row['user_book_id'] as int: row['cover_image_url'] as String,
+    };
+  }
+
   Future<List<BookItem>> searchFinished(FinishedFilter filter) async {
     final db = await BookshelfDatabase.instance();
     final where = <String>['status = ?', 'pending_delete = 0'];
@@ -1231,11 +1252,33 @@ class BookshelfDao {
   /// [executor]는 다른 도메인(노트·독후감·태그)의 같은 이름 메서드와 하나의
   /// 트랜잭션을 공유하기 위한 것이다(`ServerStorageMigrationRepositorySteps.applyResults`)
   /// — 네 테이블 중 일부만 반영된 채 중간에 실패하는 상태를 줄인다.
+  ///
+  /// [coverImageUrlByLocalId]는 이번 세션에 로컬 표지 파일을 새로 올린 책의
+  /// 서버 표지 URL만 담는다(있는 책만).
   Future<void> applyImportResults(
     DatabaseExecutor executor,
-    Map<int, int> serverIdByLocalId,
-  ) async {
+    Map<int, int> serverIdByLocalId, {
+    Map<int, String> coverImageUrlByLocalId = const {},
+  }) async {
     for (final entry in serverIdByLocalId.entries) {
+      final coverImageUrl = coverImageUrlByLocalId[entry.key];
+      // 표지를 새로 올린 책은 방금까지 표지였던 로컬 파일 경로를
+      // `local_cover_path`에 옮겨 두고 서버 URL과 짝지어 둔다 —
+      // [_rowToBookItem]이 이 짝이 맞을 때만 로컬 파일을 표지로 쓰므로,
+      // 서버 저장 모드로 바뀐 뒤에도 표지를 다시 내려받지 않는다.
+      String? localCoverPath;
+      if (coverImageUrl != null) {
+        final rows = await executor.query(
+          'user_book',
+          columns: ['cover_image_url'],
+          where: 'user_book_id = ?',
+          whereArgs: [entry.key],
+          limit: 1,
+        );
+        localCoverPath = rows.isEmpty
+            ? null
+            : rows.single['cover_image_url'] as String?;
+      }
       await executor.update(
         'user_book',
         {
@@ -1243,6 +1286,11 @@ class BookshelfDao {
           'is_dirty': 0,
           'dirty_fields': null,
           'synced_updated_at': null,
+          if (coverImageUrl != null) ...{
+            'cover_image_url': coverImageUrl,
+            'local_cover_path': localCoverPath,
+            'local_cover_url': coverImageUrl,
+          },
         },
         where: 'user_book_id = ?',
         whereArgs: [entry.key],

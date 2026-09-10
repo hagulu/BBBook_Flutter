@@ -8,16 +8,23 @@ import 'record_import_snapshot.dart';
 /// 바꾸는 순수 함수 모음(네트워크·DB 접근 없음 — 그래서 단위 테스트로만
 /// 검증한다).
 
-Map<String, dynamic> bookToImportJson(BookItem item) {
+/// 로컬 커스텀 표지를 가리키는 `/items`의 `coverImageUrl` placeholder
+/// (§ items 문서 books[n] — 기기의 실제 파일 경로를 보내지 않는다).
+/// 뒤이어 보낼 attachments 요청의 `localId`와 반드시 같은 값을 쓴다.
+String localCoverPlaceholder(int bookLocalId) => 'local://cover/$bookLocalId';
+
+/// [coverImageUrl]은 [RecordImportSnapshot.coverImageUrlByBook]이 미리
+/// 정해 둔 값이다(서버 표지 URL, `local://cover/{localId}` placeholder,
+/// 또는 표지 없음 null) — 로컬 파일 경로를 그대로 보내지 않기 위해 이
+/// 판단은 파일을 실제로 열어 볼 수 있는 [RecordImportSnapshotBuilder]에서만
+/// 한다. placeholder를 보낸 책은 반드시 attachments 업로드까지 끝나야
+/// `/complete`가 통과한다.
+Map<String, dynamic> bookToImportJson(BookItem item, {String? coverImageUrl}) {
   return {
     'localId': item.userBookId,
     'serverId': item.serverId,
     'clientRequestId': item.clientRequestId,
-    // 직접 등록한 커스텀 책의 로컬 표지 파일 경로는 서버가 받을 수 있는
-    // 형식이 아니다(API는 문자열 URL만 받고 파일 업로드를 지원하지 않는다).
-    // 사용자 확인에 따라 표지 없이 Import하고, 표지는 이후 책 정보 수정
-    // 화면에서 다시 설정하도록 안내한다.
-    'coverImageUrl': _remoteCoverUrlOrNull(item.coverImageUrl),
+    'coverImageUrl': coverImageUrl,
     'isbn13': item.isbn13,
     'title': item.title,
     'author': item.author,
@@ -41,14 +48,6 @@ Map<String, dynamic> bookToImportJson(BookItem item) {
     'platformName': item.platformName,
     'discoverySource': item.discoverySource,
   };
-}
-
-String? _remoteCoverUrlOrNull(String? coverImageUrl) {
-  if (coverImageUrl == null) return null;
-  final isRemote =
-      coverImageUrl.startsWith('http://') ||
-      coverImageUrl.startsWith('https://');
-  return isRemote ? coverImageUrl : null;
 }
 
 Map<String, dynamic> noteToImportJson(BookNote note) {

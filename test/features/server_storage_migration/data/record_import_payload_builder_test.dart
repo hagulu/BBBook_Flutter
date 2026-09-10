@@ -29,16 +29,31 @@ BookItem _book({
 
 void main() {
   group('bookToImportJson', () {
-    test('원격 URL 표지는 그대로 보낸다', () {
+    test('스냅샷이 정한 표지 값을 그대로 보낸다', () {
       final json = bookToImportJson(
-        _book(coverImageUrl: 'https://cdn.example.com/cover.jpg'),
+        _book(coverImageUrl: 'book_covers/local_1.jpg'),
+        coverImageUrl: 'https://cdn.example.com/cover.jpg',
       );
       expect(json['coverImageUrl'], 'https://cdn.example.com/cover.jpg');
     });
 
-    test('로컬 파일 경로 표지는 null로 보낸다(§ 사용자 확인 — 표지 없이 Import)', () {
-      final json = bookToImportJson(_book(coverImageUrl: 'book_covers/local_1.jpg'));
+    test('표지 값이 없으면 표지 없음(null)으로 보낸다', () {
+      // 로컬 파일 경로(`book_covers/...`)를 그대로 보내면 서버가 400으로
+      // 거부해 세션 전체가 정리된다 — [BookItem.coverImageUrl]은 payload에
+      // 쓰이지 않는다.
+      final json = bookToImportJson(
+        _book(coverImageUrl: 'book_covers/local_1.jpg'),
+      );
       expect(json['coverImageUrl'], isNull);
+    });
+
+    test('로컬 커스텀 표지 placeholder는 books[n].localId와 짝을 이룬다', () {
+      expect(localCoverPlaceholder(-5), 'local://cover/-5');
+      final json = bookToImportJson(
+        _book(userBookId: -5),
+        coverImageUrl: localCoverPlaceholder(-5),
+      );
+      expect(json['coverImageUrl'], 'local://cover/${json['localId']}');
     });
 
     test('localId/serverId/clientRequestId를 그대로 옮긴다', () {

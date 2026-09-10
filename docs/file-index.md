@@ -117,7 +117,7 @@
 ## features/server_storage_migration
 
 - `lib/features/server_storage_migration/data/record_import_api.dart` — 로컬 → 서버 저장 모드 재전환 Import 세션 API 호출(start/items/attachments/complete/cancel)
-- `lib/features/server_storage_migration/data/record_import_snapshot_builder.dart` — Import 직전 로컬 DB 스냅샷 구성(clientRequestId 백필, 이미지 파일 확보·형식/용량 확인, 독후감 이미지 `local://` placeholder 치환)
+- `lib/features/server_storage_migration/data/record_import_snapshot_builder.dart` — Import 직전 로컬 DB 스냅샷 구성(clientRequestId 백필, 이미지 파일 확보·형식/용량 확인, 독후감 이미지·로컬 커스텀 책 표지 `local://` placeholder 치환)
 - `lib/features/server_storage_migration/data/record_import_validation.dart` — 서버 400/롤백을 부르는 조합(글자 수·범위·중복 clientRequestId·태그 1:1 규칙 등)을 미리 걸러내는 순수 검증 함수
 - `lib/features/server_storage_migration/data/record_import_payload_builder.dart` — 로컬 모델 → items 요청 JSON 변환과 `maxChunkItemCount` 기준 청크 분할(순수 함수)
 - `lib/features/server_storage_migration/data/server_storage_migration_steps.dart` — Import 단계 인터페이스(테스트가 가짜 구현으로 순서·중단 조건 검증)
@@ -197,6 +197,7 @@
 
 ## docs
 
+- `docs/review/20260910-132050-import-book-cover-review.md` — 로컬 책 표지 Import의 완료 후 재시도 시 기존 서버 표지 재첨부 실패 리뷰
 - `docs/policies/offline-records.md` — 오프라인 진입·인증 복구·재전송·계정 변경 삭제 정책과 검증 항목
 - `docs/review/20260910-124921-local-migration-simplification-review.md` — 로컬 전환 단순화(동기화·이미지 다운로드 단계 삭제) 리뷰(서버 이미지 무고지 유실, 실패 테스트 5개, 반대쪽 결과 문구, 계정 전환 시 컨트롤러 상태 잔존)
 - `docs/review/20260910-123012-settings-sync-inline-rereview.md` — 위 리뷰의 재검토(지적 전건 유지 + 이중 전환 동시 실행, 동기화 게이트 통과 후 서버 삭제로 인한 로컬 행 삭제 창)
