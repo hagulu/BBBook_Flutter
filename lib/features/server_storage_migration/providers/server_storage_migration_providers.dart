@@ -22,9 +22,13 @@ final recordImportApiProvider = Provider<RecordImportApi>((ref) {
 
 /// 로컬 → 서버 저장 이전 실행/진행 상태.
 class ServerStorageMigrationController
-    extends AutoDisposeNotifier<ServerStorageMigrationState> {
+    extends Notifier<ServerStorageMigrationState> {
   Future<void>? _inFlight;
   bool _disposed = false;
+
+  void dismissResult() {
+    if (_inFlight == null) state = const ServerStorageMigrationState();
+  }
 
   @override
   ServerStorageMigrationState build() {
@@ -81,7 +85,7 @@ class ServerStorageMigrationController
 }
 
 final serverStorageMigrationControllerProvider =
-    AutoDisposeNotifierProvider<
+    NotifierProvider<
       ServerStorageMigrationController,
       ServerStorageMigrationState
     >(ServerStorageMigrationController.new);

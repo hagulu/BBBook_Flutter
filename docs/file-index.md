@@ -32,9 +32,9 @@
 
 ## features/profile
 
-- `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 리포트 카드/내 글 모아보기 2×2 바로가기/공지사항/로그아웃/약관 링크), `docs/porting-reference/profile-main-screen.md` 대응
+- `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 리포트 카드/내 글 모아보기 2×2 바로가기/로그아웃), `docs/porting-reference/profile-main-screen.md` 대응
 - `lib/features/profile/screens/profile_edit_screen.dart` — 프로필 수정 화면(닉네임·프로필 이미지 변경/삭제, 저장, 회원 탈퇴), `docs/porting-reference/profile-edit-screen.md` 대응
-- `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(밝은·다크·시스템 테마 선택, 오픈소스 라이선스 목록·전문, 저장 방식(서버/로컬) 전환 진입점), 프로필 탭 AppBar 설정 아이콘으로 진입
+- `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(상단 공지사항, 밝은·다크·시스템 테마 선택, 오픈소스 라이선스 목록·전문, 하단 이용약관·개인정보처리방침·앱 버전, 저장 방식(서버/로컬) 전환 진입점), 프로필 탭 AppBar 설정 아이콘으로 진입
 - `lib/features/profile/screens/my_reflections_screen.dart` — 내가 작성한 독후감 목록(커서 무한 스크롤), 정상 항목은 서버 reflectionId로 로컬 행을 찾아 기존 `BookReflectionDetailScreen`(수정·삭제 포함)으로 이동
 - `lib/features/profile/screens/my_reviews_screen.dart` — 내가 작성한 독자평 목록(커서 무한 스크롤), 탭해도 이동하는 상세 화면 없음
 - `lib/features/profile/screens/my_discussions_screen.dart` — 내가 작성한 토론 목록(커서 무한 스크롤), 정상 항목은 `DiscussionDetailScreen`으로 이동
@@ -198,6 +198,9 @@
 ## docs
 
 - `docs/policies/offline-records.md` — 오프라인 진입·인증 복구·재전송·계정 변경 삭제 정책과 검증 항목
+- `docs/review/20260910-124921-local-migration-simplification-review.md` — 로컬 전환 단순화(동기화·이미지 다운로드 단계 삭제) 리뷰(서버 이미지 무고지 유실, 실패 테스트 5개, 반대쪽 결과 문구, 계정 전환 시 컨트롤러 상태 잔존)
+- `docs/review/20260910-123012-settings-sync-inline-rereview.md` — 위 리뷰의 재검토(지적 전건 유지 + 이중 전환 동시 실행, 동기화 게이트 통과 후 서버 삭제로 인한 로컬 행 삭제 창)
+- `docs/review/20260910-122111-settings-sync-inline-review.md` — 저장 모드 전환의 설정 화면 인라인화 리뷰(전환 중 이탈 시 마무리 처리 스킵, 결과 표시 소실, 죽은 전환 화면)
 - `docs/review/20260908-005905-discussion-pagination-review.md` — 토론 답변 페이지네이션 전환의 빌드 중 provider 변경, 누적 토론 목록 갱신, 삭제 후 메타데이터 정합성 리뷰
 - `docs/review/20260907-002544-server-storage-migration-rereview.md` — 로컬 → 서버 저장 전환 후속 수정의 완료 복구, 30일 물리 삭제, 태그 삭제 반영, 빈 이미지 검증 재리뷰
 - `docs/review/20260906-233230-server-storage-migration-review.md` — 로컬 → 서버 저장 전환의 기존 PHOTO 재첨부, Import 후 충돌 기준값, 완료 후 복구 구간, 노트 제목 검증 리뷰

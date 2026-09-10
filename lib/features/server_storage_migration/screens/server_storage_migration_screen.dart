@@ -42,7 +42,7 @@ class _ServerStorageMigrationScreenState
       canPop: completed || failed,
       child: Scaffold(
         appBar: AppBar(
-          title: const AppBarTitle('서버 저장으로 전환'),
+          title: const AppBarTitle('동기화 켜기'),
           backgroundColor: AppColors.of(context).pageBackground,
           foregroundColor: AppColors.of(context).textStrong,
           automaticallyImplyLeading: completed || failed,
@@ -55,7 +55,7 @@ class _ServerStorageMigrationScreenState
               children: [
                 Text(
                   switch (state.stage) {
-                    ServerStorageMigrationStage.completed => '서버 저장으로 전환했어요',
+                    ServerStorageMigrationStage.completed => '동기화를 켰어요',
                     ServerStorageMigrationStage.failed => '전환하지 못했어요',
                     _ => '기록과 이미지를 서버로 옮기고 있어요',
                   },
@@ -127,7 +127,7 @@ class _ServerStorageMigrationScreenState
                 if (completed)
                   FilledButton(
                     onPressed: () {
-                      AppSnackBar.success(context, '서버 저장으로 전환했습니다.');
+                      AppSnackBar.success(context, '동기화를 켰습니다.');
                       Navigator.of(context).pop();
                     },
                     child: const Text('완료'),

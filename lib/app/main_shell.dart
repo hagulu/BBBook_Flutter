@@ -106,7 +106,7 @@ class _MainShellState extends ConsumerState<MainShell>
       onPopInvokedWithResult: (didPop, _) => _handlePopAttempt(didPop),
       child: Scaffold(
         appBar: AppBar(
-          title: const AppBarTitle('책책책'),
+          title: const AppBarTitle('북꾸러미'),
           backgroundColor: AppColors.of(context).pageBackground,
           foregroundColor: AppColors.of(context).textStrong,
           elevation: 0,

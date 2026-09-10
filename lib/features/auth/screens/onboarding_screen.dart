@@ -139,7 +139,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      '책책책',
+                      '북꾸러미',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,

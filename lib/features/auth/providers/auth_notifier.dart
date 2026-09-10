@@ -11,6 +11,7 @@ import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
+import '../../server_storage_migration/providers/server_storage_migration_providers.dart';
 import '../../tag/providers/tag_providers.dart';
 import '../data/auth_api.dart' show SocialProvider;
 import '../data/auth_repository.dart';
@@ -335,6 +336,8 @@ class AuthNotifier extends Notifier<AuthState> {
       rethrow;
     } finally {
       ref.invalidate(storageModeProvider);
+      ref.invalidate(localStorageMigrationControllerProvider);
+      ref.invalidate(serverStorageMigrationControllerProvider);
       ref.invalidate(serverDeletePendingProvider);
       ref.invalidate(bookshelfSyncControllerProvider);
       ref.invalidate(privacySettingControllerProvider);

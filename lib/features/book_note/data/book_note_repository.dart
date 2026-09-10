@@ -59,6 +59,12 @@ class BookNoteRepository {
   Future<void>? _sweepInFlight;
   Future<bool>? _syncInFlight;
 
+  /// 새 요청을 시작하지 않고 이미 실행 중인 동기화만 기다린다.
+  Future<void> waitForCurrentSync() async {
+    final pending = _syncInFlight;
+    if (pending != null) await pending;
+  }
+
   final Set<String> _unavailableImageUrls = {};
   int? _unavailableSessionGeneration;
 

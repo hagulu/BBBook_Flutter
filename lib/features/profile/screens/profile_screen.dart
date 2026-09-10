@@ -1,15 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
-
-import '../../../core/config/api_config.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../auth/providers/auth_notifier.dart';
 import '../../auth/screens/onboarding_screen.dart';
-import '../../notices/screens/notices_list_screen.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../models/profile_me.dart';
 import '../models/profile_stats_summary.dart';
@@ -115,12 +111,8 @@ class _ProfileContent extends ConsumerWidget {
           const _StatsCard(),
           const SizedBox(height: 16),
           const _MyContentCard(),
-          const SizedBox(height: 16),
-          const _NoticesCard(),
           const SizedBox(height: 20),
           const _LogoutButton(),
-          const SizedBox(height: 28),
-          const _FooterLinks(),
         ],
       ),
     );
@@ -135,30 +127,37 @@ class _ProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nickname = profile.nickname ?? '사용자';
-    return _SectionCard(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const ProfileEditScreen()),
-      ),
-      semanticsLabel: '프로필 수정',
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          _Avatar(imageUrl: profile.profileImageUrl, nickname: nickname),
-          const SizedBox(width: 14),
-          Expanded(
+    return Semantics(
+      button: true,
+      label: '프로필 수정',
+      excludeSemantics: true,
+      child: Material(
+        color: AppColors.of(context).pageBackground,
+        child: InkWell(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const ProfileEditScreen()),
+          ),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _Avatar(
+                  imageUrl: profile.profileImageUrl,
+                  nickname: nickname,
+                  size: 76,
+                ),
+                const SizedBox(height: 10),
                 Text(
                   nickname,
                   style: TextStyle(
-                    fontSize: 17,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: AppColors.of(context).textStrong,
                   ),
                 ),
                 if (profile.email != null) ...[
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     profile.email!,
                     style: TextStyle(
@@ -170,26 +169,25 @@ class _ProfileCard extends StatelessWidget {
               ],
             ),
           ),
-          Icon(
-            PhosphorIconsRegular.caretRight,
-            size: 18,
-            color: AppColors.of(context).textMuted,
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.imageUrl, required this.nickname});
+  const _Avatar({
+    required this.imageUrl,
+    required this.nickname,
+    this.size = 56,
+  });
 
   final String? imageUrl;
   final String nickname;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
-    const size = 56.0;
     final url = imageUrl;
     if (url == null || url.isEmpty) {
       return CircleAvatar(
@@ -528,66 +526,6 @@ class _ContentShortcutButton extends StatelessWidget {
   }
 }
 
-class _NoticesCard extends StatelessWidget {
-  const _NoticesCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return _SectionCard(
-      padding: EdgeInsets.zero,
-      child: _MenuRow(
-        icon: PhosphorIconsRegular.megaphone,
-        label: '공지사항',
-        onTap: () => Navigator.of(context).push<void>(
-          MaterialPageRoute(builder: (_) => const NoticesListScreen()),
-        ),
-      ),
-    );
-  }
-}
-
-class _MenuRow extends StatelessWidget {
-  const _MenuRow({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: AppColors.of(context).accentForeground),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.of(context).textStrong,
-                ),
-              ),
-            ),
-            Icon(
-              PhosphorIconsRegular.caretRight,
-              size: 16,
-              color: AppColors.of(context).textMuted,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _LogoutButton extends ConsumerWidget {
   const _LogoutButton();
 
@@ -633,54 +571,6 @@ class _LogoutButton extends ConsumerWidget {
     );
     if (!confirmed) return;
     await ref.read(authNotifierProvider.notifier).logout();
-  }
-}
-
-class _FooterLinks extends StatelessWidget {
-  const _FooterLinks();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _FooterLink(label: '이용약관', path: '/terms'),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10),
-            child: SizedBox(
-              height: 12,
-              child: VerticalDivider(
-                width: 1,
-                color: AppColors.of(context).border,
-              ),
-            ),
-          ),
-          _FooterLink(label: '개인정보처리방침', path: '/privacy'),
-        ],
-      ),
-    );
-  }
-}
-
-class _FooterLink extends StatelessWidget {
-  const _FooterLink({required this.label, required this.path});
-
-  final String label;
-  final String path;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => launchUrl(
-        Uri.parse('${ApiConfig.baseUrl}$path'),
-        mode: LaunchMode.externalApplication,
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 12, color: AppColors.of(context).textMuted),
-      ),
-    );
   }
 }
 

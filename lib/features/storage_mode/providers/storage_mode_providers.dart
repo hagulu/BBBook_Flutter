@@ -56,9 +56,13 @@ class LocalStorageMigrationPreview {
 
 /// 서버 → 로컬 저장 이전 실행/진행 상태.
 class LocalStorageMigrationController
-    extends AutoDisposeNotifier<LocalStorageMigrationState> {
+    extends Notifier<LocalStorageMigrationState> {
   Future<void>? _inFlight;
   bool _disposed = false;
+
+  void dismissResult() {
+    if (_inFlight == null) state = const LocalStorageMigrationState();
+  }
 
   @override
   LocalStorageMigrationState build() {
@@ -77,7 +81,7 @@ class LocalStorageMigrationController
     try {
       await ref.read(recordSyncApiProvider).deleteAllRecords();
       await ref.read(storageModeStoreProvider).markServerRecordsDeleted();
-      if (!_disposed) ref.invalidate(serverDeletePendingProvider);
+      ref.invalidate(serverDeletePendingProvider);
       return true;
     } catch (error) {
       developer.log('[서버 기록 정리] result=FAIL reason=${error.runtimeType}');
@@ -109,10 +113,12 @@ class LocalStorageMigrationController
     if (_disposed) return;
     state = result;
     ref.invalidate(serverDeletePendingProvider);
+    // 서버 정리에서만 실패한 경우에도 이미 로컬 모드로 전환돼 있을 수 있다.
+    // 설정 화면의 현재 상태가 실제 저장 모드와 어긋나지 않게 항상 다시 읽는다.
+    ref.invalidate(storageModeProvider);
     if (result.stage == LocalStorageMigrationStage.completed) {
       // 이전 중 내려받은 기록/이미지가 화면에 반영되도록 목록을 다시 읽게
       // 하고, 저장 모드 표시도 갱신한다.
-      ref.invalidate(storageModeProvider);
       ref.read(bookshelfSyncVersionProvider.notifier).state++;
       ref.read(bookNoteSyncVersionProvider.notifier).state++;
       ref.read(bookReflectionSyncVersionProvider.notifier).state++;
@@ -121,7 +127,7 @@ class LocalStorageMigrationController
 }
 
 final localStorageMigrationControllerProvider =
-    AutoDisposeNotifierProvider<
+    NotifierProvider<
       LocalStorageMigrationController,
       LocalStorageMigrationState
     >(LocalStorageMigrationController.new);

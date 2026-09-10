@@ -56,6 +56,12 @@ class BookshelfRepository {
   final Map<int, Future<void>> _dirtyPushChains = {};
   Future<bool>? _syncInFlight;
 
+  /// 새 요청을 시작하지 않고 이미 실행 중인 동기화만 기다린다.
+  Future<void> waitForCurrentSync() async {
+    final pending = _syncInFlight;
+    if (pending != null) await pending;
+  }
+
   /// 서버 동기화. dirty 로컬 행(책 기록 화면에서 로컬 우선 반영한 뒤 아직
   /// 서버에 반영되지 못한 수정)이 있으면 먼저 일괄 push한 뒤, 로컬에 동기화
   /// 기준값(마지막 since)이 없으면(최초 로그인 또는 로그아웃 후 최초 구성)

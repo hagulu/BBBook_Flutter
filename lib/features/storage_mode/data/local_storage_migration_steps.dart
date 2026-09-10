@@ -86,8 +86,17 @@ class LocalStorageMigrationRepositorySteps
   }
 
   @override
-  Future<void> switchToLocalMode() =>
-      storageMode.switchToLocal(ownerUserId: ownerUserId);
+  Future<void> switchToLocalMode() async {
+    await storageMode.switchToLocal(ownerUserId: ownerUserId);
+    // 새 동기화는 로컬 모드 게이트에서 차단된다. 이미 시작한 응답 적용이
+    // 끝나기 전에는 서버를 삭제하지 않는다.
+    await Future.wait([
+      bookshelfRepository.waitForCurrentSync(),
+      noteRepository.waitForCurrentSync(),
+      reflectionRepository.waitForCurrentSync(),
+      tagRepository.waitForCurrentSync(),
+    ]);
+  }
 
   @override
   Future<void> deleteServerRecords() => recordSyncApi.deleteAllRecords();

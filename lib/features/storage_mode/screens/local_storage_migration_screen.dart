@@ -42,7 +42,7 @@ class _LocalStorageMigrationScreenState
       canPop: completed || failed,
       child: Scaffold(
         appBar: AppBar(
-          title: const AppBarTitle('로컬 저장으로 전환'),
+          title: const AppBarTitle('동기화 끄기'),
           backgroundColor: AppColors.of(context).pageBackground,
           foregroundColor: AppColors.of(context).textStrong,
           automaticallyImplyLeading: completed || failed,
@@ -55,7 +55,7 @@ class _LocalStorageMigrationScreenState
               children: [
                 Text(
                   switch (state.stage) {
-                    LocalStorageMigrationStage.completed => '로컬 저장으로 전환했어요',
+                    LocalStorageMigrationStage.completed => '동기화를 껐어요',
                     LocalStorageMigrationStage.failed => '전환하지 못했어요',
                     _ => '기록과 메모·독후감 이미지를 기기에 옮기고 있어요',
                   },
@@ -161,7 +161,7 @@ class _LocalStorageMigrationScreenState
                 if (completed)
                   FilledButton(
                     onPressed: () {
-                      AppSnackBar.success(context, '로컬 저장으로 전환했습니다.');
+                      AppSnackBar.success(context, '동기화를 껐습니다.');
                       Navigator.of(context).pop();
                     },
                     child: const Text('완료'),

@@ -101,18 +101,16 @@ class LocalStorageMigrationState {
 /// 서버 저장 → 로컬 저장 이전을 순서대로 실행한다.
 ///
 /// 순서가 이 기능의 전부라고 해도 될 만큼 중요하다.
-/// 1. 기록 동기화 → 2. 이미지 전체 확보 → 3. 확보 검증 →
-/// 4. **모드 전환 기록** → 5. 서버 기록 소프트 삭제
+/// 1. **모드 전환 기록** → 2. 서버 기록 소프트 삭제
 ///
-/// 4와 5의 순서를 바꾸면 안 된다. 서버를 먼저 지운 직후 앱이 죽으면 모드는
+/// 1과 2의 순서를 바꾸면 안 된다. 서버를 먼저 지운 직후 앱이 죽으면 모드는
 /// 여전히 서버 저장이고, 다음 동기화가 "서버에서 사라진 기록"으로 판단해
-/// 로컬 원본까지 지운다. 반대로 4 다음에 죽으면 "로컬 모드 + 서버에 남은
+/// 로컬 원본까지 지운다. 반대로 1 다음에 죽으면 "로컬 모드 + 서버에 남은
 /// 데이터"가 되는데, 이건 다시 실행해 지우면 되는 회복 가능한 상태다.
 ///
-/// 3에서 하나라도 확보하지 못한 이미지가 있으면 4로 넘어가지 않는다 —
-/// 서버 데이터를 지우기 전에 멈춰야 재시도할 수 있다. 단 서버가 더 이상
-/// 주지 않는 이미지(404 등)는 서버를 남겨 둬도 되찾을 수 없으므로 이전을
-/// 막지 않고 결과에만 담아 사용자에게 알린다.
+/// 전환 시 서버 동기화나 이미지 다운로드를 하지 않는다. 현재 기기에 있는
+/// 기록만 원본으로 남기므로, 사용자는 전환 전에 다른 기기 변경사항이
+/// 동기화됐는지 확인해야 한다.
 class LocalStorageMigrationService {
   LocalStorageMigrationService(this._steps);
 
@@ -122,7 +120,7 @@ class LocalStorageMigrationService {
     void Function(LocalStorageMigrationState state)? onProgress,
   }) async {
     var state = const LocalStorageMigrationState(
-      stage: LocalStorageMigrationStage.syncingRecords,
+      stage: LocalStorageMigrationStage.switchingMode,
     );
     void emit(LocalStorageMigrationState next) {
       state = next;
@@ -131,29 +129,6 @@ class LocalStorageMigrationService {
 
     emit(state);
     try {
-      await _steps.syncAllRecords();
-
-      emit(state.copyWith(stage: LocalStorageMigrationStage.downloadingImages));
-      final report = await _steps.downloadAllImages((done, total) {
-        emit(state.copyWith(imagesDone: done, imagesTotal: total));
-      });
-      emit(state.copyWith(unavailableImages: report.unavailable));
-
-      emit(state.copyWith(stage: LocalStorageMigrationStage.verifying));
-      final missing = await _steps.countMissingLocalImages();
-      if (missing > 0) {
-        developer.log(
-          '[로컬 저장 이전] result=FAIL reason=image_download_incomplete '
-          'missing=$missing',
-        );
-        return _failed(
-          emit,
-          state,
-          '이미지 $missing장을 아직 내려받지 못했습니다. '
-          '네트워크 상태를 확인하고 다시 시도해 주세요.',
-        );
-      }
-
       // 여기서부터는 로컬이 원본이다. 서버 삭제보다 먼저 기록해 동기화를
       // 멈춰야, 삭제 직후 중단되더라도 로컬 데이터가 안전하다.
       emit(state.copyWith(stage: LocalStorageMigrationStage.switchingMode));
@@ -177,10 +152,7 @@ class LocalStorageMigrationService {
       }
 
       emit(state.copyWith(stage: LocalStorageMigrationStage.completed));
-      developer.log(
-        '[로컬 저장 이전] result=SUCCESS '
-        'unavailableImages=${report.unavailable}',
-      );
+      developer.log('[로컬 저장 이전] result=SUCCESS');
       return state;
     } catch (error) {
       developer.log('[로컬 저장 이전] result=FAIL reason=${error.runtimeType}');

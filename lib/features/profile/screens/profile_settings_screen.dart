@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/config/api_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_mode_provider.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
-import '../../server_storage_migration/screens/server_storage_migration_screen.dart';
+import '../../notices/screens/notices_list_screen.dart';
+import '../../server_storage_migration/providers/server_storage_migration_providers.dart';
+import '../../server_storage_migration/services/server_storage_migration_service.dart';
 import '../../storage_mode/data/storage_mode_store.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
-import '../../storage_mode/screens/local_storage_migration_screen.dart';
+import '../../storage_mode/services/local_storage_migration_service.dart';
 
 /// 설정 화면. 포팅 문서(`profile-main-screen.md`) 범위 밖의 저장 방식(서버/로컬)
 /// 전환 기능을 프로필 메인 화면과 분리해 여기에 둔다(프로필 탭 우측 상단
@@ -24,72 +29,83 @@ class ProfileSettingsScreen extends ConsumerWidget {
     final mode =
         ref.watch(storageModeProvider).valueOrNull ?? StorageMode.server;
     final isLocal = mode == StorageMode.local;
+    final isSwitching =
+        ref.watch(localStorageMigrationControllerProvider).isRunning ||
+        ref.watch(serverStorageMigrationControllerProvider).isRunning;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const AppBarTitle('설정'),
-        backgroundColor: AppColors.of(context).pageBackground,
-        foregroundColor: AppColors.of(context).textStrong,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const _ThemeModeCard(),
-            const SizedBox(height: 16),
-            _StorageModeCard(
-              isLocal: isLocal,
-              serverCleanupPending:
-                  isLocal &&
-                  (ref.watch(serverDeletePendingProvider).valueOrNull ?? false),
-              onSwitchToLocal: () => _startMigration(context, ref),
-              onSwitchToServer: () => _startReverseMigration(context, ref),
-              onRetryServerCleanup: () => _retryServerCleanup(context, ref),
-            ),
-            const SizedBox(height: 20),
-            const _OpenSourceLicenseMenu(),
-          ],
+    return PopScope(
+      canPop: !isSwitching,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const AppBarTitle('설정'),
+          backgroundColor: AppColors.of(context).pageBackground,
+          foregroundColor: AppColors.of(context).textStrong,
+          elevation: 0,
+        ),
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SettingsGroup(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const _NoticesMenu(),
+                    const Divider(),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 18),
+                      child: _ThemeModeCard(),
+                    ),
+                    const Divider(),
+                    Padding(
+                      padding: EdgeInsets.zero,
+                      child: _StorageModeCard(
+                        isLocal: isLocal,
+                        serverCleanupPending:
+                            isLocal &&
+                            (ref
+                                    .watch(serverDeletePendingProvider)
+                                    .valueOrNull ??
+                                false),
+                        onSwitchToLocal: () => _startMigration(context, ref),
+                        onSwitchToServer: () =>
+                            _startReverseMigration(context, ref),
+                        onRetryServerCleanup: () =>
+                            _retryServerCleanup(context, ref),
+                      ),
+                    ),
+                    const Divider(),
+                    const _OpenSourceLicenseMenu(),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
+              const _PolicyLinks(),
+              const SizedBox(height: 10),
+              const _AppVersion(),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Future<void> _startMigration(BuildContext context, WidgetRef ref) async {
-    // 얼마나 받아야 하는지 먼저 알려 준다(로컬 DB만 세므로 서버 요청 없음).
-    AppLoading.show(context);
-    final int pendingImages;
-    try {
-      pendingImages = (await ref.read(
-        localStorageMigrationPreviewProvider.future,
-      )).pendingImages;
-    } finally {
-      AppLoading.hide();
-    }
-    if (!context.mounted) return;
-
     final confirmed = await AppConfirm.show(
       context,
-      title: '로컬 저장으로 전환',
+      title: '동기화 끄기',
       message:
-          '서버에 있는 기록과 메모 사진·독후감 이미지를 이 기기로 내려받은 뒤 '
-          '서버 기록을 정리합니다.\n\n'
-          '${pendingImages == 0 ? '· 아직 받지 않은 이미지는 없습니다(기록만 최신으로 맞춥니다).\n' : '· 아직 이 기기에 없는 이미지 약 $pendingImages장을 내려받습니다.\n'}'
-          '· 책 표지는 기기에 저장하지 않아 오프라인에서는 보이지 않을 수 있습니다.\n'
-          '· 데이터 양에 따라 시간이 걸리고 데이터 통신이 발생합니다.\n'
-          '· 전환 후에는 기록이 서버에 올라가지 않아 다른 기기에서 볼 수 없습니다.\n'
-          '· 태그처럼 서버에만 있는 기능은 쓸 수 없습니다.\n'
-          '· 로그아웃하면 이 기기의 기록이 모두 사라집니다.\n\n'
+          '현재 이 기기에 있는 기록만 남기고 서버 기록은 정리합니다.\n\n'
+          '기기에 저장되지 않은 사진·이미지는 보존되지 않습니다.\n\n'
+          '끄기 전에 다른 기기의 변경사항이 모두 동기화됐는지 확인해 주세요. '
+          '동기화를 끄면 다른 기기에서 기록을 볼 수 없고, 로그아웃하면 이 기기의 기록이 삭제됩니다.\n\n'
           '계속할까요?',
-      confirmText: '전환 시작',
+      confirmText: '동기화 끄기',
     );
     if (!confirmed || !context.mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const LocalStorageMigrationScreen(),
-      ),
-    );
+    ref.read(serverStorageMigrationControllerProvider.notifier).dismissResult();
+    ref.read(localStorageMigrationControllerProvider.notifier).start();
   }
 
   Future<void> _startReverseMigration(
@@ -98,22 +114,17 @@ class ProfileSettingsScreen extends ConsumerWidget {
   ) async {
     final confirmed = await AppConfirm.show(
       context,
-      title: '서버 저장으로 전환',
+      title: '동기화 켜기',
       message:
-          '이 기기에만 있는 기록과 메모 사진·독후감 이미지를 서버로 올립니다.\n\n'
-          '· 직접 등록한 책의 표지는 서버로 올라가지 않아 나중에 다시 설정해야 할 수 있습니다.\n'
-          '· 데이터 양에 따라 시간이 걸리고 데이터 통신이 발생합니다.\n'
-          '· 하나라도 실패하면 전체가 실패 처리되며, 이 기기의 기록은 그대로 유지됩니다.\n'
-          '· 전환 후에는 기록이 서버에 저장되어 다른 기기에서도 볼 수 있습니다.\n\n'
+          '이 기기에만 있는 기록과 이미지를 계정에 올립니다.\n\n'
+          '완료되면 다른 기기에서도 기록을 볼 수 있습니다. 직접 등록한 책 표지는 '
+          '동기화되지 않을 수 있습니다.\n\n'
           '계속할까요?',
-      confirmText: '전환 시작',
+      confirmText: '동기화 켜기',
     );
     if (!confirmed || !context.mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const ServerStorageMigrationScreen(),
-      ),
-    );
+    ref.read(localStorageMigrationControllerProvider.notifier).dismissResult();
+    ref.read(serverStorageMigrationControllerProvider.notifier).start();
   }
 
   Future<void> _retryServerCleanup(BuildContext context, WidgetRef ref) async {
@@ -135,6 +146,21 @@ class ProfileSettingsScreen extends ConsumerWidget {
   }
 }
 
+class _NoticesMenu extends StatelessWidget {
+  const _NoticesMenu();
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsMenuTile(
+      icon: PhosphorIconsRegular.megaphone,
+      label: '공지사항',
+      onTap: () => Navigator.of(context).push<void>(
+        MaterialPageRoute(builder: (_) => const NoticesListScreen()),
+      ),
+    );
+  }
+}
+
 /// Flutter의 [LicenseRegistry]에 앱에 포함된 패키지 라이선스가 자동 등록된다.
 /// [showLicensePage]는 패키지별 목록과 개별 라이선스 전문 화면을 함께 제공한다.
 class _OpenSourceLicenseMenu extends StatelessWidget {
@@ -142,28 +168,87 @@ class _OpenSourceLicenseMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = AppColors.of(context);
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        PhosphorIconsRegular.scales,
-        color: colors.accentForeground,
-        size: 22,
-      ),
-      title: Text(
-        '오픈소스 라이선스',
-        style: TextStyle(color: colors.textMuted, fontSize: 14),
-      ),
-      trailing: Icon(
-        PhosphorIconsRegular.caretRight,
-        color: colors.controlInactive,
-        size: 18,
-      ),
+    return _SettingsMenuTile(
+      icon: PhosphorIconsRegular.scales,
+      label: '오픈소스 라이선스',
       onTap: () => showLicensePage(
         context: context,
-        applicationName: '책책책',
+        applicationName: '북꾸러미',
         applicationLegalese: '이 앱은 오픈소스 소프트웨어를 포함합니다.',
       ),
+    );
+  }
+}
+
+class _PolicyLinks extends StatelessWidget {
+  const _PolicyLinks();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _PolicyLink(label: '이용약관', path: '/terms'),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: SizedBox(
+              height: 12,
+              child: VerticalDivider(
+                width: 1,
+                color: AppColors.of(context).border,
+              ),
+            ),
+          ),
+          _PolicyLink(label: '개인정보처리방침', path: '/privacy'),
+        ],
+      ),
+    );
+  }
+}
+
+class _PolicyLink extends StatelessWidget {
+  const _PolicyLink({required this.label, required this.path});
+
+  final String label;
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () => launchUrl(
+        Uri.parse('${ApiConfig.baseUrl}$path'),
+        mode: LaunchMode.externalApplication,
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 12, color: AppColors.of(context).textMuted),
+      ),
+    );
+  }
+}
+
+class _AppVersion extends StatelessWidget {
+  const _AppVersion();
+
+  static final _packageInfo = PackageInfo.fromPlatform();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<PackageInfo>(
+      future: _packageInfo,
+      builder: (context, snapshot) {
+        final info = snapshot.data;
+        if (info == null) return const SizedBox.shrink();
+        return Text(
+          '버전 ${info.version}+${info.buildNumber}',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.of(context).controlInactive,
+            fontSize: 11,
+          ),
+        );
+      },
     );
   }
 }
@@ -183,13 +268,14 @@ class _ThemeModeCard extends ConsumerWidget {
       }
     }
 
+    final colors = AppColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
           '화면 테마',
           style: TextStyle(
-            color: AppColors.of(context).textStrong,
+            color: colors.textStrong,
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
@@ -221,7 +307,7 @@ class _ThemeModeCard extends ConsumerWidget {
               value: ThemeMode.dark,
               label: _ThemeModeButtonLabel(
                 icon: PhosphorIconsRegular.moon,
-                label: '다크 테마',
+                label: '다크',
               ),
             ),
           ],
@@ -255,7 +341,7 @@ class _ThemeModeButtonLabel extends StatelessWidget {
   }
 }
 
-class _StorageModeCard extends StatelessWidget {
+class _StorageModeCard extends ConsumerWidget {
   const _StorageModeCard({
     required this.isLocal,
     required this.serverCleanupPending,
@@ -273,73 +359,344 @@ class _StorageModeCard extends StatelessWidget {
   final VoidCallback onRetryServerCleanup;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.of(context).surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.of(context).border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(
-                isLocal
-                    ? PhosphorIconsRegular.deviceMobile
-                    : PhosphorIconsRegular.cloud,
-                size: 20,
-                color: AppColors.of(context).accentForeground,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final localState = ref.watch(localStorageMigrationControllerProvider);
+    final serverState = ref.watch(serverStorageMigrationControllerProvider);
+    final isSwitching = localState.isRunning || serverState.isRunning;
+    final Widget? migrationProgress;
+    if (serverState.stage != ServerStorageMigrationStage.idle) {
+      final state = serverState;
+      migrationProgress = state.stage == ServerStorageMigrationStage.idle
+          ? null
+          : _ServerMigrationProgress(
+              state: state,
+              onRetry: () => ref
+                  .read(serverStorageMigrationControllerProvider.notifier)
+                  .start(),
+            );
+    } else {
+      final state = localState;
+      migrationProgress = state.stage == LocalStorageMigrationStage.idle
+          ? null
+          : _LocalMigrationProgress(
+              state: state,
+              onRetry: isLocal ? onRetryServerCleanup : onSwitchToLocal,
+            );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SettingsMenuTile(
+          icon: PhosphorIconsRegular.arrowsClockwise,
+          label: '동기화',
+          status: isLocal ? '꺼짐' : '켜짐',
+          statusIsActive: !isLocal,
+          showCaret: false,
+          compact: true,
+          onTap: isSwitching
+              ? null
+              : (isLocal ? onSwitchToServer : onSwitchToLocal),
+        ),
+        if (migrationProgress != null) ...[
+          const SizedBox(height: 8),
+          migrationProgress,
+          if (!isSwitching)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () {
+                  ref
+                      .read(localStorageMigrationControllerProvider.notifier)
+                      .dismissResult();
+                  ref
+                      .read(serverStorageMigrationControllerProvider.notifier)
+                      .dismissResult();
+                },
+                child: const Text('확인'),
               ),
-              const SizedBox(width: 8),
-              Text(
-                isLocal ? '로컬 저장' : '서버 저장',
-                style: TextStyle(
-                  color: AppColors.of(context).textStrong,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+            ),
+        ],
+        if (serverCleanupPending) ...[
+          const SizedBox(height: 8),
+          _MigrationNotice(
+            message: '서버 기록 정리가 남아 있습니다.',
+            actionLabel: '다시 시도',
+            onAction: onRetryServerCleanup,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SettingsMenuTile extends StatelessWidget {
+  const _SettingsMenuTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.status,
+    this.statusIsActive = false,
+    this.showCaret = true,
+    this.compact = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String? status;
+  final bool statusIsActive;
+  final bool showCaret;
+  final bool compact;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Material(
+      color: colors.surface,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: compact ? 10 : 14),
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: colors.accentForeground),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(fontSize: 15, color: colors.textStrong),
                 ),
               ),
+              if (status != null) ...[
+                _SettingsStatusPill(label: status!, active: statusIsActive),
+                if (showCaret) const SizedBox(width: 6),
+              ],
+              if (showCaret)
+                Icon(
+                  PhosphorIconsRegular.caretRight,
+                  size: 16,
+                  color: onTap == null
+                      ? colors.controlInactive
+                      : colors.textMuted,
+                ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            isLocal
-                ? '기록과 이미지를 이 기기에만 보관합니다. 서버로 올리지 않습니다.'
-                : '기록은 서버에 저장되고, 이미지는 열어 본 것부터 이 기기에 저장됩니다.',
-            style: TextStyle(
-              color: AppColors.of(context).textMuted,
-              height: 1.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.border),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _SettingsStatusPill extends StatelessWidget {
+  const _SettingsStatusPill({required this.label, required this.active});
+
+  final String label;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: colors.surfaceSubtle,
+        borderRadius: BorderRadius.circular(99),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: active ? colors.accentGraphic : colors.controlInactive,
+              shape: BoxShape.circle,
+              boxShadow: active
+                  ? [
+                      BoxShadow(
+                        color: colors.accentFill.withValues(alpha: 0.65),
+                        blurRadius: 5,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
             ),
           ),
-          if (!isLocal) ...[
-            const SizedBox(height: 14),
-            OutlinedButton(
-              onPressed: onSwitchToLocal,
-              child: const Text('로컬 저장으로 전환'),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(fontSize: 12, color: colors.textBody)),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocalMigrationProgress extends StatelessWidget {
+  const _LocalMigrationProgress({required this.state, required this.onRetry});
+
+  final LocalStorageMigrationState state;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final running = state.isRunning;
+    final failed = state.stage == LocalStorageMigrationStage.failed;
+    return _MigrationProgress(
+      label: switch (state.stage) {
+        LocalStorageMigrationStage.syncingRecords => '기록을 내려받는 중',
+        LocalStorageMigrationStage.downloadingImages =>
+          '이미지 내려받는 중 (${state.imagesDone}/${state.imagesTotal})',
+        LocalStorageMigrationStage.verifying => '저장 상태를 확인하는 중',
+        LocalStorageMigrationStage.switchingMode => '저장 방식을 전환하는 중',
+        LocalStorageMigrationStage.completed => '동기화를 껐어요',
+        LocalStorageMigrationStage.failed =>
+          state.failureMessage ?? '전환하지 못했어요',
+        LocalStorageMigrationStage.idle => '',
+      },
+      progress: state.imageProgress,
+      running: running,
+      failed: failed,
+      onRetry: onRetry,
+    );
+  }
+}
+
+class _ServerMigrationProgress extends StatelessWidget {
+  const _ServerMigrationProgress({required this.state, required this.onRetry});
+
+  final ServerStorageMigrationState state;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = state.stage == ServerStorageMigrationStage.uploadingImages
+        ? state.imageProgress
+        : state.recordProgress;
+    return _MigrationProgress(
+      label: switch (state.stage) {
+        ServerStorageMigrationStage.preparing => '기록을 준비하는 중',
+        ServerStorageMigrationStage.uploadingRecords =>
+          '기록 업로드 중 (${state.recordsDone}/${state.recordsTotal})',
+        ServerStorageMigrationStage.uploadingImages =>
+          '이미지 업로드 중 (${state.imagesDone}/${state.imagesTotal})',
+        ServerStorageMigrationStage.completing => '저장 방식을 전환하는 중',
+        ServerStorageMigrationStage.completed => '동기화를 켰어요',
+        ServerStorageMigrationStage.failed =>
+          state.failureMessage ?? '전환하지 못했어요',
+        ServerStorageMigrationStage.idle => '',
+      },
+      progress: progress,
+      running: state.isRunning,
+      failed: state.stage == ServerStorageMigrationStage.failed,
+      onRetry: onRetry,
+    );
+  }
+}
+
+class _MigrationProgress extends StatelessWidget {
+  const _MigrationProgress({
+    required this.label,
+    required this.progress,
+    required this.running,
+    required this.failed,
+    required this.onRetry,
+  });
+
+  final String label;
+  final double? progress;
+  final bool running;
+  final bool failed;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.surfaceSubtle,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: failed ? colors.error : colors.textBody,
+              fontSize: 13,
             ),
-          ] else ...[
-            const SizedBox(height: 14),
-            OutlinedButton(
-              onPressed: onSwitchToServer,
-              child: const Text('서버 저장으로 전환'),
-            ),
-          ],
-          if (serverCleanupPending) ...[
-            const SizedBox(height: 14),
-            Text(
-              '서버에 남아 있는 기록 정리가 끝나지 않았습니다. 로컬 데이터는 이미 '
-              '이 기기에 있으니, 정리만 다시 실행하면 됩니다.',
-              style: TextStyle(color: AppColors.of(context).error, height: 1.5),
-            ),
+          ),
+          if (running) ...[
             const SizedBox(height: 10),
-            OutlinedButton(
-              onPressed: onRetryServerCleanup,
-              child: const Text('서버 기록 정리 다시 시도'),
+            LinearProgressIndicator(
+              value: progress,
+              minHeight: 5,
+              borderRadius: BorderRadius.circular(99),
+              color: colors.progressFill,
+              backgroundColor: colors.border,
             ),
           ],
+          if (failed) ...[
+            const SizedBox(height: 4),
+            TextButton(onPressed: onRetry, child: const Text('다시 시도')),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MigrationNotice extends StatelessWidget {
+  const _MigrationNotice({
+    required this.message,
+    required this.actionLabel,
+    required this.onAction,
+  });
+
+  final String message;
+  final String actionLabel;
+  final VoidCallback onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: colors.surfaceSubtle,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(fontSize: 13, color: colors.textBody),
+            ),
+          ),
+          TextButton(onPressed: onAction, child: Text(actionLabel)),
         ],
       ),
     );
