@@ -12,6 +12,7 @@ import '../../bookshelf/data/bookshelf_database.dart';
 import '../../bookshelf/data/bookshelf_dao.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../server_storage_migration/providers/server_storage_migration_providers.dart';
+import '../../record_archive/providers/record_archive_provider.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../../tag/providers/tag_providers.dart';
 
@@ -92,7 +93,8 @@ class BackgroundRecordSync with WidgetsBindingObserver {
 
   bool get _migrationRunning =>
       ref.read(localStorageMigrationControllerProvider).isRunning ||
-      ref.read(serverStorageMigrationControllerProvider).isRunning;
+      ref.read(serverStorageMigrationControllerProvider).isRunning ||
+      ref.read(recordArchiveProvider);
 
   Future<void> _run() async {
     final generation = BookshelfDatabase.sessionGeneration;

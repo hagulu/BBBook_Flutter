@@ -97,6 +97,7 @@ class TagDao {
   Future<int> addTagLocal({
     required int userBookId,
     required String name,
+    Transaction? transaction,
   }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
@@ -105,8 +106,7 @@ class TagDao {
     if (trimmed.length > 15) {
       throw ArgumentError.value(name, 'name', '태그명은 15자까지 입력할 수 있습니다.');
     }
-    final db = await BookshelfDatabase.instance();
-    return db.transaction((txn) async {
+    Future<int> add(Transaction txn) async {
       final tagId = await _findOrCreateLocalTagForAddTxn(txn, trimmed);
       final existing = await txn.query(
         'user_book_tag_map',
@@ -145,7 +145,11 @@ class TagDao {
         'is_dirty': 1,
       });
       return id;
-    });
+    }
+
+    if (transaction != null) return add(transaction);
+    final db = await BookshelfDatabase.instance();
+    return db.transaction(add);
   }
 
   /// 태그 삭제(soft delete)를 로컬에 즉시 반영한다. 이 책에 [tagLocalId]로
@@ -176,6 +180,10 @@ class TagDao {
       return id;
     });
   }
+
+  /// 아카이브 트랜잭션에서도 기존 이름 기준 재사용 정책을 적용한다.
+  Future<int> ensureArchiveTag(Transaction txn, String name) =>
+      _findOrCreateLocalTagForAddTxn(txn, name);
 
   Future<int> _findOrCreateLocalTagForAddTxn(
     Transaction txn,

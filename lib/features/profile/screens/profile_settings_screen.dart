@@ -8,10 +8,12 @@ import '../../../core/config/api_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_mode_provider.dart';
 import '../../../shared/widgets/app_bar_title.dart';
+import '../../../shared/widgets/app_alert.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../notices/screens/notices_list_screen.dart';
+import '../../record_archive/providers/record_archive_provider.dart';
 import '../../server_storage_migration/providers/server_storage_migration_providers.dart';
 import '../../server_storage_migration/services/server_storage_migration_service.dart';
 import '../../storage_mode/data/storage_mode_store.dart';
@@ -31,7 +33,8 @@ class ProfileSettingsScreen extends ConsumerWidget {
     final isLocal = mode == StorageMode.local;
     final isSwitching =
         ref.watch(localStorageMigrationControllerProvider).isRunning ||
-        ref.watch(serverStorageMigrationControllerProvider).isRunning;
+        ref.watch(serverStorageMigrationControllerProvider).isRunning ||
+        ref.watch(recordArchiveProvider);
 
     return PopScope(
       canPop: !isSwitching,
@@ -76,6 +79,22 @@ class ProfileSettingsScreen extends ConsumerWidget {
                       ),
                     ),
                     const Divider(),
+                    _SettingsMenuTile(
+                      icon: PhosphorIconsRegular.export,
+                      label: '내 기록 내보내기',
+                      onTap: isSwitching
+                          ? null
+                          : () => _archive(context, ref, importing: false),
+                    ),
+                    const Divider(),
+                    _SettingsMenuTile(
+                      icon: PhosphorIconsRegular.downloadSimple,
+                      label: '내 기록 가져오기',
+                      onTap: isSwitching
+                          ? null
+                          : () => _archive(context, ref, importing: true),
+                    ),
+                    const Divider(),
                     const _OpenSourceLicenseMenu(),
                   ],
                 ),
@@ -89,6 +108,39 @@ class ProfileSettingsScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _archive(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool importing,
+  }) async {
+    if (importing) {
+      final confirmed = await AppConfirm.show(
+        context,
+        title: '내 기록 가져오기',
+        message:
+            '내보낸 ZIP 파일의 기록을 이 기기에 가져옵니다. 같은 ISBN의 책은 기존 책에 연결하며, 이미 가져온 기록은 중복으로 만들지 않습니다. 동기화가 켜져 있으면 이후 서버에도 반영됩니다.',
+        confirmText: '파일 선택',
+      );
+      if (!confirmed || !context.mounted) return;
+    }
+    AppLoading.show(context);
+    String? message;
+    try {
+      message = await ref
+          .read(recordArchiveProvider.notifier)
+          .run(importing: importing);
+    } finally {
+      AppLoading.hide();
+    }
+    if (message != null && context.mounted) {
+      await AppAlert.show(
+        context,
+        title: importing ? '내 기록 가져오기' : '내 기록 내보내기',
+        message: message,
+      );
+    }
   }
 
   Future<void> _startMigration(BuildContext context, WidgetRef ref) async {
@@ -362,7 +414,10 @@ class _StorageModeCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final localState = ref.watch(localStorageMigrationControllerProvider);
     final serverState = ref.watch(serverStorageMigrationControllerProvider);
-    final isSwitching = localState.isRunning || serverState.isRunning;
+    final isSwitching =
+        localState.isRunning ||
+        serverState.isRunning ||
+        ref.watch(recordArchiveProvider);
     final Widget? migrationProgress;
     if (serverState.stage != ServerStorageMigrationStage.idle) {
       final state = serverState;

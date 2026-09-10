@@ -291,6 +291,99 @@ void main() {
     expect(steps.appliedResults!.bookCoverUrlByLocalId, isEmpty);
   });
 
+  test('coverUploadRequired가 false면 placeholder를 보냈어도 표지를 올리지 않는다', () async {
+    // 이전 세션이 `/complete`까지 마쳤지만 로컬 반영 전에 끊긴 뒤의 재시도가
+    // 이 경우다 — 서버는 활성 책의 기존 표지를 유지하므로, 여기서 첨부하면
+    // 400이 나고 새 세션 전체가 정리돼 재시도가 영영 실패한다.
+    final book = _bookItem(userBookId: -1);
+    final snapshot = RecordImportSnapshot(
+      books: [book],
+      tags: const [],
+      notes: const [],
+      noteMemos: const [],
+      reflections: const [],
+      tagMaps: const [],
+      coverImageUrlByBook: const {-1: 'local://cover/-1'},
+      pendingBookCovers: {-1: File('cover.jpg')},
+      pendingMemoImages: const {},
+      pendingReflectionImages: const {},
+    );
+    final steps = _FakeSteps(
+      outcome: RecordImportPreflightOutcome.success(snapshot),
+      coverUploadNotRequiredLocalIds: {-1},
+    );
+
+    final result = await ServerStorageMigrationService(steps).run();
+
+    expect(result.stage, ServerStorageMigrationStage.completed);
+    expect(steps.bookCoverUploads, isEmpty);
+    expect(steps.appliedResults!.bookCoverUrlByLocalId, isEmpty);
+  });
+
+  test('청크가 나뉘어도 표지가 필요한 책을 모두 올린다', () async {
+    // 첨부 여부는 청크 응답을 모두 받은 뒤 한 번에 거른다 — 청크가 나뉘면
+    // 뒤 청크의 판단만 남는 식으로 앞 책이 누락되면 `/complete`가 실패한다.
+    final books = List.generate(3, (i) => _bookItem(userBookId: -(i + 1)));
+    final snapshot = RecordImportSnapshot(
+      books: books,
+      tags: const [],
+      notes: const [],
+      noteMemos: const [],
+      reflections: const [],
+      tagMaps: const [],
+      coverImageUrlByBook: const {
+        -1: 'local://cover/-1',
+        -2: 'local://cover/-2',
+        -3: 'local://cover/-3',
+      },
+      pendingBookCovers: {
+        -1: File('cover1.jpg'),
+        -2: File('cover2.jpg'),
+        -3: File('cover3.jpg'),
+      },
+      pendingMemoImages: const {},
+      pendingReflectionImages: const {},
+    );
+    final steps = _FakeSteps(
+      outcome: RecordImportPreflightOutcome.success(snapshot),
+      maxChunkItemCount: 1,
+      coverUploadNotRequiredLocalIds: {-2},
+    );
+
+    final result = await ServerStorageMigrationService(steps).run();
+
+    expect(result.stage, ServerStorageMigrationStage.completed);
+    expect(steps.calls.where((c) => c == 'uploadChunk').length, 3);
+    expect(steps.bookCoverUploads, [-1, -3]);
+  });
+
+  test('표지 첨부가 실패하면 complete·applyResults를 호출하지 않는다', () async {
+    final book = _bookItem(userBookId: -1);
+    final snapshot = RecordImportSnapshot(
+      books: [book],
+      tags: const [],
+      notes: const [],
+      noteMemos: const [],
+      reflections: const [],
+      tagMaps: const [],
+      coverImageUrlByBook: const {-1: 'local://cover/-1'},
+      pendingBookCovers: {-1: File('cover.jpg')},
+      pendingMemoImages: const {},
+      pendingReflectionImages: const {},
+    );
+    final steps = _FakeSteps(
+      outcome: RecordImportPreflightOutcome.success(snapshot),
+      failOn: 'uploadBookCover',
+    );
+
+    final result = await ServerStorageMigrationService(steps).run();
+
+    expect(result.stage, ServerStorageMigrationStage.failed);
+    expect(steps.calls, isNot(contains('complete')));
+    expect(steps.calls, isNot(contains('applyResults')));
+    expect(steps.calls, isNot(contains('switchToServerMode')));
+  });
+
   test(
     '이미 imageUrl이 있던 PHOTO 메모가 실제로는 새로 생성되면 예비 파일을 올린다',
     () async {
@@ -483,6 +576,7 @@ class _FakeSteps implements ServerStorageMigrationSteps {
     this.failOn,
     this.cleanupOk = true,
     this.notCreatedMemoLocalIds = const {},
+    this.coverUploadNotRequiredLocalIds = const {},
   });
 
   final RecordImportPreflightOutcome outcome;
@@ -493,6 +587,11 @@ class _FakeSteps implements ServerStorageMigrationSteps {
   /// 이 목록에 있는 noteMemo localId는 청크 응답에서 `created: false`로
   /// 돌려준다(기본은 모두 `created: true`).
   final Set<int> notCreatedMemoLocalIds;
+
+  /// 이 목록에 있는 book localId는 청크 응답에서
+  /// `coverUploadRequired: false`로 돌려준다(기존 활성 책 재사용 등 —
+  /// 기본은 표지 placeholder를 보낸 책 모두 true).
+  final Set<int> coverUploadNotRequiredLocalIds;
 
   final calls = <String>[];
   final uploadedChunks = <RecordImportChunk>[];
@@ -545,6 +644,19 @@ class _FakeSteps implements ServerStorageMigrationSteps {
       );
     }
 
+    RecordImportEntityResult mapBook(Map<String, dynamic> item) {
+      final localId = item['localId'] as int;
+      final cover = item['coverImageUrl'] as String?;
+      return RecordImportEntityResult(
+        localId: localId,
+        serverId: _nextServerId++,
+        created: true,
+        coverUploadRequired:
+            (cover?.startsWith('local://') ?? false) &&
+            !coverUploadNotRequiredLocalIds.contains(localId),
+      );
+    }
+
     RecordImportEntityResult mapMemo(Map<String, dynamic> item) {
       final localId = item['localId'] as int;
       return RecordImportEntityResult(
@@ -555,7 +667,7 @@ class _FakeSteps implements ServerStorageMigrationSteps {
     }
 
     return RecordImportChunkResult(
-      books: chunk.books.map(map).toList(),
+      books: chunk.books.map(mapBook).toList(),
       notes: chunk.notes.map(map).toList(),
       noteMemos: chunk.noteMemos.map(mapMemo).toList(),
       reflections: chunk.reflections.map(map).toList(),

@@ -34,7 +34,7 @@
 
 - `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 리포트 카드/내 글 모아보기 2×2 바로가기/로그아웃), `docs/porting-reference/profile-main-screen.md` 대응
 - `lib/features/profile/screens/profile_edit_screen.dart` — 프로필 수정 화면(닉네임·프로필 이미지 변경/삭제, 저장, 회원 탈퇴), `docs/porting-reference/profile-edit-screen.md` 대응
-- `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(상단 공지사항, 밝은·다크·시스템 테마 선택, 오픈소스 라이선스 목록·전문, 하단 이용약관·개인정보처리방침·앱 버전, 저장 방식(서버/로컬) 전환 진입점), 프로필 탭 AppBar 설정 아이콘으로 진입
+- `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(상단 공지사항, 밝은·다크·시스템 테마 선택, 오픈소스 라이선스 목록·전문, 하단 이용약관·개인정보처리방침·앱 버전, 저장 방식(서버/로컬) 전환 및 내 기록 ZIP 내보내기·가져오기 진입점), 프로필 탭 AppBar 설정 아이콘으로 진입
 - `lib/features/profile/screens/my_reflections_screen.dart` — 내가 작성한 독후감 목록(커서 무한 스크롤), 정상 항목은 서버 reflectionId로 로컬 행을 찾아 기존 `BookReflectionDetailScreen`(수정·삭제 포함)으로 이동
 - `lib/features/profile/screens/my_reviews_screen.dart` — 내가 작성한 독자평 목록(커서 무한 스크롤), 탭해도 이동하는 상세 화면 없음
 - `lib/features/profile/screens/my_discussions_screen.dart` — 내가 작성한 토론 목록(커서 무한 스크롤), 정상 항목은 `DiscussionDetailScreen`으로 이동
@@ -125,6 +125,14 @@
 - `lib/features/server_storage_migration/services/server_storage_migration_service.dart` — 준비→시작→청크 업로드→이미지 업로드→완료→로컬 반영 순서를 보장하는 오케스트레이터(로컬 DB 반영은 `/complete` 성공 후에만)
 - `lib/features/server_storage_migration/providers/server_storage_migration_providers.dart` — 전환 실행/진행 상태 Riverpod provider
 - `lib/features/server_storage_migration/screens/server_storage_migration_screen.dart` — 전환 진행 화면(기록 준비/기록 업로드/이미지 업로드/완료 처리 단계 표시), 프로필 설정 화면에서 진입
+
+## features/record_archive
+
+- `lib/features/record_archive/services/record_archive_service.dart` — 로컬 기록 ZIP 내보내기·가져오기, 이미지 확보·공유 참조·검증·실패 파일 정리
+- `lib/features/record_archive/data/record_archive_dao.dart` — DB 스냅샷을 export DTO로 변환하고 기존 중복 정책·dirty 상태를 적용해 한 트랜잭션으로 복원
+- `lib/features/record_archive/models/record_archive.dart` — PK와 독립적인 version 1 아카이브 DTO·필드 규격·버전 파서·관계 검증
+- `lib/features/record_archive/providers/record_archive_provider.dart` — 설정 화면 내보내기·가져오기 진행 상태, OS ZIP 선택·공유, 완료 후 로컬 목록 갱신
+- `docs/policies/record-archive.md` — ZIP/JSON version 1 규격, 중복 대응·동기화·이미지·파일 검증 정책과 지원 한도
 
 ## features/record_sync
 

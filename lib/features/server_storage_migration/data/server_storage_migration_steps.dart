@@ -62,8 +62,8 @@ abstract class ServerStorageMigrationSteps {
   );
 
   /// 로컬 커스텀 책 표지를 올려 서버 책에 연결한다(§ items 문서 "커스텀 책
-  /// 표지 처리"). `/items`에서 `local://cover/{localId}` placeholder를 보낸
-  /// 책은 예외 없이 이 업로드까지 끝나야 `/complete`가 통과한다.
+  /// 표지 처리"). `/items` 응답이 `coverUploadRequired=true`로 알려준 책만
+  /// 올리며, 그런 책은 예외 없이 이 업로드까지 끝나야 `/complete`가 통과한다.
   Future<RecordImportAttachmentResult> uploadBookCover(
     int importId,
     int bookLocalId,
