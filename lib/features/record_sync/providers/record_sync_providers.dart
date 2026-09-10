@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_providers.dart';
+import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../data/record_sync_api.dart';
 import '../data/record_sync_dao.dart';
@@ -109,6 +110,10 @@ class InitialRecordSyncController
         state = const InitialRecordSyncState(
           phase: InitialRecordSyncPhase.completed,
         );
+        // 초기 전체 동기화는 bookshelfSyncControllerProvider를 거치지 않고
+        // user_book 테이블을 직접 채우므로, 책장 탭 목록 Provider들이 이
+        // 변경을 인지하도록 여기서 직접 버전을 올려줘야 한다.
+        ref.read(bookshelfSyncVersionProvider.notifier).state++;
       }
     } on RecordSyncSessionChanged {
       // 로그아웃/계정 전환으로 폐기되는 정상 경로다. 이전 세션의 실패 UI를
