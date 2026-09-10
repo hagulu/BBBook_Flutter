@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -13,6 +15,9 @@ import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../notices/screens/notices_list_screen.dart';
+import '../../external_record_import/models/external_import_models.dart';
+import '../../external_record_import/screens/external_import_screen.dart';
+import '../../external_record_import/services/external_import_file_picker.dart';
 import '../../record_archive/providers/record_archive_provider.dart';
 import '../../server_storage_migration/providers/server_storage_migration_providers.dart';
 import '../../server_storage_migration/services/server_storage_migration_service.dart';
@@ -95,6 +100,14 @@ class ProfileSettingsScreen extends ConsumerWidget {
                           : () => _archive(context, ref, importing: true),
                     ),
                     const Divider(),
+                    _SettingsMenuTile(
+                      icon: PhosphorIconsRegular.files,
+                      label: '다른 서비스 기록 가져오기',
+                      onTap: isSwitching
+                          ? null
+                          : () => _openExternalImport(context),
+                    ),
+                    const Divider(),
                     const _OpenSourceLicenseMenu(),
                   ],
                 ),
@@ -108,6 +121,32 @@ class ProfileSettingsScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _openExternalImport(BuildContext context) async {
+    try {
+      final file = await ExternalImportFilePicker.pick();
+      if (file == null || !context.mounted) return;
+      await Navigator.of(context).push<void>(
+        MaterialPageRoute(builder: (_) => ExternalImportScreen(file: file)),
+      );
+    } on ExternalImportException catch (error) {
+      developer.log('[외부 파일 선택] result=FAIL reason=${error.reason}');
+      if (!context.mounted) return;
+      await AppAlert.show(
+        context,
+        title: '파일을 열 수 없어요',
+        message: error.userMessage,
+      );
+    } catch (_) {
+      developer.log('[외부 파일 선택] result=FAIL reason=platform_error');
+      if (!context.mounted) return;
+      await AppAlert.show(
+        context,
+        title: '파일을 열 수 없어요',
+        message: '파일 선택을 완료하지 못했어요. 다시 시도해 주세요.',
+      );
+    }
   }
 
   Future<void> _archive(

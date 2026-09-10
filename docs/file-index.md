@@ -34,7 +34,7 @@
 
 - `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 리포트 카드/내 글 모아보기 2×2 바로가기/로그아웃), `docs/porting-reference/profile-main-screen.md` 대응
 - `lib/features/profile/screens/profile_edit_screen.dart` — 프로필 수정 화면(닉네임·프로필 이미지 변경/삭제, 저장, 회원 탈퇴), `docs/porting-reference/profile-edit-screen.md` 대응
-- `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(상단 공지사항, 밝은·다크·시스템 테마 선택, 오픈소스 라이선스 목록·전문, 하단 이용약관·개인정보처리방침·앱 버전, 저장 방식(서버/로컬) 전환 및 내 기록 ZIP 내보내기·가져오기 진입점), 프로필 탭 AppBar 설정 아이콘으로 진입
+- `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(상단 공지사항, 밝은·다크·시스템 테마 선택, 오픈소스 라이선스 목록·전문, 하단 이용약관·개인정보처리방침·앱 버전, 저장 방식(서버/로컬) 전환 및 내 기록 ZIP/외부 서비스 기록 가져오기 진입점), 프로필 탭 AppBar 설정 아이콘으로 진입
 - `lib/features/profile/screens/my_reflections_screen.dart` — 내가 작성한 독후감 목록(커서 무한 스크롤), 정상 항목은 서버 reflectionId로 로컬 행을 찾아 기존 `BookReflectionDetailScreen`(수정·삭제 포함)으로 이동
 - `lib/features/profile/screens/my_reviews_screen.dart` — 내가 작성한 독자평 목록(커서 무한 스크롤), 탭해도 이동하는 상세 화면 없음
 - `lib/features/profile/screens/my_discussions_screen.dart` — 내가 작성한 토론 목록(커서 무한 스크롤), 정상 항목은 `DiscussionDetailScreen`으로 이동
@@ -126,6 +126,14 @@
 - `lib/features/server_storage_migration/providers/server_storage_migration_providers.dart` — 전환 실행/진행 상태 Riverpod provider
 - `lib/features/server_storage_migration/screens/server_storage_migration_screen.dart` — 전환 진행 화면(기록 준비/기록 업로드/이미지 업로드/완료 처리 단계 표시), 프로필 설정 화면에서 진입
 
+## features/external_record_import
+
+- `lib/features/external_record_import/screens/external_import_screen.dart` — 북적북적 CSV·북모리 BOOKMORY 파일 분석 결과와 책/메모/제외 건수를 확인한 뒤 기존 Import 세션으로 가져오는 화면
+- `lib/features/external_record_import/providers/external_import_providers.dart` — 외부 파일 분석·기존 기록 사전 동기화·Import 실행·완료 후 증분 동기화 상태 관리
+- `lib/features/external_record_import/services/external_import_file_analyzer.dart` — 확장자 우선 분기와 CSV 헤더/BOOKMORY ZIP·SQLite 내부 검증을 거쳐 서비스별 파서로 연결
+- `lib/features/external_record_import/services/external_record_import_service.dart` — 공통 외부 모델을 기존 records Import 청크로 변환해 start/items/complete 및 실패 시 cancel 흐름 실행
+- `lib/features/external_record_import/widgets/external_import_share_coordinator.dart` — Android 공유/파일 열기 cold·warm start 이벤트를 인증 완료 뒤 분석 화면으로 즉시 연결하고 캐시 파일 정리
+
 ## features/record_archive
 
 - `lib/features/record_archive/services/record_archive_service.dart` — 로컬 기록 ZIP 내보내기·가져오기, 이미지 확보·공유 참조·검증·실패 파일 정리
@@ -205,6 +213,7 @@
 
 ## docs
 
+- `docs/review/20260910-201039-external-record-import-review.md` — 외부 기록 가져오기의 기존 책 필드 유실·공유/설정 동시 Import 충돌·CSV 식별자 충돌 리뷰
 - `docs/review/20260910-181343-kakao-login-review.md` — 카카오 로그인 연동의 릴리스 키 주입, iOS 설정 재현성, SDK 초기화 경합·예외 분류 리뷰
 - `docs/review/20260910-132050-import-book-cover-review.md` — 로컬 책 표지 Import의 완료 후 재시도 시 기존 서버 표지 재첨부 실패 리뷰
 - `docs/policies/offline-records.md` — 오프라인 진입·인증 복구·재전송·계정 변경 삭제 정책과 검증 항목

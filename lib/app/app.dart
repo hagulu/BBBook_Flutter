@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_mode_provider.dart';
+import '../features/external_record_import/widgets/external_import_share_coordinator.dart';
 import 'router.dart';
 
 final _lightTheme = buildAppTheme();
@@ -37,7 +38,10 @@ class BBBookApp extends ConsumerWidget {
             systemNavigationBarColor: AppColors.of(context).pageBackground,
             systemNavigationBarIconBrightness: iconBrightness,
           ),
-          child: child ?? const SizedBox.shrink(),
+          child: ExternalImportShareCoordinator(
+            navigatorKey: rootNavigatorKey,
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
       // 한국어 전용 서비스라 로케일을 고정한다 — 이게 없으면

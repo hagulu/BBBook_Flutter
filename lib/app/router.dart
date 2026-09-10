@@ -8,6 +8,8 @@ import '../features/auth/widgets/auth_loading_gate.dart';
 import '../features/record_sync/screens/initial_record_sync_screen.dart';
 import 'main_shell.dart';
 
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 /// Riverpod의 인증 상태 변화를 go_router의 `refresh`에 연결한다.
 class _GoRouterRefreshNotifier extends ChangeNotifier {
   _GoRouterRefreshNotifier(Ref ref) {
@@ -24,6 +26,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
   final refreshNotifier = _GoRouterRefreshNotifier(ref);
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     refreshListenable: refreshNotifier,
     redirect: (context, state) {

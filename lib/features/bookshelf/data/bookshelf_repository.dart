@@ -606,6 +606,8 @@ class BookshelfRepository {
 
   Future<BookItem?> getById(int userBookId) => _dao.getById(userBookId);
 
+  Future<BookItem?> getByIsbn13(String isbn13) => _dao.getByIsbn13(isbn13);
+
   Future<bool> hasPendingChanges(int userBookId) async =>
       await _dao.getDirtyRecord(userBookId) != null;
 
