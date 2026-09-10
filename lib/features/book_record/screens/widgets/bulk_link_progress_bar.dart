@@ -32,7 +32,10 @@ class BulkLinkProgressBar extends StatelessWidget {
       crossAxisAlignment: WrapCrossAlignment.center,
       spacing: 8,
       runSpacing: 8,
-      children: [?leading, SkipStopButtons(onSkip: onSkip, onStop: onStop)],
+      children: [
+        ?leading,
+        SkipStopButtons(onSkip: onSkip, onStop: onStop),
+      ],
     );
   }
 }
@@ -40,7 +43,11 @@ class BulkLinkProgressBar extends StatelessWidget {
 /// "건너뛰기"/"중단" 필 버튼 한 쌍. 검색 시트의 제목 행, [BulkLinkProgressBar]
 /// 양쪽에서 같은 모양으로 재사용한다.
 class SkipStopButtons extends StatelessWidget {
-  const SkipStopButtons({super.key, required this.onSkip, required this.onStop});
+  const SkipStopButtons({
+    super.key,
+    required this.onSkip,
+    required this.onStop,
+  });
 
   final VoidCallback onSkip;
   final VoidCallback onStop;
@@ -54,14 +61,14 @@ class SkipStopButtons extends StatelessWidget {
           label: '건너뛰기',
           icon: PhosphorIconsRegular.skipForward,
           onTap: onSkip,
-          color: AppColors.accentForeground,
+          color: AppColors.of(context).accentForeground,
         ),
         const SizedBox(width: 8),
         BulkActionPillButton(
           label: '중단',
           icon: PhosphorIconsRegular.prohibit,
           onTap: onStop,
-          color: AppColors.error,
+          color: AppColors.of(context).error,
         ),
       ],
     );

@@ -25,9 +25,12 @@ class MyReflectionCard extends StatelessWidget {
             ? null
             : formatRelativeDiscussionDateTime(reflection.createdAt),
         content: reflection.isHidden
-            ? const Text(
+            ? Text(
                 '숨김 처리된 독후감입니다.',
-                style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.of(context).textMuted,
+                ),
               )
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -37,10 +40,10 @@ class MyReflectionCard extends StatelessWidget {
                     reflection.title ?? '',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textStrong,
+                      color: AppColors.of(context).textStrong,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -48,9 +51,9 @@ class MyReflectionCard extends StatelessWidget {
                     reflection.previewText ?? '',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textMuted,
+                      color: AppColors.of(context).textMuted,
                       height: 1.4,
                     ),
                   ),

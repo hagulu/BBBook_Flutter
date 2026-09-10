@@ -73,8 +73,8 @@ class _PublicReflectionListScreenState
     return Scaffold(
       appBar: AppBar(
         title: AppBarTitle(widget.bookTitle, subtitle: '공개 독후감'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: SafeArea(

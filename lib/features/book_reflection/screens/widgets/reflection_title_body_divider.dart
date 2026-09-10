@@ -16,7 +16,7 @@ class ReflectionTitleBodyDivider extends StatelessWidget {
         thickness: 1,
         indent: horizontalInset,
         endIndent: horizontalInset,
-        color: AppColors.border,
+        color: AppColors.of(context).border,
       ),
     );
   }

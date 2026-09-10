@@ -80,10 +80,10 @@ class _GridBookCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             book.title,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 12,
-              color: AppColors.textStrong,
+              color: AppColors.of(context).textStrong,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -91,7 +91,10 @@ class _GridBookCard extends StatelessWidget {
           if (book.author.displayedAuthorOrNull case final author?)
             Text(
               author,
-              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.of(context).textMuted,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

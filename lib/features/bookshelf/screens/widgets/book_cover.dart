@@ -69,7 +69,7 @@ class BookCover extends StatelessWidget {
                           _CoverPlaceholder(title: title),
                       loadingBuilder: (context, child, progress) {
                         if (progress == null) return child;
-                        return const ColoredBox(color: AppColors.border);
+                        return ColoredBox(color: AppColors.of(context).border);
                       },
                     );
                   }
@@ -97,7 +97,7 @@ class BookCover extends StatelessWidget {
                         _CoverPlaceholder(title: title),
                     loadingBuilder: (context, child, progress) {
                       if (progress == null) return child;
-                      return const ColoredBox(color: AppColors.border);
+                      return ColoredBox(color: AppColors.of(context).border);
                     },
                   );
                 },
@@ -115,10 +115,8 @@ class _CoverPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
-        // 흰 제목 텍스트가 얹히므로 accentFill(옅은 라임) 대신 어두운 숲 톤
-        // 하나로 채운다 — primary를 쓰면 밝은 쪽 절반에서 글자가 안 보인다.
-        color: AppColors.accentForeground,
+      decoration: BoxDecoration(
+        color: AppColors.of(context).accentFill,
       ),
       alignment: Alignment.center,
       padding: const EdgeInsets.all(8),
@@ -127,8 +125,8 @@ class _CoverPlaceholder extends StatelessWidget {
         textAlign: TextAlign.center,
         maxLines: 4,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: AppColors.of(context).textStrong,
           fontWeight: FontWeight.bold,
           fontSize: 12,
         ),

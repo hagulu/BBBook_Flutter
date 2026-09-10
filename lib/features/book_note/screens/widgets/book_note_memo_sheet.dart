@@ -93,7 +93,10 @@ class _BookNoteMemoQuickComposerState
                     for (final type in _quickTypes)
                       Builder(
                         builder: (context) {
-                          final style = _NoteMemoTypeChoiceStyle.of(type);
+                          final style = _NoteMemoTypeChoiceStyle.of(
+                            context,
+                            type,
+                          );
                           final selected = _type == type;
                           return ChoiceChip(
                             avatar: Icon(
@@ -105,11 +108,11 @@ class _BookNoteMemoQuickComposerState
                             selected: selected,
                             showCheckmark: false,
                             selectedColor: style.background,
-                            backgroundColor: AppColors.surface,
+                            backgroundColor: AppColors.of(context).surface,
                             side: BorderSide(
                               color: selected
                                   ? style.foreground
-                                  : AppColors.border,
+                                  : AppColors.of(context).border,
                               width: selected ? 1.3 : 1,
                             ),
                             shape: const StadiumBorder(),
@@ -159,8 +162,8 @@ class _BookNoteMemoQuickComposerState
                   maxLines: 5,
                   keyboardType: TextInputType.multiline,
                   textInputAction: TextInputAction.newline,
-                  style: const TextStyle(
-                    color: AppColors.textBody,
+                  style: TextStyle(
+                    color: AppColors.of(context).textBody,
                     fontSize: 15,
                     height: 1.35,
                   ),
@@ -189,10 +192,12 @@ class _BookNoteMemoQuickComposerState
                   height: 46,
                 ),
                 style: IconButton.styleFrom(
-                  backgroundColor: AppColors.accentFill,
-                  disabledBackgroundColor: AppColors.surfaceSubtle,
-                  foregroundColor: AppColors.textStrong,
-                  disabledForegroundColor: AppColors.controlInactive,
+                  backgroundColor: AppColors.of(context).accentFill,
+                  disabledBackgroundColor: AppColors.of(context).surfaceSubtle,
+                  foregroundColor: AppColors.of(context).textStrong,
+                  disabledForegroundColor: AppColors.of(
+                    context,
+                  ).controlInactive,
                   shape: const CircleBorder(),
                 ),
                 icon: const Icon(PhosphorIconsRegular.arrowUp, size: 21),
@@ -321,14 +326,14 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
           icon: const Icon(PhosphorIconsRegular.x),
         ),
         title: AppBarTitle(widget.initialMemo == null ? '메모 작성' : '메모 수정'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
         actions: [
           TextButton(
             onPressed: _submit,
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.accentForeground,
+              foregroundColor: AppColors.of(context).accentForeground,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               textStyle: const TextStyle(
                 fontSize: 15,
@@ -390,8 +395,8 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
                       maxLines: null,
                       keyboardType: TextInputType.multiline,
                       scrollPadding: const EdgeInsets.only(bottom: 120),
-                      style: const TextStyle(
-                        color: AppColors.textBody,
+                      style: TextStyle(
+                        color: AppColors.of(context).textBody,
                         fontSize: 16,
                         height: 1.6,
                       ),
@@ -428,8 +433,8 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
                 maxLines: null,
                 textAlignVertical: TextAlignVertical.top,
                 keyboardType: TextInputType.multiline,
-                style: const TextStyle(
-                  color: AppColors.textBody,
+                style: TextStyle(
+                  color: AppColors.of(context).textBody,
                   fontSize: 16,
                   height: 1.6,
                 ),
@@ -449,11 +454,14 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
           if (_errorText != null)
             Container(
               width: double.infinity,
-              color: AppColors.surface,
+              color: AppColors.of(context).surface,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: Text(
                 _errorText!,
-                style: const TextStyle(color: AppColors.error, fontSize: 12),
+                style: TextStyle(
+                  color: AppColors.of(context).error,
+                  fontSize: 12,
+                ),
               ),
             ),
           AnimatedBuilder(
@@ -639,13 +647,15 @@ class _EditorToolbar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.surface,
+      color: AppColors.of(context).surface,
       child: SafeArea(
         top: false,
         child: Container(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: AppColors.border)),
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: AppColors.of(context).border),
+            ),
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -668,11 +678,13 @@ class _EditorToolbar extends StatelessWidget {
                             onChanged: onPageChanged,
                           ),
                         ),
-                        const Padding(
+                        Padding(
                           padding: EdgeInsets.symmetric(horizontal: 4),
                           child: Text(
                             '–',
-                            style: TextStyle(color: AppColors.textMuted),
+                            style: TextStyle(
+                              color: AppColors.of(context).textMuted,
+                            ),
                           ),
                         ),
                         Expanded(
@@ -694,8 +706,8 @@ class _EditorToolbar extends StatelessWidget {
                       child: _EditorToolButton(
                         icon: PhosphorIconsRegular.camera,
                         label: '추출',
-                        foreground: AppColors.memoQuoteForeground,
-                        background: AppColors.memoQuoteSurface,
+                        foreground: AppColors.of(context).memoQuoteForeground,
+                        background: AppColors.of(context).memoQuoteSurface,
                         onTap: onExtract,
                       ),
                     ),
@@ -713,10 +725,10 @@ class _EditorToolbar extends StatelessWidget {
                             label: '강조',
                             foreground: isActive
                                 ? AppColors.highlightGold
-                                : AppColors.textMuted,
+                                : AppColors.of(context).textMuted,
                             background: isActive
-                                ? AppColors.highlightGoldSurface
-                                : AppColors.surfaceSubtle,
+                                ? AppColors.of(context).highlightGoldSurface
+                                : AppColors.of(context).surfaceSubtle,
                             selected: isActive,
                             enabled: toggleEnabled,
                             onTap: onToggleHighlight,
@@ -733,10 +745,10 @@ class _EditorToolbar extends StatelessWidget {
                               width: 20,
                               height: 48,
                             ),
-                            icon: const Icon(
+                            icon: Icon(
                               PhosphorIconsRegular.info,
                               size: 18,
-                              color: AppColors.textMuted,
+                              color: AppColors.of(context).textMuted,
                             ),
                           ),
                         ),
@@ -774,14 +786,14 @@ class _PageInput extends StatelessWidget {
       textInputAction: textInputAction,
       textAlign: TextAlign.center,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      style: const TextStyle(
-        color: AppColors.textBody,
+      style: TextStyle(
+        color: AppColors.of(context).textBody,
         fontSize: 13,
         fontWeight: FontWeight.w600,
       ),
       decoration: InputDecoration(
         hintText: hintText,
-        prefixIcon: const Align(
+        prefixIcon: Align(
           alignment: Alignment.centerRight,
           widthFactor: 1,
           heightFactor: 1,
@@ -790,7 +802,7 @@ class _PageInput extends StatelessWidget {
             child: Text(
               'p.',
               style: TextStyle(
-                color: AppColors.textMuted,
+                color: AppColors.of(context).textMuted,
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
@@ -798,26 +810,26 @@ class _PageInput extends StatelessWidget {
           ),
         ),
         prefixIconConstraints: const BoxConstraints(minWidth: 18, minHeight: 0),
-        hintStyle: const TextStyle(
-          color: AppColors.textMuted,
+        hintStyle: TextStyle(
+          color: AppColors.of(context).textMuted,
           fontSize: 12,
           fontWeight: FontWeight.normal,
         ),
         filled: true,
-        fillColor: AppColors.surfaceSubtle,
+        fillColor: AppColors.of(context).surfaceSubtle,
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: AppColors.of(context).border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: AppColors.of(context).border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: AppColors.accentForeground),
+          borderSide: BorderSide(color: AppColors.of(context).accentForeground),
         ),
       ),
       onChanged: (_) => onChanged(),
@@ -841,9 +853,9 @@ class _TypeSelector extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: AppColors.of(context).surface,
+        border: Border(bottom: BorderSide(color: AppColors.of(context).border)),
       ),
       child: Wrap(
         spacing: 8,
@@ -852,7 +864,7 @@ class _TypeSelector extends StatelessWidget {
           for (final type in BookNoteMemoType.values)
             Builder(
               builder: (context) {
-                final style = _NoteMemoTypeChoiceStyle.of(type);
+                final style = _NoteMemoTypeChoiceStyle.of(context, type);
                 final selected = selectedType == type;
                 final enabled = !lockToSelectedType || selected;
                 return Opacity(
@@ -866,7 +878,9 @@ class _TypeSelector extends StatelessWidget {
                     backgroundColor: style.background.withValues(alpha: 0.48),
                     disabledColor: style.background.withValues(alpha: 0.32),
                     side: BorderSide(
-                      color: selected ? style.foreground : AppColors.border,
+                      color: selected
+                          ? style.foreground
+                          : AppColors.of(context).border,
                       width: selected ? 1.5 : 1,
                     ),
                     shape: const StadiumBorder(),
@@ -917,7 +931,7 @@ class _EditorToolButton extends StatelessWidget {
         color: background,
         shape: StadiumBorder(
           side: BorderSide(
-            color: selected ? foreground : AppColors.border,
+            color: selected ? foreground : AppColors.of(context).border,
             width: selected ? 1.4 : 1,
           ),
         ),
@@ -966,26 +980,29 @@ class _NoteMemoTypeChoiceStyle {
   final Color foreground;
   final Color background;
 
-  static _NoteMemoTypeChoiceStyle of(BookNoteMemoType type) => switch (type) {
-    BookNoteMemoType.summary => const _NoteMemoTypeChoiceStyle(
+  static _NoteMemoTypeChoiceStyle of(
+    BuildContext context,
+    BookNoteMemoType type,
+  ) => switch (type) {
+    BookNoteMemoType.summary => _NoteMemoTypeChoiceStyle(
       icon: PhosphorIconsRegular.notePencil,
-      foreground: AppColors.memoSummaryForeground,
-      background: AppColors.memoSummarySurface,
+      foreground: AppColors.of(context).memoSummaryForeground,
+      background: AppColors.of(context).memoSummarySurface,
     ),
-    BookNoteMemoType.quote => const _NoteMemoTypeChoiceStyle(
+    BookNoteMemoType.quote => _NoteMemoTypeChoiceStyle(
       icon: PhosphorIconsRegular.quotes,
-      foreground: AppColors.memoQuoteForeground,
-      background: AppColors.memoQuoteSurface,
+      foreground: AppColors.of(context).memoQuoteForeground,
+      background: AppColors.of(context).memoQuoteSurface,
     ),
-    BookNoteMemoType.thought => const _NoteMemoTypeChoiceStyle(
+    BookNoteMemoType.thought => _NoteMemoTypeChoiceStyle(
       icon: PhosphorIconsRegular.lightbulb,
-      foreground: AppColors.memoThoughtForeground,
-      background: AppColors.memoThoughtSurface,
+      foreground: AppColors.of(context).memoThoughtForeground,
+      background: AppColors.of(context).memoThoughtSurface,
     ),
-    BookNoteMemoType.photo => const _NoteMemoTypeChoiceStyle(
+    BookNoteMemoType.photo => _NoteMemoTypeChoiceStyle(
       icon: PhosphorIconsRegular.imageSquare,
-      foreground: AppColors.memoPhotoForeground,
-      background: AppColors.memoPhotoSurface,
+      foreground: AppColors.of(context).memoPhotoForeground,
+      background: AppColors.of(context).memoPhotoSurface,
     ),
   };
 }
@@ -1026,7 +1043,7 @@ class _PhotoPickerState extends State<_PhotoPicker> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
-            side: const BorderSide(color: AppColors.border),
+            side: BorderSide(color: AppColors.of(context).border),
           ),
           icon: const Icon(PhosphorIconsRegular.camera, size: 22),
           label: const Text(
@@ -1071,7 +1088,9 @@ class _PhotoPickerState extends State<_PhotoPicker> {
                                 _PhotoOverlayAction(
                                   icon: PhosphorIconsRegular.camera,
                                   label: '변경',
-                                  foregroundColor: AppColors.textStrong,
+                                  foregroundColor: AppColors.of(
+                                    context,
+                                  ).textStrong,
                                   onPressed: () {
                                     setState(() => _showActions = false);
                                     widget.onPick();
@@ -1081,7 +1100,7 @@ class _PhotoPickerState extends State<_PhotoPicker> {
                                 _PhotoOverlayAction(
                                   icon: PhosphorIconsRegular.trash,
                                   label: '삭제',
-                                  foregroundColor: AppColors.error,
+                                  foregroundColor: AppColors.of(context).error,
                                   onPressed: () async {
                                     final confirmed = await AppConfirm.show(
                                       context,
@@ -1135,7 +1154,7 @@ class _PhotoOverlayAction extends StatelessWidget {
           tooltip: '사진 $label',
           constraints: const BoxConstraints.tightFor(width: 64, height: 64),
           style: IconButton.styleFrom(
-            backgroundColor: AppColors.surface,
+            backgroundColor: AppColors.of(context).surface,
             foregroundColor: foregroundColor,
           ),
           icon: Icon(icon, size: 28),
@@ -1201,12 +1220,12 @@ class _ImageError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: AppColors.surfaceSubtle,
+    return ColoredBox(
+      color: AppColors.of(context).surfaceSubtle,
       child: Center(
         child: Icon(
           PhosphorIconsRegular.imageSquare,
-          color: AppColors.textMuted,
+          color: AppColors.of(context).textMuted,
         ),
       ),
     );

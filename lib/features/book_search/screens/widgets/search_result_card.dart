@@ -15,7 +15,7 @@ class SearchResultCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.surface,
+      color: AppColors.of(context).surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -24,7 +24,7 @@ class SearchResultCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: AppColors.of(context).border),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -42,35 +42,37 @@ class SearchResultCard extends StatelessWidget {
                       item.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                         height: 1.35,
-                        color: AppColors.textStrong,
+                        color: AppColors.of(context).textStrong,
                       ),
                     ),
-                    if (item.author.displayedAuthorOrNull case final author?) ...[
+                    if (item.author.displayedAuthorOrNull
+                        case final author?) ...[
                       const SizedBox(height: 4),
                       Text(
                         author,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textMuted,
+                          color: AppColors.of(context).textMuted,
                         ),
                       ),
                     ],
-                    if (item.publisher != null && item.publisher!.isNotEmpty) ...[
+                    if (item.publisher != null &&
+                        item.publisher!.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
                         item.publisher!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textMuted,
+                          color: AppColors.of(context).textMuted,
                         ),
                       ),
                     ],
@@ -80,9 +82,9 @@ class SearchResultCard extends StatelessWidget {
                         item.pubDate!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textMuted,
+                          color: AppColors.of(context).textMuted,
                         ),
                       ),
                     ],

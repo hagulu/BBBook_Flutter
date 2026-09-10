@@ -49,10 +49,7 @@ List<int?> buildPaginationRange({
     return [
       1,
       null,
-      ...List.generate(
-        rightSibling - leftSibling + 1,
-        (i) => leftSibling + i,
-      ),
+      ...List.generate(rightSibling - leftSibling + 1, (i) => leftSibling + i),
       null,
       totalPages,
     ];
@@ -133,7 +130,9 @@ class _PaginationItem extends StatelessWidget {
       label: '$page페이지${isCurrent ? ', 현재 페이지' : ''}',
       child: ExcludeSemantics(
         child: Material(
-          color: isCurrent ? AppColors.accentSurface : Colors.transparent,
+          color: isCurrent
+              ? AppColors.of(context).accentSurface
+              : Colors.transparent,
           shape: const CircleBorder(),
           child: InkWell(
             onTap: onTap,
@@ -148,8 +147,8 @@ class _PaginationItem extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
                   color: isCurrent
-                      ? AppColors.accentForeground
-                      : AppColors.textMuted,
+                      ? AppColors.of(context).accentForeground
+                      : AppColors.of(context).textMuted,
                 ),
               ),
             ),
@@ -165,13 +164,16 @@ class _PaginationEllipsis extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
+    return SizedBox(
       width: 32,
       height: 44,
       child: Center(
         child: Text(
           '···',
-          style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+          style: TextStyle(
+            fontSize: 13,
+            color: AppColors.of(context).textMuted,
+          ),
         ),
       ),
     );

@@ -107,8 +107,8 @@ class _MainShellState extends ConsumerState<MainShell>
       child: Scaffold(
         appBar: AppBar(
           title: const AppBarTitle('책책책'),
-          backgroundColor: AppColors.pageBackground,
-          foregroundColor: AppColors.textStrong,
+          backgroundColor: AppColors.of(context).pageBackground,
+          foregroundColor: AppColors.of(context).textStrong,
           elevation: 0,
           actions: _selectedIndex == 1
               ? [
@@ -127,8 +127,10 @@ class _MainShellState extends ConsumerState<MainShell>
         body: IndexedStack(index: _selectedIndex, children: _tabs),
         bottomNavigationBar: DecoratedBox(
           decoration: BoxDecoration(
-            color: AppColors.surface,
-            border: Border(top: BorderSide(color: AppColors.border)),
+            color: AppColors.of(context).surface,
+            border: Border(
+              top: BorderSide(color: AppColors.of(context).border),
+            ),
           ),
           child: SafeArea(
             child: SizedBox(
@@ -178,13 +180,13 @@ class _AddBookNavItem extends StatelessWidget {
             child: Container(
               width: 40,
               height: 40,
-              decoration: const BoxDecoration(
-                color: AppColors.accentFill,
+              decoration: BoxDecoration(
+                color: AppColors.of(context).accentFill,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 PhosphorIconsRegular.plus,
-                color: AppColors.textStrong,
+                color: AppColors.of(context).textStrong,
               ),
             ),
           ),
@@ -211,7 +213,9 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.accentForeground : AppColors.textMuted;
+    final color = selected
+        ? AppColors.of(context).accentForeground
+        : AppColors.of(context).textMuted;
     return Expanded(
       child: Semantics(
         button: true,

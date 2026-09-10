@@ -40,11 +40,11 @@ class BookNoteList extends ConsumerWidget {
             sliver: SliverToBoxAdapter(
               child: Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       '개인 노트',
                       style: TextStyle(
-                        color: AppColors.textStrong,
+                        color: AppColors.of(context).textStrong,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
@@ -151,7 +151,7 @@ class _NoteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final title = summary.note.title?.trim();
     return Material(
-      color: AppColors.surface,
+      color: AppColors.of(context).surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -159,12 +159,12 @@ class _NoteCard extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: AppColors.of(context).surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-            boxShadow: const [
+            border: Border.all(color: AppColors.of(context).border),
+            boxShadow: [
               BoxShadow(
-                color: AppColors.shadowSoft,
+                color: AppColors.of(context).shadowSoft,
                 blurRadius: 4,
                 offset: Offset(0, 1),
               ),
@@ -185,8 +185,8 @@ class _NoteCard extends StatelessWidget {
                                 : title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textStrong,
+                            style: TextStyle(
+                              color: AppColors.of(context).textStrong,
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
@@ -196,8 +196,8 @@ class _NoteCard extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text(
                             summary.pageLabel!,
-                            style: const TextStyle(
-                              color: AppColors.textMuted,
+                            style: TextStyle(
+                              color: AppColors.of(context).textMuted,
                               fontSize: 11,
                             ),
                           ),
@@ -208,8 +208,8 @@ class _NoteCard extends StatelessWidget {
                     Text(
                       '${_formatDate(summary.note.updatedAt)} · '
                       '메모 ${summary.memoCount}개',
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
+                      style: TextStyle(
+                        color: AppColors.of(context).textMuted,
                         fontSize: 12,
                       ),
                     ),
@@ -217,9 +217,9 @@ class _NoteCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              const Icon(
+              Icon(
                 PhosphorIconsRegular.caretRight,
-                color: AppColors.controlInactive,
+                color: AppColors.of(context).controlInactive,
                 size: 18,
               ),
             ],
@@ -240,7 +240,7 @@ class _EmptyNotes extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
         padding: EdgeInsets.fromLTRB(32, 24, 32, 80),
         child: Column(
@@ -249,13 +249,13 @@ class _EmptyNotes extends StatelessWidget {
             Icon(
               PhosphorIconsRegular.notePencil,
               size: 44,
-              color: AppColors.controlInactive,
+              color: AppColors.of(context).controlInactive,
             ),
             SizedBox(height: 14),
             Text(
               '아직 노트가 없습니다.',
               style: TextStyle(
-                color: AppColors.textStrong,
+                color: AppColors.of(context).textStrong,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
@@ -264,7 +264,10 @@ class _EmptyNotes extends StatelessWidget {
             Text(
               '읽으며 떠오른 생각과 기억하고 싶은 문장을 남겨보세요.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textMuted, height: 1.4),
+              style: TextStyle(
+                color: AppColors.of(context).textMuted,
+                height: 1.4,
+              ),
             ),
           ],
         ),
@@ -284,9 +287,9 @@ class _NoteLoadError extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             '노트를 불러오지 못했습니다.',
-            style: TextStyle(color: AppColors.textMuted),
+            style: TextStyle(color: AppColors.of(context).textMuted),
           ),
           const SizedBox(height: 8),
           TextButton(onPressed: onRetry, child: const Text('다시 시도')),

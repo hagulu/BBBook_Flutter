@@ -50,8 +50,8 @@ class _MyReviewsScreenState extends ConsumerState<MyReviewsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const AppBarTitle('내가 작성한 독자평'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: SafeArea(
@@ -90,12 +90,12 @@ class _ReviewList extends StatelessWidget {
       return ListView(
         controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
+        children: [
           SizedBox(height: 80),
           Center(
             child: Text(
               '작성한 리뷰가 없습니다',
-              style: TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: AppColors.of(context).textMuted),
             ),
           ),
         ],

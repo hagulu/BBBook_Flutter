@@ -30,10 +30,10 @@ class PublicReflectionCard extends StatelessWidget {
             title == null || title.isEmpty ? '제목 없음' : title,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
-              color: AppColors.textStrong,
+              color: AppColors.of(context).textStrong,
             ),
           ),
           const SizedBox(height: 6),
@@ -41,9 +41,9 @@ class PublicReflectionCard extends StatelessWidget {
             preview == null || preview.isEmpty ? '내용이 없습니다.' : preview,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: AppColors.textMuted,
+              color: AppColors.of(context).textMuted,
               height: 1.45,
             ),
           ),

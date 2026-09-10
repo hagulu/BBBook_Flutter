@@ -378,8 +378,8 @@ class _DiscussionDetailScreenState
         title: bookTitle == null
             ? const AppBarTitle('토론')
             : AppBarTitle(bookTitle, subtitle: '주제 토론'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: SafeArea(
@@ -548,10 +548,10 @@ class _TopicCard extends StatelessWidget {
                 : IconButton(
                     padding: EdgeInsets.zero,
                     tooltip: '토론 신고',
-                    icon: const Icon(
+                    icon: Icon(
                       PhosphorIconsRegular.flag,
                       size: 16,
-                      color: AppColors.textMuted,
+                      color: AppColors.of(context).textMuted,
                     ),
                     onPressed: onReport,
                   ),
@@ -559,41 +559,41 @@ class _TopicCard extends StatelessWidget {
                 ? null
                 : Row(
                     children: [
-                      const Icon(
+                      Icon(
                         PhosphorIconsRegular.calendarBlank,
                         size: 13,
-                        color: AppColors.controlInactive,
+                        color: AppColors.of(context).controlInactive,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         '${formatDiscussionDate(topic.closesAt!)} 마감',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.textMuted,
+                          color: AppColors.of(context).textMuted,
                         ),
                       ),
                     ],
                   ),
           ),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.of(context).border),
           const SizedBox(height: 16),
           Text(
             topic.content ?? '',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
-              color: AppColors.textBody,
+              color: AppColors.of(context).textBody,
               height: 1.65,
             ),
           ),
           if (pollSection != null) ...[
             const SizedBox(height: 18),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.of(context).border),
             const SizedBox(height: 12),
             pollSection!,
           ],
           const SizedBox(height: 16),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.of(context).border),
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
@@ -665,7 +665,7 @@ class _TopicMenu extends StatelessWidget {
             CommunityMenuTile(
               icon: PhosphorIconsRegular.trash,
               label: '삭제',
-              color: AppColors.error,
+              destructive: true,
               onTap: () => Navigator.pop(sheetContext, _TopicMenuAction.delete),
             ),
           ],
@@ -707,9 +707,12 @@ class _FreeAnswerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return CommunityContentCard(
       child: isClosed
-          ? const Text(
+          ? Text(
               '닫힌 토론에는 답변을 작성할 수 없습니다',
-              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.of(context).textMuted,
+              ),
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -726,14 +729,14 @@ class _FreeAnswerCard extends StatelessWidget {
                       vertical: 16,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceSubtle,
+                      color: AppColors.of(context).surfaceSubtle,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
+                    child: Text(
                       '답변을 작성해보세요...',
                       style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.textMuted,
+                        color: AppColors.of(context).textMuted,
                       ),
                     ),
                   ),
@@ -781,12 +784,12 @@ class _AnswerList extends StatelessWidget {
         DiscussionSectionLabel('답변 ${state.totalElements}개'),
         const SizedBox(height: 12),
         if (state.items.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
             child: Center(
               child: Text(
                 '아직 답변이 없습니다.',
-                style: TextStyle(color: AppColors.textMuted),
+                style: TextStyle(color: AppColors.of(context).textMuted),
               ),
             ),
           )
@@ -865,7 +868,10 @@ class _MaybeHighlightedAnswer extends StatelessWidget {
       key: highlightKey,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.accentForeground, width: 1),
+        border: Border.all(
+          color: AppColors.of(context).accentForeground,
+          width: 1,
+        ),
       ),
       child: child,
     );

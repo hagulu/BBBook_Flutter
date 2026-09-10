@@ -129,10 +129,10 @@ class BookCommunityPreviewSection extends ConsumerWidget {
               child: Center(
                 child: Column(
                   children: [
-                    const Text(
+                    Text(
                       '커뮤니티 정보를 불러오지 못했습니다.',
                       style: TextStyle(
-                        color: AppColors.textMuted,
+                        color: AppColors.of(context).textMuted,
                         fontSize: 12,
                       ),
                     ),
@@ -146,12 +146,15 @@ class BookCommunityPreviewSection extends ConsumerWidget {
               ),
             )
           else if (preview == null)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(
                 child: Text(
                   '불러오는 중',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  style: TextStyle(
+                    color: AppColors.of(context).textMuted,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ),
@@ -310,13 +313,13 @@ class _ReviewsPreview extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 '독자평',
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textStrong,
+                  color: AppColors.of(context).textStrong,
                 ),
               ),
             ),
@@ -324,15 +327,15 @@ class _ReviewsPreview extends StatelessWidget {
               StarRatingDisplay(
                 rating: preview.averageRating!,
                 size: 14,
-                filledColor: AppColors.accentGraphic,
+                filledColor: AppColors.of(context).accentGraphic,
               ),
               const SizedBox(width: 6),
               Text(
                 preview.averageRating!.toStringAsFixed(1),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textStrong,
+                  color: AppColors.of(context).textStrong,
                 ),
               ),
             ],
@@ -340,7 +343,7 @@ class _ReviewsPreview extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         for (var i = 0; i < items.length; i++) ...[
-          if (i != 0) const Divider(height: 1, color: AppColors.border),
+          if (i != 0) Divider(height: 1, color: AppColors.of(context).border),
           _ReviewPreviewCard(item: items[i], onTap: onOpenReviews),
         ],
         const SizedBox(height: 8),
@@ -348,7 +351,7 @@ class _ReviewsPreview extends StatelessWidget {
           child: TextButton(
             onPressed: onOpenReviews,
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.accentForeground,
+              foregroundColor: AppColors.of(context).accentForeground,
             ),
             child: const Text(
               '더보기',
@@ -385,7 +388,7 @@ class _ReviewPreviewCard extends StatelessWidget {
                   ? StarRatingDisplay(
                       rating: item.rating!,
                       size: 12,
-                      filledColor: AppColors.accentGraphic,
+                      filledColor: AppColors.of(context).accentGraphic,
                     )
                   : null,
             ),
@@ -394,9 +397,9 @@ class _ReviewPreviewCard extends StatelessWidget {
               item.content,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: AppColors.textBody,
+                color: AppColors.of(context).textBody,
                 height: 1.4,
               ),
             ),
@@ -405,17 +408,17 @@ class _ReviewPreviewCard extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     PhosphorIconsRegular.heart,
                     size: 13,
-                    color: AppColors.controlInactive,
+                    color: AppColors.of(context).controlInactive,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     '공감 ${item.likeCount}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textMuted,
+                      color: AppColors.of(context).textMuted,
                     ),
                   ),
                 ],

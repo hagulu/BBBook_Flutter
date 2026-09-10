@@ -40,7 +40,7 @@ class AppDialogShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.of(context).surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: Semantics(
         namesRoute: true,
@@ -66,7 +66,7 @@ class AppDialogShell extends StatelessWidget {
                               radius: 22,
                               backgroundColor:
                                   iconBackgroundColor ??
-                                  AppColors.highlightGoldSurface,
+                                  AppColors.of(context).highlightGoldSurface,
                               child: Icon(
                                 icon,
                                 color: iconColor ?? AppColors.highlightGold,
@@ -82,9 +82,9 @@ class AppDialogShell extends StatelessWidget {
                       const SizedBox(height: 16),
                       Text(
                         message,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
-                          color: AppColors.textBody,
+                          color: AppColors.of(context).textBody,
                           height: 1.4,
                         ),
                       ),
@@ -124,10 +124,10 @@ class _Title extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 18,
         fontWeight: FontWeight.bold,
-        color: AppColors.textStrong,
+        color: AppColors.of(context).textStrong,
       ),
     );
   }
@@ -144,14 +144,14 @@ class _ActionButton extends StatelessWidget {
     final Color foreground;
     switch (action.style) {
       case AppDialogActionStyle.primary:
-        background = AppColors.accentFill;
-        foreground = AppColors.textStrong;
+        background = AppColors.of(context).accentFill;
+        foreground = AppColors.of(context).textStrong;
       case AppDialogActionStyle.neutral:
-        background = AppColors.surfaceSubtle;
-        foreground = AppColors.textBody;
+        background = AppColors.of(context).surfaceSubtle;
+        foreground = AppColors.of(context).textBody;
       case AppDialogActionStyle.destructive:
-        background = AppColors.error;
-        foreground = Colors.white;
+        background = AppColors.of(context).error;
+        foreground = Theme.of(context).colorScheme.onError;
     }
     return ElevatedButton(
       onPressed: action.onPressed,

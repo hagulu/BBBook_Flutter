@@ -66,18 +66,21 @@ class _ReadingStatsMonthlyChartState extends State<ReadingStatsMonthlyChart> {
       isCurved: true,
       curveSmoothness: 0.2,
       preventCurveOverShooting: true,
-      color: AppColors.progressFill,
+      color: AppColors.of(context).progressFill,
       barWidth: 3,
       isStrokeCapRound: true,
       isStrokeJoinRound: true,
       showingIndicators: selectedSpotIndex < 0 ? const [] : [selectedSpotIndex],
-      belowBarData: fl.BarAreaData(show: true, color: AppColors.accentSurface),
+      belowBarData: fl.BarAreaData(
+        show: true,
+        color: AppColors.of(context).accentSurface,
+      ),
       dotData: fl.FlDotData(
         getDotPainter: (spot, percent, barData, index) => fl.FlDotCirclePainter(
           radius: 3,
-          color: AppColors.surface,
+          color: AppColors.of(context).surface,
           strokeWidth: 2,
-          strokeColor: AppColors.progressFill,
+          strokeColor: AppColors.of(context).progressFill,
         ),
       ),
     );
@@ -104,17 +107,17 @@ class _ReadingStatsMonthlyChartState extends State<ReadingStatsMonthlyChart> {
             gridData: fl.FlGridData(
               drawVerticalLine: false,
               horizontalInterval: interval,
-              getDrawingHorizontalLine: (_) => const fl.FlLine(
-                color: AppColors.border,
+              getDrawingHorizontalLine: (_) => fl.FlLine(
+                color: AppColors.of(context).border,
                 strokeWidth: 1,
                 dashArray: [4, 4],
               ),
             ),
             borderData: fl.FlBorderData(
               show: true,
-              border: const Border(
-                left: BorderSide(color: AppColors.border),
-                bottom: BorderSide(color: AppColors.border),
+              border: Border(
+                left: BorderSide(color: AppColors.of(context).border),
+                bottom: BorderSide(color: AppColors.of(context).border),
               ),
             ),
             titlesData: fl.FlTitlesData(
@@ -130,8 +133,8 @@ class _ReadingStatsMonthlyChartState extends State<ReadingStatsMonthlyChart> {
                     space: 6,
                     child: Text(
                       '${value.toInt()}권',
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
+                      style: TextStyle(
+                        color: AppColors.of(context).textMuted,
                         fontSize: 10,
                       ),
                     ),
@@ -154,8 +157,8 @@ class _ReadingStatsMonthlyChartState extends State<ReadingStatsMonthlyChart> {
                       space: 6,
                       child: Text(
                         '${value.toInt()}',
-                        style: const TextStyle(
-                          color: AppColors.textMuted,
+                        style: TextStyle(
+                          color: AppColors.of(context).textMuted,
                           fontSize: 10,
                         ),
                       ),
@@ -168,9 +171,9 @@ class _ReadingStatsMonthlyChartState extends State<ReadingStatsMonthlyChart> {
               handleBuiltInTouches: false,
               touchCallback: _handleTouch,
               touchTooltipData: fl.LineTouchTooltipData(
-                getTooltipColor: (_) => AppColors.textStrong,
+                getTooltipColor: (_) => AppColors.of(context).textStrong,
                 tooltipBorderRadius: BorderRadius.circular(8),
-                tooltipBorder: const BorderSide(color: AppColors.surface),
+                tooltipBorder: BorderSide(color: AppColors.of(context).surface),
                 tooltipPadding: const EdgeInsets.symmetric(
                   horizontal: 10,
                   vertical: 8,
@@ -182,8 +185,8 @@ class _ReadingStatsMonthlyChartState extends State<ReadingStatsMonthlyChart> {
                   for (final spot in spots)
                     fl.LineTooltipItem(
                       '${spot.x.toInt()}월 · ${spot.y.toInt()}권',
-                      const TextStyle(
-                        color: AppColors.surface,
+                      TextStyle(
+                        color: AppColors.of(context).surface,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -193,17 +196,17 @@ class _ReadingStatsMonthlyChartState extends State<ReadingStatsMonthlyChart> {
               getTouchedSpotIndicator: (barData, spotIndexes) => [
                 for (final _ in spotIndexes)
                   fl.TouchedSpotIndicatorData(
-                    const fl.FlLine(
-                      color: AppColors.accentForeground,
+                    fl.FlLine(
+                      color: AppColors.of(context).accentForeground,
                       strokeWidth: 1,
                     ),
                     fl.FlDotData(
                       getDotPainter: (spot, percent, barData, index) =>
                           fl.FlDotCirclePainter(
                             radius: 5,
-                            color: AppColors.surface,
+                            color: AppColors.of(context).surface,
                             strokeWidth: 2,
-                            strokeColor: AppColors.progressFill,
+                            strokeColor: AppColors.of(context).progressFill,
                           ),
                     ),
                   ),

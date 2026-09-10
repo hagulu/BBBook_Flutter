@@ -194,37 +194,34 @@ class _FinishConfirmDialogState extends State<_FinishConfirmDialog> {
             onTap: _pickFinishedAt,
             borderRadius: BorderRadius.circular(12),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 11,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
               decoration: BoxDecoration(
-                color: AppColors.surfaceSubtle,
+                color: AppColors.of(context).surfaceSubtle,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
+                  Icon(
                     PhosphorIconsRegular.calendarCheck,
                     size: 16,
-                    color: AppColors.controlInactive,
+                    color: AppColors.of(context).controlInactive,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     _finishedAt == null
                         ? '완독일: 오늘'
                         : '완독일: ${_formatDate(_finishedAt!)}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textBody,
+                      color: AppColors.of(context).textBody,
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Icon(
+                  Icon(
                     PhosphorIconsRegular.caretDown,
                     size: 14,
-                    color: AppColors.controlInactive,
+                    color: AppColors.of(context).controlInactive,
                   ),
                 ],
               ),
@@ -252,7 +249,7 @@ class _FinishConfirmDialogState extends State<_FinishConfirmDialog> {
               value: _wantToReread,
               filledIcon: PhosphorIconsFill.repeat,
               regularIcon: PhosphorIconsRegular.repeat,
-              activeColor: AppColors.error,
+              activeColor: AppColors.of(context).error,
               onChanged: (v) => setState(() => _wantToReread = v),
             ),
           ),
@@ -262,11 +259,7 @@ class _FinishConfirmDialogState extends State<_FinishConfirmDialog> {
         IconOptionSelector<BookSourceType>(
           options: [
             for (final source in BookSourceType.values)
-              IconOption(
-                value: source,
-                icon: source.icon,
-                label: source.label,
-              ),
+              IconOption(value: source, icon: source.icon, label: source.label),
           ],
           selected: _sourceType,
           onSelected: (v) =>
@@ -291,9 +284,12 @@ class _FinishConfirmDialogState extends State<_FinishConfirmDialog> {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '별점과 한줄평을 남겨보세요.',
-              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.of(context).textMuted,
+              ),
             ),
             const SizedBox(height: 12),
             Center(
@@ -308,11 +304,11 @@ class _FinishConfirmDialogState extends State<_FinishConfirmDialog> {
               focusNode: _reviewFocus,
               maxLength: 150,
               maxLines: 3,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 isDense: true,
                 hintText: '한줄평을 남겨보세요',
                 counterStyle: TextStyle(
-                  color: AppColors.textMuted,
+                  color: AppColors.of(context).textMuted,
                   fontSize: 12,
                 ),
               ),
@@ -324,12 +320,12 @@ class _FinishConfirmDialogState extends State<_FinishConfirmDialog> {
     return RecordDialogShell(
       title: '완독',
       scrollController: _scrollController,
-      titleTrailing: const Text(
+      titleTrailing: Text(
         '모두 선택 사항이에요. 원하는 항목만 골라주세요.',
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w500,
-          color: AppColors.textMuted,
+          color: AppColors.of(context).textMuted,
         ),
       ),
       content: Column(

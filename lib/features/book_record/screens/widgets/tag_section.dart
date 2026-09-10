@@ -71,13 +71,13 @@ class _AddTagIconButton extends StatelessWidget {
           // 시각적 원(28dp)은 그대로 두되, 손 떨림이 있거나 화면이 작은
           // 사용자도 정확히 누를 수 있도록 실제 탭 영역은 권장 최소인
           // 48×48dp로 넓힌다.
-          child: const SizedBox(
+          child: SizedBox(
             width: 48,
             height: 48,
             child: Center(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceSubtle,
+                  color: AppColors.of(context).surfaceSubtle,
                   shape: BoxShape.circle,
                 ),
                 child: Padding(
@@ -85,7 +85,7 @@ class _AddTagIconButton extends StatelessWidget {
                   child: Icon(
                     PhosphorIconsRegular.plus,
                     size: 16,
-                    color: AppColors.accentForeground,
+                    color: AppColors.of(context).accentForeground,
                   ),
                 ),
               ),
@@ -247,19 +247,22 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '현재 태그',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
-              color: AppColors.textStrong,
+              color: AppColors.of(context).textStrong,
             ),
           ),
           const SizedBox(height: 8),
           if (existingTags.isEmpty)
-            const Text(
+            Text(
               '적용된 태그가 없습니다.',
-              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.of(context).textMuted,
+              ),
             )
           else
             Wrap(
@@ -274,9 +277,9 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
                   ),
               ],
             ),
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 18),
-            child: Divider(height: 1, color: AppColors.border),
+            child: Divider(height: 1, color: AppColors.of(context).border),
           ),
           TextField(
             controller: _controller,
@@ -292,8 +295,8 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
                   maxLength,
                 }) => Text(
                   '$currentLength / ${maxLength ?? 15}자',
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
+                  style: TextStyle(
+                    color: AppColors.of(context).textMuted,
                     fontSize: 12,
                   ),
                 ),
@@ -311,7 +314,10 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 _errorText!,
-                style: const TextStyle(color: AppColors.error, fontSize: 12),
+                style: TextStyle(
+                  color: AppColors.of(context).error,
+                  fontSize: 12,
+                ),
               ),
             ),
           Builder(
@@ -338,12 +344,12 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       '추천 태그',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textStrong,
+                        color: AppColors.of(context).textStrong,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -393,7 +399,7 @@ class _TagChip extends StatelessWidget {
         bottom: 4,
       ),
       decoration: BoxDecoration(
-        color: AppColors.surfaceSubtle,
+        color: AppColors.of(context).surfaceSubtle,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -401,10 +407,10 @@ class _TagChip extends StatelessWidget {
         children: [
           Text(
             tag.name,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppColors.textBody,
+              color: AppColors.of(context).textBody,
             ),
           ),
           if (onDeleted != null)
@@ -414,14 +420,14 @@ class _TagChip extends StatelessWidget {
               child: InkWell(
                 onTap: onDeleted,
                 borderRadius: BorderRadius.circular(999),
-                child: const SizedBox(
+                child: SizedBox(
                   width: 36,
                   height: 36,
                   child: Center(
                     child: Icon(
                       PhosphorIconsRegular.x,
                       size: 14,
-                      color: AppColors.textMuted,
+                      color: AppColors.of(context).textMuted,
                     ),
                   ),
                 ),

@@ -49,8 +49,8 @@ class _NoticesListScreenState extends ConsumerState<NoticesListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const AppBarTitle('공지사항'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: SafeArea(
@@ -96,12 +96,12 @@ class _NoticeList extends StatelessWidget {
       return ListView(
         controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
+        children: [
           SizedBox(height: 80),
           Center(
             child: Text(
               '등록된 공지사항이 없습니다',
-              style: TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: AppColors.of(context).textMuted),
             ),
           ),
         ],
@@ -160,15 +160,15 @@ class _NoticeRow extends StatelessWidget {
         ),
         child: Container(
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: AppColors.of(context).surface,
             borderRadius: borderRadius,
             border: Border(
-              top: const BorderSide(color: AppColors.border),
+              top: BorderSide(color: AppColors.of(context).border),
               bottom: isLast
-                  ? const BorderSide(color: AppColors.border)
+                  ? BorderSide(color: AppColors.of(context).border)
                   : BorderSide.none,
-              left: const BorderSide(color: AppColors.border),
-              right: const BorderSide(color: AppColors.border),
+              left: BorderSide(color: AppColors.of(context).border),
+              right: BorderSide(color: AppColors.of(context).border),
             ),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -182,17 +182,17 @@ class _NoticeRow extends StatelessWidget {
                       notice.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        color: AppColors.textStrong,
+                        color: AppColors.of(context).textStrong,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       formatDiscussionDate(notice.createdAt),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textMuted,
+                        color: AppColors.of(context).textMuted,
                       ),
                     ),
                   ],
@@ -202,7 +202,7 @@ class _NoticeRow extends StatelessWidget {
               Icon(
                 PhosphorIconsRegular.caretRight,
                 size: 16,
-                color: AppColors.textMuted,
+                color: AppColors.of(context).textMuted,
               ),
             ],
           ),
@@ -224,9 +224,12 @@ class _LoadMoreError extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text(
+          Text(
             '공지사항을 불러오지 못했습니다',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            style: TextStyle(
+              color: AppColors.of(context).textMuted,
+              fontSize: 12,
+            ),
           ),
           TextButton(
             onPressed: onRetry,

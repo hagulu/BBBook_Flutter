@@ -108,14 +108,16 @@ class ReflectionImageEmbedBuilder extends EmbedBuilder {
   }
 
   Widget _brokenImage(double imageWidth) {
-    return Container(
-      width: imageWidth,
-      height: 120,
-      color: AppColors.surfaceSubtle,
-      alignment: Alignment.center,
-      child: const Icon(
-        PhosphorIconsRegular.imageBroken,
-        color: AppColors.textMuted,
+    return Builder(
+      builder: (context) => Container(
+        width: imageWidth,
+        height: 120,
+        color: AppColors.of(context).surfaceSubtle,
+        alignment: Alignment.center,
+        child: Icon(
+          PhosphorIconsRegular.imageBroken,
+          color: AppColors.of(context).textMuted,
+        ),
       ),
     );
   }
@@ -275,11 +277,11 @@ class _ViewerBrokenImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Icon(
         PhosphorIconsRegular.imageBroken,
         size: 36,
-        color: AppColors.textMuted,
+        color: AppColors.of(context).textMuted,
       ),
     );
   }

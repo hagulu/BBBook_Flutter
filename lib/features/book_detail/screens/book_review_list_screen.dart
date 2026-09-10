@@ -157,8 +157,8 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: AppBarTitle(widget.bookTitle, subtitle: '독자평'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: SafeArea(
@@ -188,8 +188,8 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
         onPressed: _handleCreate,
         tooltip: '독자평 쓰기',
         shape: const CircleBorder(),
-        backgroundColor: AppColors.accentFill,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).accentFill,
+        foregroundColor: AppColors.of(context).textStrong,
         child: const Icon(PhosphorIconsRegular.plus),
       ),
     );
@@ -235,7 +235,7 @@ class _ReviewList extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
         itemCount: state.items.length + (state.isLoadingMore ? 1 : 0),
         separatorBuilder: (_, _) =>
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.of(context).border),
         itemBuilder: (context, index) {
           if (index >= state.items.length) {
             return const CommunityContentPageLoader();

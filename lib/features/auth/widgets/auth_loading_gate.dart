@@ -25,7 +25,7 @@ class AuthLoadingGate extends ConsumerWidget {
     // 인증 상태 갱신과 router redirect 사이의 프레임에서도 반대편 화면을
     // 노출하지 않는다(로그인된 사용자의 온보딩 깜빡임 방지).
     if (isAuthLoading || canUseApp != requiresAuthentication) {
-      return const Scaffold(backgroundColor: AppColors.pageBackground);
+      return Scaffold(backgroundColor: AppColors.of(context).pageBackground);
     }
     return child;
   }

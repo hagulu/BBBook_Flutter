@@ -30,10 +30,12 @@ class ReadingStatusTile extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: AppColors.accentSurface.withValues(alpha: 0.35),
+            backgroundColor: AppColors.of(
+              context,
+            ).accentSurface.withValues(alpha: 0.35),
             child: Icon(
               status.icon,
-              color: AppColors.accentForeground,
+              color: AppColors.of(context).accentForeground,
               size: 24,
             ),
           ),
@@ -42,12 +44,12 @@ class ReadingStatusTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   '독서 상태',
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textMuted,
+                    color: AppColors.of(context).textMuted,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -56,19 +58,19 @@ class ReadingStatusTile extends StatelessWidget {
                     children: [
                       TextSpan(
                         text: summary,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textStrong,
+                          color: AppColors.of(context).textStrong,
                         ),
                       ),
                       if (countLabel != null)
                         TextSpan(
                           text: ' · $countLabel',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textMuted,
+                            color: AppColors.of(context).textMuted,
                           ),
                         ),
                     ],

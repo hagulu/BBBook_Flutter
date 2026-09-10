@@ -9,37 +9,36 @@ class DiscussionBadge extends StatelessWidget {
     super.key,
     required this.icon,
     required this.label,
-    required this.foreground,
-    required this.background,
+    this.foreground,
+    this.background,
   });
 
   /// 마감된 토론임을 알리는 배지.
   const DiscussionBadge.closed({Key? key})
-    : this(
-        key: key,
-        icon: PhosphorIconsRegular.lock,
-        label: '마감',
-        foreground: AppColors.textMuted,
-        background: AppColors.surfaceSubtle,
-      );
+    : this(key: key, icon: PhosphorIconsRegular.lock, label: '마감');
 
   /// 스포일러가 포함된 글임을 알리는 배지.
   const DiscussionBadge.spoiler({Key? key})
-    : this(
-        key: key,
-        icon: PhosphorIconsRegular.eyeSlash,
-        label: '스포일러',
-        foreground: AppColors.memoThoughtForeground,
-        background: AppColors.highlightGoldSurface,
-      );
+    : this(key: key, icon: PhosphorIconsRegular.eyeSlash, label: '스포일러');
 
   final IconData icon;
   final String label;
-  final Color foreground;
-  final Color background;
+  final Color? foreground;
+  final Color? background;
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final foreground =
+        this.foreground ??
+        (icon == PhosphorIconsRegular.eyeSlash
+            ? colors.memoThoughtForeground
+            : colors.textMuted);
+    final background =
+        this.background ??
+        (icon == PhosphorIconsRegular.eyeSlash
+            ? colors.highlightGoldSurface
+            : colors.surfaceSubtle);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -79,17 +78,17 @@ class DiscussionSectionLabel extends StatelessWidget {
           width: 3,
           height: 14,
           decoration: BoxDecoration(
-            color: AppColors.accentFill,
+            color: AppColors.of(context).accentFill,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
         const SizedBox(width: 8),
         Text(
           text,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.bold,
-            color: AppColors.textStrong,
+            color: AppColors.of(context).textStrong,
           ),
         ),
       ],

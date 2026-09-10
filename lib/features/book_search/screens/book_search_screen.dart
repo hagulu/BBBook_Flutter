@@ -123,8 +123,8 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const AppBarTitle('책 추가'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: Column(
@@ -239,7 +239,7 @@ class _CompactActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.surface,
+      color: AppColors.of(context).surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
@@ -248,24 +248,28 @@ class _CompactActionButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: AppColors.of(context).border),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: AppColors.accentSurface,
-                child: Icon(icon, color: AppColors.accentForeground, size: 20),
+                backgroundColor: AppColors.of(context).accentSurface,
+                child: Icon(
+                  icon,
+                  color: AppColors.of(context).accentForeground,
+                  size: 20,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 label,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
-                  color: AppColors.textStrong,
+                  color: AppColors.of(context).textStrong,
                 ),
               ),
             ],
@@ -309,7 +313,7 @@ class _SearchResultsBody extends StatelessWidget {
           children: [
             Text(
               _errorMessage(error),
-              style: const TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: AppColors.of(context).textMuted),
             ),
             if (error != BookSearchErrorType.auth) ...[
               const SizedBox(height: 8),
@@ -321,10 +325,10 @@ class _SearchResultsBody extends StatelessWidget {
     }
 
     if (state.items.isEmpty) {
-      return const Center(
+      return Center(
         child: Text(
           '검색 결과가 없습니다',
-          style: TextStyle(color: AppColors.textMuted),
+          style: TextStyle(color: AppColors.of(context).textMuted),
         ),
       );
     }
@@ -358,13 +362,13 @@ class _SearchResultsBody extends StatelessWidget {
     return Stack(
       children: [
         Opacity(opacity: 0.5, child: IgnorePointer(child: list)),
-        const Positioned(
+        Positioned(
           top: 0,
           left: 0,
           right: 0,
           child: LinearProgressIndicator(
             minHeight: 2,
-            color: AppColors.accentGraphic,
+            color: AppColors.of(context).accentGraphic,
             backgroundColor: Colors.transparent,
           ),
         ),
@@ -391,10 +395,13 @@ class _LoadMoreError extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Flexible(
+          Flexible(
             child: Text(
               '검색 결과를 더 불러오지 못했습니다',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+              style: TextStyle(
+                color: AppColors.of(context).textMuted,
+                fontSize: 12,
+              ),
             ),
           ),
           TextButton(

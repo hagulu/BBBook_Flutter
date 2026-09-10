@@ -28,8 +28,7 @@ class _ServerStorageMigrationScreenState
   void initState() {
     super.initState();
     Future.microtask(
-      () =>
-          ref.read(serverStorageMigrationControllerProvider.notifier).start(),
+      () => ref.read(serverStorageMigrationControllerProvider.notifier).start(),
     );
   }
 
@@ -44,8 +43,8 @@ class _ServerStorageMigrationScreenState
       child: Scaffold(
         appBar: AppBar(
           title: const AppBarTitle('서버 저장으로 전환'),
-          backgroundColor: AppColors.pageBackground,
-          foregroundColor: AppColors.textStrong,
+          backgroundColor: AppColors.of(context).pageBackground,
+          foregroundColor: AppColors.of(context).textStrong,
           automaticallyImplyLeading: completed || failed,
         ),
         body: SafeArea(
@@ -61,7 +60,7 @@ class _ServerStorageMigrationScreenState
                     _ => '기록과 이미지를 서버로 옮기고 있어요',
                   },
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppColors.textStrong,
+                    color: AppColors.of(context).textStrong,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -74,7 +73,10 @@ class _ServerStorageMigrationScreenState
                       state.failureMessage ?? '잠시 후 다시 시도해 주세요.',
                     _ => '완료될 때까지 앱을 켜 두세요. 실패하면 기존 기기 기록은 그대로 유지됩니다.',
                   },
-                  style: const TextStyle(color: AppColors.textMuted, height: 1.5),
+                  style: TextStyle(
+                    color: AppColors.of(context).textMuted,
+                    height: 1.5,
+                  ),
                 ),
                 const SizedBox(height: 28),
                 _StageRow(
@@ -149,7 +151,11 @@ class _ServerStorageMigrationScreenState
 }
 
 class _StageRow extends StatelessWidget {
-  const _StageRow({required this.label, required this.done, required this.active});
+  const _StageRow({
+    required this.label,
+    required this.done,
+    required this.active,
+  });
 
   final String label;
   final bool done;
@@ -165,20 +171,20 @@ class _StageRow extends StatelessWidget {
             width: 22,
             height: 22,
             child: done
-                ? const Icon(
+                ? Icon(
                     PhosphorIconsFill.checkCircle,
                     size: 20,
-                    color: AppColors.accentForeground,
+                    color: AppColors.of(context).accentForeground,
                   )
                 : active
                 ? const Padding(
                     padding: EdgeInsets.all(2),
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(
+                : Icon(
                     PhosphorIconsRegular.circle,
                     size: 20,
-                    color: AppColors.controlInactive,
+                    color: AppColors.of(context).controlInactive,
                   ),
           ),
           const SizedBox(width: 12),
@@ -187,8 +193,8 @@ class _StageRow extends StatelessWidget {
               label,
               style: TextStyle(
                 color: done || active
-                    ? AppColors.textStrong
-                    : AppColors.textMuted,
+                    ? AppColors.of(context).textStrong
+                    : AppColors.of(context).textMuted,
                 fontWeight: active ? FontWeight.w600 : FontWeight.w400,
               ),
             ),

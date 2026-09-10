@@ -12,6 +12,49 @@ import 'package:flutter/material.dart';
 class AppColors {
   const AppColors._();
 
+  static AppPalette of(BuildContext context) {
+    final palette = Theme.of(context).extension<AppPalette>();
+    assert(palette != null, 'AppPalette가 없는 Theme에서 AppColors.of를 호출했습니다.');
+    return palette ?? AppPalette.light;
+  }
+
+  /// 저장된 리치 텍스트 색상은 바꾸지 않고 표시할 때만 대비를 보정한다.
+  static final _readableTextCache = <(int, int), Color>{};
+
+  static Color readableText(Color foreground, Color background) {
+    final key = (foreground.toARGB32(), background.toARGB32());
+    final cached = _readableTextCache[key];
+    if (cached != null) return cached;
+
+    double contrast(Color color) {
+      final a = Color.alphaBlend(color, background).computeLuminance();
+      final b = background.computeLuminance();
+      return a > b ? (a + .05) / (b + .05) : (b + .05) / (a + .05);
+    }
+
+    if (contrast(foreground) >= 4.5) {
+      _readableTextCache[key] = foreground;
+      return foreground;
+    }
+    final target = contrast(Colors.white) > contrast(Colors.black)
+        ? Colors.white
+        : Colors.black;
+    var low = 0.0;
+    var high = 1.0;
+    for (var step = 0; step < 7; step++) {
+      final middle = (low + high) / 2;
+      final candidate = Color.lerp(foreground, target, middle)!;
+      if (contrast(candidate) >= 4.5) {
+        high = middle;
+      } else {
+        low = middle;
+      }
+    }
+    final adjusted = Color.lerp(foreground, target, high)!;
+    _readableTextCache[key] = adjusted;
+    return adjusted;
+  }
+
   // --- 브랜드: 숲 ---
   /// 버튼·선택 칩·활성 탭 등 넓은 영역을 채우는 부드러운 라임 강조색.
   /// 이 색 위의 글씨·아이콘은 [textStrong]을 사용한다.
@@ -110,6 +153,12 @@ class AppColors {
   /// 카메라·이미지처럼 화면 비율 차이로 생기는 미디어 바깥 여백.
   static const mediaBackdrop = Color(0xFF000000);
 
+  /// 카메라·전체 화면 이미지 위에 쓰는 모드와 무관한 전경색.
+  static const mediaForeground = Color(0xFFFFFFFF);
+
+  /// 서버 카테고리 색이 없을 때 사용하는 모드와 무관한 중립 회색.
+  static const categoryFallback = Color(0xFF94A3B8);
+
   /// 보더·구분선·진행률 트랙.
   static const border = Color(0xFFDDE5D2);
 
@@ -136,22 +185,43 @@ class AppBrandColors {
   static const google = Color(0xFF4285F4);
 }
 
-ThemeData buildAppTheme() {
+ThemeData buildAppTheme({Brightness brightness = Brightness.light}) {
+  final colors = brightness == Brightness.dark
+      ? AppPalette.dark
+      : AppPalette.light;
   final colorScheme = ColorScheme.fromSeed(
-    seedColor: AppColors.accentFill,
-    primary: AppColors.accentFill,
-    onPrimary: AppColors.textStrong,
-    error: AppColors.error,
-    onError: Colors.white,
-    surface: AppColors.surface,
-    onSurface: AppColors.textStrong,
-    outline: AppColors.border,
+    brightness: brightness,
+    seedColor: colors.accentFill,
+    primary: colors.accentForeground,
+    onPrimary: colors.pageBackground,
+    error: colors.error,
+    onError: brightness == Brightness.dark
+        ? colors.pageBackground
+        : Colors.white,
+    surface: colors.surface,
+    onSurface: colors.textStrong,
+    onSurfaceVariant: colors.textMuted,
+    surfaceContainerLowest: colors.pageBackground,
+    surfaceContainerLow: colors.surface,
+    surfaceContainer: colors.surface,
+    surfaceContainerHigh: colors.surfaceSubtle,
+    surfaceContainerHighest: colors.surfaceSubtle,
+    primaryContainer: colors.accentSurface,
+    onPrimaryContainer: colors.accentForeground,
+    secondary: colors.accentForeground,
+    onSecondary: colors.pageBackground,
+    secondaryContainer: colors.accentFill,
+    onSecondaryContainer: colors.textStrong,
+    outline: colors.border,
+    outlineVariant: colors.border,
   );
 
   return ThemeData(
     useMaterial3: true,
+    brightness: brightness,
+    extensions: [colors],
     colorScheme: colorScheme,
-    scaffoldBackgroundColor: AppColors.pageBackground,
+    scaffoldBackgroundColor: colors.pageBackground,
     // 전역 fontFamily를 따로 지정하지 않는다. `useMaterial3`인 `ThemeData`는
     // `defaultTargetPlatform`에 맞춰 `Typography.material2021`을 구성하는데,
     // iOS에서는 이미 본문에 `CupertinoSystemText`, 큰 제목에
@@ -161,49 +231,59 @@ ThemeData buildAppTheme() {
     // 비공식 패밀리명이라 OS 버전에 따라 폴백될 위험도 있다.
     // titleTextStyle을 여기 넣으면 화면별 foregroundColor 상속이 끊긴다.
     // toolbarHeight는 기본값(kToolbarHeight=56)을 그대로 쓴다.
-    appBarTheme: const AppBarTheme(centerTitle: false),
-    bottomSheetTheme: const BottomSheetThemeData(
+    appBarTheme: AppBarTheme(
+      centerTitle: false,
+      backgroundColor: colors.pageBackground,
+      foregroundColor: colors.textStrong,
+      surfaceTintColor: Colors.transparent,
+    ),
+    dividerColor: colors.border,
+    dialogTheme: DialogThemeData(
+      backgroundColor: colors.surface,
+      surfaceTintColor: Colors.transparent,
+    ),
+    bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: Colors.transparent,
       modalBackgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      dragHandleColor: AppColors.border,
+      dragHandleColor: colors.border,
       dragHandleSize: Size(36, 4),
     ),
     // 기본 M3 bodyLarge(16px)는 TextField 입력 글씨로 쓰기엔 커 보여서(design-system.md
     // 본문 14~15px 기준) 앱 전역 입력창 글씨 크기를 낮춘다.
-    textTheme: const TextTheme(
-      bodyLarge: TextStyle(fontSize: 14, color: AppColors.textBody),
+    textTheme: TextTheme(
+      bodyLarge: TextStyle(fontSize: 14, color: colors.textBody),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.accentFill,
-        foregroundColor: AppColors.textStrong,
-        minimumSize: const Size.fromHeight(48),
+        backgroundColor: colors.accentFill,
+        foregroundColor: colors.textStrong,
+        minimumSize: Size.fromHeight(48),
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        textStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: AppColors.textBody,
-        minimumSize: const Size.fromHeight(48),
-        side: const BorderSide(color: AppColors.border),
+        foregroundColor: colors.textBody,
+        minimumSize: Size.fromHeight(48),
+        side: BorderSide(color: colors.border),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        textStyle: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
       ),
     ),
     // design-system.md: "텍스트 입력/검색창: 보더 없이 필 배경 + rounded-xl
     // outline-none" — 밑줄(UnderlineInputBorder) 대신 보더 없는 필 배경으로 통일.
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: AppColors.surfaceSubtle,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      hintStyle: const TextStyle(color: AppColors.textMuted),
-      labelStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+      fillColor: colors.surfaceSubtle,
+      contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      hintStyle: TextStyle(color: colors.textMuted),
+      labelStyle: TextStyle(color: colors.textMuted, fontSize: 13),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -214,19 +294,264 @@ ThemeData buildAppTheme() {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: AppColors.accentForeground,
-          width: 1.5,
-        ),
+        borderSide: BorderSide(color: colors.accentForeground, width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.error, width: 1.2),
+        borderSide: BorderSide(color: colors.error, width: 1.2),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+        borderSide: BorderSide(color: colors.error, width: 1.5),
       ),
     ),
   );
+}
+
+/// Theme에 연결된 역할별 색상. 화면은 AppColors.of(context)로 구독한다.
+class AppPalette extends ThemeExtension<AppPalette> {
+  const AppPalette({
+    required this.accentFill,
+    required this.accentForeground,
+    required this.accentGraphic,
+    required this.accentSurface,
+    required this.progressFill,
+    required this.highlightGoldSurface,
+    required this.memoSummaryForeground,
+    required this.memoSummarySurface,
+    required this.memoQuoteForeground,
+    required this.memoQuoteSurface,
+    required this.memoThoughtForeground,
+    required this.memoThoughtSurface,
+    required this.memoPhotoForeground,
+    required this.memoPhotoSurface,
+    required this.textStrong,
+    required this.textBody,
+    required this.textMuted,
+    required this.controlInactive,
+    required this.pageBackground,
+    required this.surface,
+    required this.surfaceSubtle,
+    required this.border,
+    required this.error,
+    required this.shadowSoft,
+    required this.shadowStrong,
+    required this.reflectionQuoteText,
+  });
+  final Color accentFill;
+  final Color accentForeground;
+  final Color accentGraphic;
+  final Color accentSurface;
+  final Color progressFill;
+  final Color highlightGoldSurface;
+  final Color memoSummaryForeground;
+  final Color memoSummarySurface;
+  final Color memoQuoteForeground;
+  final Color memoQuoteSurface;
+  final Color memoThoughtForeground;
+  final Color memoThoughtSurface;
+  final Color memoPhotoForeground;
+  final Color memoPhotoSurface;
+  final Color textStrong;
+  final Color textBody;
+  final Color textMuted;
+  final Color controlInactive;
+  final Color pageBackground;
+  final Color surface;
+  final Color surfaceSubtle;
+  final Color border;
+  final Color error;
+  final Color shadowSoft;
+  final Color shadowStrong;
+  final Color reflectionQuoteText;
+  static const light = AppPalette(
+    accentFill: AppColors.accentFill,
+    accentForeground: AppColors.accentForeground,
+    accentGraphic: AppColors.accentGraphic,
+    accentSurface: AppColors.accentSurface,
+    progressFill: AppColors.progressFill,
+    highlightGoldSurface: AppColors.highlightGoldSurface,
+    memoSummaryForeground: AppColors.memoSummaryForeground,
+    memoSummarySurface: AppColors.memoSummarySurface,
+    memoQuoteForeground: AppColors.memoQuoteForeground,
+    memoQuoteSurface: AppColors.memoQuoteSurface,
+    memoThoughtForeground: AppColors.memoThoughtForeground,
+    memoThoughtSurface: AppColors.memoThoughtSurface,
+    memoPhotoForeground: AppColors.memoPhotoForeground,
+    memoPhotoSurface: AppColors.memoPhotoSurface,
+    textStrong: AppColors.textStrong,
+    textBody: AppColors.textBody,
+    textMuted: AppColors.textMuted,
+    controlInactive: AppColors.controlInactive,
+    pageBackground: AppColors.pageBackground,
+    surface: AppColors.surface,
+    surfaceSubtle: AppColors.surfaceSubtle,
+    border: AppColors.border,
+    error: AppColors.error,
+    shadowSoft: AppColors.shadowSoft,
+    shadowStrong: AppColors.shadowStrong,
+    reflectionQuoteText: AppColors.reflectionQuoteText,
+  );
+  // 다크 모드는 무채색에 가까운 검정 표면에 브랜드 강조색만 남긴다.
+  static const dark = AppPalette(
+    // 선택된 책장 상태·주요 버튼은 검정 표면에서 구분되는 짙은 숲색을 쓴다.
+    accentFill: Color(0xFF40552D),
+    accentForeground: Color(0xFFC4D98C),
+    accentGraphic: Color(0xFFB1CC76),
+    accentSurface: Color(0xFF252525),
+    progressFill: Color(0xFFB1CC76),
+    highlightGoldSurface: Color(0xFF443B1F),
+    memoSummaryForeground: Color(0xFF9CCCF2),
+    memoSummarySurface: Color(0xFF223849),
+    memoQuoteForeground: Color(0xFFCEB4F2),
+    memoQuoteSurface: Color(0xFF382D46),
+    memoThoughtForeground: Color(0xFFEAC17A),
+    memoThoughtSurface: Color(0xFF443820),
+    memoPhotoForeground: Color(0xFFEFB0C5),
+    memoPhotoSurface: Color(0xFF452D38),
+    textStrong: Color(0xFFF0F0F0),
+    textBody: Color(0xFFD4D4D4),
+    textMuted: Color(0xFFB0B0B0),
+    controlInactive: Color(0xFF909090),
+    pageBackground: Color(0xFF101010),
+    surface: Color(0xFF1A1A1A),
+    surfaceSubtle: Color(0xFF242424),
+    border: Color(0xFF3A3A3A),
+    error: Color(0xFFF2948C),
+    shadowSoft: Color(0x33000000),
+    shadowStrong: Color(0x66000000),
+    reflectionQuoteText: Color(0xFFB0B0B0),
+  );
+  @override
+  AppPalette copyWith({
+    Color? accentFill,
+    Color? accentForeground,
+    Color? accentGraphic,
+    Color? accentSurface,
+    Color? progressFill,
+    Color? highlightGoldSurface,
+    Color? memoSummaryForeground,
+    Color? memoSummarySurface,
+    Color? memoQuoteForeground,
+    Color? memoQuoteSurface,
+    Color? memoThoughtForeground,
+    Color? memoThoughtSurface,
+    Color? memoPhotoForeground,
+    Color? memoPhotoSurface,
+    Color? textStrong,
+    Color? textBody,
+    Color? textMuted,
+    Color? controlInactive,
+    Color? pageBackground,
+    Color? surface,
+    Color? surfaceSubtle,
+    Color? border,
+    Color? error,
+    Color? shadowSoft,
+    Color? shadowStrong,
+    Color? reflectionQuoteText,
+  }) => AppPalette(
+    accentFill: accentFill ?? this.accentFill,
+    accentForeground: accentForeground ?? this.accentForeground,
+    accentGraphic: accentGraphic ?? this.accentGraphic,
+    accentSurface: accentSurface ?? this.accentSurface,
+    progressFill: progressFill ?? this.progressFill,
+    highlightGoldSurface: highlightGoldSurface ?? this.highlightGoldSurface,
+    memoSummaryForeground: memoSummaryForeground ?? this.memoSummaryForeground,
+    memoSummarySurface: memoSummarySurface ?? this.memoSummarySurface,
+    memoQuoteForeground: memoQuoteForeground ?? this.memoQuoteForeground,
+    memoQuoteSurface: memoQuoteSurface ?? this.memoQuoteSurface,
+    memoThoughtForeground: memoThoughtForeground ?? this.memoThoughtForeground,
+    memoThoughtSurface: memoThoughtSurface ?? this.memoThoughtSurface,
+    memoPhotoForeground: memoPhotoForeground ?? this.memoPhotoForeground,
+    memoPhotoSurface: memoPhotoSurface ?? this.memoPhotoSurface,
+    textStrong: textStrong ?? this.textStrong,
+    textBody: textBody ?? this.textBody,
+    textMuted: textMuted ?? this.textMuted,
+    controlInactive: controlInactive ?? this.controlInactive,
+    pageBackground: pageBackground ?? this.pageBackground,
+    surface: surface ?? this.surface,
+    surfaceSubtle: surfaceSubtle ?? this.surfaceSubtle,
+    border: border ?? this.border,
+    error: error ?? this.error,
+    shadowSoft: shadowSoft ?? this.shadowSoft,
+    shadowStrong: shadowStrong ?? this.shadowStrong,
+    reflectionQuoteText: reflectionQuoteText ?? this.reflectionQuoteText,
+  );
+  @override
+  AppPalette lerp(covariant AppPalette? other, double t) {
+    if (other == null) return this;
+    return AppPalette(
+      accentFill: Color.lerp(accentFill, other.accentFill, t)!,
+      accentForeground: Color.lerp(
+        accentForeground,
+        other.accentForeground,
+        t,
+      )!,
+      accentGraphic: Color.lerp(accentGraphic, other.accentGraphic, t)!,
+      accentSurface: Color.lerp(accentSurface, other.accentSurface, t)!,
+      progressFill: Color.lerp(progressFill, other.progressFill, t)!,
+      highlightGoldSurface: Color.lerp(
+        highlightGoldSurface,
+        other.highlightGoldSurface,
+        t,
+      )!,
+      memoSummaryForeground: Color.lerp(
+        memoSummaryForeground,
+        other.memoSummaryForeground,
+        t,
+      )!,
+      memoSummarySurface: Color.lerp(
+        memoSummarySurface,
+        other.memoSummarySurface,
+        t,
+      )!,
+      memoQuoteForeground: Color.lerp(
+        memoQuoteForeground,
+        other.memoQuoteForeground,
+        t,
+      )!,
+      memoQuoteSurface: Color.lerp(
+        memoQuoteSurface,
+        other.memoQuoteSurface,
+        t,
+      )!,
+      memoThoughtForeground: Color.lerp(
+        memoThoughtForeground,
+        other.memoThoughtForeground,
+        t,
+      )!,
+      memoThoughtSurface: Color.lerp(
+        memoThoughtSurface,
+        other.memoThoughtSurface,
+        t,
+      )!,
+      memoPhotoForeground: Color.lerp(
+        memoPhotoForeground,
+        other.memoPhotoForeground,
+        t,
+      )!,
+      memoPhotoSurface: Color.lerp(
+        memoPhotoSurface,
+        other.memoPhotoSurface,
+        t,
+      )!,
+      textStrong: Color.lerp(textStrong, other.textStrong, t)!,
+      textBody: Color.lerp(textBody, other.textBody, t)!,
+      textMuted: Color.lerp(textMuted, other.textMuted, t)!,
+      controlInactive: Color.lerp(controlInactive, other.controlInactive, t)!,
+      pageBackground: Color.lerp(pageBackground, other.pageBackground, t)!,
+      surface: Color.lerp(surface, other.surface, t)!,
+      surfaceSubtle: Color.lerp(surfaceSubtle, other.surfaceSubtle, t)!,
+      border: Color.lerp(border, other.border, t)!,
+      error: Color.lerp(error, other.error, t)!,
+      shadowSoft: Color.lerp(shadowSoft, other.shadowSoft, t)!,
+      shadowStrong: Color.lerp(shadowStrong, other.shadowStrong, t)!,
+      reflectionQuoteText: Color.lerp(
+        reflectionQuoteText,
+        other.reflectionQuoteText,
+        t,
+      )!,
+    );
+  }
 }

@@ -54,14 +54,14 @@ class EntryButton extends StatelessWidget {
               horizontal: dense ? 10 : 16,
               vertical: compact ? 18 : 16,
             ),
-            child: compact ? _buildCompact() : _buildSingleLine(),
+            child: compact ? _buildCompact(context) : _buildSingleLine(context),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildSingleLine() {
+  Widget _buildSingleLine(BuildContext context) {
     return Row(
       children: [
         _Avatar(icon: icon),
@@ -71,10 +71,10 @@ class EntryButton extends StatelessWidget {
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: AppColors.textStrong,
+              color: AppColors.of(context).textStrong,
             ),
           ),
         ),
@@ -90,10 +90,10 @@ class EntryButton extends StatelessWidget {
             child: _CountBadge(count: count!),
           ),
         ],
-        const Icon(
+        Icon(
           PhosphorIconsRegular.caretRight,
           size: 18,
-          color: AppColors.controlInactive,
+          color: AppColors.of(context).controlInactive,
         ),
       ],
     );
@@ -101,14 +101,10 @@ class EntryButton extends StatelessWidget {
 
   /// 라벨+평점(1줄) + 개수(2줄)로 나눠 보여준다. 아이콘을 [_buildSingleLine]
   /// 보다 크게 키워 존재감을 준다.
-  Widget _buildCompact() {
+  Widget _buildCompact(BuildContext context) {
     return Row(
       children: [
-        _Avatar(
-          icon: icon,
-          radius: dense ? 18 : 24,
-          iconSize: dense ? 18 : 24,
-        ),
+        _Avatar(icon: icon, radius: dense ? 18 : 24, iconSize: dense ? 18 : 24),
         SizedBox(width: dense ? 8 : 14),
         Expanded(
           child: Column(
@@ -126,7 +122,7 @@ class EntryButton extends StatelessWidget {
                       style: TextStyle(
                         fontSize: dense ? 14 : 16,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textStrong,
+                        color: AppColors.of(context).textStrong,
                       ),
                     ),
                   ),
@@ -147,7 +143,7 @@ class EntryButton extends StatelessWidget {
         Icon(
           PhosphorIconsRegular.caretRight,
           size: dense ? 16 : 20,
-          color: AppColors.controlInactive,
+          color: AppColors.of(context).controlInactive,
         ),
       ],
     );
@@ -165,8 +161,14 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     return CircleAvatar(
       radius: radius,
-      backgroundColor: AppColors.accentSurface.withValues(alpha: 0.35),
-      child: Icon(icon, color: AppColors.accentForeground, size: iconSize),
+      backgroundColor: AppColors.of(
+        context,
+      ).accentSurface.withValues(alpha: 0.35),
+      child: Icon(
+        icon,
+        color: AppColors.of(context).accentForeground,
+        size: iconSize,
+      ),
     );
   }
 }
@@ -181,18 +183,18 @@ class _RatingLabel extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(
+        Icon(
           PhosphorIconsFill.star,
           size: 13,
-          color: AppColors.accentGraphic,
+          color: AppColors.of(context).accentGraphic,
         ),
         const SizedBox(width: 3),
         Text(
           rating.toStringAsFixed(1),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: AppColors.textBody,
+            color: AppColors.of(context).textBody,
           ),
         ),
       ],
@@ -210,15 +212,15 @@ class _CountBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.surfaceSubtle,
+        color: AppColors.of(context).surfaceSubtle,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         '$count',
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.bold,
-          color: AppColors.textMuted,
+          color: AppColors.of(context).textMuted,
         ),
       ),
     );

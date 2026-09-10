@@ -32,12 +32,17 @@ class PillOption extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           decoration: BoxDecoration(
-            color: selected ? AppColors.accentFill : AppColors.surfaceSubtle,
+            color: selected
+                ? AppColors.of(context).accentFill
+                : AppColors.of(context).surfaceSubtle,
             borderRadius: BorderRadius.circular(999),
             // accentFill은 밝은 표면과 명도 차가 작아 선택 배경만으로
             // 구분하기 어려우므로 강조색 보더로 상태를 보강한다.
             border: selected
-                ? Border.all(color: AppColors.accentForeground, width: 1.2)
+                ? Border.all(
+                    color: AppColors.of(context).accentForeground,
+                    width: 1.2,
+                  )
                 : null,
           ),
           child: Row(
@@ -47,7 +52,9 @@ class PillOption extends StatelessWidget {
                 Icon(
                   icon,
                   size: 14,
-                  color: selected ? AppColors.textStrong : AppColors.textMuted,
+                  color: selected
+                      ? AppColors.of(context).textStrong
+                      : AppColors.of(context).textMuted,
                 ),
                 const SizedBox(width: 6),
               ],
@@ -56,7 +63,9 @@ class PillOption extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: selected ? AppColors.textStrong : AppColors.textMuted,
+                  color: selected
+                      ? AppColors.of(context).textStrong
+                      : AppColors.of(context).textMuted,
                 ),
               ),
             ],

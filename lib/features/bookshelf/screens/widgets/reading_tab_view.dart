@@ -68,7 +68,7 @@ class _ReadingBookCard extends ConsumerWidget {
     }
 
     final card = Material(
-      color: AppColors.surface,
+      color: AppColors.of(context).surface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -80,11 +80,11 @@ class _ReadingBookCard extends ConsumerWidget {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.surface,
+            color: AppColors.of(context).surface,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
-                color: AppColors.shadowSoft,
+                color: AppColors.of(context).shadowSoft,
                 blurRadius: 4,
                 offset: Offset(0, 1),
               ),
@@ -114,10 +114,10 @@ class _ReadingBookCard extends ConsumerWidget {
                     ],
                     Text(
                       book.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
-                        color: AppColors.textStrong,
+                        color: AppColors.of(context).textStrong,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -126,9 +126,9 @@ class _ReadingBookCard extends ConsumerWidget {
                       const SizedBox(height: 2),
                       Text(
                         _subtitle(book)!,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textMuted,
+                          color: AppColors.of(context).textMuted,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -165,14 +165,16 @@ class _CategoryBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: (color ?? AppColors.controlInactive).withValues(alpha: 0.14),
+        color: (color ?? AppColors.of(context).controlInactive).withValues(
+          alpha: 0.14,
+        ),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         text,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
-          color: AppColors.textBody,
+          color: AppColors.of(context).textBody,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -199,14 +201,14 @@ class _ProgressRow extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.accentFill,
+                  color: AppColors.of(context).accentFill,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
                   '+$elapsedDays일',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
-                    color: AppColors.textStrong,
+                    color: AppColors.of(context).textStrong,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -219,18 +221,18 @@ class _ProgressRow extends StatelessWidget {
               // 보여준다.
               Text(
                 ratio != null ? '${(ratio * 100).round()}%' : '',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.textMuted,
+                  color: AppColors.of(context).textMuted,
                 ),
               )
             else if (book.effectiveTotalPages != null)
               Text(
                 '${book.currentPage} / ${book.effectiveTotalPages}쪽'
                 '${ratio != null ? ' (${(ratio * 100).round()}%)' : ''}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.textMuted,
+                  color: AppColors.of(context).textMuted,
                 ),
               ),
           ],
@@ -242,8 +244,10 @@ class _ProgressRow extends StatelessWidget {
             child: LinearProgressIndicator(
               value: ratio,
               minHeight: 6,
-              backgroundColor: AppColors.border,
-              valueColor: const AlwaysStoppedAnimation(AppColors.progressFill),
+              backgroundColor: AppColors.of(context).border,
+              valueColor: AlwaysStoppedAnimation(
+                AppColors.of(context).progressFill,
+              ),
             ),
           ),
         ],

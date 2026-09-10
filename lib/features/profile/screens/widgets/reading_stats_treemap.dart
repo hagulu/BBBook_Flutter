@@ -67,9 +67,9 @@ class _ReadingStatsTreemapState extends State<ReadingStatsTreemap> {
           excludeSemantics: true,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: AppColors.of(context).surface,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: AppColors.of(context).border),
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(9),

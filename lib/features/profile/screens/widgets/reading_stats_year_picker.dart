@@ -75,7 +75,7 @@ class ReadingStatsYearPicker extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.accentSurface,
+            color: AppColors.of(context).accentSurface,
             borderRadius: BorderRadius.circular(999),
           ),
           child: Row(
@@ -83,17 +83,17 @@ class ReadingStatsYearPicker extends StatelessWidget {
             children: [
               Text(
                 currentLabel,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.accentForeground,
+                  color: AppColors.of(context).accentForeground,
                 ),
               ),
               const SizedBox(width: 4),
-              const Icon(
+              Icon(
                 PhosphorIconsRegular.caretDown,
                 size: 14,
-                color: AppColors.accentForeground,
+                color: AppColors.of(context).accentForeground,
               ),
             ],
           ),
@@ -126,7 +126,9 @@ class _YearChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           decoration: BoxDecoration(
-            color: selected ? AppColors.accentFill : AppColors.surfaceSubtle,
+            color: selected
+                ? AppColors.of(context).accentFill
+                : AppColors.of(context).surfaceSubtle,
             borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
@@ -134,7 +136,9 @@ class _YearChip extends StatelessWidget {
             style: TextStyle(
               fontSize: 13,
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? AppColors.textStrong : AppColors.textMuted,
+              color: selected
+                  ? AppColors.of(context).textStrong
+                  : AppColors.of(context).textMuted,
             ),
           ),
         ),

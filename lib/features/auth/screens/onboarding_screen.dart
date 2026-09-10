@@ -101,7 +101,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       appBar: widget.reauthentication
           ? AppBar(title: const Text('다시 로그인'))
           : null,
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: AppColors.of(context).pageBackground,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -111,11 +111,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               child: Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: AppColors.of(context).surface,
                   borderRadius: BorderRadius.circular(24),
-                  boxShadow: const [
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.shadowSoft,
+                      color: AppColors.of(context).shadowSoft,
                       blurRadius: 24,
                       offset: Offset(0, 8),
                     ),
@@ -128,22 +128,22 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: AppColors.accentFill,
+                        color: AppColors.of(context).accentFill,
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      child: const Icon(
+                      child: Icon(
                         PhosphorIconsRegular.bookOpen,
-                        color: AppColors.textStrong,
+                        color: AppColors.of(context).textStrong,
                         size: 30,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       '책책책',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.textStrong,
+                        color: AppColors.of(context).textStrong,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -151,9 +151,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       widget.reauthentication
                           ? '기록을 동기화하려면 같은 계정으로 로그인해 주세요.'
                           : '로그인하고 기록을 시작하세요.',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.textMuted,
+                        color: AppColors.of(context).textMuted,
                       ),
                     ),
                     const SizedBox(height: 28),
@@ -195,7 +195,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       ),
                       backgroundColor: Colors.white,
                       foregroundColor: AppColors.textStrong,
-                      border: const BorderSide(color: AppColors.border),
+                      border: BorderSide(color: AppColors.of(context).border),
                       isLoading: _loading == _LoadingProvider.google,
                       onPressed: _isBusy ? null : _handleGoogleLogin,
                     ),

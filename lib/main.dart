@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/app.dart';
 import 'core/config/api_config.dart';
+import 'core/theme/theme_mode_provider.dart';
 import 'features/book_note/services/note_memo_image_store.dart';
 import 'features/book_reflection/services/reflection_image_store.dart';
 import 'features/bookshelf/services/book_cover_image_store.dart';
@@ -21,5 +22,11 @@ void main() async {
   await noteMemoImageStore.warmUp();
   await reflectionImageStore.warmUp();
   await bookCoverImageStore.warmUp();
-  runApp(const ProviderScope(child: BBBookApp()));
+  final themeMode = await loadThemeMode();
+  runApp(
+    ProviderScope(
+      overrides: [initialThemeModeProvider.overrideWithValue(themeMode)],
+      child: const BBBookApp(),
+    ),
+  );
 }

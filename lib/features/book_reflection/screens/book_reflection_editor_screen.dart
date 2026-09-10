@@ -33,74 +33,85 @@ const _reflectionQuoteMarkInset = -6.0;
 /// 리더(`public_reflection_reader_screen.dart`)와 같은 값을 쓴다.
 /// `paragraph`를 비워 두면 패키지 기본값이 그대로 적용되므로 `lists`까지
 /// 함께 지정해야 목록 줄에서 크기가 되돌아가지 않는다.
-const _reflectionBodyTextStyle = TextStyle(
-  color: AppColors.textBody,
-  fontSize: 16,
-  height: 1.65,
+final _reflectionQuillStylesLight = _buildReflectionQuillStyles(
+  AppPalette.light,
 );
+final _reflectionQuillStylesDark = _buildReflectionQuillStyles(AppPalette.dark);
 
-const bookReflectionQuillStyles = DefaultStyles(
-  h1: DefaultTextBlockStyle(
-    TextStyle(
-      color: AppColors.textStrong,
-      fontSize: 27,
-      height: 1.3,
-      fontWeight: FontWeight.bold,
+DefaultStyles bookReflectionQuillStyles(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+    ? _reflectionQuillStylesDark
+    : _reflectionQuillStylesLight;
+
+DefaultStyles _buildReflectionQuillStyles(AppPalette colors) {
+  final bodyTextStyle = TextStyle(
+    color: colors.textBody,
+    fontSize: 16,
+    height: 1.65,
+  );
+  return DefaultStyles(
+    h1: DefaultTextBlockStyle(
+      TextStyle(
+        color: colors.textStrong,
+        fontSize: 27,
+        height: 1.3,
+        fontWeight: FontWeight.bold,
+      ),
+      HorizontalSpacing.zero,
+      VerticalSpacing(12, 0),
+      VerticalSpacing.zero,
+      null,
     ),
-    HorizontalSpacing.zero,
-    VerticalSpacing(12, 0),
-    VerticalSpacing.zero,
-    null,
-  ),
-  h2: DefaultTextBlockStyle(
-    TextStyle(
-      color: AppColors.textStrong,
-      fontSize: 22,
-      height: 1.3,
-      fontWeight: FontWeight.bold,
+    h2: DefaultTextBlockStyle(
+      TextStyle(
+        color: colors.textStrong,
+        fontSize: 22,
+        height: 1.3,
+        fontWeight: FontWeight.bold,
+      ),
+      HorizontalSpacing.zero,
+      VerticalSpacing(8, 0),
+      VerticalSpacing.zero,
+      null,
     ),
-    HorizontalSpacing.zero,
-    VerticalSpacing(8, 0),
-    VerticalSpacing.zero,
-    null,
-  ),
-  placeHolder: DefaultTextBlockStyle(
-    TextStyle(color: AppColors.textMuted, fontSize: 16, height: 1.65),
-    HorizontalSpacing.zero,
-    VerticalSpacing.zero,
-    VerticalSpacing.zero,
-    null,
-  ),
-  paragraph: DefaultTextBlockStyle(
-    _reflectionBodyTextStyle,
-    HorizontalSpacing.zero,
-    VerticalSpacing.zero,
-    VerticalSpacing.zero,
-    null,
-  ),
-  lists: DefaultListBlockStyle(
-    _reflectionBodyTextStyle,
-    HorizontalSpacing.zero,
-    VerticalSpacing(6, 0),
-    VerticalSpacing(0, 6),
-    null,
-    null,
-  ),
-  quote: DefaultTextBlockStyle(
-    TextStyle(
-      color: AppColors.reflectionQuoteText,
-      fontStyle: FontStyle.italic,
-      height: 1.5,
+    placeHolder: DefaultTextBlockStyle(
+      TextStyle(color: colors.textMuted, fontSize: 16, height: 1.65),
+      HorizontalSpacing.zero,
+      VerticalSpacing.zero,
+      VerticalSpacing.zero,
+      null,
     ),
-    HorizontalSpacing(
-      _reflectionQuoteLeftSpacing,
-      _reflectionQuoteRightSpacing,
+    paragraph: DefaultTextBlockStyle(
+      bodyTextStyle,
+      HorizontalSpacing.zero,
+      VerticalSpacing.zero,
+      VerticalSpacing.zero,
+      null,
     ),
-    VerticalSpacing(12, 12),
-    VerticalSpacing(1, 1),
-    null,
-  ),
-);
+    lists: DefaultListBlockStyle(
+      bodyTextStyle,
+      HorizontalSpacing.zero,
+      VerticalSpacing(6, 0),
+      VerticalSpacing(0, 6),
+      null,
+      null,
+    ),
+    quote: DefaultTextBlockStyle(
+      TextStyle(
+        color: colors.reflectionQuoteText,
+        fontStyle: FontStyle.italic,
+        height: 1.5,
+      ),
+      HorizontalSpacing(
+        _reflectionQuoteLeftSpacing,
+        _reflectionQuoteRightSpacing,
+      ),
+      VerticalSpacing(12, 12),
+      VerticalSpacing(1, 1),
+      null,
+    ),
+  );
+}
 
 InlineSpan reflectionTextSpanBuilder(
   BuildContext context,
@@ -121,6 +132,19 @@ InlineSpan reflectionTextSpanBuilder(
       decoration: attributes.containsKey(Attribute.strikeThrough.key)
           ? TextDecoration.lineThrough
           : TextDecoration.none,
+    );
+  }
+  if (resolvedStyle != null) {
+    final colors = AppColors.of(context);
+    final background = Color.alphaBlend(
+      resolvedStyle.backgroundColor ?? Colors.transparent,
+      colors.surface,
+    );
+    resolvedStyle = resolvedStyle.copyWith(
+      color: AppColors.readableText(
+        resolvedStyle.color ?? colors.textBody,
+        background,
+      ),
     );
   }
   final contentSpan = TextSpan(
@@ -349,7 +373,11 @@ class _BookReflectionEditorScreenState
   /// 어긋나지 않게 한다.
   bool _allowTextReplacement(int index, int length, Object? data) {
     if (_allowImageDeletion) return true;
-    return !documentRangeOverlapsImage(_quillController.document, index, length);
+    return !documentRangeOverlapsImage(
+      _quillController.document,
+      index,
+      length,
+    );
   }
 
   void _deleteImage(QuillController controller, int offset) {
@@ -544,16 +572,14 @@ class _BookReflectionEditorScreenState
       child: Scaffold(
         resizeToAvoidBottomInset: true,
         appBar: AppBar(
-          title: AppBarTitle(
-            widget.reflection == null ? '독후감 작성' : '독후감 수정',
-          ),
-          backgroundColor: AppColors.pageBackground,
-          foregroundColor: AppColors.textStrong,
+          title: AppBarTitle(widget.reflection == null ? '독후감 작성' : '독후감 수정'),
+          backgroundColor: AppColors.of(context).pageBackground,
+          foregroundColor: AppColors.of(context).textStrong,
           actions: [
             TextButton(
               onPressed: _isSaving ? null : _save,
               style: TextButton.styleFrom(
-                foregroundColor: AppColors.textStrong,
+                foregroundColor: AppColors.of(context).textStrong,
                 textStyle: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
@@ -573,12 +599,12 @@ class _BookReflectionEditorScreenState
                   width: double.infinity,
                   margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
                   decoration: BoxDecoration(
-                    color: AppColors.surface,
+                    color: AppColors.of(context).surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border),
-                    boxShadow: const [
+                    border: Border.all(color: AppColors.of(context).border),
+                    boxShadow: [
                       BoxShadow(
-                        color: AppColors.shadowSoft,
+                        color: AppColors.of(context).shadowSoft,
                         blurRadius: 4,
                         offset: Offset(0, 1),
                       ),
@@ -628,16 +654,16 @@ class _BookReflectionEditorScreenState
                                     textInputAction: TextInputAction.next,
                                     onSubmitted: (_) =>
                                         _editorFocusNode.requestFocus(),
-                                    style: const TextStyle(
-                                      color: AppColors.textStrong,
+                                    style: TextStyle(
+                                      color: AppColors.of(context).textStrong,
                                       fontSize: 19,
                                       height: 1.35,
                                       fontWeight: FontWeight.bold,
                                     ),
-                                    decoration: const InputDecoration(
+                                    decoration: InputDecoration(
                                       hintText: '이 기록에 제목을 붙여보세요',
                                       hintStyle: TextStyle(
-                                        color: AppColors.textMuted,
+                                        color: AppColors.of(context).textMuted,
                                         fontSize: 19,
                                         height: 1.35,
                                         fontWeight: FontWeight.bold,
@@ -667,7 +693,9 @@ class _BookReflectionEditorScreenState
                                       16,
                                     ),
                                     placeholder: '책을 읽고 느낀 점을 기록해 보세요.',
-                                    customStyles: bookReflectionQuillStyles,
+                                    customStyles: bookReflectionQuillStyles(
+                                      context,
+                                    ),
                                     textSpanBuilder: reflectionTextSpanBuilder,
                                     embedBuilders: [
                                       ReflectionImageEmbedBuilder(
@@ -754,9 +782,9 @@ class _ReflectionToolbarState extends State<_ReflectionToolbar> {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: AppColors.of(context).surface,
+        border: Border(top: BorderSide(color: AppColors.of(context).border)),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) => SingleChildScrollView(
@@ -1203,17 +1231,17 @@ class _EditorColorButtonState extends State<_EditorColorButton> {
     }
     final selectedColor = selected?.color;
     final foreground = selectedColor == null
-        ? AppColors.textBody
+        ? AppColors.of(context).textBody
         : selectedColor.computeLuminance() < 0.45
-        ? AppColors.surface
-        : AppColors.textStrong;
+        ? AppColors.of(context).surface
+        : AppColors.of(context).textStrong;
     final tooltip = widget.isBackground ? '배경색' : '글씨색';
 
     return PopupMenuButton<String>(
       tooltip: tooltip,
       requestFocus: false,
       onSelected: _apply,
-      color: AppColors.surface,
+      color: AppColors.of(context).surface,
       position: PopupMenuPosition.over,
       offset: const Offset(0, -64),
       itemBuilder: (menuContext) => [
@@ -1313,15 +1341,17 @@ class _EditorColorSwatch extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
-              color: selected ? AppColors.accentForeground : AppColors.surface,
+              color: selected
+                  ? AppColors.of(context).accentForeground
+                  : AppColors.of(context).surface,
               width: 2,
             ),
           ),
           child: Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: option.color ?? AppColors.surface,
-              border: Border.all(color: AppColors.border),
+              color: option.color ?? AppColors.of(context).surface,
+              border: Border.all(color: AppColors.of(context).border),
             ),
             child: option.color == null
                 ? Center(

@@ -82,7 +82,7 @@ class BookThumbnailField extends StatelessWidget {
             _ThumbnailActionButton(
               icon: PhosphorIconsRegular.camera,
               label: hasThumbnail ? '표지 변경' : '표지 추가',
-              color: AppColors.accentForeground,
+              color: AppColors.of(context).accentForeground,
               onTap: onPick,
             ),
             if (hasThumbnail) ...[
@@ -90,7 +90,7 @@ class BookThumbnailField extends StatelessWidget {
               _ThumbnailActionButton(
                 icon: PhosphorIconsRegular.trash,
                 label: '표지 삭제',
-                color: AppColors.error,
+                color: AppColors.of(context).error,
                 onTap: onRemove,
               ),
             ],
@@ -117,7 +117,7 @@ class _ThumbnailActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.surfaceSubtle,
+      color: AppColors.of(context).surfaceSubtle,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,

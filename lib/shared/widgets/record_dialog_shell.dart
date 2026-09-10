@@ -63,8 +63,8 @@ class RecordDialogSurface extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
         height: height,
-        decoration: const BoxDecoration(
-          color: AppColors.surface,
+        decoration: BoxDecoration(
+          color: AppColors.of(context).surface,
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(RecordDialogMetrics.cornerRadius),
           ),
@@ -104,7 +104,7 @@ class RecordDialogHandle extends StatelessWidget {
         width: RecordDialogMetrics.handleWidth,
         height: RecordDialogMetrics.handleHeight,
         decoration: BoxDecoration(
-          color: AppColors.border,
+          color: AppColors.of(context).border,
           borderRadius: BorderRadius.circular(
             RecordDialogMetrics.handleHeight / 2,
           ),
@@ -132,10 +132,10 @@ class RecordDialogHeader extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: AppColors.textStrong,
+              color: AppColors.of(context).textStrong,
             ),
           ),
           ?trailing,
@@ -220,14 +220,14 @@ class _Button extends StatelessWidget {
     final Color foreground;
     switch (button.style) {
       case RecordDialogButtonStyle.primary:
-        background = AppColors.accentFill;
-        foreground = AppColors.textStrong;
+        background = AppColors.of(context).accentFill;
+        foreground = AppColors.of(context).textStrong;
       case RecordDialogButtonStyle.neutral:
-        background = AppColors.surfaceSubtle;
-        foreground = AppColors.textBody;
+        background = AppColors.of(context).surfaceSubtle;
+        foreground = AppColors.of(context).textBody;
       case RecordDialogButtonStyle.destructive:
-        background = AppColors.error;
-        foreground = Colors.white;
+        background = AppColors.of(context).error;
+        foreground = Theme.of(context).colorScheme.onError;
     }
     return ElevatedButton(
       onPressed: button.onPressed,
@@ -266,7 +266,9 @@ class RecordDialogActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive ? AppColors.error : AppColors.textStrong;
+    final color = destructive
+        ? AppColors.of(context).error
+        : AppColors.of(context).textStrong;
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(RecordDialogMetrics.controlRadius),
@@ -324,21 +326,21 @@ class RecordDialogActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final emphasisColor = destructive
-        ? AppColors.error
-        : AppColors.accentForeground;
+        ? AppColors.of(context).error
+        : AppColors.of(context).accentForeground;
     final labelColor = destructive
-        ? AppColors.error
+        ? AppColors.of(context).error
         : selected
-        ? AppColors.accentForeground
-        : AppColors.textStrong;
+        ? AppColors.of(context).accentForeground
+        : AppColors.of(context).textStrong;
     return Semantics(
       button: true,
       selected: selected,
       label: label,
       child: Material(
         color: selected
-            ? AppColors.accentSurface.withValues(alpha: 0.35)
-            : AppColors.surface,
+            ? AppColors.of(context).accentSurface.withValues(alpha: 0.35)
+            : AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(RecordDialogMetrics.controlRadius),
         child: InkWell(
           onTap: onTap,
@@ -353,7 +355,9 @@ class RecordDialogActionCard extends StatelessWidget {
                 RecordDialogMetrics.controlRadius,
               ),
               border: Border.all(
-                color: selected ? AppColors.accentForeground : AppColors.border,
+                color: selected
+                    ? AppColors.of(context).accentForeground
+                    : AppColors.of(context).border,
                 width: selected ? 1.5 : 1,
               ),
             ),
@@ -380,8 +384,8 @@ class RecordDialogActionCard extends StatelessWidget {
                     maxLines: 1,
                     style: TextStyle(
                       color: selected
-                          ? AppColors.accentForeground
-                          : AppColors.textMuted,
+                          ? AppColors.of(context).accentForeground
+                          : AppColors.of(context).textMuted,
                       fontSize: 10,
                     ),
                   ),
@@ -424,24 +428,31 @@ class RecordDialogToggleTile extends StatelessWidget {
           ),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-        secondary: Icon(icon, size: 20, color: AppColors.textStrong),
+        secondary: Icon(
+          icon,
+          size: 20,
+          color: AppColors.of(context).textStrong,
+        ),
         title: Text(
           title,
-          style: const TextStyle(
-            color: AppColors.textStrong,
+          style: TextStyle(
+            color: AppColors.of(context).textStrong,
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
         ),
         subtitle: Text(
           subtitle,
-          style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+          style: TextStyle(
+            color: AppColors.of(context).textMuted,
+            fontSize: 12,
+          ),
         ),
         value: value,
-        activeThumbColor: AppColors.surface,
-        activeTrackColor: AppColors.accentForeground,
-        inactiveThumbColor: AppColors.surface,
-        inactiveTrackColor: AppColors.controlInactive,
+        activeThumbColor: AppColors.of(context).surface,
+        activeTrackColor: AppColors.of(context).accentForeground,
+        inactiveThumbColor: AppColors.of(context).surface,
+        inactiveTrackColor: AppColors.of(context).controlInactive,
         onChanged: onChanged,
       ),
     );

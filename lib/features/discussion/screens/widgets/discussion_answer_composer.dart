@@ -84,7 +84,7 @@ class _DiscussionAnswerSheetState extends State<_DiscussionAnswerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final accent = widget.accentColor ?? AppColors.accentForeground;
+    final accent = widget.accentColor ?? AppColors.of(context).accentForeground;
 
     return RecordDialogShell(
       title: '답변 작성',
@@ -103,7 +103,10 @@ class _DiscussionAnswerSheetState extends State<_DiscussionAnswerSheet> {
             autofocus: true,
             minLines: 3,
             maxLines: 8,
-            style: const TextStyle(fontSize: 14, color: AppColors.textBody),
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.of(context).textBody,
+            ),
             decoration: InputDecoration(
               hintText: widget.hintText,
               focusedBorder: OutlineInputBorder(

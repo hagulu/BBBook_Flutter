@@ -33,7 +33,7 @@ Future<CategorySelection?> showBookCategoryPickerDialog(
         children: [
           _CategoryChip(
             label: '미지정',
-            dotColor: AppColors.controlInactive,
+            dotColor: AppColors.of(context).controlInactive,
             selected: initialCategoryId == null,
             onTap: () =>
                 Navigator.of(context).pop(const CategorySelection(null)),
@@ -91,12 +91,12 @@ class BookCategoryField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           '카테고리',
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: AppColors.textMuted,
+            color: AppColors.of(context).textMuted,
           ),
         ),
         const SizedBox(height: 4),
@@ -106,7 +106,7 @@ class BookCategoryField extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
             decoration: BoxDecoration(
-              color: AppColors.surfaceSubtle,
+              color: AppColors.of(context).surfaceSubtle,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -115,7 +115,9 @@ class BookCategoryField extends StatelessWidget {
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: selected?.color ?? AppColors.controlInactive,
+                    color:
+                        selected?.color ??
+                        AppColors.of(context).controlInactive,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -123,17 +125,17 @@ class BookCategoryField extends StatelessWidget {
                 Expanded(
                   child: Text(
                     selected?.name ?? '미지정',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textBody,
+                      color: AppColors.of(context).textBody,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Icon(
+                Icon(
                   PhosphorIconsRegular.caretDown,
                   size: 14,
-                  color: AppColors.controlInactive,
+                  color: AppColors.of(context).controlInactive,
                 ),
               ],
             ),
@@ -171,7 +173,7 @@ class _CategoryChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected
                 ? dotColor.withValues(alpha: 0.16)
-                : AppColors.surfaceSubtle,
+                : AppColors.of(context).surfaceSubtle,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
               color: selected ? dotColor : Colors.transparent,
@@ -195,7 +197,9 @@ class _CategoryChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? AppColors.textBody : AppColors.textMuted,
+                  color: selected
+                      ? AppColors.of(context).textBody
+                      : AppColors.of(context).textMuted,
                 ),
               ),
             ],

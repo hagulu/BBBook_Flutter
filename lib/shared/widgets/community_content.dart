@@ -24,10 +24,10 @@ class CommunityContentListHeader extends StatelessWidget {
           Expanded(
             child: Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textStrong,
+                color: AppColors.of(context).textStrong,
               ),
             ),
           ),
@@ -60,13 +60,13 @@ class CommunityContentCard extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.of(context).border),
       ),
       child: child,
     );
 
     return Material(
-      color: AppColors.surface,
+      color: AppColors.of(context).surface,
       borderRadius: BorderRadius.circular(borderRadius),
       clipBehavior: Clip.antiAlias,
       child: onTap == null
@@ -108,15 +108,15 @@ class CommunityAuthorRow extends StatelessWidget {
       normalizedNickname?.isNotEmpty == true ? normalizedNickname! : '알 수 없음',
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: AppColors.textStrong,
+        color: AppColors.of(context).textStrong,
       ),
     );
     final dateText = Text(
       dateLabel,
-      style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+      style: TextStyle(fontSize: 11, color: AppColors.of(context).textMuted),
     );
 
     return Row(
@@ -129,11 +129,11 @@ class CommunityAuthorRow extends StatelessWidget {
                   children: [
                     Flexible(child: nicknameText),
                     const SizedBox(width: 6),
-                    const Text(
+                    Text(
                       '·',
                       style: TextStyle(
                         fontSize: 10,
-                        color: AppColors.textMuted,
+                        color: AppColors.of(context).textMuted,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -190,8 +190,8 @@ class CommunityContentHeader extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: 44),
           child: Text(
             title,
-            style: const TextStyle(
-              color: AppColors.textStrong,
+            style: TextStyle(
+              color: AppColors.of(context).textStrong,
               fontSize: 19,
               height: 1.35,
               fontWeight: FontWeight.bold,
@@ -233,14 +233,14 @@ class _CommunityAvatar extends StatelessWidget {
     final hasImage = normalizedUrl?.isNotEmpty == true;
     return CircleAvatar(
       radius: radius,
-      backgroundColor: AppColors.accentSurface,
+      backgroundColor: AppColors.of(context).accentSurface,
       backgroundImage: hasImage ? NetworkImage(normalizedUrl!) : null,
       child: hasImage
           ? null
           : Icon(
               PhosphorIconsRegular.user,
               size: radius,
-              color: AppColors.accentForeground,
+              color: AppColors.of(context).accentForeground,
             ),
     );
   }
@@ -271,7 +271,7 @@ class CommunityContentEmptyList extends StatelessWidget {
           Center(
             child: Text(
               message,
-              style: const TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: AppColors.of(context).textMuted),
               textAlign: TextAlign.center,
             ),
           ),
@@ -301,7 +301,7 @@ class CommunityContentErrorState extends StatelessWidget {
           children: [
             Text(
               message,
-              style: const TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: AppColors.of(context).textMuted),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
@@ -327,12 +327,15 @@ class CommunityContentPageLoader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
+    return Padding(
       padding: EdgeInsets.symmetric(vertical: 16),
       child: Center(
         child: Text(
           '불러오는 중...',
-          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          style: TextStyle(
+            color: AppColors.of(context).textMuted,
+            fontSize: 12,
+          ),
         ),
       ),
     );
@@ -389,7 +392,7 @@ class CommunityLikeButton extends StatelessWidget {
         child: Opacity(
           opacity: isEnabled ? 1 : 0.65,
           child: Material(
-            color: AppColors.surfaceSubtle,
+            color: AppColors.of(context).surfaceSubtle,
             borderRadius: BorderRadius.circular(999),
             child: InkWell(
               onTap: onTap,
@@ -408,16 +411,16 @@ class CommunityLikeButton extends StatelessWidget {
                             : PhosphorIconsRegular.heart,
                         size: 15,
                         color: isLiked
-                            ? AppColors.error
-                            : AppColors.controlInactive,
+                            ? AppColors.of(context).error
+                            : AppColors.of(context).controlInactive,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         '공감 $likeCount',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textMuted,
+                          color: AppColors.of(context).textMuted,
                         ),
                       ),
                     ],
@@ -470,15 +473,15 @@ class CommunityLikeInline extends StatelessWidget {
                       : PhosphorIconsRegular.heart,
                   size: 18,
                   color: isLiked
-                      ? AppColors.error
-                      : AppColors.controlInactive,
+                      ? AppColors.of(context).error
+                      : AppColors.of(context).controlInactive,
                 ),
                 const SizedBox(width: 5),
                 Text(
                   '$likeCount',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textMuted,
+                    color: AppColors.of(context).textMuted,
                   ),
                 ),
               ],
@@ -506,15 +509,18 @@ class CommunityLikeCount extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
+            Icon(
               PhosphorIconsRegular.heart,
               size: 16,
-              color: AppColors.controlInactive,
+              color: AppColors.of(context).controlInactive,
             ),
             const SizedBox(width: 4),
             Text(
               '$likeCount',
-              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.of(context).textMuted,
+              ),
             ),
           ],
         ),
@@ -545,7 +551,7 @@ class CommunityMoreButton extends StatelessWidget {
       icon: Icon(
         PhosphorIconsRegular.dotsThree,
         size: iconSize,
-        color: AppColors.textMuted,
+        color: AppColors.of(context).textMuted,
       ),
     );
   }
@@ -558,13 +564,13 @@ class CommunityMenuTile extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.color = AppColors.textBody,
+    this.destructive = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  final Color color;
+  final bool destructive;
 
   @override
   Widget build(BuildContext context) {
@@ -573,7 +579,7 @@ class CommunityMenuTile extends StatelessWidget {
       child: RecordDialogActionTile(
         icon: icon,
         label: label,
-        destructive: color == AppColors.error,
+        destructive: destructive,
         onTap: onTap,
       ),
     );

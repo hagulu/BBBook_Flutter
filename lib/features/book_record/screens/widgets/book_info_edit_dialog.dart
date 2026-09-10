@@ -88,10 +88,10 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
   late String? _isbn13 = widget.book.isbn13;
   String? _errorText;
 
-  static const _labelStyle = TextStyle(
+  TextStyle get _labelStyle => TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.w600,
-    color: AppColors.textMuted,
+    color: AppColors.of(context).textMuted,
   );
 
   @override
@@ -359,9 +359,17 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
             onRemove: _clearThumbnail,
           ),
           const SizedBox(height: 20),
-          _labeledField(label: '제목', controller: _titleController, maxLength: 255),
+          _labeledField(
+            label: '제목',
+            controller: _titleController,
+            maxLength: 255,
+          ),
           const SizedBox(height: 10),
-          _labeledField(label: '저자', controller: _authorController, maxLength: 255),
+          _labeledField(
+            label: '저자',
+            controller: _authorController,
+            maxLength: 255,
+          ),
           const SizedBox(height: 10),
           _labeledField(
             label: '출판사',
@@ -396,14 +404,15 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
             const SizedBox(height: 8),
             Text(
               _errorText!,
-              style: const TextStyle(color: AppColors.error, fontSize: 12),
+              style: TextStyle(
+                color: AppColors.of(context).error,
+                fontSize: 12,
+              ),
             ),
           ],
         ],
       ),
-      buttons: [
-        RecordDialogButton(label: '저장', onPressed: _save),
-      ],
+      buttons: [RecordDialogButton(label: '저장', onPressed: _save)],
     );
   }
 }
@@ -420,12 +429,12 @@ class _IsbnField extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'ISBN',
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: AppColors.textMuted,
+            color: AppColors.of(context).textMuted,
           ),
         ),
         const SizedBox(height: 4),
@@ -435,31 +444,31 @@ class _IsbnField extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
             decoration: BoxDecoration(
-              color: AppColors.surfaceSubtle,
+              color: AppColors.of(context).surfaceSubtle,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   PhosphorIconsRegular.link,
                   size: 15,
-                  color: AppColors.accentForeground,
+                  color: AppColors.of(context).accentForeground,
                 ),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     isbn13 ?? '책 정보 연결',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.accentForeground,
+                      color: AppColors.of(context).accentForeground,
                     ),
                   ),
                 ),
-                const Icon(
+                Icon(
                   PhosphorIconsRegular.caretRight,
                   size: 14,
-                  color: AppColors.accentForeground,
+                  color: AppColors.of(context).accentForeground,
                 ),
               ],
             ),

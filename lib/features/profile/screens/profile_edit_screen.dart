@@ -244,8 +244,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const AppBarTitle('프로필 수정'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: _loading
@@ -291,20 +291,22 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         vertical: 14,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceSubtle,
+                        color: AppColors.of(context).surfaceSubtle,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         _email!,
-                        style: const TextStyle(color: AppColors.textMuted),
+                        style: TextStyle(
+                          color: AppColors.of(context).textMuted,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
+                    Text(
                       '이메일은 변경할 수 없습니다',
                       style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textMuted,
+                        color: AppColors.of(context).textMuted,
                       ),
                     ),
                   ],
@@ -322,9 +324,9 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                       child: Text(
                         '회원 탈퇴',
                         style: TextStyle(
-                          color: AppColors.textMuted,
+                          color: AppColors.of(context).textMuted,
                           decoration: TextDecoration.underline,
-                          decorationColor: AppColors.textMuted,
+                          decorationColor: AppColors.of(context).textMuted,
                         ),
                       ),
                     ),
@@ -345,7 +347,7 @@ class _FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+      style: TextStyle(fontSize: 13, color: AppColors.of(context).textMuted),
     );
   }
 }
@@ -360,12 +362,12 @@ class _ButtonSpinnerLabel extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const SizedBox(
+        SizedBox(
           width: 16,
           height: 16,
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            color: AppColors.textStrong,
+            color: AppColors.of(context).textStrong,
           ),
         ),
         const SizedBox(width: 10),
@@ -400,7 +402,11 @@ class _AvatarEditor extends StatelessWidget {
           clipBehavior: Clip.none,
           children: [
             ClipOval(
-              child: SizedBox(width: size, height: size, child: _image()),
+              child: SizedBox(
+                width: size,
+                height: size,
+                child: _image(context),
+              ),
             ),
             Positioned(
               right: 0,
@@ -408,14 +414,14 @@ class _AvatarEditor extends StatelessWidget {
               child: Container(
                 width: 28,
                 height: 28,
-                decoration: const BoxDecoration(
-                  color: AppColors.accentFill,
+                decoration: BoxDecoration(
+                  color: AppColors.of(context).accentFill,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   PhosphorIconsRegular.camera,
                   size: 15,
-                  color: AppColors.textStrong,
+                  color: AppColors.of(context).textStrong,
                 ),
               ),
             ),
@@ -425,7 +431,7 @@ class _AvatarEditor extends StatelessWidget {
     );
   }
 
-  Widget _image() {
+  Widget _image(BuildContext context) {
     if (imageFile != null) {
       return Image.file(imageFile!, fit: BoxFit.cover);
     }
@@ -434,22 +440,22 @@ class _AvatarEditor extends StatelessWidget {
       return Image.network(
         url,
         fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _initial(),
+        errorBuilder: (context, error, stackTrace) => _initial(context),
       );
     }
-    return _initial();
+    return _initial(context);
   }
 
-  Widget _initial() {
+  Widget _initial(BuildContext context) {
     return ColoredBox(
-      color: AppColors.accentSurface,
+      color: AppColors.of(context).accentSurface,
       child: Center(
         child: Text(
           nickname.isEmpty ? '?' : nickname[0].toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 28,
             fontWeight: FontWeight.bold,
-            color: AppColors.accentForeground,
+            color: AppColors.of(context).accentForeground,
           ),
         ),
       ),

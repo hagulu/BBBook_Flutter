@@ -43,8 +43,8 @@ class _LocalStorageMigrationScreenState
       child: Scaffold(
         appBar: AppBar(
           title: const AppBarTitle('로컬 저장으로 전환'),
-          backgroundColor: AppColors.pageBackground,
-          foregroundColor: AppColors.textStrong,
+          backgroundColor: AppColors.of(context).pageBackground,
+          foregroundColor: AppColors.of(context).textStrong,
           automaticallyImplyLeading: completed || failed,
         ),
         body: SafeArea(
@@ -60,7 +60,7 @@ class _LocalStorageMigrationScreenState
                     _ => '기록과 메모·독후감 이미지를 기기에 옮기고 있어요',
                   },
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: AppColors.textStrong,
+                    color: AppColors.of(context).textStrong,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -75,8 +75,8 @@ class _LocalStorageMigrationScreenState
                       '완료될 때까지 앱을 켜 두세요. '
                           '모두 옮기기 전에는 서버 기록을 지우지 않습니다.',
                   },
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
+                  style: TextStyle(
+                    color: AppColors.of(context).textMuted,
                     height: 1.5,
                   ),
                 ),
@@ -91,8 +91,8 @@ class _LocalStorageMigrationScreenState
                       value: state.imageProgress,
                       minHeight: 8,
                       borderRadius: BorderRadius.circular(999),
-                      color: AppColors.progressFill,
-                      backgroundColor: AppColors.border,
+                      color: AppColors.of(context).progressFill,
+                      backgroundColor: AppColors.of(context).border,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -137,14 +137,14 @@ class _LocalStorageMigrationScreenState
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceSubtle,
+                      color: AppColors.of(context).surfaceSubtle,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '이미지 ${state.unavailableImages}장은 서버에서 더 이상 받을 수 '
                       '없어 옮기지 못했습니다.',
-                      style: const TextStyle(
-                        color: AppColors.textBody,
+                      style: TextStyle(
+                        color: AppColors.of(context).textBody,
                         height: 1.5,
                       ),
                     ),
@@ -206,20 +206,20 @@ class _StageRow extends StatelessWidget {
             width: 22,
             height: 22,
             child: done
-                ? const Icon(
+                ? Icon(
                     PhosphorIconsFill.checkCircle,
                     size: 20,
-                    color: AppColors.accentForeground,
+                    color: AppColors.of(context).accentForeground,
                   )
                 : active
                 ? const Padding(
                     padding: EdgeInsets.all(2),
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(
+                : Icon(
                     PhosphorIconsRegular.circle,
                     size: 20,
-                    color: AppColors.controlInactive,
+                    color: AppColors.of(context).controlInactive,
                   ),
           ),
           const SizedBox(width: 12),
@@ -228,8 +228,8 @@ class _StageRow extends StatelessWidget {
               label,
               style: TextStyle(
                 color: done || active
-                    ? AppColors.textStrong
-                    : AppColors.textMuted,
+                    ? AppColors.of(context).textStrong
+                    : AppColors.of(context).textMuted,
                 fontWeight: active ? FontWeight.w600 : FontWeight.w400,
               ),
             ),

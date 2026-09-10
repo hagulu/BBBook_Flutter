@@ -30,7 +30,7 @@ class UnlinkedFinishedBanner extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Material(
-        color: AppColors.accentSurface.withValues(alpha: 0.35),
+        color: AppColors.of(context).accentSurface.withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
@@ -39,35 +39,35 @@ class UnlinkedFinishedBanner extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   PhosphorIconsRegular.link,
                   size: 18,
-                  color: AppColors.accentForeground,
+                  color: AppColors.of(context).accentForeground,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'ISBN 미연결 ${unlinked.length}권 있어요',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textStrong,
+                      color: AppColors.of(context).textStrong,
                     ),
                   ),
                 ),
-                const Text(
+                Text(
                   '연결하기',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.accentForeground,
+                    color: AppColors.of(context).accentForeground,
                   ),
                 ),
                 const SizedBox(width: 2),
-                const Icon(
+                Icon(
                   PhosphorIconsRegular.caretRight,
                   size: 14,
-                  color: AppColors.accentForeground,
+                  color: AppColors.of(context).accentForeground,
                 ),
               ],
             ),

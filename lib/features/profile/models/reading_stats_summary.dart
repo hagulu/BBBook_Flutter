@@ -26,10 +26,12 @@ class ReadingStatsCategory {
   final double ratio;
 
   /// [colorHex]가 유효한 HEX 문자열이 아니면(카테고리 마스터 캐시에 없는
-  /// 경우 포함) 회색([AppColors.border])으로 대체한다(`stats-screen.md`
+  /// 경우 포함) 회색([AppColors.categoryFallback])으로 대체한다(`stats-screen.md`
   /// §1-4).
   Color get color {
-    if (!_kHexColorPattern.hasMatch(colorHex)) return AppColors.border;
+    if (!_kHexColorPattern.hasMatch(colorHex)) {
+      return AppColors.categoryFallback;
+    }
     final normalized = colorHex.replaceFirst('#', '');
     final expanded = normalized.length == 3
         ? normalized.split('').map((c) => '$c$c').join()

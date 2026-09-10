@@ -47,9 +47,9 @@ class _ReviewBodyState extends State<_ReviewBody> {
     final review = widget.review;
 
     if (review.isHidden) {
-      return const Text(
+      return Text(
         '숨김 처리된 리뷰입니다.',
-        style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+        style: TextStyle(fontSize: 13, color: AppColors.of(context).textMuted),
       );
     }
 
@@ -62,7 +62,7 @@ class _ReviewBodyState extends State<_ReviewBody> {
           StarRatingDisplay(
             rating: review.rating!,
             size: 13,
-            filledColor: AppColors.accentGraphic,
+            filledColor: AppColors.of(context).accentGraphic,
           ),
           if (content != null) const SizedBox(height: 6),
         ],
@@ -76,21 +76,24 @@ class _ReviewBodyState extends State<_ReviewBody> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceSubtle,
+                  color: AppColors.of(context).surfaceSubtle,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       PhosphorIconsRegular.eyeSlash,
                       size: 14,
-                      color: AppColors.textMuted,
+                      color: AppColors.of(context).textMuted,
                     ),
                     SizedBox(width: 6),
                     Text(
                       '스포일러가 포함되어 있어요. 눌러서 보기',
-                      style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.of(context).textMuted,
+                      ),
                     ),
                   ],
                 ),
@@ -105,9 +108,9 @@ class _ReviewBodyState extends State<_ReviewBody> {
               content,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: AppColors.textBody,
+                color: AppColors.of(context).textBody,
                 height: 1.4,
               ),
             ),

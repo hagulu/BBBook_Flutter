@@ -116,10 +116,10 @@ class BoolIconOption extends StatelessWidget {
             decoration: BoxDecoration(
               color: value
                   ? activeColor.withValues(alpha: 0.12)
-                  : AppColors.surface,
+                  : AppColors.of(context).surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: value ? activeColor : AppColors.border,
+                color: value ? activeColor : AppColors.of(context).border,
                 width: value ? 1.5 : 1,
               ),
             ),
@@ -129,7 +129,9 @@ class BoolIconOption extends StatelessWidget {
                 Icon(
                   value ? filledIcon : regularIcon,
                   size: iconSize,
-                  color: value ? activeColor : AppColors.controlInactive,
+                  color: value
+                      ? activeColor
+                      : AppColors.of(context).controlInactive,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -138,7 +140,7 @@ class BoolIconOption extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: value ? FontWeight.bold : FontWeight.w500,
-                    color: value ? activeColor : AppColors.textBody,
+                    color: value ? activeColor : AppColors.of(context).textBody,
                   ),
                 ),
               ],
@@ -176,11 +178,13 @@ class _OptionCell<T> extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 2),
             decoration: BoxDecoration(
               color: selected
-                  ? AppColors.accentSurface.withValues(alpha: 0.35)
-                  : AppColors.surface,
+                  ? AppColors.of(context).accentSurface.withValues(alpha: 0.35)
+                  : AppColors.of(context).surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: selected ? AppColors.accentForeground : AppColors.border,
+                color: selected
+                    ? AppColors.of(context).accentForeground
+                    : AppColors.of(context).border,
                 width: selected ? 1.5 : 1,
               ),
             ),
@@ -191,8 +195,8 @@ class _OptionCell<T> extends StatelessWidget {
                   option.icon,
                   size: option.iconSize,
                   color: selected
-                      ? AppColors.accentForeground
-                      : AppColors.controlInactive,
+                      ? AppColors.of(context).accentForeground
+                      : AppColors.of(context).controlInactive,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -202,8 +206,8 @@ class _OptionCell<T> extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: selected ? FontWeight.bold : FontWeight.w500,
                     color: selected
-                        ? AppColors.accentForeground
-                        : AppColors.textBody,
+                        ? AppColors.of(context).accentForeground
+                        : AppColors.of(context).textBody,
                   ),
                 ),
               ],

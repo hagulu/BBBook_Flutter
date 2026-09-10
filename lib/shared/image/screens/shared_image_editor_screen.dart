@@ -197,8 +197,8 @@ class _SharedImageEditorScreenState extends State<_SharedImageEditorScreen> {
           CropRotateTool.flip,
           CropRotateTool.reset,
         ],
-        style: const CropRotateEditorStyle(
-          cropCornerColor: AppColors.accentFill,
+        style: CropRotateEditorStyle(
+          cropCornerColor: AppColors.of(context).accentFill,
         ),
         // OCR 프로필은 크롭 화면이 곧 첫 화면이라 "이전"이 없다. 시스템
         // 뒤로 가기 제스처가 이 라우트를 그냥 pop 해버리면 같은 화면이
@@ -226,7 +226,7 @@ class _SharedImageEditorScreenState extends State<_SharedImageEditorScreen> {
   // accentGraphic을 쓴다 — 미선택 아이콘 색(연회색 0xFFEEEEEE)과 밝기 차이가
   // 있어야 선택 상태가 또렷이 구분된다(라임은 미선택 색과 밝기가 비슷해
   // 색상 차이만으로 구분해야 함).
-  PaintEditorConfigs get _paintEditorConfigs => const PaintEditorConfigs(
+  PaintEditorConfigs get _paintEditorConfigs => PaintEditorConfigs(
     tools: [
       PaintMode.line,
       PaintMode.dashLine,
@@ -240,7 +240,7 @@ class _SharedImageEditorScreenState extends State<_SharedImageEditorScreen> {
     showToggleFillButton: false,
     style: PaintEditorStyle(
       initialStrokeWidth: 4,
-      bottomBarActiveItemColor: AppColors.accentGraphic,
+      bottomBarActiveItemColor: AppColors.of(context).accentGraphic,
     ),
   );
 
@@ -418,7 +418,9 @@ class _SharedImageEditorScreenState extends State<_SharedImageEditorScreen> {
     _pendingCropExit = _CropExitAction.finishWhole;
     await state.done();
     await Future.delayed(const Duration(milliseconds: 600));
-    if (mounted && state.mounted && _pendingCropExit == _CropExitAction.finishWhole) {
+    if (mounted &&
+        state.mounted &&
+        _pendingCropExit == _CropExitAction.finishWhole) {
       _pendingCropExit = null;
     }
   }

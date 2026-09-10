@@ -66,7 +66,7 @@ class _ScrollableMessage extends StatelessWidget {
                 children: [
                   Text(
                     text,
-                    style: const TextStyle(color: AppColors.textMuted),
+                    style: TextStyle(color: AppColors.of(context).textMuted),
                   ),
                   if (onRetry != null) ...[
                     const SizedBox(height: 8),

@@ -58,10 +58,10 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
   FinishConfirmResult? _finishOptions;
   String? _errorText;
 
-  static const _labelStyle = TextStyle(
+  TextStyle get _labelStyle => TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.w600,
-    color: AppColors.textMuted,
+    color: AppColors.of(context).textMuted,
   );
 
   @override
@@ -285,7 +285,10 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
             const SizedBox(height: 8),
             Text(
               _errorText!,
-              style: const TextStyle(color: AppColors.error, fontSize: 12),
+              style: TextStyle(
+                color: AppColors.of(context).error,
+                fontSize: 12,
+              ),
             ),
           ],
         ],

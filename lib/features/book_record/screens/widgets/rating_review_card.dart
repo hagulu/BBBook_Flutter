@@ -81,12 +81,9 @@ class RatingReviewCard extends ConsumerWidget {
             borderRadius: BorderRadius.circular(12),
             child: Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.surfaceSubtle,
+                color: AppColors.of(context).surfaceSubtle,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -100,8 +97,8 @@ class RatingReviewCard extends ConsumerWidget {
                   fontSize: 14,
                   height: 1.4,
                   color: hasReview
-                      ? AppColors.textBody
-                      : AppColors.textMuted,
+                      ? AppColors.of(context).textBody
+                      : AppColors.of(context).textMuted,
                 ),
               ),
             ),

@@ -80,7 +80,9 @@ Future<String?> captureMemoQuoteWithOcr(BuildContext context) async {
     BookNoteMemoOcrAnalysis? analysis;
     AppLoading.show(context);
     try {
-      analysis = await const BookNoteMemoOcrService().analyzeImage(analyzedPath);
+      analysis = await const BookNoteMemoOcrService().analyzeImage(
+        analyzedPath,
+      );
     } catch (_) {
       analysis = null;
     } finally {
@@ -151,7 +153,7 @@ class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
       backgroundColor: AppColors.mediaBackdrop,
       appBar: AppBar(
         backgroundColor: AppColors.mediaBackdrop,
-        foregroundColor: AppColors.surface,
+        foregroundColor: AppColors.mediaForeground,
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
           tooltip: '닫기',
@@ -164,8 +166,8 @@ class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
                 ? null
                 : () => setState(() => _selectedIndexes = <int>{}),
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.surface,
-              disabledForegroundColor: AppColors.surface.withValues(
+              foregroundColor: AppColors.mediaForeground,
+              disabledForegroundColor: AppColors.mediaForeground.withValues(
                 alpha: 0.4,
               ),
             ),
@@ -176,8 +178,8 @@ class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
                 ? null
                 : () => Navigator.of(context).pop(_selectedText()),
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.surface,
-              disabledForegroundColor: AppColors.surface.withValues(
+              foregroundColor: AppColors.mediaForeground,
+              disabledForegroundColor: AppColors.mediaForeground.withValues(
                 alpha: 0.4,
               ),
             ),
@@ -218,7 +220,7 @@ class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
                         ? '발췌할 단어를 드래그해 주세요.'
                         : '${_selectedIndexes.length}개 단어가 선택되었습니다.',
                     style: TextStyle(
-                      color: AppColors.surface.withValues(alpha: 0.84),
+                      color: AppColors.mediaForeground.withValues(alpha: 0.84),
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -237,7 +239,9 @@ class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
     final lines = <int, List<BookNoteMemoOcrWord>>{};
     for (final index in selected) {
       final word = widget.analysis.words[index];
-      lines.putIfAbsent(word.lineOrder, () => <BookNoteMemoOcrWord>[]).add(word);
+      lines
+          .putIfAbsent(word.lineOrder, () => <BookNoteMemoOcrWord>[])
+          .add(word);
     }
     final orderedLines = lines.entries.toList()
       ..sort((left, right) => left.key.compareTo(right.key));

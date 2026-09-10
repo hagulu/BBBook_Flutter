@@ -72,18 +72,21 @@ class DiscussionOptionsEditor extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              const Text(
+              Text(
                 '기타',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textStrong,
+                  color: AppColors.of(context).textStrong,
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
+              Text(
                 '자동 제공',
-                style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.of(context).textMuted,
+                ),
               ),
             ],
           ),
@@ -137,7 +140,9 @@ class _OptionRow extends StatelessWidget {
               ],
               style: TextStyle(
                 fontSize: 14,
-                color: isLocked ? AppColors.textMuted : AppColors.textBody,
+                color: isLocked
+                    ? AppColors.of(context).textMuted
+                    : AppColors.of(context).textBody,
               ),
               decoration: InputDecoration(
                 counterText: '',
@@ -155,12 +160,12 @@ class _OptionRow extends StatelessWidget {
             ),
           ),
           if (isLocked)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(right: 10),
               child: Icon(
                 PhosphorIconsRegular.lock,
                 size: 16,
-                color: AppColors.controlInactive,
+                color: AppColors.of(context).controlInactive,
               ),
             )
           else
@@ -197,7 +202,9 @@ class _IconAction extends StatelessWidget {
       icon: Icon(
         icon,
         size: 16,
-        color: onPressed == null ? AppColors.border : AppColors.controlInactive,
+        color: onPressed == null
+            ? AppColors.of(context).border
+            : AppColors.of(context).controlInactive,
       ),
       onPressed: onPressed,
     );

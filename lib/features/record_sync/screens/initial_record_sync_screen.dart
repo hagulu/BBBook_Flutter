@@ -66,17 +66,17 @@ class _InitialRecordSyncScreen extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(
+                  Icon(
                     PhosphorIconsRegular.bookOpen,
                     size: 54,
-                    color: AppColors.accentForeground,
+                    color: AppColors.of(context).accentForeground,
                   ),
                   const SizedBox(height: 24),
                   Text(
                     failed ? '기록을 준비하지 못했어요' : '내 기록을 준비하고 있어요',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: AppColors.textStrong,
+                      color: AppColors.of(context).textStrong,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -86,8 +86,8 @@ class _InitialRecordSyncScreen extends StatelessWidget {
                         ? '네트워크 상태를 확인한 뒤 다시 시도해 주세요.'
                         : '저장된 노트와 독후감을 안전하게 정리하고 있어요.\n잠시만 기다려 주세요.',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.textMuted,
+                    style: TextStyle(
+                      color: AppColors.of(context).textMuted,
                       height: 1.5,
                     ),
                   ),
@@ -102,8 +102,8 @@ class _InitialRecordSyncScreen extends StatelessWidget {
                         value: progress,
                         minHeight: 8,
                         borderRadius: BorderRadius.circular(999),
-                        color: AppColors.progressFill,
-                        backgroundColor: AppColors.border,
+                        color: AppColors.of(context).progressFill,
+                        backgroundColor: AppColors.of(context).border,
                       ),
                     ),
                     const SizedBox(height: 28),
@@ -195,28 +195,28 @@ class _StageRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = switch (status) {
-      _StageStatus.pending => AppColors.controlInactive,
+      _StageStatus.pending => AppColors.of(context).controlInactive,
       _StageStatus.active ||
-      _StageStatus.completed => AppColors.accentForeground,
-      _StageStatus.failed => AppColors.error,
+      _StageStatus.completed => AppColors.of(context).accentForeground,
+      _StageStatus.failed => AppColors.of(context).error,
     };
     final trailing = switch (status) {
-      _StageStatus.active => const SizedBox.square(
+      _StageStatus.active => SizedBox.square(
         dimension: 18,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          color: AppColors.accentForeground,
+          color: AppColors.of(context).accentForeground,
         ),
       ),
-      _StageStatus.completed => const Icon(
+      _StageStatus.completed => Icon(
         PhosphorIconsFill.checkCircle,
         size: 20,
-        color: AppColors.accentForeground,
+        color: AppColors.of(context).accentForeground,
       ),
-      _StageStatus.failed => const Icon(
+      _StageStatus.failed => Icon(
         PhosphorIconsRegular.warning,
         size: 20,
-        color: AppColors.error,
+        color: AppColors.of(context).error,
       ),
       _StageStatus.pending => const SizedBox(width: 20),
     };
@@ -224,8 +224,8 @@ class _StageRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border.all(color: AppColors.border),
+        color: AppColors.of(context).surface,
+        border: Border.all(color: AppColors.of(context).border),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(

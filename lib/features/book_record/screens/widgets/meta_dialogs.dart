@@ -296,12 +296,12 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
           ),
           if (_source?.platformOptionsKey != null) ...[
             const SizedBox(height: 16),
-            const Text(
+            Text(
               '플랫폼',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textMuted,
+                color: AppColors.of(context).textMuted,
               ),
             ),
             const SizedBox(height: 8),
@@ -338,12 +338,12 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
           ],
           if (_isEbookSelected) ...[
             const SizedBox(height: 16),
-            const Text(
+            Text(
               '전자책 페이지 수',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textMuted,
+                color: AppColors.of(context).textMuted,
               ),
             ),
             const SizedBox(height: 8),
@@ -366,13 +366,19 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
               const SizedBox(height: 6),
               Text(
                 _ebookPagesError!,
-                style: const TextStyle(color: AppColors.error, fontSize: 12),
+                style: TextStyle(
+                  color: AppColors.of(context).error,
+                  fontSize: 12,
+                ),
               ),
             ] else ...[
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 '보는 기기에 맞는 쪽수를 입력하세요',
-                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                style: TextStyle(
+                  color: AppColors.of(context).textMuted,
+                  fontSize: 12,
+                ),
               ),
             ],
           ],
@@ -478,10 +484,13 @@ class _ShortReviewDialogState extends State<_ShortReviewDialog> {
         autofocus: true,
         maxLength: 150,
         maxLines: 5,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           isDense: true,
           hintText: '이 책에 대한 한 줄 평을 남겨보세요.',
-          counterStyle: TextStyle(color: AppColors.textMuted, fontSize: 12),
+          counterStyle: TextStyle(
+            color: AppColors.of(context).textMuted,
+            fontSize: 12,
+          ),
         ),
       ),
       buttons: [
@@ -601,26 +610,28 @@ class _ReadingDateDialog extends StatelessWidget {
         // 이 시트엔 별도 저장 버튼이 없어 탭 자체가 곧 확정이라, 같은 값을
         // 다시 탭했을 때만 콜백이 안 오면 그 상태로 멈춘 것처럼 보인다.
         allowSameValueSelection: true,
-        selectedDayHighlightColor: AppColors.accentFill,
+        selectedDayHighlightColor: AppColors.of(context).accentFill,
         dayBorderRadius: BorderRadius.circular(10),
         yearBorderRadius: BorderRadius.circular(10),
-        selectedDayTextStyle: const TextStyle(
-          color: AppColors.textStrong,
+        selectedDayTextStyle: TextStyle(
+          color: AppColors.of(context).textStrong,
           fontWeight: FontWeight.bold,
         ),
-        todayTextStyle: const TextStyle(
-          color: AppColors.accentForeground,
+        todayTextStyle: TextStyle(
+          color: AppColors.of(context).accentForeground,
           fontWeight: FontWeight.bold,
         ),
-        dayTextStyle: const TextStyle(color: AppColors.textBody),
-        disabledDayTextStyle: const TextStyle(color: AppColors.controlInactive),
-        weekdayLabelTextStyle: const TextStyle(
-          color: AppColors.textMuted,
+        dayTextStyle: TextStyle(color: AppColors.of(context).textBody),
+        disabledDayTextStyle: TextStyle(
+          color: AppColors.of(context).controlInactive,
+        ),
+        weekdayLabelTextStyle: TextStyle(
+          color: AppColors.of(context).textMuted,
           fontWeight: FontWeight.w600,
           fontSize: 12,
         ),
-        controlsTextStyle: const TextStyle(
-          color: AppColors.textStrong,
+        controlsTextStyle: TextStyle(
+          color: AppColors.of(context).textStrong,
           fontWeight: FontWeight.bold,
           fontSize: 15,
         ),

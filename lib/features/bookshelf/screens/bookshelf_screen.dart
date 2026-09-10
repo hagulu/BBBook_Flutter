@@ -67,8 +67,8 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
             controller: _tabController,
             isScrollable: true,
             tabAlignment: TabAlignment.start,
-            labelColor: AppColors.textStrong,
-            unselectedLabelColor: AppColors.textMuted,
+            labelColor: AppColors.of(context).textStrong,
+            unselectedLabelColor: AppColors.of(context).textMuted,
             labelStyle: const TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 13,
@@ -78,7 +78,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
               fontSize: 13,
             ),
             indicator: BoxDecoration(
-              color: AppColors.accentFill,
+              color: AppColors.of(context).accentFill,
               borderRadius: BorderRadius.circular(999),
             ),
             indicatorSize: TabBarIndicatorSize.tab,

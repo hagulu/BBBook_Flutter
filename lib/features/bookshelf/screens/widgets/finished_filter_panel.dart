@@ -40,7 +40,7 @@ class FinishedFilterPanel extends ConsumerWidget {
               label: '명작',
               selected: filter.masterpieceOnly,
               selectedColor: AppColors.highlightGold,
-              selectedTextColor: AppColors.textStrong,
+              selectedTextColor: AppColors.of(context).textStrong,
               selectedBorderColor: null,
               leading: Icon(
                 filter.masterpieceOnly
@@ -48,8 +48,8 @@ class FinishedFilterPanel extends ConsumerWidget {
                     : PhosphorIconsRegular.crown,
                 size: 14,
                 color: filter.masterpieceOnly
-                    ? AppColors.textStrong
-                    : AppColors.textMuted,
+                    ? AppColors.of(context).textStrong
+                    : AppColors.of(context).textMuted,
               ),
               onTap: () => notifier.setMasterpieceOnly(!filter.masterpieceOnly),
             ),
@@ -74,7 +74,8 @@ class FinishedFilterPanel extends ConsumerWidget {
                   selected: filter.categories.contains(category),
                   leading: _CategoryColorDot(
                     color:
-                        categoryColors[category] ?? AppColors.controlInactive,
+                        categoryColors[category] ??
+                        AppColors.of(context).controlInactive,
                   ),
                   onTap: () => notifier.toggleCategory(category),
                 ),
@@ -132,10 +133,10 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 12,
         fontWeight: FontWeight.w600,
-        color: AppColors.textMuted,
+        color: AppColors.of(context).textMuted,
       ),
     );
   }
@@ -162,17 +163,17 @@ class _FilterChip extends StatelessWidget {
     required this.selected,
     required this.onTap,
     this.leading,
-    this.selectedColor = AppColors.accentFill,
-    this.selectedTextColor = AppColors.textStrong,
-    this.selectedBorderColor = AppColors.accentForeground,
+    this.selectedColor,
+    this.selectedTextColor,
+    this.selectedBorderColor,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
   final Widget? leading;
-  final Color selectedColor;
-  final Color selectedTextColor;
+  final Color? selectedColor;
+  final Color? selectedTextColor;
   final Color? selectedBorderColor;
 
   @override
@@ -186,11 +187,18 @@ class _FilterChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           decoration: BoxDecoration(
-            color: selected ? selectedColor : AppColors.surfaceSubtle,
+            color: selected
+                ? (selectedColor ?? AppColors.of(context).accentFill)
+                : AppColors.of(context).surfaceSubtle,
             borderRadius: BorderRadius.circular(999),
             // 밝은 선택 배경은 보더를 함께 써서 상태를 명확히 구분한다.
-            border: selected && selectedBorderColor != null
-                ? Border.all(color: selectedBorderColor!, width: 1.2)
+            border: selected
+                ? Border.all(
+                    color:
+                        selectedBorderColor ??
+                        AppColors.of(context).accentForeground,
+                    width: 1.2,
+                  )
                 : null,
           ),
           child: Row(
@@ -202,7 +210,9 @@ class _FilterChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: selected ? selectedTextColor : AppColors.textMuted,
+                  color: selected
+                      ? (selectedTextColor ?? AppColors.of(context).textStrong)
+                      : AppColors.of(context).textMuted,
                 ),
               ),
             ],

@@ -31,27 +31,30 @@ class MyDiscussionAnswerCard extends StatelessWidget {
                 answer.topicTitle!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textStrong,
+                  color: AppColors.of(context).textStrong,
                 ),
               ),
               const SizedBox(height: 4),
             ],
             if (answer.isHidden)
-              const Text(
+              Text(
                 '숨김 처리된 댓글입니다.',
-                style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.of(context).textMuted,
+                ),
               )
             else if (answer.content != null)
               Text(
                 answer.content!,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textBody,
+                  color: AppColors.of(context).textBody,
                   height: 1.4,
                 ),
               ),

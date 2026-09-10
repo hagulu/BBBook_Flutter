@@ -43,8 +43,8 @@ class BookReflectionDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: AppBarTitle(bookTitle),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: switch (asyncReflection) {
@@ -251,12 +251,12 @@ class _ReflectionBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (reflection.isHidden) {
-      return const Center(
+      return Center(
         child: Padding(
           padding: EdgeInsets.all(32),
           child: Text(
             '숨김 처리된 독후감입니다.',
-            style: TextStyle(color: AppColors.textMuted),
+            style: TextStyle(color: AppColors.of(context).textMuted),
           ),
         ),
       );
@@ -269,12 +269,12 @@ class _ReflectionBody extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: AppColors.of(context).surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
-          boxShadow: const [
+          border: Border.all(color: AppColors.of(context).border),
+          boxShadow: [
             BoxShadow(
-              color: AppColors.shadowSoft,
+              color: AppColors.of(context).shadowSoft,
               blurRadius: 4,
               offset: Offset(0, 1),
             ),
@@ -288,8 +288,8 @@ class _ReflectionBody extends StatelessWidget {
                 Expanded(
                   child: Text(
                     title == null || title.isEmpty ? '제목 없음' : title,
-                    style: const TextStyle(
-                      color: AppColors.textStrong,
+                    style: TextStyle(
+                      color: AppColors.of(context).textStrong,
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
                     ),
@@ -302,8 +302,8 @@ class _ReflectionBody extends StatelessWidget {
                 Expanded(
                   child: Text(
                     _formatDate(reflection.updatedAt),
-                    style: const TextStyle(
-                      color: AppColors.textMuted,
+                    style: TextStyle(
+                      color: AppColors.of(context).textMuted,
                       fontSize: 12,
                     ),
                   ),
@@ -328,8 +328,8 @@ class _ReflectionBody extends StatelessWidget {
                 reflection.contentText?.trim().isNotEmpty == true
                     ? reflection.contentText!.trim()
                     : '내용이 없습니다.',
-                style: const TextStyle(
-                  color: AppColors.textBody,
+                style: TextStyle(
+                  color: AppColors.of(context).textBody,
                   fontSize: 15,
                   height: 1.6,
                 ),
@@ -402,7 +402,7 @@ class _ReflectionRichContentState
         padding: EdgeInsets.zero,
         enableInteractiveSelection: true,
         showCursor: false,
-        customStyles: bookReflectionQuillStyles,
+        customStyles: bookReflectionQuillStyles(context),
         textSpanBuilder: reflectionTextSpanBuilder,
         embedBuilders: [
           ReflectionImageEmbedBuilder(localImagePaths: localImagePaths),
@@ -417,10 +417,10 @@ class _ReflectionNotFound extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Text(
         '독후감을 찾을 수 없습니다.',
-        style: TextStyle(color: AppColors.textMuted),
+        style: TextStyle(color: AppColors.of(context).textMuted),
       ),
     );
   }
@@ -437,9 +437,9 @@ class _ReflectionLoadError extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             '독후감을 불러오지 못했습니다.',
-            style: TextStyle(color: AppColors.textMuted),
+            style: TextStyle(color: AppColors.of(context).textMuted),
           ),
           const SizedBox(height: 8),
           TextButton(onPressed: onRetry, child: const Text('다시 시도')),

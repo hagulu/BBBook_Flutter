@@ -56,7 +56,7 @@ class _ReviewItemState extends State<ReviewItem> {
             CommunityMenuTile(
               icon: PhosphorIconsRegular.trash,
               label: '삭제',
-              color: AppColors.error,
+              destructive: true,
               onTap: () =>
                   Navigator.pop(sheetContext, _ReviewMenuAction.delete),
             ),
@@ -95,7 +95,7 @@ class _ReviewItemState extends State<ReviewItem> {
                         StarRatingDisplay(
                           rating: review.rating!,
                           size: 14,
-                          filledColor: AppColors.accentGraphic,
+                          filledColor: AppColors.of(context).accentGraphic,
                         ),
                         const SizedBox(width: 8),
                       ],
@@ -112,10 +112,10 @@ class _ReviewItemState extends State<ReviewItem> {
                             minWidth: 32,
                             minHeight: 32,
                           ),
-                          icon: const Icon(
+                          icon: Icon(
                             PhosphorIconsRegular.flag,
                             size: 16,
-                            color: AppColors.textMuted,
+                            color: AppColors.of(context).textMuted,
                           ),
                           onPressed: widget.onReport,
                         ),
@@ -124,9 +124,12 @@ class _ReviewItemState extends State<ReviewItem> {
           ),
           const SizedBox(height: 8),
           if (review.isHidden)
-            const Text(
+            Text(
               '숨김 처리된 리뷰입니다.',
-              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.of(context).textMuted,
+              ),
             )
           else ...[
             if (review.isSpoiler && !_spoilerRevealed)
@@ -138,23 +141,23 @@ class _ReviewItemState extends State<ReviewItem> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceSubtle,
+                    color: AppColors.of(context).surfaceSubtle,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         PhosphorIconsRegular.eyeSlash,
                         size: 14,
-                        color: AppColors.textMuted,
+                        color: AppColors.of(context).textMuted,
                       ),
                       SizedBox(width: 6),
                       Text(
                         '스포일러가 포함되어 있어요. 눌러서 보기',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textMuted,
+                          color: AppColors.of(context).textMuted,
                         ),
                       ),
                     ],
@@ -164,9 +167,9 @@ class _ReviewItemState extends State<ReviewItem> {
             else
               Text(
                 review.content ?? '',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textBody,
+                  color: AppColors.of(context).textBody,
                   height: 1.4,
                 ),
               ),

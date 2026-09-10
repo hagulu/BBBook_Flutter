@@ -193,8 +193,8 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: AppBarTitle(state.value?.detail.title ?? '책 상세'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: body,
@@ -220,9 +220,9 @@ class _BottomActionBar extends StatelessWidget {
     return SafeArea(
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        decoration: const BoxDecoration(
-          color: AppColors.pageBackground,
-          border: Border(top: BorderSide(color: AppColors.border)),
+        decoration: BoxDecoration(
+          color: AppColors.of(context).pageBackground,
+          border: Border(top: BorderSide(color: AppColors.of(context).border)),
         ),
         child: Row(
           children: [
@@ -267,9 +267,9 @@ class _ErrorBody extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             '불러오지 못했습니다.',
-            style: TextStyle(color: AppColors.textMuted),
+            style: TextStyle(color: AppColors.of(context).textMuted),
           ),
           const SizedBox(height: 8),
           TextButton(onPressed: onRetry, child: const Text('다시 시도')),
@@ -309,15 +309,17 @@ class _HeroSection extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: AppColors.accentSurface.withValues(alpha: 0.4),
+                color: AppColors.of(
+                  context,
+                ).accentSurface.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 detail.category!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textBody,
+                  color: AppColors.of(context).textBody,
                 ),
               ),
             ),
@@ -326,10 +328,10 @@ class _HeroSection extends StatelessWidget {
           Text(
             detail.title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 20,
-              color: AppColors.textStrong,
+              color: AppColors.of(context).textStrong,
             ),
           ),
           if (detail.author.displayedAuthorOrNull case final author?) ...[
@@ -337,10 +339,10 @@ class _HeroSection extends StatelessWidget {
             Text(
               author,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textMuted,
+                color: AppColors.of(context).textMuted,
               ),
             ),
           ],
@@ -351,7 +353,10 @@ class _HeroSection extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.of(context).textMuted,
+              ),
             ),
           ],
           if (detail.displayRating != null) ...[
@@ -363,10 +368,10 @@ class _HeroSection extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   detail.rating!.toStringAsFixed(1),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textStrong,
+                    color: AppColors.of(context).textStrong,
                   ),
                 ),
               ],
@@ -403,9 +408,9 @@ class _DescriptionCard extends StatefulWidget {
 class _DescriptionCardState extends State<_DescriptionCard> {
   bool _expanded = false;
 
-  static const TextStyle _textStyle = TextStyle(
+  TextStyle get _textStyle => TextStyle(
     fontSize: 14,
-    color: AppColors.textBody,
+    color: AppColors.of(context).textBody,
     height: 1.5,
   );
 
@@ -420,11 +425,11 @@ class _DescriptionCardState extends State<_DescriptionCard> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: AppColors.shadowSoft,
+            color: AppColors.of(context).shadowSoft,
             blurRadius: 4,
             offset: Offset(0, 1),
           ),
@@ -450,7 +455,9 @@ class _DescriptionCardState extends State<_DescriptionCard> {
                 maxLines: _expanded
                     ? null
                     : _DescriptionCard._collapsedMaxLines,
-                overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                overflow: _expanded
+                    ? TextOverflow.visible
+                    : TextOverflow.ellipsis,
               ),
               if (isOverflowing) ...[
                 const SizedBox(height: 8),
@@ -472,10 +479,10 @@ class _DescriptionCardState extends State<_DescriptionCard> {
                             children: [
                               Text(
                                 _expanded ? '접기' : '더보기',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: AppColors.textMuted,
+                                  color: AppColors.of(context).textMuted,
                                 ),
                               ),
                               const SizedBox(width: 2),
@@ -484,7 +491,7 @@ class _DescriptionCardState extends State<_DescriptionCard> {
                                     ? PhosphorIconsRegular.caretUp
                                     : PhosphorIconsRegular.caretDown,
                                 size: 14,
-                                color: AppColors.textMuted,
+                                color: AppColors.of(context).textMuted,
                               ),
                             ],
                           ),

@@ -96,8 +96,8 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: AppBarTitle(widget.bookTitle),
-          backgroundColor: AppColors.pageBackground,
-          foregroundColor: AppColors.textStrong,
+          backgroundColor: AppColors.of(context).pageBackground,
+          foregroundColor: AppColors.of(context).textStrong,
           elevation: 0,
           actions: [
             if (switch (asyncDetail) {
@@ -139,16 +139,16 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
                     PhosphorIconsRegular.highlighter,
                     size: 16,
                     color: _importantOnly
-                        ? AppColors.textStrong
-                        : AppColors.textMuted,
+                        ? AppColors.of(context).textStrong
+                        : AppColors.of(context).textMuted,
                   ),
                   label: const Text('강조 메모만'),
-                  selectedColor: AppColors.highlightGoldSurface,
-                  backgroundColor: AppColors.surface,
-                  side: const BorderSide(color: AppColors.border),
+                  selectedColor: AppColors.of(context).highlightGoldSurface,
+                  backgroundColor: AppColors.of(context).surface,
+                  side: BorderSide(color: AppColors.of(context).border),
                   elevation: 3,
-                  labelStyle: const TextStyle(
-                    color: AppColors.textBody,
+                  labelStyle: TextStyle(
+                    color: AppColors.of(context).textBody,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -164,15 +164,15 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
               tooltip: '메모 빠르게 추가',
               shape: const CircleBorder(),
               backgroundColor: _isSavingMemo
-                  ? AppColors.surfaceSubtle
-                  : AppColors.accentFill,
-              foregroundColor: AppColors.textStrong,
+                  ? AppColors.of(context).surfaceSubtle
+                  : AppColors.of(context).accentFill,
+              foregroundColor: AppColors.of(context).textStrong,
               child: _isSavingMemo
-                  ? const SizedBox.square(
+                  ? SizedBox.square(
                       dimension: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: AppColors.textStrong,
+                        color: AppColors.of(context).textStrong,
                       ),
                     )
                   : const Icon(PhosphorIconsRegular.plus),
@@ -203,10 +203,10 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
                   maxLength: 255,
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => unawaited(_saveTitle()),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textStrong,
+                    color: AppColors.of(context).textStrong,
                   ),
                   decoration: const InputDecoration(
                     hintText: '제목을 입력하세요 (선택)',
@@ -549,7 +549,7 @@ class BookNoteMemoTimelineItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final typeStyle = _NoteMemoTypeStyle.of(memo.type);
+    final typeStyle = _NoteMemoTypeStyle.of(context, memo.type);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -623,8 +623,8 @@ class BookNoteMemoTimelineItem extends StatelessWidget {
                                     memo.pageLabel!,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: AppColors.textMuted,
+                                    style: TextStyle(
+                                      color: AppColors.of(context).textMuted,
                                       fontSize: 10,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -640,8 +640,8 @@ class BookNoteMemoTimelineItem extends StatelessWidget {
                             _formatDateTime(memo.createdAt),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textMuted,
+                            style: TextStyle(
+                              color: AppColors.of(context).textMuted,
                               fontSize: 10,
                               fontWeight: FontWeight.w500,
                             ),
@@ -673,14 +673,14 @@ class BookNoteMemoTimelineItem extends StatelessWidget {
                     ),
                     if (showDivider) ...[
                       const SizedBox(height: 26),
-                      const Align(
+                      Align(
                         alignment: Alignment.center,
                         child: SizedBox(
                           width: 312,
                           child: Divider(
                             height: 1,
                             thickness: 1,
-                            color: AppColors.border,
+                            color: AppColors.of(context).border,
                           ),
                         ),
                       ),
@@ -728,28 +728,29 @@ class _NoteMemoTypeStyle {
 
   Color get sidebar => Color.lerp(background, foreground, 0.32)!;
 
-  static _NoteMemoTypeStyle of(BookNoteMemoType type) => switch (type) {
-    BookNoteMemoType.summary => const _NoteMemoTypeStyle(
-      icon: PhosphorIconsRegular.notePencil,
-      foreground: AppColors.memoSummaryForeground,
-      background: AppColors.memoSummarySurface,
-    ),
-    BookNoteMemoType.quote => const _NoteMemoTypeStyle(
-      icon: PhosphorIconsRegular.quotes,
-      foreground: AppColors.memoQuoteForeground,
-      background: AppColors.memoQuoteSurface,
-    ),
-    BookNoteMemoType.thought => const _NoteMemoTypeStyle(
-      icon: PhosphorIconsRegular.lightbulb,
-      foreground: AppColors.memoThoughtForeground,
-      background: AppColors.memoThoughtSurface,
-    ),
-    BookNoteMemoType.photo => const _NoteMemoTypeStyle(
-      icon: PhosphorIconsRegular.imageSquare,
-      foreground: AppColors.memoPhotoForeground,
-      background: AppColors.memoPhotoSurface,
-    ),
-  };
+  static _NoteMemoTypeStyle of(BuildContext context, BookNoteMemoType type) =>
+      switch (type) {
+        BookNoteMemoType.summary => _NoteMemoTypeStyle(
+          icon: PhosphorIconsRegular.notePencil,
+          foreground: AppColors.of(context).memoSummaryForeground,
+          background: AppColors.of(context).memoSummarySurface,
+        ),
+        BookNoteMemoType.quote => _NoteMemoTypeStyle(
+          icon: PhosphorIconsRegular.quotes,
+          foreground: AppColors.of(context).memoQuoteForeground,
+          background: AppColors.of(context).memoQuoteSurface,
+        ),
+        BookNoteMemoType.thought => _NoteMemoTypeStyle(
+          icon: PhosphorIconsRegular.lightbulb,
+          foreground: AppColors.of(context).memoThoughtForeground,
+          background: AppColors.of(context).memoThoughtSurface,
+        ),
+        BookNoteMemoType.photo => _NoteMemoTypeStyle(
+          icon: PhosphorIconsRegular.imageSquare,
+          foreground: AppColors.of(context).memoPhotoForeground,
+          background: AppColors.of(context).memoPhotoSurface,
+        ),
+      };
 }
 
 class _QuoteContent extends StatelessWidget {
@@ -764,10 +765,10 @@ class _QuoteContent extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '“',
             style: TextStyle(
-              color: AppColors.memoQuoteForeground,
+              color: AppColors.of(context).memoQuoteForeground,
               fontSize: 46,
               height: 0.85,
               fontWeight: FontWeight.w700,
@@ -790,7 +791,7 @@ class _MemoRichText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final baseStyle = TextStyle(
-      color: AppColors.textBody,
+      color: AppColors.of(context).textBody,
       height: 1.55,
       fontSize: 14,
       fontStyle: italic ? FontStyle.italic : FontStyle.normal,
@@ -805,8 +806,8 @@ class _MemoRichText extends StatelessWidget {
       spans.add(
         TextSpan(
           text: match.group(1),
-          style: const TextStyle(
-            backgroundColor: AppColors.highlightGoldSurface,
+          style: TextStyle(
+            backgroundColor: AppColors.of(context).highlightGoldSurface,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -875,12 +876,12 @@ class _BrokenImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: AppColors.surfaceSubtle,
+    return ColoredBox(
+      color: AppColors.of(context).surfaceSubtle,
       child: Center(
         child: Icon(
           PhosphorIconsRegular.imageSquare,
-          color: AppColors.textMuted,
+          color: AppColors.of(context).textMuted,
           size: 30,
         ),
       ),
@@ -906,13 +907,13 @@ class _EmptyMemos extends StatelessWidget {
                   ? PhosphorIconsRegular.highlighter
                   : PhosphorIconsRegular.notePencil,
               size: 42,
-              color: AppColors.controlInactive,
+              color: AppColors.of(context).controlInactive,
             ),
             const SizedBox(height: 14),
             Text(
               importantOnly ? '강조 메모가 없습니다.' : '아직 메모가 없습니다.',
-              style: const TextStyle(
-                color: AppColors.textStrong,
+              style: TextStyle(
+                color: AppColors.of(context).textStrong,
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
               ),
@@ -923,7 +924,10 @@ class _EmptyMemos extends StatelessWidget {
                   ? '강조 표시를 한 기록이 여기에 모입니다.'
                   : '요약, 발췌, 생각, 사진을 차곡차곡 남겨보세요.',
               textAlign: TextAlign.center,
-              style: const TextStyle(color: AppColors.textMuted, height: 1.4),
+              style: TextStyle(
+                color: AppColors.of(context).textMuted,
+                height: 1.4,
+              ),
             ),
           ],
         ),
@@ -937,10 +941,10 @@ class _NoteNotFound extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Text(
         '노트를 찾을 수 없습니다.',
-        style: TextStyle(color: AppColors.textMuted),
+        style: TextStyle(color: AppColors.of(context).textMuted),
       ),
     );
   }
@@ -957,9 +961,9 @@ class _LoadError extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             '노트를 불러오지 못했습니다.',
-            style: TextStyle(color: AppColors.textMuted),
+            style: TextStyle(color: AppColors.of(context).textMuted),
           ),
           const SizedBox(height: 8),
           TextButton(onPressed: onRetry, child: const Text('다시 시도')),

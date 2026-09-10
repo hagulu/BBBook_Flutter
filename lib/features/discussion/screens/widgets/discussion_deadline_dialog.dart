@@ -20,10 +20,8 @@ Future<void> showDiscussionDeadlineDialog(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _DeadlineDialog(
-      initialClosesAt: initialClosesAt,
-      onSave: onSave,
-    ),
+    builder: (_) =>
+        _DeadlineDialog(initialClosesAt: initialClosesAt, onSave: onSave),
   );
 }
 
@@ -89,9 +87,12 @@ class _DeadlineDialogState extends State<_DeadlineDialog> {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '마감일이 지나면 토론이 자동으로 닫힙니다. 비워 두면 마감일 없이 열어 둡니다.',
-            style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.of(context).textMuted,
+            ),
           ),
           const SizedBox(height: 14),
           InkWell(
@@ -100,7 +101,7 @@ class _DeadlineDialogState extends State<_DeadlineDialog> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: AppColors.surfaceSubtle,
+                color: AppColors.of(context).surfaceSubtle,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -113,8 +114,8 @@ class _DeadlineDialogState extends State<_DeadlineDialog> {
                       style: TextStyle(
                         fontSize: 14,
                         color: selected == null
-                            ? AppColors.textMuted
-                            : AppColors.textStrong,
+                            ? AppColors.of(context).textMuted
+                            : AppColors.of(context).textStrong,
                       ),
                     ),
                   ),
@@ -125,19 +126,19 @@ class _DeadlineDialogState extends State<_DeadlineDialog> {
                         minWidth: 32,
                         minHeight: 32,
                       ),
-                      icon: const Icon(
+                      icon: Icon(
                         PhosphorIconsRegular.x,
                         size: 16,
-                        color: AppColors.textMuted,
+                        color: AppColors.of(context).textMuted,
                       ),
                       onPressed: _isSaving
                           ? null
                           : () => setState(() => _selected = null),
                     ),
-                  const Icon(
+                  Icon(
                     PhosphorIconsRegular.calendarBlank,
                     size: 18,
-                    color: AppColors.controlInactive,
+                    color: AppColors.of(context).controlInactive,
                   ),
                 ],
               ),
@@ -147,7 +148,10 @@ class _DeadlineDialogState extends State<_DeadlineDialog> {
             const SizedBox(height: 10),
             Text(
               _errorMessage!,
-              style: const TextStyle(fontSize: 12, color: AppColors.error),
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.of(context).error,
+              ),
             ),
           ],
         ],

@@ -88,8 +88,8 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: AppBarTitle(widget.bookTitle, subtitle: '주제 토론'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: SafeArea(
@@ -117,8 +117,8 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
         onPressed: _openForm,
         tooltip: '토론 작성',
         shape: const CircleBorder(),
-        backgroundColor: AppColors.accentFill,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).accentFill,
+        foregroundColor: AppColors.of(context).textStrong,
         child: const Icon(PhosphorIconsRegular.plus),
       ),
     );
@@ -173,10 +173,10 @@ class _TopicList extends StatelessWidget {
           children: [
             filterRow,
             const SizedBox(height: 68),
-            const Center(
+            Center(
               child: Text(
                 '아직 등록된 토론이 없습니다.',
-                style: TextStyle(color: AppColors.textMuted),
+                style: TextStyle(color: AppColors.of(context).textMuted),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -237,7 +237,9 @@ class _FilterChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.accentFill : AppColors.surfaceSubtle,
+          color: isSelected
+              ? AppColors.of(context).accentFill
+              : AppColors.of(context).surfaceSubtle,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
@@ -245,7 +247,9 @@ class _FilterChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: isSelected ? AppColors.textStrong : AppColors.textMuted,
+            color: isSelected
+                ? AppColors.of(context).textStrong
+                : AppColors.of(context).textMuted,
           ),
         ),
       ),

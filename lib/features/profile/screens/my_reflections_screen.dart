@@ -58,7 +58,10 @@ class _MyReflectionsScreenState extends ConsumerState<MyReflectionsScreen> {
         ? null
         : await ref
               .read(bookReflectionRepositoryProvider)
-              .findByServerId(ownerUserId: ownerUserId, serverId: reflection.id);
+              .findByServerId(
+                ownerUserId: ownerUserId,
+                serverId: reflection.id,
+              );
 
     if (!mounted) return;
     if (ownerUserId == null || local == null) {
@@ -87,8 +90,8 @@ class _MyReflectionsScreenState extends ConsumerState<MyReflectionsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const AppBarTitle('내가 작성한 독후감'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: SafeArea(
@@ -130,12 +133,12 @@ class _ReflectionList extends StatelessWidget {
       return ListView(
         controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        children: const [
+        children: [
           SizedBox(height: 80),
           Center(
             child: Text(
               '작성한 독후감이 없습니다',
-              style: TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: AppColors.of(context).textMuted),
             ),
           ),
         ],

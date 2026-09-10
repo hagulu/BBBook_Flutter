@@ -25,9 +25,12 @@ class DiscussionTopicCard extends StatelessWidget {
     return CommunityContentCard(
       onTap: onTap,
       child: topic.isHidden
-          ? const Text(
+          ? Text(
               '숨김 처리된 토론입니다.',
-              style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.of(context).textMuted,
+              ),
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,10 +49,10 @@ class DiscussionTopicCard extends StatelessWidget {
                   topic.title ?? '',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textStrong,
+                    color: AppColors.of(context).textStrong,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -57,9 +60,9 @@ class DiscussionTopicCard extends StatelessWidget {
                   topic.isSpoiler ? '스포일러가 포함된 토론입니다' : (topic.content ?? ''),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textMuted,
+                    color: AppColors.of(context).textMuted,
                     height: 1.4,
                   ),
                 ),

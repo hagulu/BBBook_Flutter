@@ -107,11 +107,14 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
               trailing: answer.isHidden ? null : _buildMenu(answer),
             ),
           if (answer.isHidden)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: 10),
               child: Text(
                 '숨김 처리된 답변입니다.',
-                style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.of(context).textMuted,
+                ),
               ),
             )
           else ...[
@@ -133,9 +136,9 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
             else ...[
               Text(
                 answer.content ?? '',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textBody,
+                  color: AppColors.of(context).textBody,
                   height: 1.5,
                 ),
               ),
@@ -160,10 +163,10 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
       return IconButton(
         padding: EdgeInsets.zero,
         tooltip: '답변 신고',
-        icon: const Icon(
+        icon: Icon(
           PhosphorIconsRegular.flag,
           size: 16,
-          color: AppColors.textMuted,
+          color: AppColors.of(context).textMuted,
         ),
         onPressed: widget.onReport,
       );
@@ -196,7 +199,7 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
             CommunityMenuTile(
               icon: PhosphorIconsRegular.trash,
               label: '삭제',
-              color: AppColors.error,
+              destructive: true,
               onTap: () =>
                   Navigator.pop(sheetContext, _AnswerMenuAction.delete),
             ),
@@ -237,7 +240,7 @@ class _EditForm extends StatelessWidget {
           autofocus: true,
           minLines: 3,
           maxLines: 8,
-          style: const TextStyle(fontSize: 14, color: AppColors.textBody),
+          style: TextStyle(fontSize: 14, color: AppColors.of(context).textBody),
         ),
         const SizedBox(height: 10),
         Row(
@@ -245,7 +248,9 @@ class _EditForm extends StatelessWidget {
           children: [
             TextButton(
               onPressed: isSaving ? null : onCancel,
-              style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.of(context).textMuted,
+              ),
               child: const Text('취소'),
             ),
             const SizedBox(width: 4),
@@ -256,8 +261,8 @@ class _EditForm extends StatelessWidget {
                 return FilledButton(
                   onPressed: canSubmit ? onSubmit : null,
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.accentFill,
-                    foregroundColor: AppColors.textStrong,
+                    backgroundColor: AppColors.of(context).accentFill,
+                    foregroundColor: AppColors.of(context).textStrong,
                     minimumSize: const Size(64, 36),
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     shape: RoundedRectangleBorder(

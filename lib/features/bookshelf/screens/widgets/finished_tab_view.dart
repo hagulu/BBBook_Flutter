@@ -47,7 +47,8 @@ const _kFinishedGroupHeaderHeightGrowth = 20.0;
 
 double _scaledFinishedGroupHeaderHeight(double textScale) {
   final growth = (textScale - 1.0).clamp(0.0, double.infinity);
-  return _kFinishedGroupHeaderHeight + growth * _kFinishedGroupHeaderHeightGrowth;
+  return _kFinishedGroupHeaderHeight +
+      growth * _kFinishedGroupHeaderHeightGrowth;
 }
 
 /// 완독 탭 상단 컨트롤과 콘텐츠 사이 여백(스크롤 오프셋 계산에도 사용).
@@ -79,7 +80,8 @@ const _kFinishedListChipRowHeightGrowth = 13.0;
 
 double _scaledFinishedListChipRowHeight(double textScale) {
   final growth = (textScale - 1.0).clamp(0.0, double.infinity);
-  return _kFinishedListChipRowHeight + growth * _kFinishedListChipRowHeightGrowth;
+  return _kFinishedListChipRowHeight +
+      growth * _kFinishedListChipRowHeightGrowth;
 }
 
 /// 완독 탭 목록 표시 방식. 그리드(썸네일 위주)와 리스트(제목/작가/출판사/
@@ -104,7 +106,8 @@ const _kFinishedViewModePrefKey = 'finished_view_mode';
 /// 리스트 모드의 책 사이 구분선과 카테고리/태그 알약 사이 구분선이 같은
 /// 색을 쓰도록 하나로 통일한 값. `AppColors.border`(불투명)보다는 옅고,
 /// 완전 무채색 흐림보다는 살짝 진해 "보일랑 말랑" 정도로 보이게 한다.
-final _kFinishedDividerColor = AppColors.border.withValues(alpha: 0.7);
+Color _finishedDividerColor(BuildContext context) =>
+    AppColors.of(context).border.withValues(alpha: 0.7);
 
 /// 완독 탭: 검색/필터가 없는 기본 모드에서는 월별 그룹 그리드 + 우측 연/월
 /// 인덱스(Google 포토 사진 스크러버 참고: 평소엔 얇은 트랙만 보이다 드래그 시
@@ -610,7 +613,7 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(text, style: const TextStyle(color: AppColors.textMuted)),
+          Text(text, style: TextStyle(color: AppColors.of(context).textMuted)),
           if (onRetry != null) ...[
             const SizedBox(height: 8),
             TextButton(onPressed: onRetry, child: const Text('다시 시도')),
@@ -706,13 +709,13 @@ class _MonthHeaderDelegate extends SliverPersistentHeaderDelegate {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       alignment: Alignment.centerLeft,
-      color: AppColors.pageBackground,
+      color: AppColors.of(context).pageBackground,
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 14,
-          color: AppColors.textStrong,
+          color: AppColors.of(context).textStrong,
         ),
       ),
     );
@@ -761,7 +764,7 @@ class _FinishedIconBar extends ConsumerWidget {
                 searchOpen
                     ? PhosphorIconsRegular.x
                     : PhosphorIconsRegular.magnifyingGlass,
-                color: AppColors.accentForeground,
+                color: AppColors.of(context).accentForeground,
                 size: 20,
               ),
               onPressed: onSearchTap,
@@ -779,7 +782,7 @@ class _FinishedIconBar extends ConsumerWidget {
                     isListMode
                         ? PhosphorIconsRegular.squaresFour
                         : PhosphorIconsRegular.listBullets,
-                    color: AppColors.accentForeground,
+                    color: AppColors.of(context).accentForeground,
                     size: 20,
                   ),
                   onPressed: onViewModeTap,
@@ -797,7 +800,7 @@ class _FinishedIconBar extends ConsumerWidget {
                     isPublic
                         ? PhosphorIconsRegular.globe
                         : PhosphorIconsRegular.lock,
-                    color: AppColors.accentForeground,
+                    color: AppColors.of(context).accentForeground,
                     size: 20,
                   ),
                   onPressed: privacyState.isLoading
@@ -821,9 +824,9 @@ class _FinishedIconBar extends ConsumerWidget {
                   ),
                   padding: EdgeInsets.zero,
                   tooltip: '완독 책장 공개 안내',
-                  icon: const Icon(
+                  icon: Icon(
                     PhosphorIconsRegular.question,
-                    color: AppColors.controlInactive,
+                    color: AppColors.of(context).controlInactive,
                     size: 18,
                   ),
                   onPressed: () => AppAlert.show(
@@ -861,8 +864,10 @@ class _FilterSheetResetButton extends ConsumerWidget {
       style: TextButton.styleFrom(
         minimumSize: const Size(0, 32),
         padding: const EdgeInsets.symmetric(horizontal: 10),
-        foregroundColor: AppColors.accentForeground,
-        backgroundColor: AppColors.accentSurface.withValues(alpha: 0.4),
+        foregroundColor: AppColors.of(context).accentForeground,
+        backgroundColor: AppColors.of(
+          context,
+        ).accentSurface.withValues(alpha: 0.4),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       ),
       onPressed: () {
@@ -917,7 +922,7 @@ class _FinishedSearchBar extends StatelessWidget {
                   isDense: true,
                   hintText: '책 이름, 작가, 출판사 검색',
                   filled: true,
-                  fillColor: AppColors.surfaceSubtle,
+                  fillColor: AppColors.of(context).surfaceSubtle,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
@@ -926,20 +931,20 @@ class _FinishedSearchBar extends StatelessWidget {
                     horizontal: 16,
                     vertical: 12,
                   ),
-                  prefixIcon: const Icon(
+                  prefixIcon: Icon(
                     PhosphorIconsRegular.magnifyingGlass,
                     size: 20,
-                    color: AppColors.textMuted,
+                    color: AppColors.of(context).textMuted,
                   ),
                   suffixIcon: ValueListenableBuilder<TextEditingValue>(
                     valueListenable: searchController,
                     builder: (context, value, _) {
                       if (value.text.isEmpty) return const SizedBox.shrink();
                       return IconButton(
-                        icon: const Icon(
+                        icon: Icon(
                           PhosphorIconsRegular.x,
                           size: 18,
-                          color: AppColors.textMuted,
+                          color: AppColors.of(context).textMuted,
                         ),
                         onPressed: onClearSearch,
                       );
@@ -961,7 +966,7 @@ class _FinishedSearchBar extends StatelessWidget {
                     style: TextButton.styleFrom(
                       minimumSize: const Size(0, 32),
                       padding: const EdgeInsets.symmetric(horizontal: 8),
-                      foregroundColor: AppColors.textStrong,
+                      foregroundColor: AppColors.of(context).textStrong,
                     ),
                     onPressed: onToggleFilterPanel,
                     icon: Icon(
@@ -969,14 +974,14 @@ class _FinishedSearchBar extends StatelessWidget {
                           ? PhosphorIconsFill.funnel
                           : PhosphorIconsRegular.funnel,
                       size: 16,
-                      color: AppColors.textStrong,
+                      color: AppColors.of(context).textStrong,
                     ),
                     label: Text(
                       filterActiveCount > 0 ? '필터 $filterActiveCount' : '필터',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textStrong,
+                        color: AppColors.of(context).textStrong,
                       ),
                     ),
                   ),
@@ -1000,11 +1005,11 @@ class _ScrubBubble extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.accentFill,
+        color: AppColors.of(context).accentFill,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: AppColors.shadowStrong,
+            color: AppColors.of(context).shadowStrong,
             blurRadius: 8,
             offset: Offset(0, 2),
           ),
@@ -1012,8 +1017,8 @@ class _ScrubBubble extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: AppColors.textStrong,
+        style: TextStyle(
+          color: AppColors.of(context).textStrong,
           fontWeight: FontWeight.bold,
           fontSize: 13,
         ),
@@ -1074,7 +1079,7 @@ class _FinishedBookCard extends StatelessWidget {
                     child: Icon(
                       PhosphorIconsFill.linkBreak,
                       size: 14,
-                      color: AppColors.error,
+                      color: AppColors.of(context).error,
                     ),
                   ),
                 ),
@@ -1083,10 +1088,10 @@ class _FinishedBookCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             book.title,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 12,
-              color: AppColors.textStrong,
+              color: AppColors.of(context).textStrong,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -1171,10 +1176,10 @@ class _FinishedBookListRow extends StatelessWidget {
                           book.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
-                            color: AppColors.textStrong,
+                            color: AppColors.of(context).textStrong,
                           ),
                         ),
                       ),
@@ -1182,10 +1187,10 @@ class _FinishedBookListRow extends StatelessWidget {
                         const SizedBox(width: 4),
                         Semantics(
                           label: 'ISBN 미연결',
-                          child: const Icon(
+                          child: Icon(
                             PhosphorIconsFill.linkBreak,
                             size: 12,
-                            color: AppColors.error,
+                            color: AppColors.of(context).error,
                           ),
                         ),
                       ],
@@ -1201,8 +1206,8 @@ class _FinishedBookListRow extends StatelessWidget {
                           if (author != null)
                             TextSpan(
                               text: author,
-                              style: const TextStyle(
-                                color: AppColors.textStrong,
+                              style: TextStyle(
+                                color: AppColors.of(context).textStrong,
                               ),
                             ),
                           if (author != null && publisher != null)
@@ -1212,9 +1217,9 @@ class _FinishedBookListRow extends StatelessWidget {
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: AppColors.textMuted,
+                        color: AppColors.of(context).textMuted,
                       ),
                     ),
                   ],
@@ -1259,7 +1264,10 @@ class _FinishedBookListRow extends StatelessWidget {
               left: _kFinishedListThumbWidth + 12,
               right: 8,
               bottom: 0,
-              child: Container(height: 1, color: _kFinishedDividerColor),
+              child: Container(
+                height: 1,
+                color: _finishedDividerColor(context),
+              ),
             ),
         ],
       ),
@@ -1285,7 +1293,7 @@ class _ChipDivider extends StatelessWidget {
         width: 1,
         height: 12,
         margin: const EdgeInsets.only(right: 6),
-        color: _kFinishedDividerColor,
+        color: _finishedDividerColor(context),
       ),
     );
   }
@@ -1308,17 +1316,17 @@ class _ListChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
         color: color == null
-            ? AppColors.surfaceSubtle
+            ? AppColors.of(context).surfaceSubtle
             : color!.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(999),
       ),
       alignment: Alignment.center,
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w600,
-          color: AppColors.textBody,
+          color: AppColors.of(context).textBody,
         ),
       ),
     );
@@ -1341,7 +1349,9 @@ class _StarRow extends StatelessWidget {
           size: 12,
           // 완독 목록에 표시되는 별점은 YES24 회원 평점이 아니라 서비스 안에서
           // 직접 기록한 "내 평점"이라 아이덴티티 컬러로 구분한다.
-          color: i < filled ? AppColors.accentGraphic : AppColors.border,
+          color: i < filled
+              ? AppColors.of(context).accentGraphic
+              : AppColors.of(context).border,
         ),
       ),
     );

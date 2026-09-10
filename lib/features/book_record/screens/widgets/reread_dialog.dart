@@ -87,10 +87,10 @@ class _RereadDialogState extends State<_RereadDialog> {
             child: Text(
               '$_count',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textStrong,
+                color: AppColors.of(context).textStrong,
               ),
             ),
           ),
@@ -106,7 +106,10 @@ class _RereadDialogState extends State<_RereadDialog> {
           onPressed: () => Navigator.of(context).pop(
             // 또 볼래는 이제 이 팝업이 아니라 책 기록 화면에서 직접
             // 토글한다 — 여기서는 그 값을 그대로 되돌려 보낸다.
-            RereadCountUpdated(_count, wantToReread: widget.initialWantToReread),
+            RereadCountUpdated(
+              _count,
+              wantToReread: widget.initialWantToReread,
+            ),
           ),
         ),
       ],
@@ -123,14 +126,18 @@ class _StepperButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.surfaceSubtle,
+      color: AppColors.of(context).surfaceSubtle,
       shape: const CircleBorder(),
       child: InkWell(
         onTap: onPressed,
         customBorder: const CircleBorder(),
         child: Padding(
           padding: const EdgeInsets.all(10),
-          child: Icon(icon, color: AppColors.accentForeground, size: 20),
+          child: Icon(
+            icon,
+            color: AppColors.of(context).accentForeground,
+            size: 20,
+          ),
         ),
       ),
     );

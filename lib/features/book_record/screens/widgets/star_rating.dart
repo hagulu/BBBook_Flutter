@@ -32,7 +32,7 @@ class StarRatingDisplay extends StatelessWidget {
         (i) => Icon(
           i < filled ? PhosphorIconsFill.star : PhosphorIconsRegular.star,
           size: size,
-          color: i < filled ? filledColor : AppColors.border,
+          color: i < filled ? filledColor : AppColors.of(context).border,
         ),
       ),
     );
@@ -70,7 +70,9 @@ class StarRatingInput extends StatelessWidget {
                 onChanged(starIndex == filled ? 0 : starIndex.toDouble()),
             icon: Icon(
               i < filled ? PhosphorIconsFill.star : PhosphorIconsRegular.star,
-              color: i < filled ? AppColors.accentGraphic : AppColors.border,
+              color: i < filled
+                  ? AppColors.of(context).accentGraphic
+                  : AppColors.of(context).border,
               size: 28,
             ),
           );

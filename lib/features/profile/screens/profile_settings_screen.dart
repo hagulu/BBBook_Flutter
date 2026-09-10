@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/theme/theme_mode_provider.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
@@ -27,20 +28,29 @@ class ProfileSettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const AppBarTitle('설정'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-        child: _StorageModeCard(
-          isLocal: isLocal,
-          serverCleanupPending:
-              isLocal &&
-              (ref.watch(serverDeletePendingProvider).valueOrNull ?? false),
-          onSwitchToLocal: () => _startMigration(context, ref),
-          onSwitchToServer: () => _startReverseMigration(context, ref),
-          onRetryServerCleanup: () => _retryServerCleanup(context, ref),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _ThemeModeCard(),
+            const SizedBox(height: 16),
+            _StorageModeCard(
+              isLocal: isLocal,
+              serverCleanupPending:
+                  isLocal &&
+                  (ref.watch(serverDeletePendingProvider).valueOrNull ?? false),
+              onSwitchToLocal: () => _startMigration(context, ref),
+              onSwitchToServer: () => _startReverseMigration(context, ref),
+              onRetryServerCleanup: () => _retryServerCleanup(context, ref),
+            ),
+            const SizedBox(height: 20),
+            const _OpenSourceLicenseMenu(),
+          ],
         ),
       ),
     );
@@ -82,7 +92,10 @@ class ProfileSettingsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _startReverseMigration(BuildContext context, WidgetRef ref) async {
+  Future<void> _startReverseMigration(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
     final confirmed = await AppConfirm.show(
       context,
       title: '서버 저장으로 전환',
@@ -122,6 +135,126 @@ class ProfileSettingsScreen extends ConsumerWidget {
   }
 }
 
+/// Flutter의 [LicenseRegistry]에 앱에 포함된 패키지 라이선스가 자동 등록된다.
+/// [showLicensePage]는 패키지별 목록과 개별 라이선스 전문 화면을 함께 제공한다.
+class _OpenSourceLicenseMenu extends StatelessWidget {
+  const _OpenSourceLicenseMenu();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(
+        PhosphorIconsRegular.scales,
+        color: colors.accentForeground,
+        size: 22,
+      ),
+      title: Text(
+        '오픈소스 라이선스',
+        style: TextStyle(color: colors.textMuted, fontSize: 14),
+      ),
+      trailing: Icon(
+        PhosphorIconsRegular.caretRight,
+        color: colors.controlInactive,
+        size: 18,
+      ),
+      onTap: () => showLicensePage(
+        context: context,
+        applicationName: '책책책',
+        applicationLegalese: '이 앱은 오픈소스 소프트웨어를 포함합니다.',
+      ),
+    );
+  }
+}
+
+class _ThemeModeCard extends ConsumerWidget {
+  const _ThemeModeCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(themeModeProvider);
+    Future<void> select(ThemeMode selectedMode) async {
+      final saved = await ref
+          .read(themeModeProvider.notifier)
+          .select(selectedMode);
+      if (!saved && context.mounted) {
+        AppSnackBar.error(context, '테마 설정을 저장하지 못했습니다. 다시 선택해 주세요.');
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '화면 테마',
+          style: TextStyle(
+            color: AppColors.of(context).textStrong,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SegmentedButton<ThemeMode>(
+          expandedInsets: EdgeInsets.zero,
+          style: ButtonStyle(
+            padding: const WidgetStatePropertyAll(
+              EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+            ),
+          ),
+          segments: const [
+            ButtonSegment(
+              value: ThemeMode.system,
+              label: _ThemeModeButtonLabel(
+                icon: PhosphorIconsRegular.deviceMobile,
+                label: '시스템',
+              ),
+            ),
+            ButtonSegment(
+              value: ThemeMode.light,
+              label: _ThemeModeButtonLabel(
+                icon: PhosphorIconsRegular.sun,
+                label: '라이트',
+              ),
+            ),
+            ButtonSegment(
+              value: ThemeMode.dark,
+              label: _ThemeModeButtonLabel(
+                icon: PhosphorIconsRegular.moon,
+                label: '다크 테마',
+              ),
+            ),
+          ],
+          selected: {mode},
+          showSelectedIcon: false,
+          onSelectionChanged: (selection) {
+            select(selection.single);
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _ThemeModeButtonLabel extends StatelessWidget {
+  const _ThemeModeButtonLabel({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 20),
+        const SizedBox(height: 5),
+        Text(label, textAlign: TextAlign.center),
+      ],
+    );
+  }
+}
+
 class _StorageModeCard extends StatelessWidget {
   const _StorageModeCard({
     required this.isLocal,
@@ -144,9 +277,9 @@ class _StorageModeCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.of(context).border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -158,13 +291,13 @@ class _StorageModeCard extends StatelessWidget {
                     ? PhosphorIconsRegular.deviceMobile
                     : PhosphorIconsRegular.cloud,
                 size: 20,
-                color: AppColors.accentForeground,
+                color: AppColors.of(context).accentForeground,
               ),
               const SizedBox(width: 8),
               Text(
                 isLocal ? '로컬 저장' : '서버 저장',
-                style: const TextStyle(
-                  color: AppColors.textStrong,
+                style: TextStyle(
+                  color: AppColors.of(context).textStrong,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -176,7 +309,10 @@ class _StorageModeCard extends StatelessWidget {
             isLocal
                 ? '기록과 이미지를 이 기기에만 보관합니다. 서버로 올리지 않습니다.'
                 : '기록은 서버에 저장되고, 이미지는 열어 본 것부터 이 기기에 저장됩니다.',
-            style: const TextStyle(color: AppColors.textMuted, height: 1.5),
+            style: TextStyle(
+              color: AppColors.of(context).textMuted,
+              height: 1.5,
+            ),
           ),
           if (!isLocal) ...[
             const SizedBox(height: 14),
@@ -193,10 +329,10 @@ class _StorageModeCard extends StatelessWidget {
           ],
           if (serverCleanupPending) ...[
             const SizedBox(height: 14),
-            const Text(
+            Text(
               '서버에 남아 있는 기록 정리가 끝나지 않았습니다. 로컬 데이터는 이미 '
               '이 기기에 있으니, 정리만 다시 실행하면 됩니다.',
-              style: TextStyle(color: AppColors.error, height: 1.5),
+              style: TextStyle(color: AppColors.of(context).error, height: 1.5),
             ),
             const SizedBox(height: 10),
             OutlinedButton(

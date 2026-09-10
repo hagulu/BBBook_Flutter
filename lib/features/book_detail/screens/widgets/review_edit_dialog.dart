@@ -113,10 +113,13 @@ class _ReviewEditDialogState extends State<_ReviewEditDialog> {
             controller: _contentController,
             maxLength: 150,
             maxLines: 4,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               isDense: true,
               hintText: '리뷰 내용을 입력해주세요',
-              counterStyle: TextStyle(color: AppColors.textMuted, fontSize: 12),
+              counterStyle: TextStyle(
+                color: AppColors.of(context).textMuted,
+                fontSize: 12,
+              ),
             ),
           ),
           if (_errorText != null)
@@ -124,7 +127,10 @@ class _ReviewEditDialogState extends State<_ReviewEditDialog> {
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 _errorText!,
-                style: const TextStyle(color: AppColors.error, fontSize: 12),
+                style: TextStyle(
+                  color: AppColors.of(context).error,
+                  fontSize: 12,
+                ),
               ),
             ),
         ],
@@ -154,8 +160,8 @@ class _SpoilerToggle extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isSpoiler
-              ? AppColors.highlightGoldSurface
-              : AppColors.surfaceSubtle,
+              ? AppColors.of(context).highlightGoldSurface
+              : AppColors.of(context).surfaceSubtle,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Row(
@@ -165,8 +171,8 @@ class _SpoilerToggle extends StatelessWidget {
               PhosphorIconsRegular.eyeSlash,
               size: 14,
               color: isSpoiler
-                  ? AppColors.memoThoughtForeground
-                  : AppColors.textMuted,
+                  ? AppColors.of(context).memoThoughtForeground
+                  : AppColors.of(context).textMuted,
             ),
             const SizedBox(width: 5),
             Text(
@@ -175,8 +181,8 @@ class _SpoilerToggle extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 color: isSpoiler
-                    ? AppColors.memoThoughtForeground
-                    : AppColors.textMuted,
+                    ? AppColors.of(context).memoThoughtForeground
+                    : AppColors.of(context).textMuted,
               ),
             ),
           ],

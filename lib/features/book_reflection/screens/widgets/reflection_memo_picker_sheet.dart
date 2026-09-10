@@ -99,7 +99,7 @@ class _NoteList extends ConsumerWidget {
       AsyncData(:final value) => ListView.separated(
         itemCount: value.length,
         separatorBuilder: (_, _) =>
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.of(context).border),
         itemBuilder: (context, index) {
           final summary = value[index];
           final title = summary.note.title?.trim();
@@ -111,19 +111,19 @@ class _NoteList extends ConsumerWidget {
                   : title,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.textStrong,
+              style: TextStyle(
+                color: AppColors.of(context).textStrong,
                 fontWeight: FontWeight.w600,
               ),
             ),
             subtitle: Text(
               '메모 ${summary.memoCount}개',
-              style: const TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: AppColors.of(context).textMuted),
             ),
-            trailing: const Icon(
+            trailing: Icon(
               PhosphorIconsRegular.caretRight,
               size: 18,
-              color: AppColors.controlInactive,
+              color: AppColors.of(context).controlInactive,
             ),
             onTap: () => onSelected(summary.note.id),
           );
@@ -184,7 +184,7 @@ class _ReflectionMemoListScreenState
     final asyncDetail = ref.watch(bookNoteDetailProvider(args));
 
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: AppColors.of(context).pageBackground,
       appBar: AppBar(
         leading: IconButton(
           onPressed: () => Navigator.of(context).pop(),
@@ -192,8 +192,8 @@ class _ReflectionMemoListScreenState
           icon: const Icon(PhosphorIconsRegular.x),
         ),
         title: const AppBarTitle('메모 선택'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -207,16 +207,16 @@ class _ReflectionMemoListScreenState
                 PhosphorIconsRegular.highlighter,
                 size: 16,
                 color: _importantOnly
-                    ? AppColors.textStrong
-                    : AppColors.textMuted,
+                    ? AppColors.of(context).textStrong
+                    : AppColors.of(context).textMuted,
               ),
               label: const Text('강조 메모만'),
-              selectedColor: AppColors.highlightGoldSurface,
-              backgroundColor: AppColors.surface,
-              side: const BorderSide(color: AppColors.border),
+              selectedColor: AppColors.of(context).highlightGoldSurface,
+              backgroundColor: AppColors.of(context).surface,
+              side: BorderSide(color: AppColors.of(context).border),
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              labelStyle: const TextStyle(
-                color: AppColors.textBody,
+              labelStyle: TextStyle(
+                color: AppColors.of(context).textBody,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -289,7 +289,9 @@ class _MemoList extends StatelessWidget {
       separatorBuilder: (_, _) => const SizedBox.shrink(),
       itemBuilder: (context, index) {
         final memo = memos[index];
-        final hasContent = stripMemoHighlightMarkup(memo.content).trim().isNotEmpty;
+        final hasContent = stripMemoHighlightMarkup(
+          memo.content,
+        ).trim().isNotEmpty;
         final isSelectable = memo.hasImage || hasContent;
         return BookNoteMemoTimelineItem(
           memo: memo,
@@ -313,9 +315,12 @@ class _EmptyMessage extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 32, color: AppColors.controlInactive),
+          Icon(icon, size: 32, color: AppColors.of(context).controlInactive),
           const SizedBox(height: 10),
-          Text(message, style: const TextStyle(color: AppColors.textMuted)),
+          Text(
+            message,
+            style: TextStyle(color: AppColors.of(context).textMuted),
+          ),
         ],
       ),
     );

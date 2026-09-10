@@ -74,7 +74,7 @@ class _CenteredMessage extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(text, style: const TextStyle(color: AppColors.textMuted)),
+          Text(text, style: TextStyle(color: AppColors.of(context).textMuted)),
           if (action != null) ...[const SizedBox(height: 8), action!],
         ],
       ),
@@ -151,29 +151,29 @@ class _ProfileCard extends StatelessWidget {
               children: [
                 Text(
                   nickname,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textStrong,
+                    color: AppColors.of(context).textStrong,
                   ),
                 ),
                 if (profile.email != null) ...[
                   const SizedBox(height: 2),
                   Text(
                     profile.email!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textMuted,
+                      color: AppColors.of(context).textMuted,
                     ),
                   ),
                 ],
               ],
             ),
           ),
-          const Icon(
+          Icon(
             PhosphorIconsRegular.caretRight,
             size: 18,
-            color: AppColors.textMuted,
+            color: AppColors.of(context).textMuted,
           ),
         ],
       ),
@@ -194,13 +194,13 @@ class _Avatar extends StatelessWidget {
     if (url == null || url.isEmpty) {
       return CircleAvatar(
         radius: size / 2,
-        backgroundColor: AppColors.accentSurface,
+        backgroundColor: AppColors.of(context).accentSurface,
         child: Text(
           _initialOf(nickname),
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: AppColors.accentForeground,
+            color: AppColors.of(context).accentForeground,
           ),
         ),
       );
@@ -213,13 +213,13 @@ class _Avatar extends StatelessWidget {
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => CircleAvatar(
           radius: size / 2,
-          backgroundColor: AppColors.accentSurface,
+          backgroundColor: AppColors.of(context).accentSurface,
           child: Text(
             _initialOf(nickname),
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: AppColors.accentForeground,
+              color: AppColors.of(context).accentForeground,
             ),
           ),
         ),
@@ -260,19 +260,19 @@ class _StatsCard extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
+              Text(
                 '독서 리포트',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.6,
-                  color: AppColors.textMuted,
+                  color: AppColors.of(context).textMuted,
                 ),
               ),
-              const Icon(
+              Icon(
                 PhosphorIconsRegular.caretRight,
                 size: 16,
-                color: AppColors.textMuted,
+                color: AppColors.of(context).textMuted,
               ),
             ],
           ),
@@ -299,7 +299,10 @@ class _StatsPlaceholder extends StatelessWidget {
     return SizedBox(
       height: 52,
       child: Center(
-        child: Text(text, style: const TextStyle(color: AppColors.textMuted)),
+        child: Text(
+          text,
+          style: TextStyle(color: AppColors.of(context).textMuted),
+        ),
       ),
     );
   }
@@ -322,7 +325,7 @@ class _StatsRow extends StatelessWidget {
               label: '완독',
             ),
           ),
-          const VerticalDivider(width: 1, color: AppColors.border),
+          VerticalDivider(width: 1, color: AppColors.of(context).border),
           Expanded(
             child: _StatsColumn(
               value: _formatThousands(stats.totalPages),
@@ -330,7 +333,7 @@ class _StatsRow extends StatelessWidget {
               label: '읽은 페이지',
             ),
           ),
-          const VerticalDivider(width: 1, color: AppColors.border),
+          VerticalDivider(width: 1, color: AppColors.of(context).border),
           Expanded(
             child: _StatsColumn(
               value: stats.mostReadCategory?.categoryName ?? '–',
@@ -365,10 +368,10 @@ class _StatsColumn extends StatelessWidget {
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textStrong,
+                  color: AppColors.of(context).textStrong,
                 ),
               ),
             ),
@@ -376,9 +379,9 @@ class _StatsColumn extends StatelessWidget {
               const SizedBox(width: 1),
               Text(
                 unit!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  color: AppColors.textMuted,
+                  color: AppColors.of(context).textMuted,
                 ),
               ),
             ],
@@ -387,7 +390,10 @@ class _StatsColumn extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+          style: TextStyle(
+            fontSize: 12,
+            color: AppColors.of(context).textMuted,
+          ),
         ),
       ],
     );
@@ -439,7 +445,7 @@ class _MyContentCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(left: 4, bottom: 8),
           child: Text(
             '내 글 모아보기',
@@ -447,7 +453,7 @@ class _MyContentCard extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.6,
-              color: AppColors.textMuted,
+              color: AppColors.of(context).textMuted,
             ),
           ),
         ),
@@ -494,22 +500,26 @@ class _ContentShortcutButton extends StatelessWidget {
         children: [
           DecoratedBox(
             decoration: BoxDecoration(
-              color: AppColors.accentSurface,
+              color: AppColors.of(context).accentSurface,
               borderRadius: BorderRadius.circular(10),
             ),
             child: SizedBox.square(
               dimension: 36,
-              child: Icon(icon, size: 19, color: AppColors.accentForeground),
+              child: Icon(
+                icon,
+                size: 19,
+                color: AppColors.of(context).accentForeground,
+              ),
             ),
           ),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: AppColors.textStrong,
+              color: AppColors.of(context).textStrong,
             ),
           ),
         ],
@@ -555,21 +565,21 @@ class _MenuRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: AppColors.accentForeground),
+            Icon(icon, size: 20, color: AppColors.of(context).accentForeground),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: AppColors.textStrong,
+                  color: AppColors.of(context).textStrong,
                 ),
               ),
             ),
-            const Icon(
+            Icon(
               PhosphorIconsRegular.caretRight,
               size: 16,
-              color: AppColors.textMuted,
+              color: AppColors.of(context).textMuted,
             ),
           ],
         ),
@@ -588,7 +598,7 @@ class _LogoutButton extends ConsumerWidget {
       child: TextButton.icon(
         onPressed: () => _logout(context, ref),
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.error,
+          foregroundColor: AppColors.of(context).error,
           padding: const EdgeInsets.symmetric(horizontal: 4),
         ),
         icon: const Icon(PhosphorIconsRegular.signOut, size: 18),
@@ -636,11 +646,14 @@ class _FooterLinks extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           _FooterLink(label: '이용약관', path: '/terms'),
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(horizontal: 10),
             child: SizedBox(
               height: 12,
-              child: VerticalDivider(width: 1, color: AppColors.border),
+              child: VerticalDivider(
+                width: 1,
+                color: AppColors.of(context).border,
+              ),
             ),
           ),
           _FooterLink(label: '개인정보처리방침', path: '/privacy'),
@@ -665,7 +678,7 @@ class _FooterLink extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+        style: TextStyle(fontSize: 12, color: AppColors.of(context).textMuted),
       ),
     );
   }
@@ -689,9 +702,9 @@ class _SectionCard extends StatelessWidget {
     final content = Padding(padding: padding, child: child);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.of(context).border),
       ),
       child: onTap == null
           ? ClipRRect(borderRadius: BorderRadius.circular(16), child: content)

@@ -170,8 +170,8 @@ class _ProgressCardState extends ConsumerState<ProgressCard>
                   padding: const EdgeInsets.only(left: 6),
                   child: Text(
                     '${(ratio * 100).round()}%',
-                    style: const TextStyle(
-                      color: AppColors.progressFill,
+                    style: TextStyle(
+                      color: AppColors.of(context).progressFill,
                       fontWeight: FontWeight.bold,
                       fontSize: 17,
                     ),
@@ -185,10 +185,10 @@ class _ProgressCardState extends ConsumerState<ProgressCard>
                   focusNode: _pageFocus,
                   textAlign: TextAlign.end,
                   keyboardType: TextInputType.number,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textStrong,
+                    color: AppColors.of(context).textStrong,
                   ),
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   onSubmitted: (_) => _commitPage(),
@@ -201,20 +201,22 @@ class _ProgressCardState extends ConsumerState<ProgressCard>
                     hintStyle: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textMuted.withValues(alpha: 0.5),
+                      color: AppColors.of(
+                        context,
+                      ).textMuted.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
               ),
               if (isAudioBook)
-                const Text(
+                Text(
                   '%',
-                  style: TextStyle(color: AppColors.textMuted),
+                  style: TextStyle(color: AppColors.of(context).textMuted),
                 )
               else if (totalPages != null)
                 Text(
                   ' / $totalPages쪽',
-                  style: const TextStyle(color: AppColors.textMuted),
+                  style: TextStyle(color: AppColors.of(context).textMuted),
                 ),
             ],
           ),
@@ -233,10 +235,10 @@ class _ProgressCardState extends ConsumerState<ProgressCard>
                 // 컨트롤처럼 보이지 않게 한다.
                 thumbShape: SliderComponentShape.noThumb,
                 overlayShape: SliderComponentShape.noOverlay,
-                activeTrackColor: AppColors.progressFill,
-                inactiveTrackColor: AppColors.border,
-                disabledActiveTrackColor: AppColors.progressFill,
-                disabledInactiveTrackColor: AppColors.border,
+                activeTrackColor: AppColors.of(context).progressFill,
+                inactiveTrackColor: AppColors.of(context).border,
+                disabledActiveTrackColor: AppColors.of(context).progressFill,
+                disabledInactiveTrackColor: AppColors.of(context).border,
               ),
               child: Slider(
                 padding: EdgeInsets.zero,

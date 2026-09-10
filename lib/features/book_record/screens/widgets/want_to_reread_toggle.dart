@@ -9,7 +9,7 @@ import '../../../../core/theme/app_theme.dart';
 /// 은 같은 라벨/아이콘/색을 쓰되 `BoolIconOption`으로 명작과 한 행에 두므로
 /// 이 위젯 자체는 쓰지 않는다. 내가 나에게
 /// 남기는 기록이라 라벨은 존댓말이 아니라 반말로 쓴다. 전용 색상을 새로
-/// 만들지 않고 [AppColors.error] 색을 그대로 쓴다.
+/// 만들지 않고 [AppColors.of(context).error] 색을 그대로 쓴다.
 ///
 /// [compact]가 true면 작은 원형 아이콘 옆에 짧은 라벨만 붙인 필 형태로
 /// 그린다 — 재독 횟수 팝업처럼 콘텐츠가 가운데 정렬된 화면에서, 전체 폭
@@ -31,7 +31,9 @@ class WantToRereadToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = compact ? 30.0 : 40.0;
     final iconSize = compact ? 16.0 : 20.0;
-    final labelColor = value ? AppColors.error : AppColors.textBody;
+    final labelColor = value
+        ? AppColors.of(context).error
+        : AppColors.of(context).textBody;
     final badge = AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       width: size,
@@ -40,8 +42,8 @@ class WantToRereadToggle extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: value
-            ? AppColors.error.withValues(alpha: 0.12)
-            : AppColors.surfaceSubtle,
+            ? AppColors.of(context).error.withValues(alpha: 0.12)
+            : AppColors.of(context).surfaceSubtle,
       ),
       // 다른 상태 아이콘(ReadingStatusTile/명작 토글)과 같은 "원형 배경 +
       // 아이콘" 언어를 재사용해 이질감 없이 어울리게 한다. 회귀/다시 읽기를
@@ -49,7 +51,9 @@ class WantToRereadToggle extends StatelessWidget {
       child: Icon(
         value ? PhosphorIconsFill.repeat : PhosphorIconsRegular.repeat,
         size: iconSize,
-        color: value ? AppColors.error : AppColors.controlInactive,
+        color: value
+            ? AppColors.of(context).error
+            : AppColors.of(context).controlInactive,
       ),
     );
 

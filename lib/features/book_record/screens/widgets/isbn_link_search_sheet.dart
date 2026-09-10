@@ -242,10 +242,10 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
                       children: [
                         Text(
                           '${widget.bulkProgress!.index} / ${widget.bulkProgress!.total}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textMuted,
+                            color: AppColors.of(context).textMuted,
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -333,24 +333,27 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
   Widget _body() {
     switch (_loadState) {
       case _LoadState.idle:
-        return const Center(
+        return Center(
           child: Text(
             '검색어를 입력해주세요',
-            style: TextStyle(color: AppColors.textMuted),
+            style: TextStyle(color: AppColors.of(context).textMuted),
           ),
         );
       case _LoadState.loading:
-        return const Center(
-          child: Text('검색 중...', style: TextStyle(color: AppColors.textMuted)),
+        return Center(
+          child: Text(
+            '검색 중...',
+            style: TextStyle(color: AppColors.of(context).textMuted),
+          ),
         );
       case _LoadState.error:
         return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
+              Text(
                 '검색 중 문제가 발생했습니다.',
-                style: TextStyle(color: AppColors.textMuted),
+                style: TextStyle(color: AppColors.of(context).textMuted),
               ),
               const SizedBox(height: 8),
               TextButton(onPressed: _search, child: const Text('다시 시도')),
@@ -359,10 +362,10 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
         );
       case _LoadState.loaded:
         if (_items.isEmpty) {
-          return const Center(
+          return Center(
             child: Text(
               '검색 결과가 없습니다',
-              style: TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: AppColors.of(context).textMuted),
             ),
           );
         }
@@ -384,9 +387,9 @@ class _IsbnLinkSearchSheetState extends ConsumerState<_IsbnLinkSearchSheet> {
                   ),
                   Text(
                     '$_page / $_totalPages',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textMuted,
+                      color: AppColors.of(context).textMuted,
                     ),
                   ),
                   IconButton(

@@ -37,7 +37,7 @@ class _ReadingStatsCategoryChartState extends State<ReadingStatsCategoryChart> {
           child: TextButton(
             onPressed: () => setState(() => _showDetails = !_showDetails),
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.accentForeground,
+              foregroundColor: AppColors.of(context).accentForeground,
               minimumSize: const Size(96, 40),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -144,18 +144,22 @@ class _CategoryDetailRow extends StatelessWidget {
                         category.categoryName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textBody,
+                        style: TextStyle(
+                          color: AppColors.of(context).textBody,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: SizedBox(
                         height: 2,
-                        child: CustomPaint(painter: _DottedLeaderPainter()),
+                        child: CustomPaint(
+                          painter: _DottedLeaderPainter(
+                            AppColors.of(context).textMuted,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -170,8 +174,8 @@ class _CategoryDetailRow extends StatelessWidget {
               '$percent%',
               maxLines: 1,
               textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: AppColors.textStrong,
+              style: TextStyle(
+                color: AppColors.of(context).textStrong,
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
               ),
@@ -184,8 +188,8 @@ class _CategoryDetailRow extends StatelessWidget {
               '${category.count}권',
               maxLines: 1,
               textAlign: TextAlign.right,
-              style: const TextStyle(
-                color: AppColors.textBody,
+              style: TextStyle(
+                color: AppColors.of(context).textBody,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),
@@ -198,12 +202,14 @@ class _CategoryDetailRow extends StatelessWidget {
 }
 
 class _DottedLeaderPainter extends CustomPainter {
-  const _DottedLeaderPainter();
+  const _DottedLeaderPainter(this.color);
+
+  final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = AppColors.textMuted.withValues(alpha: .55)
+      ..color = color.withValues(alpha: .55)
       ..strokeWidth = 1.25
       ..strokeCap = StrokeCap.round;
     const dashLength = 2.0;
@@ -220,7 +226,8 @@ class _DottedLeaderPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _DottedLeaderPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _DottedLeaderPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 String _detailsSemanticsLabel(List<ReadingStatsCategory> categories) {

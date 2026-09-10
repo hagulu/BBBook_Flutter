@@ -265,7 +265,7 @@ class MemoHighlightController extends TextEditingController {
         ? value.composing
         : null;
     final highlightStyle = (style ?? const TextStyle()).copyWith(
-      backgroundColor: AppColors.highlightGoldSurface,
+      backgroundColor: AppColors.of(context).highlightGoldSurface,
     );
     // 강조 span과 조합 중 span이 서로 걸칠 수 있으므로, 두 범위의 경계를 모두
     // 모아 쪼갠 구간마다 강조/밑줄을 독립적으로 합성한다.
@@ -298,7 +298,9 @@ class MemoHighlightController extends TextEditingController {
           const TextStyle(decoration: TextDecoration.underline),
         );
       }
-      spans.add(TextSpan(text: text.substring(start, end), style: segmentStyle));
+      spans.add(
+        TextSpan(text: text.substring(start, end), style: segmentStyle),
+      );
     }
     return TextSpan(style: style, children: spans);
   }

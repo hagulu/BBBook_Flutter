@@ -51,7 +51,7 @@ class MyContentCardLayout extends StatelessWidget {
         if (book != null) ...[
           _BookTitleRow(book: book, onTap: onBookTap),
           const SizedBox(height: 8),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.of(context).border),
           const SizedBox(height: 10),
         ],
         IntrinsicHeight(
@@ -77,9 +77,9 @@ class MyContentCardLayout extends StatelessWidget {
                         alignment: Alignment.centerRight,
                         child: Text(
                           dateLabel!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
-                            color: AppColors.textMuted,
+                            color: AppColors.of(context).textMuted,
                           ),
                         ),
                       ),
@@ -107,10 +107,10 @@ class _BookTitleRow extends StatelessWidget {
       [book.title, ?book.author.displayedAuthorOrNull].join(' · '),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: AppColors.textMuted,
+        color: AppColors.of(context).textMuted,
       ),
     );
 

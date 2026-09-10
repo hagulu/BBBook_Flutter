@@ -44,12 +44,12 @@ class MetaSummaryCard extends StatelessWidget {
                     onTap: onTapStartedAt,
                   ),
                 ),
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: Icon(
                     PhosphorIconsRegular.arrowRight,
                     size: 16,
-                    color: AppColors.controlInactive,
+                    color: AppColors.of(context).controlInactive,
                   ),
                 ),
                 Expanded(
@@ -68,12 +68,12 @@ class MetaSummaryCard extends StatelessWidget {
                 // 이미 무슨 날짜인지 말해주므로 "시작" 라벨은 값이 있을
                 // 때만 붙인다(없으면 라벨+플레이스홀더가 중복돼 보인다).
                 if (startedAt != null) ...[
-                  const Text(
+                  Text(
                     '시작',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textMuted,
+                      color: AppColors.of(context).textMuted,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -126,8 +126,8 @@ class _DateValue extends StatelessWidget {
               fontSize: currentDate == null ? 13 : 15,
               fontWeight: FontWeight.w600,
               color: currentDate == null
-                  ? AppColors.textMuted
-                  : AppColors.textStrong,
+                  ? AppColors.of(context).textMuted
+                  : AppColors.of(context).textStrong,
             ),
           ),
         ),

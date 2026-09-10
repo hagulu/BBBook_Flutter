@@ -29,11 +29,11 @@ class _ReadingStatsScreenState extends ConsumerState<ReadingStatsScreen> {
     final summaryAsync = ref.watch(readingStatsSummaryProvider(_selectedYear));
 
     return Scaffold(
-      backgroundColor: AppColors.pageBackground,
+      backgroundColor: AppColors.of(context).pageBackground,
       appBar: AppBar(
         title: const AppBarTitle('독서 리포트'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
         actions: [
           Padding(
@@ -90,10 +90,13 @@ class _LoadingState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
+    return Padding(
       padding: EdgeInsets.symmetric(vertical: 64),
       child: Center(
-        child: Text('불러오는 중...', style: TextStyle(color: AppColors.textMuted)),
+        child: Text(
+          '불러오는 중...',
+          style: TextStyle(color: AppColors.of(context).textMuted),
+        ),
       ),
     );
   }
@@ -112,9 +115,9 @@ class _ErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               '불러오기에 실패했습니다',
-              style: TextStyle(color: AppColors.textMuted),
+              style: TextStyle(color: AppColors.of(context).textMuted),
             ),
             const SizedBox(height: 8),
             TextButton(onPressed: onRetry, child: const Text('다시 시도')),
@@ -175,11 +178,11 @@ class _SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.6,
-        color: AppColors.textMuted,
+        color: AppColors.of(context).textMuted,
       ),
     );
   }
@@ -195,9 +198,9 @@ class _Card extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: AppColors.of(context).surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.of(context).border),
       ),
       child: Padding(padding: padding, child: child),
     );
@@ -264,7 +267,7 @@ class _SummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 14, color: AppColors.accentForeground),
+          Icon(icon, size: 14, color: AppColors.of(context).accentForeground),
           const SizedBox(height: 10),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -275,19 +278,19 @@ class _SummaryCard extends StatelessWidget {
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textStrong,
+                    color: AppColors.of(context).textStrong,
                   ),
                 ),
               ),
               const SizedBox(width: 2),
               Text(
                 unit,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textMuted,
+                  color: AppColors.of(context).textMuted,
                 ),
               ),
             ],
@@ -295,7 +298,10 @@ class _SummaryCard extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.of(context).textMuted,
+            ),
           ),
         ],
       ),
@@ -339,7 +345,7 @@ class _MoreSection extends StatelessWidget {
           children: [
             for (var i = 0; i < items.length; i++) ...[
               if (i > 0)
-                const VerticalDivider(width: 1, color: AppColors.border),
+                VerticalDivider(width: 1, color: AppColors.of(context).border),
               Expanded(child: _MoreColumn(item: items[i])),
             ],
           ],
@@ -387,7 +393,7 @@ class _MoreColumn extends StatelessWidget {
                 style: TextStyle(
                   fontSize: item.valueFontSize,
                   fontWeight: item.valueFontWeight,
-                  color: AppColors.textStrong,
+                  color: AppColors.of(context).textStrong,
                 ),
               ),
             ),
@@ -395,9 +401,9 @@ class _MoreColumn extends StatelessWidget {
               const SizedBox(width: 2),
               Text(
                 item.unit!,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textMuted,
+                  color: AppColors.of(context).textMuted,
                 ),
               ),
             ],
@@ -406,7 +412,10 @@ class _MoreColumn extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           item.label,
-          style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+          style: TextStyle(
+            fontSize: 11,
+            color: AppColors.of(context).textMuted,
+          ),
         ),
       ],
     );
@@ -427,7 +436,10 @@ class _EmptyState extends StatelessWidget {
         children: [
           const Text('📚', style: TextStyle(fontSize: 32)),
           const SizedBox(height: 8),
-          Text(message, style: const TextStyle(color: AppColors.textMuted)),
+          Text(
+            message,
+            style: TextStyle(color: AppColors.of(context).textMuted),
+          ),
         ],
       ),
     );

@@ -66,8 +66,8 @@ class BookRecordScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: AppBarTitle(book?.title ?? '책 기록'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: body,
@@ -80,10 +80,10 @@ class _NotFoundBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Text(
         '책을 찾을 수 없습니다.',
-        style: TextStyle(color: AppColors.textMuted),
+        style: TextStyle(color: AppColors.of(context).textMuted),
       ),
     );
   }
@@ -100,9 +100,9 @@ class _ErrorBody extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
+          Text(
             '불러오지 못했습니다.',
-            style: TextStyle(color: AppColors.textMuted),
+            style: TextStyle(color: AppColors.of(context).textMuted),
           ),
           const SizedBox(height: 8),
           TextButton(onPressed: onRetry, child: const Text('다시 시도')),
@@ -160,10 +160,10 @@ class _BookRecordBody extends ConsumerWidget {
                 // 탭이 4개라 기본 labelPadding(좌우 16)으로는 좁은 화면에서
                 // '생각나눔'이 잘린다.
                 labelPadding: const EdgeInsets.symmetric(horizontal: 8),
-                labelColor: AppColors.textStrong,
-                unselectedLabelColor: AppColors.textMuted,
-                indicatorColor: AppColors.accentForeground,
-                dividerColor: AppColors.border,
+                labelColor: AppColors.of(context).textStrong,
+                unselectedLabelColor: AppColors.of(context).textMuted,
+                indicatorColor: AppColors.of(context).accentForeground,
+                dividerColor: AppColors.of(context).border,
               ),
             ),
           ),
@@ -200,7 +200,7 @@ class _BookRecordBody extends ConsumerWidget {
                         Container(
                           width: 1,
                           height: 40,
-                          color: AppColors.border,
+                          color: AppColors.of(context).border,
                           margin: const EdgeInsets.symmetric(horizontal: 12),
                         ),
                         Expanded(
@@ -220,20 +220,20 @@ class _BookRecordBody extends ConsumerWidget {
                                     book.platformName!.isEmpty)
                                 ? null
                                 : book.platformName,
-                            labelStyle: const TextStyle(
+                            labelStyle: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.textMuted,
+                              color: AppColors.of(context).textMuted,
                             ),
-                            valueStyle: const TextStyle(
+                            valueStyle: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.textStrong,
+                              color: AppColors.of(context).textStrong,
                             ),
-                            placeholderStyle: const TextStyle(
+                            placeholderStyle: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
-                              color: AppColors.textMuted,
+                              color: AppColors.of(context).textMuted,
                             ),
                           ),
                         ),
@@ -275,7 +275,7 @@ class _BookRecordBody extends ConsumerWidget {
                                 : PhosphorIconsRegular.crown,
                             color: book.isMasterpiece
                                 ? AppColors.highlightGold
-                                : AppColors.textMuted,
+                                : AppColors.of(context).textMuted,
                             toggled: book.isMasterpiece,
                             onTap: () =>
                                 _toggleMasterpiece(context, controller),
@@ -284,7 +284,7 @@ class _BookRecordBody extends ConsumerWidget {
                         Container(
                           width: 1,
                           height: 48,
-                          color: AppColors.border,
+                          color: AppColors.of(context).border,
                           margin: const EdgeInsets.symmetric(horizontal: 12),
                         ),
                         Expanded(
@@ -296,8 +296,8 @@ class _BookRecordBody extends ConsumerWidget {
                                 ? PhosphorIconsFill.repeat
                                 : PhosphorIconsRegular.repeat,
                             color: book.wantToReread
-                                ? AppColors.error
-                                : AppColors.textMuted,
+                                ? AppColors.of(context).error
+                                : AppColors.of(context).textMuted,
                             toggled: book.wantToReread,
                             onTap: () =>
                                 _toggleWantToReread(context, controller),
@@ -306,7 +306,7 @@ class _BookRecordBody extends ConsumerWidget {
                         Container(
                           width: 1,
                           height: 48,
-                          color: AppColors.border,
+                          color: AppColors.of(context).border,
                           margin: const EdgeInsets.symmetric(horizontal: 12),
                         ),
                         Expanded(
@@ -322,8 +322,8 @@ class _BookRecordBody extends ConsumerWidget {
                             color:
                                 DifficultyLevel.fromApiValue(book.difficulty) !=
                                     null
-                                ? AppColors.accentForeground
-                                : AppColors.textMuted,
+                                ? AppColors.of(context).accentForeground
+                                : AppColors.of(context).textMuted,
                             placeholder:
                                 DifficultyLevel.fromApiValue(book.difficulty) ==
                                     null
@@ -369,7 +369,7 @@ class _BookRecordBody extends ConsumerWidget {
                   child: InkWell(
                     onTap: () => _confirmDelete(context, ref),
                     borderRadius: BorderRadius.circular(8),
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.symmetric(
                         vertical: 8,
                         horizontal: 12,
@@ -380,7 +380,7 @@ class _BookRecordBody extends ConsumerWidget {
                           Icon(
                             PhosphorIconsRegular.trash,
                             size: 16,
-                            color: AppColors.textMuted,
+                            color: AppColors.of(context).textMuted,
                           ),
                           SizedBox(width: 6),
                           Text(
@@ -388,7 +388,7 @@ class _BookRecordBody extends ConsumerWidget {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.textMuted,
+                              color: AppColors.of(context).textMuted,
                             ),
                           ),
                         ],
@@ -820,10 +820,10 @@ class _IconField extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
-                color: AppColors.textStrong,
+                color: AppColors.of(context).textStrong,
               ),
             ),
             const SizedBox(height: 6),
@@ -835,10 +835,10 @@ class _IconField extends StatelessWidget {
                 textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textMuted,
+                  color: AppColors.of(context).textMuted,
                 ),
               ),
           ],
@@ -866,7 +866,10 @@ class _TabBarHeaderDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return ColoredBox(color: AppColors.pageBackground, child: tabBar);
+    return ColoredBox(
+      color: AppColors.of(context).pageBackground,
+      child: tabBar,
+    );
   }
 
   @override
@@ -926,15 +929,17 @@ class _Header extends ConsumerWidget {
                           vertical: 2,
                         ),
                         decoration: BoxDecoration(
-                          color: (categoryColor ?? AppColors.controlInactive)
-                              .withValues(alpha: 0.14),
+                          color:
+                              (categoryColor ??
+                                      AppColors.of(context).controlInactive)
+                                  .withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
                           book.category!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textBody,
+                            color: AppColors.of(context).textBody,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -945,22 +950,23 @@ class _Header extends ConsumerWidget {
                       book.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 17,
-                        color: AppColors.textStrong,
+                        color: AppColors.of(context).textStrong,
                       ),
                     ),
-                    if (book.author.displayedAuthorOrNull case final author?) ...[
+                    if (book.author.displayedAuthorOrNull
+                        case final author?) ...[
                       const SizedBox(height: 4),
                       Text(
                         author,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textMuted,
+                          color: AppColors.of(context).textMuted,
                         ),
                       ),
                     ],
@@ -971,9 +977,9 @@ class _Header extends ConsumerWidget {
                         book.publisher!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textMuted,
+                          color: AppColors.of(context).textMuted,
                         ),
                       ),
                     ],

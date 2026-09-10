@@ -15,74 +15,83 @@ import '../../discussion/utils/discussion_date.dart';
 import '../models/public_reflection.dart';
 import '../providers/public_reflection_providers.dart';
 
-const _readerBodyTextStyle = TextStyle(
-  color: AppColors.textBody,
-  fontSize: 16,
-  height: 1.65,
-);
-
 /// 긴 글을 위한 행간을 적용하되 Quill의 헤더·인용·목록·인라인 색상 속성은
 /// 기존 독후감 리더와 같은 렌더러로 유지한다.
-const _readerQuillStyles = DefaultStyles(
-  h1: DefaultTextBlockStyle(
-    TextStyle(
-      color: AppColors.textStrong,
-      fontSize: 27,
-      height: 1.3,
-      fontWeight: FontWeight.bold,
+final _readerQuillStylesLight = _buildReaderQuillStyles(AppPalette.light);
+final _readerQuillStylesDark = _buildReaderQuillStyles(AppPalette.dark);
+
+DefaultStyles _readerQuillStyles(BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+    ? _readerQuillStylesDark
+    : _readerQuillStylesLight;
+
+DefaultStyles _buildReaderQuillStyles(AppPalette colors) {
+  final bodyTextStyle = TextStyle(
+    color: colors.textBody,
+    fontSize: 16,
+    height: 1.65,
+  );
+  return DefaultStyles(
+    h1: DefaultTextBlockStyle(
+      TextStyle(
+        color: colors.textStrong,
+        fontSize: 27,
+        height: 1.3,
+        fontWeight: FontWeight.bold,
+      ),
+      HorizontalSpacing.zero,
+      VerticalSpacing(12, 0),
+      VerticalSpacing.zero,
+      null,
     ),
-    HorizontalSpacing.zero,
-    VerticalSpacing(12, 0),
-    VerticalSpacing.zero,
-    null,
-  ),
-  h2: DefaultTextBlockStyle(
-    TextStyle(
-      color: AppColors.textStrong,
-      fontSize: 22,
-      height: 1.3,
-      fontWeight: FontWeight.bold,
+    h2: DefaultTextBlockStyle(
+      TextStyle(
+        color: colors.textStrong,
+        fontSize: 22,
+        height: 1.3,
+        fontWeight: FontWeight.bold,
+      ),
+      HorizontalSpacing.zero,
+      VerticalSpacing(8, 0),
+      VerticalSpacing.zero,
+      null,
     ),
-    HorizontalSpacing.zero,
-    VerticalSpacing(8, 0),
-    VerticalSpacing.zero,
-    null,
-  ),
-  placeHolder: DefaultTextBlockStyle(
-    TextStyle(color: AppColors.textMuted, fontSize: 16, height: 1.65),
-    HorizontalSpacing.zero,
-    VerticalSpacing.zero,
-    VerticalSpacing.zero,
-    null,
-  ),
-  paragraph: DefaultTextBlockStyle(
-    _readerBodyTextStyle,
-    HorizontalSpacing.zero,
-    VerticalSpacing(3, 5),
-    VerticalSpacing.zero,
-    null,
-  ),
-  lists: DefaultListBlockStyle(
-    _readerBodyTextStyle,
-    HorizontalSpacing.zero,
-    VerticalSpacing(7, 2),
-    VerticalSpacing(2, 7),
-    null,
-    null,
-  ),
-  quote: DefaultTextBlockStyle(
-    TextStyle(
-      color: AppColors.reflectionQuoteText,
-      fontSize: 16,
-      fontStyle: FontStyle.italic,
-      height: 1.65,
+    placeHolder: DefaultTextBlockStyle(
+      TextStyle(color: colors.textMuted, fontSize: 16, height: 1.65),
+      HorizontalSpacing.zero,
+      VerticalSpacing.zero,
+      VerticalSpacing.zero,
+      null,
     ),
-    HorizontalSpacing(14, 8),
-    VerticalSpacing(14, 14),
-    VerticalSpacing(1, 1),
-    null,
-  ),
-);
+    paragraph: DefaultTextBlockStyle(
+      bodyTextStyle,
+      HorizontalSpacing.zero,
+      VerticalSpacing(3, 5),
+      VerticalSpacing.zero,
+      null,
+    ),
+    lists: DefaultListBlockStyle(
+      bodyTextStyle,
+      HorizontalSpacing.zero,
+      VerticalSpacing(7, 2),
+      VerticalSpacing(2, 7),
+      null,
+      null,
+    ),
+    quote: DefaultTextBlockStyle(
+      TextStyle(
+        color: colors.reflectionQuoteText,
+        fontSize: 16,
+        fontStyle: FontStyle.italic,
+        height: 1.65,
+      ),
+      HorizontalSpacing(14, 8),
+      VerticalSpacing(14, 14),
+      VerticalSpacing(1, 1),
+      null,
+    ),
+  );
+}
 
 /// 공개 독후감의 읽기 전용 Quill 리더.
 class PublicReflectionReaderScreen extends ConsumerStatefulWidget {
@@ -128,8 +137,8 @@ class _PublicReflectionReaderScreenState
     return Scaffold(
       appBar: AppBar(
         title: AppBarTitle(widget.bookTitle, subtitle: '공개 독후감'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: switch (state) {
@@ -177,7 +186,7 @@ class _ReaderBody extends StatelessWidget {
                   contentJson: detail.contentJson,
                 ),
                 const SizedBox(height: 16),
-                const Divider(height: 1, color: AppColors.border),
+                Divider(height: 1, color: AppColors.of(context).border),
                 const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -237,12 +246,12 @@ class _PublicReflectionRichContentState
       controller: _controller,
       focusNode: _focusNode,
       scrollController: _scrollController,
-      config: const QuillEditorConfig(
+      config: QuillEditorConfig(
         scrollable: false,
         padding: EdgeInsets.zero,
         enableInteractiveSelection: true,
         showCursor: false,
-        customStyles: _readerQuillStyles,
+        customStyles: _readerQuillStyles(context),
         textSpanBuilder: reflectionTextSpanBuilder,
         embedBuilders: [ReflectionImageEmbedBuilder()],
       ),

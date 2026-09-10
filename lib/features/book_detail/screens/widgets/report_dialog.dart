@@ -74,14 +74,14 @@ class _ReportDialogState extends State<_ReportDialog> {
                 for (final reason in ReportReason.values)
                   RadioListTile<ReportReason>(
                     value: reason,
-                    activeColor: AppColors.accentForeground,
+                    activeColor: AppColors.of(context).accentForeground,
                     dense: true,
                     contentPadding: EdgeInsets.zero,
                     title: Text(
                       reason.label,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: AppColors.textBody,
+                        color: AppColors.of(context).textBody,
                       ),
                     ),
                   ),

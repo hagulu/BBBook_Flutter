@@ -11,7 +11,8 @@
 
 ## core
 
-- `lib/core/theme/app_theme.dart` — 역할 기반 색상 토큰(AppColors: "햇빛 드는 밝은 숲" 그린 팔레트)/브랜드 고정색(AppBrandColors)/ThemeData 정의(app·feature가 공통 참조, 색상은 여기 외에 하드코딩 금지)
+- `lib/core/theme/app_theme.dart` — 밝은 숲·검정 기반 다크 역할별 색상 토큰(AppColors·AppPalette)/브랜드 고정색(AppBrandColors)/밝은·다크 ThemeData 정의
+- `lib/core/theme/theme_mode_provider.dart` — 밝은·다크·시스템 테마 선택 상태·기기 저장·앱 시작 시 복원(기본 밝은 테마)
 - `lib/core/network/api_client.dart` — 공통 API 클라이언트, 요청 전 세션 복구·401 refresh 1회 재시도·일시 오류 재시도 간격·이전 세션 응답 차단
 - `lib/core/network/api_base_options.dart` — API 공통 base URL/timeout 정의(ApiClient·인증 전용 Dio 공유)
 - `lib/core/network/patch_field.dart` — PATCH 필드 3-상태(생략=유지 / PatchField.value=수정 / PatchField.clear=명시적 null 삭제) 표현
@@ -33,7 +34,7 @@
 
 - `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 리포트 카드/내 글 모아보기 2×2 바로가기/공지사항/로그아웃/약관 링크), `docs/porting-reference/profile-main-screen.md` 대응
 - `lib/features/profile/screens/profile_edit_screen.dart` — 프로필 수정 화면(닉네임·프로필 이미지 변경/삭제, 저장, 회원 탈퇴), `docs/porting-reference/profile-edit-screen.md` 대응
-- `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(포팅 문서 범위 밖 저장 방식(서버/로컬) 전환 진입점), 프로필 탭 AppBar 설정 아이콘으로 진입
+- `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(밝은·다크·시스템 테마 선택, 오픈소스 라이선스 목록·전문, 저장 방식(서버/로컬) 전환 진입점), 프로필 탭 AppBar 설정 아이콘으로 진입
 - `lib/features/profile/screens/my_reflections_screen.dart` — 내가 작성한 독후감 목록(커서 무한 스크롤), 정상 항목은 서버 reflectionId로 로컬 행을 찾아 기존 `BookReflectionDetailScreen`(수정·삭제 포함)으로 이동
 - `lib/features/profile/screens/my_reviews_screen.dart` — 내가 작성한 독자평 목록(커서 무한 스크롤), 탭해도 이동하는 상세 화면 없음
 - `lib/features/profile/screens/my_discussions_screen.dart` — 내가 작성한 토론 목록(커서 무한 스크롤), 정상 항목은 `DiscussionDetailScreen`으로 이동
@@ -220,3 +221,4 @@
 - `docs/review/20260904-022040-tag-local-sync-review.md` — 태그 로컬 우선 동기화의 원격 책 삭제 정합성·책장 UI 갱신·전체 동기화 orphan 기준 시각 리뷰
 - `docs/review/20260904-132202-search-debounce-discussion-answer-pagination-review.md` — 책 검색 디바운스 요청 경합과 토론 댓글 삭제 후 페이지 범위·파일 인덱스 정합성 리뷰
 - `docs/review/20260904-144819-book-record-finish-dialog-ui-review.md` — 책 기록·완독 팝업 UI 변경의 오프라인 명작 유실, 키보드 종료 경합, 날짜 터치 영역·아이콘 시맨틱스 리뷰
+- `docs/review/20260910-110045-dark-theme-review.md` — 다크 테마 도입의 표지 플레이스홀더 대비, Quill 스타일 const 소실, readableText 비용, 루트 오버레이 스타일·팔레트 전환 누락 리뷰

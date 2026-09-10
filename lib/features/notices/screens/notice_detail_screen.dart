@@ -22,8 +22,8 @@ class NoticeDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const AppBarTitle('공지사항'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
       body: SafeArea(
@@ -32,10 +32,10 @@ class NoticeDetailScreen extends ConsumerWidget {
           AsyncData(:final value) => _NoticeDetailBody(detail: value),
           AsyncError(:final error)
               when error is ApiException && error.statusCode == 404 =>
-            const Center(
+            Center(
               child: Text(
                 '공지사항을 찾을 수 없습니다',
-                style: TextStyle(color: AppColors.textMuted),
+                style: TextStyle(color: AppColors.of(context).textMuted),
               ),
             ),
           AsyncError() => CommunityContentErrorState(
@@ -62,34 +62,37 @@ class _NoticeDetailBody extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: AppColors.of(context).surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.of(context).border),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               detail.title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textStrong,
+                color: AppColors.of(context).textStrong,
               ),
             ),
             const SizedBox(height: 6),
             Text(
               formatDiscussionDate(detail.createdAt),
-              style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.of(context).textMuted,
+              ),
             ),
             const SizedBox(height: 14),
-            const Divider(height: 1, color: AppColors.border),
+            Divider(height: 1, color: AppColors.of(context).border),
             const SizedBox(height: 14),
             Text(
               detail.content,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textBody,
+                color: AppColors.of(context).textBody,
                 height: 1.5,
               ),
             ),

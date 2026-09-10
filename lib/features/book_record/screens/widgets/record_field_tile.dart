@@ -22,7 +22,7 @@ class RecordFieldTile extends StatelessWidget {
     required this.hasValue,
     required this.onTap,
     this.valueIcon,
-    this.valueIconColor = AppColors.accentForeground,
+    this.valueIconColor,
     this.valueSecondary,
     this.labelStyle,
     this.valueStyle,
@@ -37,7 +37,7 @@ class RecordFieldTile extends StatelessWidget {
 
   /// 값 아이콘 색. 대부분(출처/난이도)은 공통 accent 색이지만, 명작·또 볼래
   /// 같은 상태 토글은 각자의 강조색(금색/에러색)을 쓴다.
-  final Color valueIconColor;
+  final Color? valueIconColor;
   final String? valueSecondary;
   final TextStyle? labelStyle;
   final TextStyle? valueStyle;
@@ -55,10 +55,10 @@ class RecordFieldTile extends StatelessWidget {
             label,
             style:
                 labelStyle ??
-                const TextStyle(
+                TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
-                  color: AppColors.textStrong,
+                  color: AppColors.of(context).textStrong,
                 ),
           ),
           const SizedBox(height: 4),
@@ -69,7 +69,12 @@ class RecordFieldTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               if (hasValue && valueIcon != null) ...[
-                Icon(valueIcon, size: 15, color: valueIconColor),
+                Icon(
+                  valueIcon,
+                  size: 15,
+                  color:
+                      valueIconColor ?? AppColors.of(context).accentForeground,
+                ),
                 const SizedBox(width: 4),
               ],
               Flexible(
@@ -85,18 +90,18 @@ class RecordFieldTile extends StatelessWidget {
                                 ? FontWeight.w600
                                 : FontWeight.w500,
                             color: hasValue
-                                ? AppColors.textStrong
-                                : AppColors.textMuted,
+                                ? AppColors.of(context).textStrong
+                                : AppColors.of(context).textMuted,
                           ),
                     children: [
                       TextSpan(text: value),
                       if (hasValue && valueSecondary != null)
                         TextSpan(
                           text: ' · $valueSecondary',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: AppColors.textMuted,
+                            color: AppColors.of(context).textMuted,
                           ),
                         ),
                     ],

@@ -157,15 +157,15 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: AppBarTitle(_isEdit ? '토론 수정' : '토론 작성'),
-        backgroundColor: AppColors.pageBackground,
-        foregroundColor: AppColors.textStrong,
+        backgroundColor: AppColors.of(context).pageBackground,
+        foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
         actions: [
           TextButton(
             onPressed: _canSubmit ? _submit : null,
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.textStrong,
-              disabledForegroundColor: AppColors.controlInactive,
+              foregroundColor: AppColors.of(context).textStrong,
+              disabledForegroundColor: AppColors.of(context).controlInactive,
               textStyle: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
@@ -185,12 +185,12 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                 width: double.infinity,
                 margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: AppColors.of(context).surface,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: const [
+                  border: Border.all(color: AppColors.of(context).border),
+                  boxShadow: [
                     BoxShadow(
-                      color: AppColors.shadowSoft,
+                      color: AppColors.of(context).shadowSoft,
                       blurRadius: 4,
                       offset: Offset(0, 1),
                     ),
@@ -210,14 +210,16 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                             vertical: 12,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.highlightGoldSurface,
+                            color: AppColors.of(context).highlightGoldSurface,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Text(
+                          child: Text(
                             '마감된 토론은 내용을 수정할 수 없습니다.',
                             style: TextStyle(
                               fontSize: 13,
-                              color: AppColors.memoThoughtForeground,
+                              color: AppColors.of(
+                                context,
+                              ).memoThoughtForeground,
                             ),
                           ),
                         ),
@@ -232,13 +234,13 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                             kMaxDiscussionTitleLength,
                           ),
                         ],
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 19,
                           height: 1.35,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textStrong,
+                          color: AppColors.of(context).textStrong,
                         ),
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           counterText: '',
                           isDense: true,
                           contentPadding: EdgeInsets.zero,
@@ -251,7 +253,7 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                             fontSize: 19,
                             height: 1.35,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textMuted,
+                            color: AppColors.of(context).textMuted,
                           ),
                         ),
                       ),
@@ -261,10 +263,10 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                         enabled: !_isLocked,
                         minLines: 8,
                         maxLines: 16,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           height: 1.65,
-                          color: AppColors.textBody,
+                          color: AppColors.of(context).textBody,
                         ),
                         decoration: const InputDecoration(
                           isDense: true,
@@ -400,9 +402,9 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
   /// 동작한다(키보드가 닫혀 있으면 화면 맨 아래에 고정).
   Widget _buildKeyboardToolbar() {
     return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        border: Border(top: BorderSide(color: AppColors.border)),
+      decoration: BoxDecoration(
+        color: AppColors.of(context).surface,
+        border: Border(top: BorderSide(color: AppColors.of(context).border)),
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -418,8 +420,8 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
             TextButton.icon(
               onPressed: _isLocked ? null : _openOptionsSheet,
               style: TextButton.styleFrom(
-                foregroundColor: AppColors.accentForeground,
-                disabledForegroundColor: AppColors.controlInactive,
+                foregroundColor: AppColors.of(context).accentForeground,
+                disabledForegroundColor: AppColors.of(context).controlInactive,
               ),
               icon: const Icon(PhosphorIconsRegular.listBullets, size: 16),
               label: Text(
@@ -454,8 +456,8 @@ class _SpoilerToggle extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isSpoiler
-              ? AppColors.highlightGoldSurface
-              : AppColors.surfaceSubtle,
+              ? AppColors.of(context).highlightGoldSurface
+              : AppColors.of(context).surfaceSubtle,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Row(
@@ -465,8 +467,8 @@ class _SpoilerToggle extends StatelessWidget {
               PhosphorIconsRegular.eyeSlash,
               size: 14,
               color: isSpoiler
-                  ? AppColors.memoThoughtForeground
-                  : AppColors.textMuted,
+                  ? AppColors.of(context).memoThoughtForeground
+                  : AppColors.of(context).textMuted,
             ),
             const SizedBox(width: 5),
             Text(
@@ -475,8 +477,8 @@ class _SpoilerToggle extends StatelessWidget {
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
                 color: isSpoiler
-                    ? AppColors.memoThoughtForeground
-                    : AppColors.textMuted,
+                    ? AppColors.of(context).memoThoughtForeground
+                    : AppColors.of(context).textMuted,
               ),
             ),
           ],

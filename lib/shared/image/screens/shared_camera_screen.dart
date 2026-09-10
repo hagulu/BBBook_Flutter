@@ -414,135 +414,146 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.mediaBackdrop,
-      body: AppLoadingOverlay(
-        isLoading: _isLoading || _isPickingImage,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (_controller case final controller?)
-              _buildPreview(controller)
-            else
-              const ColoredBox(color: AppColors.mediaBackdrop),
-            if (_errorMessage case final message?)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        message,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: AppColors.surface),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light,
+      child: Scaffold(
+        backgroundColor: AppColors.mediaBackdrop,
+        body: AppLoadingOverlay(
+          isLoading: _isLoading || _isPickingImage,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (_controller case final controller?)
+                _buildPreview(controller)
+              else
+                const ColoredBox(color: AppColors.mediaBackdrop),
+              if (_errorMessage case final message?)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          message,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.mediaForeground,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: _initializeCamera,
+                          child: const Text('다시 시도'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              if (_policy.guideOverlayBuilder case final builder?)
+                Positioned.fill(child: builder(context)),
+              if (_policy.hintText case final hint?)
+                Positioned(
+                  left: 24,
+                  right: 24,
+                  bottom: 124,
+                  child: Text(
+                    hint,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.mediaForeground,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              Positioned(
+                top: 12,
+                left: 12,
+                child: SafeArea(
+                  child: IconButton.filledTonal(
+                    onPressed: () => Navigator.of(context).pop(),
+                    tooltip: '닫기',
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.mediaForeground.withValues(
+                        alpha: 0.84,
                       ),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: _initializeCamera,
-                        child: const Text('다시 시도'),
-                      ),
-                    ],
+                      foregroundColor: AppColors.mediaBackdrop,
+                    ),
+                    icon: RotatedControlIcon(
+                      orientation: _deviceOrientation,
+                      icon: PhosphorIconsRegular.x,
+                    ),
                   ),
                 ),
               ),
-            if (_policy.guideOverlayBuilder case final builder?)
-              Positioned.fill(child: builder(context)),
-            if (_policy.hintText case final hint?)
               Positioned(
                 left: 24,
-                right: 24,
-                bottom: 124,
-                child: Text(
-                  hint,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: AppColors.surface,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            Positioned(
-              top: 12,
-              left: 12,
-              child: SafeArea(
-                child: IconButton.filledTonal(
-                  onPressed: () => Navigator.of(context).pop(),
-                  tooltip: '닫기',
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.surface.withValues(alpha: 0.84),
-                    foregroundColor: AppColors.textStrong,
-                  ),
-                  icon: RotatedControlIcon(
-                    orientation: _deviceOrientation,
-                    icon: PhosphorIconsRegular.x,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: 24,
-              bottom: 38,
-              child: SafeArea(
-                top: false,
-                child: IconButton(
-                  onPressed: _isTakingPicture || _isPickingImage
-                      ? null
-                      : _pickFromGallery,
-                  tooltip: '갤러리에서 선택',
-                  constraints: const BoxConstraints.tightFor(
-                    width: 52,
-                    height: 52,
-                  ),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.surface.withValues(alpha: 0.9),
-                    foregroundColor: AppColors.textStrong,
-                    disabledBackgroundColor: AppColors.surfaceSubtle,
-                    shape: const CircleBorder(),
-                  ),
-                  icon: RotatedControlIcon(
-                    orientation: _deviceOrientation,
-                    icon: PhosphorIconsRegular.imageSquare,
-                    size: 24,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 28,
-              child: SafeArea(
-                top: false,
-                child: Center(
+                bottom: 38,
+                child: SafeArea(
+                  top: false,
                   child: IconButton(
-                    onPressed: _isTakingPicture ? null : _takePicture,
-                    tooltip: '촬영',
+                    onPressed: _isTakingPicture || _isPickingImage
+                        ? null
+                        : _pickFromGallery,
+                    tooltip: '갤러리에서 선택',
                     constraints: const BoxConstraints.tightFor(
-                      width: 72,
-                      height: 72,
+                      width: 52,
+                      height: 52,
                     ),
                     style: IconButton.styleFrom(
-                      backgroundColor: AppColors.surface,
-                      foregroundColor: AppColors.textStrong,
-                      disabledBackgroundColor: AppColors.surfaceSubtle,
-                      side: const BorderSide(
-                        color: AppColors.accentFill,
-                        width: 4,
+                      backgroundColor: AppColors.mediaForeground.withValues(
+                        alpha: 0.9,
                       ),
+                      foregroundColor: AppColors.mediaBackdrop,
+                      disabledBackgroundColor: AppColors.mediaForeground
+                          .withValues(alpha: 0.3),
                       shape: const CircleBorder(),
                     ),
                     icon: RotatedControlIcon(
                       orientation: _deviceOrientation,
-                      icon: PhosphorIconsRegular.camera,
-                      size: 28,
+                      icon: PhosphorIconsRegular.imageSquare,
+                      size: 24,
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 28,
+                child: SafeArea(
+                  top: false,
+                  child: Center(
+                    child: IconButton(
+                      onPressed: _isTakingPicture ? null : _takePicture,
+                      tooltip: '촬영',
+                      constraints: const BoxConstraints.tightFor(
+                        width: 72,
+                        height: 72,
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.mediaForeground,
+                        foregroundColor: AppColors.mediaBackdrop,
+                        disabledBackgroundColor: AppColors.mediaForeground
+                            .withValues(alpha: 0.3),
+                        side: const BorderSide(
+                          color: AppColors.accentFill,
+                          width: 4,
+                        ),
+                        shape: const CircleBorder(),
+                      ),
+                      icon: RotatedControlIcon(
+                        orientation: _deviceOrientation,
+                        icon: PhosphorIconsRegular.camera,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
