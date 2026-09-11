@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/providers/auth_notifier.dart';
+import '../../book_note/models/book_note.dart';
 import '../../book_note/providers/book_note_providers.dart';
 import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
@@ -55,24 +57,51 @@ final externalImportExecutionLockProvider =
 
 enum ExternalImportPhase { analyzing, ready, importing, completed, failed }
 
+enum ExternalImportFeedbackType { info, error }
+
+class ExternalImportFeedback {
+  const ExternalImportFeedback.info(this.message)
+    : type = ExternalImportFeedbackType.info;
+
+  const ExternalImportFeedback.error(this.message)
+    : type = ExternalImportFeedbackType.error;
+
+  final String message;
+  final ExternalImportFeedbackType type;
+}
+
 class ExternalImportState {
   const ExternalImportState({
     this.phase = ExternalImportPhase.analyzing,
     this.result,
     this.message,
     this.progress,
+    this.selectedBookIndexes = const {},
+    this.conflictingBookIndexes = const {},
+    this.overwriteBookIndexes = const {},
+    this.needsRefresh = false,
   });
 
   final ExternalImportPhase phase;
   final ExternalImportParseResult? result;
   final String? message;
   final ExternalImportProgress? progress;
+  final Set<int> selectedBookIndexes;
+  final Set<int> conflictingBookIndexes;
+  final Set<int> overwriteBookIndexes;
+  final bool needsRefresh;
+
+  int get selectedBookCount => selectedBookIndexes.length;
 
   ExternalImportState copyWith({
     ExternalImportPhase? phase,
     ExternalImportParseResult? result,
     String? message,
     ExternalImportProgress? progress,
+    Set<int>? selectedBookIndexes,
+    Set<int>? conflictingBookIndexes,
+    Set<int>? overwriteBookIndexes,
+    bool? needsRefresh,
     bool clearMessage = false,
   }) {
     return ExternalImportState(
@@ -80,6 +109,11 @@ class ExternalImportState {
       result: result ?? this.result,
       message: clearMessage ? null : message ?? this.message,
       progress: progress ?? this.progress,
+      selectedBookIndexes: selectedBookIndexes ?? this.selectedBookIndexes,
+      conflictingBookIndexes:
+          conflictingBookIndexes ?? this.conflictingBookIndexes,
+      overwriteBookIndexes: overwriteBookIndexes ?? this.overwriteBookIndexes,
+      needsRefresh: needsRefresh ?? this.needsRefresh,
     );
   }
 }
@@ -104,13 +138,22 @@ class ExternalImportController
       final result = await ref
           .read(externalImportFileAnalyzerProvider)
           .analyze(arg);
+      final existingBooksByIsbn = await _loadExistingBooks(result);
+      final conflicts = _conflictingIndexes(result, existingBooksByIsbn);
+      final selected = {
+        for (var index = 0; index < result.books.length; index++)
+          if (!conflicts.contains(index)) index,
+      };
       if (_disposed) return;
       state = ExternalImportState(
         phase: ExternalImportPhase.ready,
         result: result,
+        selectedBookIndexes: Set.unmodifiable(selected),
+        conflictingBookIndexes: Set.unmodifiable(conflicts),
       );
       developer.log(
         '[외부 파일 분석] source=${result.source.code} '
+        'conflictCount=${conflicts.length} '
         'result=SUCCESS',
       );
     } on ExternalImportException catch (error) {
@@ -120,8 +163,13 @@ class ExternalImportController
         phase: ExternalImportPhase.failed,
         message: error.userMessage,
       );
-    } catch (_) {
-      developer.log('[외부 파일 분석] result=FAIL reason=unexpected_error');
+    } catch (error, stackTrace) {
+      developer.log(
+        '[외부 파일 분석] exception=${error.runtimeType} '
+        'result=FAIL reason=unexpected_error',
+        error: kDebugMode ? error : null,
+        stackTrace: kDebugMode ? stackTrace : null,
+      );
       if (_disposed) return;
       state = const ExternalImportState(
         phase: ExternalImportPhase.failed,
@@ -130,45 +178,114 @@ class ExternalImportController
     }
   }
 
-  Future<String?> startImport() async {
+  void toggleBookSelection(int index) {
+    if (state.phase != ExternalImportPhase.ready ||
+        index < 0 ||
+        index >= (state.result?.books.length ?? 0)) {
+      return;
+    }
+    final selected = state.selectedBookIndexes.toSet();
+    final overwrites = state.overwriteBookIndexes.toSet();
+    if (!selected.add(index)) {
+      selected.remove(index);
+      overwrites.remove(index);
+    } else if (state.conflictingBookIndexes.contains(index)) {
+      overwrites.add(index);
+    }
+    state = state.copyWith(
+      selectedBookIndexes: Set.unmodifiable(selected),
+      overwriteBookIndexes: Set.unmodifiable(overwrites),
+      clearMessage: true,
+    );
+  }
+
+  Future<ExternalImportFeedback?> startImport() async {
     final input = state.result;
     if (input == null || state.phase == ExternalImportPhase.importing) {
       return null;
     }
+    if (state.selectedBookIndexes.isEmpty) {
+      return const ExternalImportFeedback.info('가져올 책을 한 권 이상 선택해 주세요.');
+    }
     if (ref.read(localStorageMigrationControllerProvider).isRunning ||
         ref.read(serverStorageMigrationControllerProvider).isRunning) {
-      return '저장 방식 변경이 끝난 뒤 다시 시도해 주세요.';
+      return const ExternalImportFeedback.info('저장 방식 변경이 끝난 뒤 다시 시도해 주세요.');
     }
     final ownerUserId = ref.read(authNotifierProvider).user?.id;
-    if (ownerUserId == null) return '로그인 상태를 확인해 주세요.';
+    if (ownerUserId == null) {
+      return const ExternalImportFeedback.error('로그인 상태를 확인해 주세요.');
+    }
     final executionLock = ref.read(
       externalImportExecutionLockProvider.notifier,
     );
     if (!executionLock.tryAcquire(userId: ownerUserId, owner: this)) {
-      return '다른 기록을 가져오는 중이에요. 완료된 뒤 다시 시도해 주세요.';
+      return const ExternalImportFeedback.info(
+        '다른 기록을 가져오는 중이에요. 완료된 뒤 다시 시도해 주세요.',
+      );
     }
+    final keepAliveLink = ref.keepAlive();
     final generation = BookshelfDatabase.sessionGeneration;
+    var stage = 'storage_mode_check';
+    var importCommitted = false;
 
     try {
       final mode = await ref.read(storageModeStoreProvider).current();
       if (mode == StorageMode.local) {
-        return '현재 동기화가 꺼져 있어요. 설정에서 동기화를 켠 뒤 가져와 주세요.';
+        developer.log(
+          '[외부 기록 가져오기 시작] userId=$ownerUserId '
+          'source=${input.source.code} result=FAIL '
+          'reason=local_storage_mode',
+        );
+        return const ExternalImportFeedback.info(
+          '현재 동기화가 꺼져 있어요. 설정에서 동기화를 켠 뒤 가져와 주세요.',
+        );
       }
       state = state.copyWith(
         phase: ExternalImportPhase.importing,
         clearMessage: true,
+        needsRefresh: false,
       );
-      // 기존 로컬 편집을 먼저 서버에 반영한 뒤 같은 ISBN의 기존 책을 찾아,
-      // Import payload가 그 책의 기록과 설정을 그대로 보존하도록 한다.
+      developer.log(
+        '[외부 기록 가져오기 시작] userId=$ownerUserId '
+        'source=${input.source.code} selectedBookCount=${state.selectedBookCount} '
+        'overwriteCount=${state.overwriteBookIndexes.length} result=SUCCESS',
+      );
+      // 기존 로컬 편집을 먼저 서버에 반영한 뒤 같은 ISBN의 기존 책을 다시
+      // 확인한다. 목록에서 명시적으로 덮어쓰기를 고르지 않은 충돌은 이
+      // 시점에도 자동 제외해, 분석 이후 생긴 변경을 조용히 덮지 않는다.
+      stage = 'pre_import_bookshelf_sync';
       await ref
           .read(bookshelfSyncControllerProvider.notifier)
           .syncNow(userInitiated: true);
+      stage = 'pending_delete_flush';
+      final selectedIsbns = state.selectedBookIndexes
+          .map((index) => input.books[index].isbn13)
+          .whereType<String>();
+      final deletesFlushed = await ref
+          .read(bookshelfRepositoryProvider)
+          .flushPendingDeletesForIsbns(selectedIsbns);
+      if (!deletesFlushed) {
+        throw const ExternalImportException(
+          '방금 삭제한 책을 서버에 반영하고 있어요. 잠시 후 다시 시도해 주세요.',
+          reason: 'pending_book_delete',
+        );
+      }
+      // 첫 호출이 삭제보다 먼저 시작된 백그라운드 동기화와 합류했을 수
+      // 있다. 삭제 push가 끝난 뒤 새 요청을 한 번 더 보내 로컬 tombstone까지
+      // 정리해야 Import가 같은 ISBN 책을 안전하게 복구할 수 있다.
+      stage = 'post_delete_bookshelf_sync';
+      await ref
+          .read(bookshelfSyncControllerProvider.notifier)
+          .syncNow(userInitiated: true);
+      stage = 'pre_import_note_sync';
       await ref
           .read(bookNoteSyncControllerProvider.notifier)
           .syncNow(userInitiated: true);
+      stage = 'pre_import_reflection_sync';
       await ref
           .read(bookReflectionSyncControllerProvider.notifier)
           .syncNow(userInitiated: true);
+      stage = 'pre_import_tag_sync';
       await ref.read(tagSyncControllerProvider.notifier).syncNow();
       _checkSession(ownerUserId, generation);
       if (!_allSyncsHealthy()) {
@@ -180,27 +297,93 @@ class ExternalImportController
       final existingBooksByIsbn = await _loadExistingBooks(input);
       _checkSession(ownerUserId, generation);
 
-      await ref
+      final currentConflicts = _conflictingIndexes(input, existingBooksByIsbn);
+      final selectedIndexes = state.selectedBookIndexes.toSet();
+      final overwriteIndexes = state.overwriteBookIndexes.toSet();
+      final newlyProtected = selectedIndexes.where(
+        (index) =>
+            currentConflicts.contains(index) &&
+            !overwriteIndexes.contains(index),
+      );
+      if (newlyProtected.isNotEmpty) {
+        selectedIndexes.removeAll(newlyProtected);
+        if (!_disposed) {
+          state = state.copyWith(
+            phase: ExternalImportPhase.ready,
+            selectedBookIndexes: Set.unmodifiable(selectedIndexes),
+            conflictingBookIndexes: Set.unmodifiable(currentConflicts),
+            overwriteBookIndexes: Set.unmodifiable(
+              overwriteIndexes.intersection(currentConflicts),
+            ),
+          );
+        }
+        return const ExternalImportFeedback.info(
+          '기존 책이 새로 확인되어 선택에서 제외했어요. 목록을 확인해 주세요.',
+        );
+      }
+
+      final selectedBooks = selectedIndexes
+          .map((index) => input.books[index])
+          .toList(growable: false);
+      final selectedInput = ExternalImportParseResult(
+        source: input.source,
+        books: selectedBooks,
+        discoveredBookCount: input.discoveredBookCount,
+        skippedItemCount: input.skippedItemCount,
+        warningCount: input.warningCount,
+      );
+      final overwriteExistingIsbns = overwriteIndexes
+          .map((index) => input.books[index].isbn13)
+          .whereType<String>()
+          .toSet();
+
+      stage = 'record_import';
+      final importResult = await ref
           .read(externalRecordImportServiceProvider)
           .run(
-            input,
+            selectedInput,
             existingBooksByIsbn: existingBooksByIsbn,
+            overwriteExistingIsbns: overwriteExistingIsbns,
             onProgress: (progress) {
               if (_disposed) return;
               state = state.copyWith(progress: progress);
             },
           );
+      importCommitted = true;
       _checkSession(ownerUserId, generation);
 
+      stage = 'post_import_bookshelf_sync';
       await ref
           .read(bookshelfSyncControllerProvider.notifier)
           .syncNow(userInitiated: true);
+      stage = 'post_import_note_sync';
       await ref
           .read(bookNoteSyncControllerProvider.notifier)
-          .syncNow(userInitiated: true);
+          .syncNow(userInitiated: true, forceFullSync: true);
+      stage = 'restored_memo_cleanup';
+      final canCleanRestoredMemos = _bookAndNoteSyncsHealthy();
+      if (!canCleanRestoredMemos &&
+          importResult.restoredBooksByIsbn.isNotEmpty) {
+        developer.log(
+          '[외부 기록 복구 메모 정리] result=SKIP '
+          'reason=post_import_sync_failed',
+        );
+      }
+      final cleanup = canCleanRestoredMemos
+          ? await _removeRestoredBookMemos(
+              ownerUserId: ownerUserId,
+              result: importResult,
+            )
+          : (deletedNoteCount: 0, deletedMemoCount: 0);
+      if (cleanup.deletedNoteCount > 0 || cleanup.deletedMemoCount > 0) {
+        stage = 'post_cleanup_note_push';
+        await ref.read(bookNoteRepositoryProvider).pushAllDirty();
+      }
+      stage = 'post_import_reflection_sync';
       await ref
           .read(bookReflectionSyncControllerProvider.notifier)
           .syncNow(userInitiated: true);
+      stage = 'post_import_tag_sync';
       await ref.read(tagSyncControllerProvider.notifier).syncNow();
       final refreshed = _allSyncsHealthy();
       if (!refreshed) {
@@ -209,45 +392,95 @@ class ExternalImportController
           'result=FAIL reason=local_refresh_failed',
         );
       }
-      if (_disposed) return null;
-      ref.read(bookshelfSyncVersionProvider.notifier).state++;
-      ref.read(bookNoteSyncVersionProvider.notifier).state++;
-      ref.read(bookReflectionSyncVersionProvider.notifier).state++;
-      ref.read(tagSyncVersionProvider.notifier).state++;
-      state = state.copyWith(
-        phase: ExternalImportPhase.completed,
-        message: refreshed ? '기록을 가져왔어요.' : '기록은 가져왔지만 목록 새로고침이 필요해요.',
+      _completeImport(
+        selectedBookCount: selectedBooks.length,
+        needsRefresh: !refreshed,
+      );
+      developer.log(
+        '[외부 기록 가져오기 흐름] userId=$ownerUserId '
+        'source=${input.source.code} stage=completed '
+        'selectedBookCount=${selectedBooks.length} result=SUCCESS',
       );
       return null;
     } on ExternalImportException catch (error) {
+      developer.log(
+        '[외부 기록 가져오기 흐름] userId=$ownerUserId '
+        'source=${input.source.code} stage=$stage result=FAIL '
+        'reason=${error.reason}',
+      );
+      if (importCommitted) {
+        _completeImport(
+          selectedBookCount: state.selectedBookCount,
+          needsRefresh: true,
+        );
+        return null;
+      }
       if (!_disposed) {
         state = state.copyWith(
           phase: ExternalImportPhase.ready,
           message: error.userMessage,
         );
       }
-      return error.userMessage;
+      return ExternalImportFeedback.error(error.userMessage);
     } on _ExternalImportSessionChanged {
       const message = '계정 상태가 변경되어 가져오기를 중단했어요.';
+      developer.log(
+        '[외부 기록 가져오기 흐름] userId=$ownerUserId '
+        'source=${input.source.code} stage=$stage result=FAIL '
+        'reason=session_changed',
+      );
       if (!_disposed) {
         state = state.copyWith(
           phase: ExternalImportPhase.ready,
           message: message,
         );
       }
-      return message;
-    } catch (_) {
+      return const ExternalImportFeedback.error(message);
+    } catch (error, stackTrace) {
       const message = '기록을 가져오지 못했어요. 잠시 후 다시 시도해 주세요.';
+      developer.log(
+        '[외부 기록 가져오기 흐름] userId=$ownerUserId '
+        'source=${input.source.code} stage=$stage result=FAIL '
+        'reason=unexpected_error exception=${error.runtimeType}',
+        error: kDebugMode ? error : null,
+        stackTrace: kDebugMode ? stackTrace : null,
+      );
+      if (importCommitted) {
+        _completeImport(
+          selectedBookCount: state.selectedBookCount,
+          needsRefresh: true,
+        );
+        return null;
+      }
       if (!_disposed) {
         state = state.copyWith(
           phase: ExternalImportPhase.ready,
           message: message,
         );
       }
-      return message;
+      return const ExternalImportFeedback.error(message);
     } finally {
       executionLock.release(this);
+      keepAliveLink.close();
     }
+  }
+
+  void _completeImport({
+    required int selectedBookCount,
+    required bool needsRefresh,
+  }) {
+    if (_disposed) return;
+    ref.read(bookshelfSyncVersionProvider.notifier).state++;
+    ref.read(bookNoteSyncVersionProvider.notifier).state++;
+    ref.read(bookReflectionSyncVersionProvider.notifier).state++;
+    ref.read(tagSyncVersionProvider.notifier).state++;
+    state = state.copyWith(
+      phase: ExternalImportPhase.completed,
+      message: needsRefresh
+          ? '기록은 가져왔지만 목록 새로고침이 필요해요.'
+          : '$selectedBookCount권의 기록을 가져왔어요.',
+      needsRefresh: needsRefresh,
+    );
   }
 
   Future<Map<String, BookItem>> _loadExistingBooks(
@@ -269,6 +502,100 @@ class ExternalImportController
     };
   }
 
+  Set<int> _conflictingIndexes(
+    ExternalImportParseResult input,
+    Map<String, BookItem> existingBooksByIsbn,
+  ) {
+    return {
+      for (var index = 0; index < input.books.length; index++)
+        if (input.books[index].isbn13 case final isbn13?
+            when existingBooksByIsbn.containsKey(isbn13))
+          index,
+    };
+  }
+
+  Future<({int deletedNoteCount, int deletedMemoCount})>
+  _removeRestoredBookMemos({
+    required int ownerUserId,
+    required ExternalRecordImportResult result,
+  }) async {
+    if (result.restoredBooksByIsbn.isEmpty) {
+      return (deletedNoteCount: 0, deletedMemoCount: 0);
+    }
+
+    final bookshelfRepository = ref.read(bookshelfRepositoryProvider);
+    final noteRepository = ref.read(bookNoteRepositoryProvider);
+    var deletedNoteCount = 0;
+    var deletedMemoCount = 0;
+    for (final restored in result.restoredBooksByIsbn.entries) {
+      final book = await bookshelfRepository.getByIsbn13(restored.key);
+      final effectiveServerId = book?.serverId ?? book?.userBookId;
+      if (book == null || effectiveServerId != restored.value.bookServerId) {
+        continue;
+      }
+
+      final summaries = await noteRepository.findByUserBook(
+        ownerUserId: ownerUserId,
+        userBookId: book.userBookId,
+      );
+      final detailsByNoteLocalId = <int, BookNoteDetail>{};
+      for (final summary in summaries) {
+        final note = summary.note;
+        final serverNoteId = note.serverId;
+        if (serverNoteId == null ||
+            !restored.value.importedNoteServerIds.contains(serverNoteId)) {
+          continue;
+        }
+        final detail = await noteRepository.findDetail(
+          ownerUserId: ownerUserId,
+          userBookId: book.userBookId,
+          noteId: note.id,
+        );
+        if (detail != null) detailsByNoteLocalId[note.id] = detail;
+      }
+      final plan = buildRestoredBookMemoCleanupPlan(
+        imported: restored.value,
+        summaries: summaries,
+        detailsByNoteLocalId: detailsByNoteLocalId,
+      );
+      if (plan == null) {
+        developer.log(
+          '[외부 기록 복구 메모 정리] bookId=${book.userBookId} '
+          'result=SKIP reason=imported_mapping_not_confirmed',
+        );
+        continue;
+      }
+      for (final noteLocalId in plan.noteLocalIds) {
+        await noteRepository.deleteNote(
+          ownerUserId: ownerUserId,
+          userBookId: book.userBookId,
+          noteId: noteLocalId,
+        );
+        deletedNoteCount++;
+      }
+      for (final target in plan.memoTargets) {
+        await noteRepository.deleteNoteMemo(
+          ownerUserId: ownerUserId,
+          userBookId: book.userBookId,
+          noteId: target.noteLocalId,
+          noteMemoId: target.memoLocalId,
+          previousLocalImagePath: target.previousLocalImagePath,
+        );
+        deletedMemoCount++;
+      }
+    }
+    developer.log(
+      '[외부 기록 복구 메모 정리] '
+      'restoredBookCount=${result.restoredBooksByIsbn.length} '
+      'deletedNoteCount=$deletedNoteCount '
+      'deletedMemoCount=$deletedMemoCount result=SUCCESS',
+    );
+    return (
+      deletedNoteCount: deletedNoteCount,
+      deletedMemoCount: deletedMemoCount,
+    );
+  }
+
   void _checkSession(int ownerUserId, int generation) {
     if (generation != BookshelfDatabase.sessionGeneration ||
         ref.read(authNotifierProvider).user?.id != ownerUserId) {
@@ -281,6 +608,11 @@ class ExternalImportController
         !ref.read(bookNoteSyncControllerProvider).hasError &&
         !ref.read(bookReflectionSyncControllerProvider).hasError &&
         !ref.read(tagSyncControllerProvider).hasError;
+  }
+
+  bool _bookAndNoteSyncsHealthy() {
+    return !ref.read(bookshelfSyncControllerProvider).hasError &&
+        !ref.read(bookNoteSyncControllerProvider).hasError;
   }
 }
 

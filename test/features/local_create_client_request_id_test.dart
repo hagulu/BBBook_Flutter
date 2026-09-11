@@ -330,6 +330,61 @@ void main() {
     expect(await const BookshelfDao().getDirtyRecord(local.userBookId), isNull);
   });
 
+  test('같은 ISBN Import 전에는 진행 중인 책 삭제를 서버까지 반영한다', () async {
+    const dao = BookshelfDao();
+    final now = DateTime.utc(2026, 9, 11);
+    final local = await dao.insertLocalCreate(
+      BookItem(
+        userBookId: 0,
+        clientRequestId: '55555555-5555-4555-8555-555555555555',
+        isbn13: '9785555555555',
+        title: '삭제 후 가져올 책',
+        status: BookStatus.wantToRead,
+        currentPage: 0,
+        isMasterpiece: false,
+        rereadCount: 0,
+        tags: const [],
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await dao.confirmCreate(
+      localId: local.userBookId,
+      capturedUpdatedAt: local.updatedAt,
+      response: const UserBookCreateResult(
+        userBookId: 95,
+        bookId: 15,
+        isbn13: '9785555555555',
+        title: '삭제 후 가져올 책',
+        author: null,
+        publisher: null,
+        statsTotalPages: null,
+        displayTotalPages: null,
+        coverImageUrl: null,
+        status: 'WANT_TO_READ',
+        created: true,
+      ),
+    );
+    await dao.deleteOne(local.userBookId, queueServerDelete: true);
+
+    final adapter = _RetryCreateAdapter();
+    final client = ApiClient(baseUrl: 'https://example.test');
+    client.dio.httpClientAdapter = adapter;
+    final repository = BookshelfRepository(
+      api: BookshelfApi(apiClient: client),
+      recordApi: BookRecordApi(apiClient: client),
+      bookDetailApi: BookDetailApi(apiClient: client),
+      bookSearchApi: BookSearchApi(apiClient: client),
+    );
+
+    expect(
+      await repository.flushPendingDeletesForIsbns(const ['9785555555555']),
+      isTrue,
+    );
+    expect(adapter.deletedPaths, ['/api/me/books/95']);
+    expect(await dao.getDirtyRecord(local.userBookId), isNull);
+  });
+
   test('이미 로컬에 있는 ISBN은 요청 상태를 무시하지 않고 409로 알린다', () async {
     const dao = BookshelfDao();
     final now = DateTime.utc(2026, 8, 19);

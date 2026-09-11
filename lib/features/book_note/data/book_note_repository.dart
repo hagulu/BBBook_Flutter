@@ -314,11 +314,16 @@ class BookNoteRepository {
   /// [BookshelfRepository.sync]와 같은 구조다.
   ///
   /// 반환값은 실제로 로컬 DB가 바뀌었는지 여부.
-  Future<bool> sync({required int ownerUserId}) => _syncInFlight ??= _runSync(
-    ownerUserId: ownerUserId,
-  ).whenComplete(() => _syncInFlight = null);
+  Future<bool> sync({required int ownerUserId, bool forceFullSync = false}) =>
+      _syncInFlight ??= _runSync(
+        ownerUserId: ownerUserId,
+        forceFullSync: forceFullSync,
+      ).whenComplete(() => _syncInFlight = null);
 
-  Future<bool> _runSync({required int ownerUserId}) async {
+  Future<bool> _runSync({
+    required int ownerUserId,
+    required bool forceFullSync,
+  }) async {
     // 로컬 저장 모드에서는 서버와 주고받지 않는다. 로컬 파일 정리(네트워크
     // 없음)는 계속 해야 하므로 그것만 실행한다.
     if (await _storageMode.isLocal()) {
@@ -330,6 +335,15 @@ class BookNoteRepository {
     await pushAllDirty();
     if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
       return false;
+    }
+
+    // Record Import는 멱등 키로 기존 노트/메모를 재사용할 수 있어, 완료된
+    // 모든 항목이 직전 since 이후의 변경분으로 다시 내려온다고 보장할 수
+    // 없다. 완료 직후에는 전체 조회로 노트/메모를 다시 맞춰 누락을 막는다.
+    if (forceFullSync) {
+      final changed = await _fullSync(ownerUserId, expectedGeneration);
+      unawaited(sweepLocalImages());
+      return changed;
     }
 
     final since = await _dao.getLastSyncedAtNote();

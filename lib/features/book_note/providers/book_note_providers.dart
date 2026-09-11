@@ -53,14 +53,26 @@ class BookNoteSyncController extends AsyncNotifier<DateTime?> {
 
   /// 당겨서 새로고침 등 겹쳐 호출돼도 진행 중인 동기화 Future를 그대로
   /// 공유해, 중복 네트워크 요청과 상태 덮어쓰기를 막는다.
-  Future<void> syncNow({bool userInitiated = false}) {
+  Future<void> syncNow({
+    bool userInitiated = false,
+    bool forceFullSync = false,
+  }) {
+    final pending = _inFlight;
+    if (pending != null) {
+      if (!forceFullSync) return pending;
+      return pending.then(
+        (_) => syncNow(userInitiated: userInitiated, forceFullSync: true),
+      );
+    }
     if (_inFlight == null && userInitiated) {
       ref.read(apiClientProvider).requestUserRetry();
     }
-    return _inFlight ??= _runSync().whenComplete(() => _inFlight = null);
+    return _inFlight ??= _runSync(
+      forceFullSync: forceFullSync,
+    ).whenComplete(() => _inFlight = null);
   }
 
-  Future<void> _runSync() async {
+  Future<void> _runSync({required bool forceFullSync}) async {
     final ownerUserId = ref.read(
       authNotifierProvider.select((auth) => auth.user?.id),
     );
@@ -68,7 +80,10 @@ class BookNoteSyncController extends AsyncNotifier<DateTime?> {
 
     state = const AsyncValue<DateTime?>.loading().copyWithPrevious(state);
     try {
-      final changed = await _repository.sync(ownerUserId: ownerUserId);
+      final changed = await _repository.sync(
+        ownerUserId: ownerUserId,
+        forceFullSync: forceFullSync,
+      );
       final syncedAt = await _repository.getLastSyncedAtNote();
       if (_disposed) return;
       state = AsyncValue.data(syncedAt);

@@ -2,6 +2,7 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_client.dart';
 import '../models/record_import_models.dart';
@@ -27,11 +28,15 @@ class RecordImportApi {
     try {
       final response = await _apiClient.dio.post<Map<String, dynamic>>(api);
       final session = RecordImportSession.fromJson(_unwrapMap(response));
-      developer.log('[Import 시작] importId=${session.importId} result=SUCCESS');
+      developer.log(
+        '[Import 시작] api=$api importId=${session.importId} '
+        'importedCount=${session.importedCount} result=SUCCESS',
+      );
       return session;
     } on DioException catch (e) {
-      developer.log('[Import 시작] result=FAIL reason=status_${e.response?.statusCode}');
-      throw _mapError(e);
+      final error = _mapError(e);
+      _logRequestFailure(operation: 'Import 시작', api: api, error: error);
+      throw error;
     }
   }
 
@@ -46,14 +51,21 @@ class RecordImportApi {
         api,
         data: payload,
       );
-      developer.log('[Import 청크 업로드] importId=$importId result=SUCCESS');
+      developer.log(
+        '[Import 청크 업로드] api=$api importId=$importId '
+        '${_payloadCountLog(payload)} result=SUCCESS',
+      );
       return RecordImportChunkResult.fromJson(_unwrapMap(response));
     } on DioException catch (e) {
-      developer.log(
-        '[Import 청크 업로드] importId=$importId result=FAIL '
-        'reason=status_${e.response?.statusCode}',
+      final error = _mapError(e);
+      _logRequestFailure(
+        operation: 'Import 청크 업로드',
+        api: api,
+        importId: importId,
+        error: error,
+        context: _payloadCountLog(payload),
       );
-      throw _mapError(e);
+      throw error;
     }
   }
 
@@ -79,16 +91,20 @@ class RecordImportApi {
         data: formData,
       );
       developer.log(
-        '[Import 이미지 업로드] importId=$importId entityType=${entityType.apiValue} '
-        'result=SUCCESS',
+        '[Import 이미지 업로드] api=$api importId=$importId '
+        'entityType=${entityType.apiValue} result=SUCCESS',
       );
       return RecordImportAttachmentResult.fromJson(_unwrapMap(response));
     } on DioException catch (e) {
-      developer.log(
-        '[Import 이미지 업로드] importId=$importId entityType=${entityType.apiValue} '
-        'result=FAIL reason=status_${e.response?.statusCode}',
+      final error = _mapError(e);
+      _logRequestFailure(
+        operation: 'Import 이미지 업로드',
+        api: api,
+        importId: importId,
+        error: error,
+        context: 'entityType=${entityType.apiValue}',
       );
-      throw _mapError(e);
+      throw error;
     }
   }
 
@@ -100,13 +116,20 @@ class RecordImportApi {
         api,
         data: counts.toJson(),
       );
-      developer.log('[Import 완료] importId=$importId result=SUCCESS');
-    } on DioException catch (e) {
       developer.log(
-        '[Import 완료] importId=$importId result=FAIL '
-        'reason=status_${e.response?.statusCode}',
+        '[Import 완료] api=$api importId=$importId '
+        '${_countLog(counts)} result=SUCCESS',
       );
-      throw _mapError(e);
+    } on DioException catch (e) {
+      final error = _mapError(e);
+      _logRequestFailure(
+        operation: 'Import 완료',
+        api: api,
+        importId: importId,
+        error: error,
+        context: _countLog(counts),
+      );
+      throw error;
     }
   }
 
@@ -122,12 +145,18 @@ class RecordImportApi {
     final api = '/api/me/records/import/$importId/cancel';
     try {
       await _apiClient.dio.post<Map<String, dynamic>>(api);
-      developer.log('[Import 취소] importId=$importId result=SUCCESS');
+      developer.log('[Import 취소] api=$api importId=$importId result=SUCCESS');
     } on DioException catch (e) {
       final statusCode = e.response?.statusCode;
       if (statusCode == 404 || statusCode == 409) return;
-      developer.log('[Import 취소] importId=$importId result=FAIL reason=status_$statusCode');
-      throw _mapError(e);
+      final error = _mapError(e);
+      _logRequestFailure(
+        operation: 'Import 취소',
+        api: api,
+        importId: importId,
+        error: error,
+      );
+      throw error;
     }
   }
 
@@ -152,12 +181,72 @@ class RecordImportApi {
       null => RecordImportFailureKind.network,
       _ => RecordImportFailureKind.unknown,
     };
-    final message = statusCode == 401 ? '인증에 실패했습니다.' : '가져오기 요청 처리 중 오류가 발생했습니다.';
+    final responseBody = e.response?.data;
+    final rawServerMessage = responseBody is Map
+        ? responseBody['message']
+        : null;
+    final serverMessage =
+        rawServerMessage is String && rawServerMessage.trim().isNotEmpty
+        ? rawServerMessage.trim()
+        : null;
+    final message = statusCode == 401
+        ? '인증에 실패했습니다.'
+        : serverMessage ?? '가져오기 요청 처리 중 오류가 발생했습니다.';
     return RecordImportException(
       message,
       kind: kind,
       statusCode: statusCode,
+      serverMessage: serverMessage,
       cause: e,
     );
+  }
+
+  void _logRequestFailure({
+    required String operation,
+    required String api,
+    required RecordImportException error,
+    int? importId,
+    String? context,
+  }) {
+    final cause = error.cause;
+    final causeType = cause is DioException ? cause.type.name : 'unknown';
+    final diagnosticMessage = (error.serverMessage ?? error.message)
+        .replaceAll(RegExp(r'[\r\n]+'), ' ')
+        .trim();
+    final limitedMessage = diagnosticMessage.length <= 300
+        ? diagnosticMessage
+        : '${diagnosticMessage.substring(0, 300)}…';
+    developer.log(
+      '[$operation] api=$api '
+      '${importId == null ? '' : 'importId=$importId '}'
+      '${context == null ? '' : '$context '}'
+      'status=${error.statusCode} dioType=$causeType result=FAIL '
+      'reason=${error.kind.name}'
+      '${kDebugMode ? ' serverMessage="$limitedMessage"' : ''}',
+      error: kDebugMode ? cause : null,
+      stackTrace: kDebugMode && cause is DioException ? cause.stackTrace : null,
+    );
+  }
+
+  String _payloadCountLog(Map<String, dynamic> payload) {
+    int lengthOf(String key) => switch (payload[key]) {
+      final List<dynamic> values => values.length,
+      _ => -1,
+    };
+    return 'bookCount=${lengthOf('books')} '
+        'noteCount=${lengthOf('notes')} '
+        'noteMemoCount=${lengthOf('noteMemos')} '
+        'reflectionCount=${lengthOf('reflections')} '
+        'tagCount=${lengthOf('tags')} '
+        'tagMapCount=${lengthOf('tagMaps')}';
+  }
+
+  String _countLog(RecordImportCounts counts) {
+    return 'bookCount=${counts.bookCount} '
+        'noteCount=${counts.noteCount} '
+        'noteMemoCount=${counts.noteMemoCount} '
+        'reflectionCount=${counts.reflectionCount} '
+        'tagCount=${counts.tagCount} '
+        'tagMapCount=${counts.tagMapCount}';
   }
 }

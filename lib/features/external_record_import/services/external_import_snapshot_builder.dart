@@ -14,6 +14,7 @@ class ExternalImportSnapshotBuilder {
   RecordImportSnapshot build(
     ExternalImportParseResult input, {
     Map<String, BookItem> existingBooksByIsbn = const {},
+    Set<String> overwriteExistingIsbns = const {},
   }) {
     final now = DateTime.now().toUtc();
     final books = <BookItem>[];
@@ -36,10 +37,20 @@ class ExternalImportSnapshotBuilder {
       final isAudio = external.sourceType == ExternalBookSourceType.audioBook;
       final isbn13 = external.isbn13;
       final existing = isbn13 == null ? null : existingBooksByIsbn[isbn13];
-      final book = existing == null
+      final overwriteExisting =
+          existing != null &&
+          isbn13 != null &&
+          overwriteExistingIsbns.contains(isbn13);
+      final book = existing == null || overwriteExisting
           ? BookItem(
               userBookId: bookLocalId,
-              clientRequestId: _stableId('book|$identity'),
+              serverId: overwriteExisting ? existing.serverId : null,
+              // 같은 clientRequestId의 활성 책은 서버가 기존 필드를 유지한다.
+              // 사용자가 명시적으로 덮어쓰기를 선택한 경우에는 새 키를 써서
+              // serverId/ISBN 매칭의 교체 정책을 타게 한다.
+              clientRequestId: overwriteExisting
+                  ? uuid.v4()
+                  : _stableId('book|$identity'),
               isbn13: external.isbn13,
               title: external.title,
               author: external.author,
@@ -47,16 +58,24 @@ class ExternalImportSnapshotBuilder {
               statsTotalPages: isEbook || isAudio ? null : external.totalPages,
               displayTotalPages: isEbook ? external.totalPages : null,
               coverImageUrl: external.coverImageUrl,
+              displayCategoryId: existing?.displayCategoryId,
+              category: existing?.category,
               status: external.status,
               currentPage: external.currentPage,
               myRating: external.rating,
               shortReview: external.shortReview,
-              isMasterpiece: false,
+              isMasterpiece: existing?.isMasterpiece ?? false,
               sourceType: external.sourceType?.apiValue,
               rereadCount: external.rereadCount,
+              wantToReread: existing?.wantToReread ?? false,
+              difficulty: existing?.difficulty,
               startedAt: external.startedAt,
               finishedAt: external.finishedAt,
-              tags: const [],
+              libraryId: existing?.libraryId,
+              libraryDueAt: existing?.libraryDueAt,
+              platformName: existing?.platformName,
+              discoverySource: existing?.discoverySource,
+              tags: existing?.tags ?? const [],
               createdAt: createdAt,
               updatedAt: createdAt,
             )

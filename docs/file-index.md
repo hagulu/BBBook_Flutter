@@ -8,6 +8,7 @@
 - `lib/app/app.dart` — MaterialApp 루트 위젯
 - `lib/app/router.dart` — go_router 라우팅, 인증 상태 기반 redirect(AuthGuard 대응)
 - `lib/app/main_shell.dart` — 로그인 후 진입하는 하단 탭 셸(책장/책 추가/마이), 기본 탭은 BOOKSHELF, 가운데 원형 책 추가 버튼으로 아래에서 올라오는 전체 화면 책 추가 진입, 포그라운드 전환 시 동기화 트리거
+- `lib/app/main_shell_tab_provider.dart` — 메인 셸과 하위 기능이 공유하는 현재 하단 탭 상태
 
 ## core
 
@@ -131,7 +132,7 @@
 - `lib/features/external_record_import/screens/external_import_screen.dart` — 북적북적 CSV·북모리 BOOKMORY 파일 분석 결과와 책/메모/제외 건수를 확인한 뒤 기존 Import 세션으로 가져오는 화면
 - `lib/features/external_record_import/providers/external_import_providers.dart` — 외부 파일 분석·기존 기록 사전 동기화·Import 실행·완료 후 증분 동기화 상태 관리
 - `lib/features/external_record_import/services/external_import_file_analyzer.dart` — 확장자 우선 분기와 CSV 헤더/BOOKMORY ZIP·SQLite 내부 검증을 거쳐 서비스별 파서로 연결
-- `lib/features/external_record_import/services/external_record_import_service.dart` — 공통 외부 모델을 기존 records Import 청크로 변환해 start/items/complete 및 실패 시 cancel 흐름 실행
+- `lib/features/external_record_import/services/external_record_import_service.dart` — 공통 외부 모델을 기존 records Import 청크로 변환해 start/items/complete를 실행하고, API 실패는 서버 자동 롤백에 맡기며 클라이언트 후처리 실패만 cancel
 - `lib/features/external_record_import/widgets/external_import_share_coordinator.dart` — Android 공유/파일 열기 cold·warm start 이벤트를 인증 완료 뒤 분석 화면으로 즉시 연결하고 캐시 파일 정리
 
 ## features/record_archive
@@ -213,6 +214,7 @@
 
 ## docs
 
+- `docs/review/20260911-144837-external-import-selection-review.md` — 외부 기록 가져오기 선택·덮어쓰기·복구 메모 정리·로그·대용량 목록 후속 리뷰
 - `docs/review/20260910-201039-external-record-import-review.md` — 외부 기록 가져오기의 기존 책 필드 유실·공유/설정 동시 Import 충돌·CSV 식별자 충돌 리뷰
 - `docs/review/20260910-181343-kakao-login-review.md` — 카카오 로그인 연동의 릴리스 키 주입, iOS 설정 재현성, SDK 초기화 경합·예외 분류 리뷰
 - `docs/review/20260910-132050-import-book-cover-review.md` — 로컬 책 표지 Import의 완료 후 재시도 시 기존 서버 표지 재첨부 실패 리뷰

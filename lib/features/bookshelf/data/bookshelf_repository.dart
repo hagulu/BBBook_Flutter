@@ -608,6 +608,22 @@ class BookshelfRepository {
 
   Future<BookItem?> getByIsbn13(String isbn13) => _dao.getByIsbn13(isbn13);
 
+  /// 같은 ISBN을 다시 추가하거나 Import하기 전에 로컬 삭제 큐가 서버까지
+  /// 반영됐는지 확인한다. 화면의 삭제는 local-first라 즉시 반환되므로,
+  /// 호출 시점에 이미 실행 중인 삭제 push가 있으면 같은 책별 큐에서 기다린다.
+  Future<bool> flushPendingDeletesForIsbns(Iterable<String> isbns) async {
+    for (final isbn13 in isbns.toSet()) {
+      final pendingLocalIds = await _dao.pendingDeletesForIsbn(isbn13);
+      for (final localId in pendingLocalIds) {
+        await pushDirtyRecord(localId);
+      }
+      if ((await _dao.pendingDeletesForIsbn(isbn13)).isNotEmpty) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   Future<bool> hasPendingChanges(int userBookId) async =>
       await _dao.getDirtyRecord(userBookId) != null;
 

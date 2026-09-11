@@ -322,7 +322,9 @@ class BookmoryImporter {
       sourceType: sourceType,
       coverImageUrl: _httpUrl(json['image']),
       createdAt: _epochInstant(json['created_at']),
-      tags: _tags(json['tags']),
+      // 북모리의 자동 분류 태그는 서비스 내부 분류값이 다수 포함되고 기존
+      // 책의 태그 제한과 충돌할 수 있어 가져오지 않는다.
+      tags: const [],
       warnings: warnings,
     );
   }
@@ -522,23 +524,6 @@ class BookmoryImporter {
       result.write(character);
     }
     return result.toString();
-  }
-
-  List<String> _tags(Object? value) {
-    final raw = <String>[];
-    if (value is List<dynamic>) {
-      raw.addAll(value.whereType<String>());
-    } else if (value is String) {
-      raw.addAll(value.split(RegExp(r'\s+(?=#)')));
-    }
-    final result = <String>[];
-    for (final entry in raw) {
-      final normalized = entry.trim().replaceFirst(RegExp(r'^#'), '');
-      if (normalized.isEmpty || normalized.length > 15) continue;
-      if (!result.contains(normalized)) result.add(normalized);
-      if (result.length == 10) break;
-    }
-    return result;
   }
 }
 

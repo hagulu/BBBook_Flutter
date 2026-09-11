@@ -126,6 +126,59 @@ void main() {
     expect(snapshot.noteMemos, hasLength(1));
   });
 
+  test('충돌 책을 명시적으로 선택하면 외부 기록으로 덮어쓴다', () {
+    final now = DateTime.utc(2026, 9, 10);
+    final existing = BookItem(
+      userBookId: 91,
+      serverId: 901,
+      clientRequestId: '11111111-1111-1111-1111-111111111111',
+      isbn13: '9781234567890',
+      title: '기존 제목',
+      displayCategoryId: 7,
+      category: '인문',
+      status: BookStatus.finished,
+      currentPage: 100,
+      myRating: 5,
+      shortReview: '기존 평가',
+      isMasterpiece: true,
+      rereadCount: 2,
+      wantToReread: true,
+      difficulty: 'HARD',
+      libraryId: 12,
+      libraryDueAt: DateTime(2026, 9, 20),
+      platformName: '도서관',
+      discoverySource: 'FRIEND',
+      tags: const [],
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    final snapshot = builder.build(
+      input(),
+      existingBooksByIsbn: {'9781234567890': existing},
+      overwriteExistingIsbns: const {'9781234567890'},
+    );
+    final overwritten = snapshot.books.single;
+
+    expect(overwritten.serverId, existing.serverId);
+    expect(overwritten.clientRequestId, isNot(existing.clientRequestId));
+    expect(overwritten.title, '책');
+    expect(overwritten.status, BookStatus.reading);
+    expect(overwritten.currentPage, 25);
+    expect(overwritten.myRating, isNull);
+    expect(overwritten.shortReview, isNull);
+    expect(overwritten.displayCategoryId, 7);
+    expect(overwritten.category, '인문');
+    expect(overwritten.isMasterpiece, isTrue);
+    expect(overwritten.rereadCount, 1);
+    expect(overwritten.wantToReread, isTrue);
+    expect(overwritten.difficulty, 'HARD');
+    expect(overwritten.libraryId, 12);
+    expect(overwritten.libraryDueAt, DateTime(2026, 9, 20));
+    expect(overwritten.platformName, '도서관');
+    expect(overwritten.discoverySource, 'FRIEND');
+  });
+
   test('같은 서지 정보의 북적북적 행도 인덱스로 서로 구분한다', () {
     final duplicatedBibliography = ExternalImportParseResult(
       source: ExternalImportSource.bookJuk,

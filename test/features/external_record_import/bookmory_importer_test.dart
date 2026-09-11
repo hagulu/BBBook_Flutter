@@ -5,6 +5,8 @@ import 'package:archive/archive.dart';
 import 'package:bbbook/features/bookshelf/models/book_status.dart';
 import 'package:bbbook/features/external_record_import/data/bookmory_importer.dart';
 import 'package:bbbook/features/external_record_import/models/external_import_models.dart';
+import 'package:bbbook/features/external_record_import/services/external_import_snapshot_builder.dart';
+import 'package:bbbook/features/server_storage_migration/data/record_import_validation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -27,6 +29,7 @@ void main() {
     expect(result.discoveredBookCount, 3);
     expect(result.books, hasLength(3));
     expect(result.noteCount, 3);
+    expect(result.books.expand((book) => book.tags), isEmpty);
 
     final littlePrince = result.books.singleWhere(
       (book) => book.title == '어린 왕자',
@@ -50,6 +53,21 @@ void main() {
     expect(frankenstein.notes.first.content, '- 좋았서');
     expect(frankenstein.notes.first.startPage, 15);
     expect(frankenstein.notes.first.endPage, 15);
+
+    final snapshot = const ExternalImportSnapshotBuilder().build(result);
+    expect(snapshot.tags, isEmpty);
+    expect(snapshot.tagMaps, isEmpty);
+    expect(
+      validateRecordImportSnapshot(
+        books: snapshot.books,
+        notes: snapshot.notes,
+        memos: snapshot.noteMemos,
+        reflections: snapshot.reflections,
+        tags: snapshot.tags,
+        tagMaps: snapshot.tagMaps,
+      ),
+      isNull,
+    );
   });
 
   test('Quill Delta의 줄바꿈과 목록 내용을 plain text로 보존한다', () {

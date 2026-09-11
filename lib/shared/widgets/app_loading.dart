@@ -66,10 +66,12 @@ class AppLoadingOverlay extends StatelessWidget {
     super.key,
     required this.isLoading,
     required this.child,
+    this.blockInteraction = true,
   });
 
   final bool isLoading;
   final Widget child;
+  final bool blockInteraction;
 
   @override
   Widget build(BuildContext context) {
@@ -78,15 +80,18 @@ class AppLoadingOverlay extends StatelessWidget {
         child,
         if (isLoading) ...[
           Positioned.fill(
-            child: AbsorbPointer(
-              child: ColoredBox(
-                color: Colors.black.withValues(alpha: 0.15),
-                child: Center(
-                  child: Semantics(
-                    liveRegion: true,
-                    label: '로딩 중',
-                    child: CircularProgressIndicator(
-                      color: AppColors.of(context).accentForeground,
+            child: IgnorePointer(
+              ignoring: !blockInteraction,
+              child: AbsorbPointer(
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  child: Center(
+                    child: Semantics(
+                      liveRegion: true,
+                      label: '로딩 중',
+                      child: CircularProgressIndicator(
+                        color: AppColors.of(context).accentForeground,
+                      ),
                     ),
                   ),
                 ),
@@ -94,7 +99,7 @@ class AppLoadingOverlay extends StatelessWidget {
             ),
           ),
           // child의 시맨틱스를 차단해 로딩 중 버튼 등을 스크린 리더로 조작할 수 없게 한다.
-          const BlockSemantics(),
+          if (blockInteraction) const BlockSemantics(),
         ],
       ],
     );

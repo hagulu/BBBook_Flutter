@@ -202,15 +202,17 @@ class RecordImportException implements Exception {
     this.message, {
     required this.kind,
     this.statusCode,
+    this.serverMessage,
     this.cause,
   });
 
   final String message;
   final RecordImportFailureKind kind;
   final int? statusCode;
+  final String? serverMessage;
   final Object? cause;
 
   @override
   String toString() =>
-      'RecordImportException(kind: $kind, statusCode: $statusCode, message: $message)';
+      'RecordImportException(kind: $kind, statusCode: $statusCode)';
 }

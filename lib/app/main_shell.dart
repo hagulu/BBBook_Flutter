@@ -14,6 +14,7 @@ import '../features/profile/screens/profile_settings_screen.dart';
 import '../features/record_sync/providers/background_record_sync_provider.dart';
 import '../shared/widgets/app_bar_title.dart';
 import '../shared/widgets/app_confirm.dart';
+import 'main_shell_tab_provider.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 로그인 후 진입하는 하단 탭 셸(BOOKSHELF/PROFILE, `navigation.md` 대응).
@@ -31,8 +32,6 @@ class MainShell extends ConsumerStatefulWidget {
 class _MainShellState extends ConsumerState<MainShell>
     with WidgetsBindingObserver {
   static const _tabs = [BookshelfScreen(), ProfileScreen()];
-
-  int _selectedIndex = 0;
 
   @override
   void initState() {
@@ -101,6 +100,7 @@ class _MainShellState extends ConsumerState<MainShell>
   @override
   Widget build(BuildContext context) {
     ref.watch(backgroundRecordSyncProvider);
+    final selectedIndex = ref.watch(mainShellTabIndexProvider);
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) => _handlePopAttempt(didPop),
@@ -110,7 +110,7 @@ class _MainShellState extends ConsumerState<MainShell>
           backgroundColor: AppColors.of(context).pageBackground,
           foregroundColor: AppColors.of(context).textStrong,
           elevation: 0,
-          actions: _selectedIndex == 1
+          actions: selectedIndex == 1
               ? [
                   IconButton(
                     icon: const Icon(PhosphorIconsRegular.gearSix),
@@ -124,7 +124,7 @@ class _MainShellState extends ConsumerState<MainShell>
                 ]
               : null,
         ),
-        body: IndexedStack(index: _selectedIndex, children: _tabs),
+        body: IndexedStack(index: selectedIndex, children: _tabs),
         bottomNavigationBar: DecoratedBox(
           decoration: BoxDecoration(
             color: AppColors.of(context).surface,
@@ -141,16 +141,18 @@ class _MainShellState extends ConsumerState<MainShell>
                     icon: PhosphorIconsRegular.books,
                     selectedIcon: PhosphorIconsFill.books,
                     label: '책장',
-                    selected: _selectedIndex == 0,
-                    onTap: () => setState(() => _selectedIndex = 0),
+                    selected: selectedIndex == 0,
+                    onTap: () =>
+                        ref.read(mainShellTabIndexProvider.notifier).state = 0,
                   ),
                   _AddBookNavItem(onTap: _openBookSearch),
                   _NavItem(
                     icon: PhosphorIconsRegular.user,
                     selectedIcon: PhosphorIconsFill.user,
                     label: '마이',
-                    selected: _selectedIndex == 1,
-                    onTap: () => setState(() => _selectedIndex = 1),
+                    selected: selectedIndex == 1,
+                    onTap: () =>
+                        ref.read(mainShellTabIndexProvider.notifier).state = 1,
                   ),
                 ],
               ),
