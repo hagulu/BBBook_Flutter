@@ -180,9 +180,14 @@ class AppBrandColors {
   const AppBrandColors._();
 
   static const kakao = Color(0xFFFEE500);
-  static const kakaoLabel = Color(0xFF3C1E1E);
+  // 카카오 로그인 디자인 가이드: 레이블 #000000 85%.
+  static const kakaoLabel = Color(0xD9000000);
   static const naver = Color(0xFF03C75A);
   static const google = Color(0xFF4285F4);
+
+  // Google 로그인 브랜딩 가이드(Light 스타일) 고정 색상.
+  static const googleBorder = Color(0xFF747775);
+  static const googleLabel = Color(0xFF1F1F1F);
 }
 
 ThemeData buildAppTheme({Brightness brightness = Brightness.light}) {

@@ -28,7 +28,7 @@
 - `lib/features/auth/data/local_auth_store.dart` — 기록 DB에 계정 소유자 캐시, 기존 설치의 동기화 메타데이터에서 오프라인 계정 복원
 - `lib/features/auth/data/auth_repository.dart` — 인증 세션 source of truth(API·시큐어 스토리지·소셜 SDK 오케스트레이션)
 - `lib/features/auth/data/auth_api.dart` — 인증 API 호출(로그인/refresh/logout/getMe)
-- `lib/features/auth/data/social_auth_service.dart` — Google/Apple 네이티브 로그인
+- `lib/features/auth/data/social_auth_service.dart` — Google/Apple/Kakao/Naver 네이티브 로그인, 공급자 토큰 획득·SDK 로그아웃
 - `lib/features/auth/widgets/auth_loading_gate.dart` — 인증 확인·라우터 전환 사이 빈 배경 표시, 로그인 사용자의 온보딩 순간 노출 방지
 
 ## features/profile

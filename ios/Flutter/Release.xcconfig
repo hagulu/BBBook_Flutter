@@ -2,3 +2,5 @@
 // Kakao.xcconfig은 git에 커밋하지 않으므로(Kakao.xcconfig.sample 참고) 새 체크아웃에서도
 // 빌드가 깨지지 않도록 optional include로 둔다. 값이 없으면 카카오 로그인만 동작하지 않는다.
 #include? "Kakao.xcconfig"
+
+#include? "NaverKeys.xcconfig"

@@ -1,8 +1,13 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart' show PlatformException;
+import 'package:naver_login_flutter/naver_login_flutter.dart';
+import 'package:flutter/services.dart' show MethodChannel, PlatformException;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+
+import '../../../core/config/kakao_config.dart';
 
 /// 소셜 로그인 실패 시 화면에 노출할 메시지를 담는 예외.
 class SocialAuthException implements Exception {
@@ -10,12 +15,11 @@ class SocialAuthException implements Exception {
   final String message;
 }
 
-/// Google/Apple 네이티브 SDK로 소셜 로그인을 수행해 id_token을 반환한다.
-///
-/// 원본(Next.js)은 브라우저 팝업 + postMessage 기반이었으나, 모바일에서는
-/// 네이티브 Google/Apple Sign-In SDK로 완전히 대체한다(features/auth.md
-/// Flutter 이관 시 주의사항).
+/// 네이티브 소셜 SDK에서 백엔드 검증용 ID 토큰 또는 Access Token을 얻는다.
 class SocialAuthService {
+  static const _socialConfigChannel = MethodChannel(
+    'com.hagulu.nook.bbbook/social_config',
+  );
   // 백엔드가 id_token의 audience를 검증하므로 값이 백엔드 설정과 일치해야 한다.
   static const _googleClientId =
       '585070787661-73kr7939i6slm4c1r53egdn2mi9c48si.apps.googleusercontent.com';
@@ -81,6 +85,64 @@ class SocialAuthService {
     }
   }
 
+  Future<String> signInWithNaver() async {
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.android &&
+            defaultTargetPlatform != TargetPlatform.iOS)) {
+      throw const SocialAuthException('현재 플랫폼에서는 네이버 로그인을 지원하지 않습니다.');
+    }
+    try {
+      final configured = await _socialConfigChannel.invokeMethod<bool>(
+        'isNaverConfigured',
+      );
+      if (configured != true) {
+        throw const SocialAuthException('네이버 로그인 설정이 필요합니다. 앱 관리자에게 문의해 주세요.');
+      }
+      await FlutterNaverLogin.setLogEnabled(false);
+      final result = await FlutterNaverLogin.logIn().timeout(
+        const Duration(seconds: 90),
+        onTimeout: () =>
+            throw const SocialAuthException('네이버 로그인 응답이 없습니다. 다시 시도해 주세요.'),
+      );
+      if (result.status == NaverLoginStatus.loggedOut ||
+          (result.errorMessage?.toLowerCase().contains('cancel') ?? false)) {
+        developer.log(
+          '[소셜 로그인] provider=naver result=FAIL '
+          'reason=sdk_canceled status=${result.status.name}',
+        );
+        throw const SocialAuthException('로그인이 취소되었습니다.');
+      }
+      if (result.status != NaverLoginStatus.loggedIn) {
+        developer.log(
+          '[소셜 로그인] provider=naver result=FAIL reason=sdk_login_failed',
+        );
+        throw const SocialAuthException('네이버 로그인에 실패했습니다. 다시 시도해 주세요.');
+      }
+      // 로그인 결과의 프로필이 아닌 SDK에 저장된 Access Token을 전달한다.
+      final token = await FlutterNaverLogin.getCurrentAccessToken();
+      if (token.accessToken.trim().isEmpty) {
+        developer.log(
+          '[소셜 로그인] provider=naver result=FAIL reason=missing_access_token',
+        );
+        throw const SocialAuthException('네이버 인증 정보를 가져오지 못했습니다.');
+      }
+      return token.accessToken;
+    } on SocialAuthException {
+      rethrow;
+    } catch (_) {
+      developer.log('[소셜 로그인] provider=naver result=FAIL reason=sdk_error');
+      throw const SocialAuthException('네이버 로그인 중 오류가 발생했습니다.');
+    }
+  }
+
+  Future<void> signOutNaver() async {
+    try {
+      await FlutterNaverLogin.logOut();
+    } catch (_) {
+      developer.log('[소셜 로그아웃] provider=naver result=FAIL reason=sdk_error');
+    }
+  }
+
   Future<void> signOutGoogle() async {
     if (_googleInitialized) {
       await GoogleSignIn.instance.signOut();
@@ -91,6 +153,9 @@ class SocialAuthService {
   /// Access Token을 반환한다. 백엔드 검증 용도로만 쓰이며 서비스 자체
   /// 인증 토큰으로 사용하지 않는다.
   Future<String> signInWithKakao() async {
+    if (!KakaoConfig.isConfigured) {
+      throw const SocialAuthException('카카오 로그인 설정이 필요합니다. 앱 관리자에게 문의해 주세요.');
+    }
     try {
       final talkInstalled = await isKakaoTalkInstalled();
       final token = talkInstalled

@@ -37,6 +37,8 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["kakaoNativeAppKey"] = kakaoNativeAppKey
+        manifestPlaceholders["naverClientId"] = localProperties.getProperty("naver.client_id", "")
+        manifestPlaceholders["naverClientSecret"] = localProperties.getProperty("naver.client_secret", "")
     }
 
     buildTypes {

@@ -9,7 +9,8 @@ import '../models/auth_user.dart';
 enum SocialProvider {
   google,
   apple,
-  kakao;
+  kakao,
+  naver;
 
   String get apiValue => name;
 }

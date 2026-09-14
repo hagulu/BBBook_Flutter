@@ -164,6 +164,11 @@ class AuthNotifier extends Notifier<AuthState> {
   }) =>
       _login(SocialProvider.kakao, confirmAccountChange: confirmAccountChange);
 
+  Future<bool> loginWithNaver({
+    Future<bool> Function()? confirmAccountChange,
+  }) =>
+      _login(SocialProvider.naver, confirmAccountChange: confirmAccountChange);
+
   /// [SocialAuthException], [ApiException]은 그대로 던져 화면(SnackBar)에서 처리한다.
   Future<bool> _login(
     SocialProvider provider, {

@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
@@ -11,14 +13,13 @@ import '../providers/auth_providers.dart';
 import '../widgets/social_login_button.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
-enum _LoadingProvider { none, google, apple, kakao }
+enum _LoadingProvider { none, google, apple, kakao, naver }
 
 /// 온보딩(로그인) 화면.
 ///
 /// 문서: docs/porting-reference/features/auth.md,
 /// docs/porting-reference/screenshots/onboarding.jpg
 ///
-/// 네이버는 원본과 동일하게 UI만 노출하고 비활성화된 목업 버튼으로 둔다.
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key, this.reauthentication = false});
 
@@ -48,6 +49,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       () => ref
           .read(authNotifierProvider.notifier)
           .loginWithKakao(confirmAccountChange: _confirmAccountChange),
+    );
+  }
+
+  Future<void> _handleNaverLogin() {
+    return _handleLogin(
+      _LoadingProvider.naver,
+      () => ref
+          .read(authNotifierProvider.notifier)
+          .loginWithNaver(confirmAccountChange: _confirmAccountChange),
     );
   }
 
@@ -166,63 +176,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       ),
                     ),
                     const SizedBox(height: 28),
-                    SocialLoginButton(
-                      label: '카카오로 시작하기',
-                      icon: const Icon(
-                        PhosphorIconsRegular.chatCircle,
-                        color: AppBrandColors.kakaoLabel,
-                        size: 20,
-                      ),
-                      backgroundColor: AppBrandColors.kakao,
-                      foregroundColor: AppBrandColors.kakaoLabel,
-                      isLoading: _loading == _LoadingProvider.kakao,
-                      onPressed: _isBusy ? null : _handleKakaoLogin,
-                    ),
-                    const SizedBox(height: 12),
-                    const SocialLoginButton(
-                      label: '네이버로 시작하기',
-                      icon: Text(
-                        'N',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      backgroundColor: AppBrandColors.naver,
-                      foregroundColor: Colors.white,
-                      onPressed: null,
-                    ),
-                    const SizedBox(height: 12),
-                    SocialLoginButton(
-                      label: 'Google로 시작하기',
-                      icon: const Text(
-                        'G',
-                        style: TextStyle(
-                          color: AppBrandColors.google,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      backgroundColor: Colors.white,
-                      foregroundColor: AppColors.textStrong,
-                      border: BorderSide(color: AppColors.of(context).border),
-                      isLoading: _loading == _LoadingProvider.google,
-                      onPressed: _isBusy ? null : _handleGoogleLogin,
-                    ),
-                    const SizedBox(height: 12),
-                    SocialLoginButton(
-                      label: 'Apple로 시작하기',
-                      icon: const Icon(
-                        PhosphorIconsRegular.appleLogo,
-                        color: Colors.white,
-                        size: 22,
-                      ),
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      isLoading: _loading == _LoadingProvider.apple,
-                      onPressed: (_isBusy || !isAppleSignInSupported)
-                          ? null
-                          : _handleAppleLogin,
+                    ..._buildSocialLoginButtons(
+                      context,
+                      isAppleSignInSupported: isAppleSignInSupported,
                     ),
                   ],
                 ),
@@ -232,5 +188,94 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildSocialLoginButtons(
+    BuildContext context, {
+    required bool isAppleSignInSupported,
+  }) {
+    // Google 로그인 브랜딩 가이드라인의 플랫폼별 좌측 여백(로고 → 버튼 좌측)
+    // 규격. iOS: 16, Android: 12.
+    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+    final googleLeadingPadding = isIOS ? 16.0 : 12.0;
+    final appleButtonHeight = MediaQuery.textScalerOf(context).scale(48);
+    const appleButtonRadius = BorderRadius.all(Radius.circular(12));
+
+    final buttons = <Widget>[
+      if (isAppleSignInSupported)
+        MediaQuery.withNoTextScaling(
+          // 패키지는 높이로 글자 크기를 계산하므로 배율은 높이에 한 번만 적용한다.
+          child: SizedBox(
+            height: appleButtonHeight,
+            width: double.infinity,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SignInWithAppleButton(
+                  text: 'Apple로 계속하기',
+                  height: appleButtonHeight,
+                  borderRadius: appleButtonRadius,
+                  iconAlignment: SignInWithAppleIconAlignment.left,
+                  onPressed: _isBusy ? null : _handleAppleLogin,
+                ),
+                if (_loading == _LoadingProvider.apple)
+                  const Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius: appleButtonRadius,
+                      child: ColoredBox(
+                        color: Colors.black87,
+                        child: Center(
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      SocialLoginButton(
+        iconAsset: 'assets/icon/social/google.svg',
+        label: 'Google로 계속하기',
+        backgroundColor: Colors.white,
+        foregroundColor: AppBrandColors.googleLabel,
+        border: const BorderSide(color: AppBrandColors.googleBorder),
+        leadingPadding: googleLeadingPadding,
+        isLoading: _loading == _LoadingProvider.google,
+        onPressed: _isBusy ? null : _handleGoogleLogin,
+      ),
+      SocialLoginButton(
+        iconAsset: 'assets/icon/social/kakao.svg',
+        label: '카카오로 계속하기',
+        backgroundColor: AppBrandColors.kakao,
+        foregroundColor: AppBrandColors.kakaoLabel,
+        borderRadius: 12,
+        isLoading: _loading == _LoadingProvider.kakao,
+        onPressed: _isBusy ? null : _handleKakaoLogin,
+      ),
+      SocialLoginButton(
+        iconAsset: 'assets/icon/social/naver.svg',
+        label: '네이버로 계속하기',
+        backgroundColor: AppBrandColors.naver,
+        foregroundColor: Colors.white,
+        leadingPadding: 20,
+        isLoading: _loading == _LoadingProvider.naver,
+        onPressed: _isBusy ? null : _handleNaverLogin,
+      ),
+    ];
+
+    return [
+      for (var i = 0; i < buttons.length; i++) ...[
+        if (i > 0) const SizedBox(height: 12),
+        buttons[i],
+      ],
+    ];
   }
 }

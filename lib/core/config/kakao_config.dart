@@ -1,24 +1,42 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 class KakaoConfig {
   const KakaoConfig._();
 
-  // Kakao Developers 콘솔의 네이티브 앱 키. 코드에 직접 적지 않고
-  // `flutter run --dart-define=KAKAO_NATIVE_APP_KEY=실제-네이티브-앱-키`로 주입한다.
-  // Android는 android/local.properties의 kakao.nativeAppKey, iOS는
-  // ios/Flutter/Kakao.xcconfig의 KAKAO_NATIVE_APP_KEY에 동일한 값을 별도로 설정해야
-  // 네이티브 매니페스트/Info.plist의 커스텀 URL 스킴도 맞춰진다.
-  static const String nativeAppKey = String.fromEnvironment(
-    'KAKAO_NATIVE_APP_KEY',
+  // Android와 iOS의 Redirect URI에 이미 사용한 네이티브 앱 키를 SDK에도 쓴다.
+  static const _configChannel = MethodChannel(
+    'com.hagulu.nook.bbbook/social_config',
   );
+  static bool isConfigured = false;
+
+  static Future<String> loadNativeAppKey() async {
+    isConfigured = false;
+    try {
+      final key =
+          await _configChannel.invokeMethod<String>('getKakaoNativeAppKey') ??
+          '';
+      isConfigured = key.trim().isNotEmpty && !key.contains(r'$(');
+      return isConfigured ? key : '';
+    } on PlatformException {
+      developer.log('[카카오 설정 조회] result=FAIL reason=platform_error');
+      return '';
+    } on MissingPluginException {
+      developer.log('[카카오 설정 조회] result=FAIL reason=missing_plugin');
+      return '';
+    }
+  }
 
   /// release 빌드에 네이티브 앱 키가 비어있는 채로 배포되는 것을 막는다.
   /// `main()`에서 앱 시작 전에 한 번 호출한다.
   static void assertConfiguredForRelease() {
-    if (kReleaseMode && nativeAppKey.isEmpty) {
+    if (kReleaseMode && !isConfigured) {
       throw StateError(
-        'KAKAO_NATIVE_APP_KEY가 설정되지 않았습니다. release 빌드는 반드시 '
-        '--dart-define=KAKAO_NATIVE_APP_KEY=실제-네이티브-앱-키 로 지정해야 합니다.',
+        '카카오 네이티브 앱 키가 설정되지 않았습니다. Android는 '
+        'android/local.properties의 kakao.nativeAppKey, iOS는 '
+        'ios/Flutter/Kakao.xcconfig의 KAKAO_NATIVE_APP_KEY를 설정하세요.',
       );
     }
   }

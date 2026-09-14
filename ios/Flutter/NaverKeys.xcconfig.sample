@@ -1,0 +1,4 @@
+// 웹과 동일한 Naver Application 설정값을 사용합니다.
+NAVER_CLIENT_ID = 실제-클라이언트-ID
+NAVER_CLIENT_SECRET = 실제-클라이언트-시크릿
+NAVER_URL_SCHEME = bbbooknaver

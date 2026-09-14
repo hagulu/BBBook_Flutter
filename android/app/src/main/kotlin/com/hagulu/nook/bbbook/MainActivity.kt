@@ -1,6 +1,7 @@
 package com.hagulu.nook.bbbook
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
 import android.os.Build
@@ -16,6 +17,7 @@ import java.util.ArrayDeque
 import java.util.UUID
 
 class MainActivity : FlutterActivity() {
+    private val socialConfigChannelName = "com.hagulu.nook.bbbook/social_config"
     private val methodChannelName = "com.hagulu.nook.bbbook/external_import"
     private val eventChannelName = "com.hagulu.nook.bbbook/external_import/events"
     private val pendingFiles = ArrayDeque<Map<String, String>>()
@@ -23,6 +25,28 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, socialConfigChannelName)
+            .setMethodCallHandler { call, result ->
+                if (call.method != "isNaverConfigured" && call.method != "getKakaoNativeAppKey") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                try {
+                    val metadata = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA).metaData
+                    when (call.method) {
+                        "isNaverConfigured" -> {
+                            val clientId = metadata?.getString("com.naver.sdk.clientId")
+                            val clientSecret = metadata?.getString("com.naver.sdk.clientSecret")
+                            result.success(!clientId.isNullOrBlank() && !clientSecret.isNullOrBlank())
+                        }
+                        "getKakaoNativeAppKey" -> {
+                            result.success(metadata?.getString("com.hagulu.nook.bbbook.kakaoNativeAppKey") ?: "")
+                        }
+                    }
+                } catch (_: Exception) {
+                    result.error("SOCIAL_CONFIG_UNAVAILABLE", "Social configuration is unavailable", null)
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, methodChannelName)
             .setMethodCallHandler { call, result ->
                 if (call.method != "getInitialSharedFile") {
