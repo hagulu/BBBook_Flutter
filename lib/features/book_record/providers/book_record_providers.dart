@@ -87,6 +87,12 @@ class BookRecordController
     if (updated != null) {
       state = AsyncValue.data(updated);
       ref.read(bookshelfSyncVersionProvider.notifier).state++;
+      // 이 patch가 독서 상태를 바꿨을 때만 책장 탭 이동 신호를 올린다 —
+      // 진행률 등 다른 필드만 바뀐 저장까지 매번 신호를 올리면 책장으로
+      // 돌아갈 때마다 불필요하게 탭이 다시 계산된다.
+      if (patch.status != null) {
+        ref.read(lastBookStatusChangeProvider.notifier).state = updated.status;
+      }
     }
   }
 

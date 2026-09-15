@@ -243,7 +243,9 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                         decoration: InputDecoration(
                           counterText: '',
                           isDense: true,
-                          contentPadding: EdgeInsets.zero,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 6,
+                          ),
                           filled: false,
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,

@@ -19,6 +19,7 @@ class MyReflectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return CommunityContentCard(
       onTap: onTap,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       child: MyContentCardLayout(
         book: reflection.book,
         dateLabel: reflection.isHidden

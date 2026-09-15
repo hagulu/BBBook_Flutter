@@ -30,6 +30,7 @@ class BookshelfScreen extends ConsumerStatefulWidget {
 // 읽기 중단 탭이 항상 마지막 index라 노출/은닉으로 length가 3 ↔ 4로 바뀌어도
 // 앞의 읽을 책(0)/읽는 중(1)/완독(2) index는 그대로 유지된다.
 const _kStoppedTabIndex = 3;
+const _kFinishedTabIndex = 2;
 const _kReadingTabIndex = 1;
 const _kWantToReadTabIndex = 0;
 
@@ -75,6 +76,24 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
     _tabController.index = index;
     _lastTabIndex = index;
     _applyingProgrammaticChange = false;
+  }
+
+  /// [status]에 대응하는 탭 index. 읽기 중단 탭이 아직 노출되지 않았는데
+  /// 중단으로 바뀐 경우(그 신호가 도착한 프레임에는 아직 탭 노출 여부가
+  /// 갱신되지 않았을 수 있음)에는 null을 반환해 이동을 건너뛴다 — 뒤이어
+  /// `_syncTabControllerWithData`가 탭을 새로 노출시키면서 알아서 옮겨준다.
+  int? _tabIndexForStatus(BookStatus status) {
+    switch (status) {
+      case BookStatus.wantToRead:
+        return _kWantToReadTabIndex;
+      case BookStatus.reading:
+      case BookStatus.paused:
+        return _kReadingTabIndex;
+      case BookStatus.finished:
+        return _kFinishedTabIndex;
+      case BookStatus.stopped:
+        return _hasStoppedTab ? _kStoppedTabIndex : null;
+    }
   }
 
   void _recreateController({required int length, required int index}) {
@@ -163,6 +182,18 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
         setState(_syncTabControllerWithData);
       });
     }
+
+    // 책 기록 상세 화면에서 독서 상태를 바꾸고 돌아오면(그 화면은 이
+    // IndexedStack 아래 계속 마운트된 채 유지됨) 바뀐 상태에 맞는 탭으로
+    // 옮긴다. 사용자가 직접 고른 탭을 덮어써도 되는 이유: 방금 그 책의
+    // 상태를 바꾼 행동 자체가 최신 의도이기 때문이다.
+    ref.listen<BookStatus?>(lastBookStatusChangeProvider, (previous, next) {
+      if (next == null) return;
+      final index = _tabIndexForStatus(next);
+      if (index != null && index != _tabController.index) {
+        setState(() => _setControllerIndex(index));
+      }
+    });
 
     return Column(
       children: [

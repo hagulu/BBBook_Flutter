@@ -76,6 +76,11 @@ class BookReflectionRepository {
     );
   }
 
+  /// "내가 작성한 독후감" 목록 전용(로컬 조회, 서버 API를 쓰지 않는다).
+  Future<List<BookReflection>> findAllForOwner({required int ownerUserId}) {
+    return _dao.findAllForOwner(ownerUserId: ownerUserId);
+  }
+
   Future<BookReflection?> findDetail({
     required int ownerUserId,
     required int userBookId,

@@ -2,7 +2,10 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/providers/auth_access_providers.dart';
 import '../../auth/providers/auth_providers.dart';
+import '../../book_reflection/providers/book_reflection_providers.dart';
+import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../data/my_content_api.dart';
 import '../models/my_discussion_answer_summary.dart';
 import '../models/my_discussion_summary.dart';
@@ -45,53 +48,35 @@ class MyContentListState<T> {
   }
 }
 
+/// "내가 작성한 독후감" 목록. 다른 3개와 달리 서버 API가 아니라 로컬
+/// DB에서 직접 읽는다 — 목록의 id가 바로 로컬 PK라 상세로 이동할 때 서버
+/// ID로 로컬 행을 다시 찾는 동기화 타이밍 문제가 없다. 로컬 조회라 커서
+/// 페이지네이션도 필요 없다(동기화로 로컬이 바뀌면 자동으로 다시 읽는다).
 class MyReflectionListController
-    extends AutoDisposeAsyncNotifier<MyContentListState<MyReflectionSummary>> {
-  late MyContentApi _api;
-
+    extends AutoDisposeAsyncNotifier<List<MyReflectionSummary>> {
   @override
-  FutureOr<MyContentListState<MyReflectionSummary>> build() async {
-    _api = ref.watch(myContentApiProvider);
-    final page = await _api.fetchReflections(size: _kPageSize);
-    return MyContentListState(
-      items: page.items,
-      nextCursor: page.nextCursor,
-      hasNext: page.hasNext,
+  FutureOr<List<MyReflectionSummary>> build() async {
+    final ownerUserId = ref.watch(recordOwnerIdProvider);
+    ref.watch(bookReflectionSyncVersionProvider);
+    if (ownerUserId == null) return const [];
+
+    final reflectionRepository = ref.watch(bookReflectionRepositoryProvider);
+    final bookshelfRepository = ref.watch(bookshelfRepositoryProvider);
+    final reflections = await reflectionRepository.findAllForOwner(
+      ownerUserId: ownerUserId,
     );
-  }
-
-  Future<void> loadMore() async {
-    final current = state.valueOrNull;
-    if (current == null || !current.hasNext || current.isLoadingMore) return;
-
-    state = AsyncValue.data(current.copyWith(isLoadingMore: true));
-    try {
-      final page = await _api.fetchReflections(
-        cursor: current.nextCursor,
-        size: _kPageSize,
-      );
-      final latest = state.valueOrNull;
-      if (latest == null) return;
-      state = AsyncValue.data(
-        latest.copyWith(
-          items: [...latest.items, ...page.items],
-          nextCursor: page.nextCursor,
-          hasNext: page.hasNext,
-          isLoadingMore: false,
-        ),
-      );
-    } catch (_) {
-      final latest = state.valueOrNull;
-      if (latest != null) {
-        state = AsyncValue.data(latest.copyWith(isLoadingMore: false));
-      }
+    final items = <MyReflectionSummary>[];
+    for (final reflection in reflections) {
+      final book = await bookshelfRepository.getById(reflection.userBookId);
+      items.add(MyReflectionSummary.fromLocal(reflection: reflection, book: book));
     }
+    return items;
   }
 }
 
 final myReflectionListControllerProvider = AsyncNotifierProvider.autoDispose<
   MyReflectionListController,
-  MyContentListState<MyReflectionSummary>
+  List<MyReflectionSummary>
 >(MyReflectionListController.new);
 
 class MyReviewListController

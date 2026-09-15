@@ -64,6 +64,11 @@ final bookshelfSyncVersionProvider = StateProvider<int>((ref) => 0);
 /// 불필요하게 깜빡인다.
 final externalSyncVersionProvider = StateProvider<int>((ref) => 0);
 
+/// 책 기록 화면에서 독서 상태(status)가 바뀔 때마다 그 결과 상태를 담아
+/// 올린다. 책장 화면(BookshelfScreen)이 이 값을 구독해, 상세 화면에서
+/// 상태를 바꾸고 뒤로 나왔을 때 바뀐 상태에 맞는 탭으로 옮겨간다.
+final lastBookStatusChangeProvider = StateProvider<BookStatus?>((ref) => null);
+
 /// 동기화 실행/상태 관리(최초엔 전체 동기화, 이후엔 증분 동기화). 값은
 /// 마지막 동기화 시각(없으면 null).
 class BookshelfSyncController extends AsyncNotifier<DateTime?> {

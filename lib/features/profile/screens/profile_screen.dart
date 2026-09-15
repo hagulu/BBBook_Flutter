@@ -615,15 +615,17 @@ class _LogoutButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Align(
-      alignment: Alignment.centerLeft,
-      child: TextButton.icon(
+      alignment: Alignment.center,
+      child: TextButton(
         onPressed: () => _logout(context, ref),
         style: TextButton.styleFrom(
-          foregroundColor: AppColors.of(context).error,
+          foregroundColor: AppColors.of(context).textMuted,
           padding: const EdgeInsets.symmetric(horizontal: 4),
         ),
-        icon: const Icon(PhosphorIconsRegular.signOut, size: 18),
-        label: const Text('로그아웃'),
+        child: const Text(
+          '로그아웃',
+          style: TextStyle(fontSize: 12, decoration: TextDecoration.underline),
+        ),
       ),
     );
   }

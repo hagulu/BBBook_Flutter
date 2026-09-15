@@ -43,7 +43,7 @@ class BookReflectionDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: AppBarTitle(bookTitle),
+        title: AppBarTitle(bookTitle, subtitle: '독후감'),
         backgroundColor: AppColors.of(context).pageBackground,
         foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,

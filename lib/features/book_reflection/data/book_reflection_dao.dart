@@ -39,6 +39,23 @@ class BookReflectionDao {
     return rows.map(_reflectionFromRow).toList(growable: false);
   }
 
+  /// "내가 작성한 독후감" 목록 전용 — 소유자의 모든 독후감(책 무관)을
+  /// 최신순으로 반환한다. 서버 API 대신 이 조회를 쓰면 목록·상세가 항상
+  /// 같은 로컬 PK를 참조해, 동기화 시점 차이로 상세를 못 찾는 문제가
+  /// 애초에 생기지 않는다.
+  Future<List<BookReflection>> findAllForOwner({
+    required int ownerUserId,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'book_reflection',
+      where: 'owner_user_id = ? AND deleted_at IS NULL',
+      whereArgs: [ownerUserId],
+      orderBy: 'created_at DESC, id DESC',
+    );
+    return rows.map(_reflectionFromRow).toList(growable: false);
+  }
+
   Future<BookReflection?> findDetail({
     required int ownerUserId,
     required int userBookId,

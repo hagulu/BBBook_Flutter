@@ -21,6 +21,7 @@ class MyReviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CommunityContentCard(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       child: MyContentCardLayout(
         book: review.book,
         dateLabel: formatRelativeDiscussionDateTime(review.createdAt),

@@ -5,15 +5,15 @@ import '../../../core/network/api_exception.dart';
 import '../models/my_content_book.dart';
 import '../models/my_discussion_answer_summary.dart';
 import '../models/my_discussion_summary.dart';
-import '../models/my_reflection_summary.dart';
 import '../models/my_review_summary.dart';
 
-/// "내가 작성한 콘텐츠" 4개 목록 API 호출(`my-content-screens.md` §1, §2-4,
-/// §3-4, §4-4, §5-4).
+/// "내가 작성한 콘텐츠" 목록 API 호출(`my-content-screens.md` §1, §3-4, §4-4,
+/// §5-4). 독후감은 로컬 DB에서 직접 조회한다([MyReflectionListController]
+/// 참고 — 서버 목록 API는 상세로 이동할 로컬 PK를 주지 않아 동기화 타이밍
+/// 문제가 있었다).
 ///
-/// 문서: ../../../../../api-doc/api-me-reflections-get.md,
-/// api-me-reviews-get.md, api-me-discussions-get.md,
-/// api-me-discussion-answers-get.md
+/// 문서: ../../../../../api-doc/api-me-reviews-get.md,
+/// api-me-discussions-get.md, api-me-discussion-answers-get.md
 ///
 /// 인증 필요 요청이므로 401 시 1회 재시도 후 실패하면 로그아웃 처리하는
 /// [ApiClient]를 통해서만 호출한다(CLAUDE.md 인증 API 호출 규칙).
@@ -21,19 +21,6 @@ class MyContentApi {
   MyContentApi({required this._apiClient});
 
   final ApiClient _apiClient;
-
-  /// GET /api/me/reflections
-  Future<MyContentPage<MyReflectionSummary>> fetchReflections({
-    int? cursor,
-    required int size,
-  }) {
-    return _fetchPage(
-      '/api/me/reflections',
-      cursor: cursor,
-      size: size,
-      itemFromJson: MyReflectionSummary.fromJson,
-    );
-  }
 
   /// GET /api/me/reviews
   Future<MyContentPage<MyReviewSummary>> fetchReviews({

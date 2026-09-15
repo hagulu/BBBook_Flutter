@@ -103,15 +103,27 @@ class _BookTitleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Text(
-      [book.title, ?book.author.displayedAuthorOrNull].join(' · '),
+    final author = book.author.displayedAuthorOrNull;
+    final text = Text.rich(
+      TextSpan(
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: AppColors.of(context).textMuted,
+        ),
+        children: [
+          TextSpan(text: book.title),
+          if (author != null) ...[
+            const WidgetSpan(child: SizedBox(width: 3)),
+            TextSpan(
+              text: '($author)',
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w400),
+            ),
+          ],
+        ],
+      ),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: AppColors.of(context).textMuted,
-      ),
     );
 
     if (onTap == null) return text;

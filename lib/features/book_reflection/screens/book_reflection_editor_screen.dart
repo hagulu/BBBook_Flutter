@@ -669,8 +669,11 @@ class _BookReflectionEditorScreenState
                                         fontWeight: FontWeight.bold,
                                       ),
                                       counterText: '',
+                                      isDense: true,
                                       filled: false,
-                                      contentPadding: EdgeInsets.zero,
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        vertical: 6,
+                                      ),
                                       border: InputBorder.none,
                                       enabledBorder: InputBorder.none,
                                       focusedBorder: InputBorder.none,
