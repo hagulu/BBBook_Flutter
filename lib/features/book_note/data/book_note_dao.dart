@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/policy/attachment_limit_policy.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
 import '../../record_sync/models/record_sync_payload.dart';
 import '../models/book_note.dart';
@@ -177,6 +178,7 @@ class BookNoteDao {
     required int noteId,
     required BookNoteMemoDraft draft,
     required String? localImagePath,
+    int? noteImageLimit,
   }) async {
     final db = await BookshelfDatabase.instance();
     return db.transaction((txn) async {
@@ -186,6 +188,15 @@ class BookNoteDao {
         userBookId: userBookId,
         noteId: noteId,
       );
+      // 화면이 편집을 시작할 때 읽은 개수는 스냅샷이라, 그 사이 동기화가
+      // 다른 기기의 사진 메모를 반영했을 수 있다 — 실제 쓰기 직전에 같은
+      // 트랜잭션 안에서 한 번 더 확인해야 한도를 원자적으로 지킬 수 있다.
+      if (localImagePath != null && noteImageLimit != null) {
+        final count = await _countImageMemos(txn, noteId);
+        if (count >= noteImageLimit) {
+          throw const NoteImageLimitExceededException();
+        }
+      }
       final id = await _nextLocalId(txn, 'book_note_memo');
       final orderRows = await txn.rawQuery(
         'SELECT MAX(sort_order) AS max_order FROM book_note_memo '
@@ -230,6 +241,7 @@ class BookNoteDao {
     required int noteMemoId,
     required BookNoteMemoDraft draft,
     required String? localImagePath,
+    int? noteImageLimit,
   }) async {
     final db = await BookshelfDatabase.instance();
     return db.transaction((txn) async {
@@ -239,6 +251,21 @@ class BookNoteDao {
         userBookId: userBookId,
         noteId: noteId,
       );
+      // `cleared`가 아니면 저장 후 이미지가 남는다 — `unchanged`는 이미
+      // 이미지가 있던 메모에서만 나오므로(편집 화면이 제출 전 강제한다),
+      // 자기 자신을 개수에서 뺀 채 확인하면 교체·유지는 항상 통과하고
+      // 새로 이미지가 생기는 경우만 한도에 걸린다.
+      if (draft.imageChange != MemoImageChange.cleared &&
+          noteImageLimit != null) {
+        final count = await _countImageMemos(
+          txn,
+          noteId,
+          excludeMemoId: noteMemoId,
+        );
+        if (count >= noteImageLimit) {
+          throw const NoteImageLimitExceededException();
+        }
+      }
       final now = DateTime.now().toUtc().toIso8601String();
       final count = await txn.update(
         'book_note_memo',
@@ -1172,6 +1199,31 @@ class BookNoteDao {
       limit: 1,
     );
     if (rows.isEmpty) throw StateError('Note not found');
+  }
+
+  /// 노트 안에서 이미지가 첨부된(삭제되지 않은) 메모 개수. [excludeMemoId]를
+  /// 주면 그 메모 자신은 제외한다 — 수정 중인 메모가 이미 이미지를 갖고
+  /// 있었다면 자기 자신 때문에 한도에 걸리지 않게 하기 위함이다.
+  Future<int> _countImageMemos(
+    Transaction txn,
+    int noteId, {
+    int? excludeMemoId,
+  }) async {
+    final where = <String>[
+      'note_id = ?',
+      'deleted_at IS NULL',
+      '(image_url IS NOT NULL OR local_image_path IS NOT NULL)',
+    ];
+    final args = <Object?>[noteId];
+    if (excludeMemoId != null) {
+      where.add('id != ?');
+      args.add(excludeMemoId);
+    }
+    final rows = await txn.rawQuery(
+      'SELECT COUNT(*) AS c FROM book_note_memo WHERE ${where.join(' AND ')}',
+      args,
+    );
+    return (rows.single['c'] as int?) ?? 0;
   }
 
   static BookNote _noteFromRow(Map<String, Object?> row) {

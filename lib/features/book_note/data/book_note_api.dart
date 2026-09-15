@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/policy/attachment_limit_policy.dart';
 import '../../record_sync/models/record_sync_payload.dart';
 import '../models/book_note.dart';
 import '../models/book_note_sync_changes_result.dart';
@@ -27,9 +28,12 @@ import '../models/book_note_sync_changes_result.dart';
 /// 인증 필요 요청이므로 401 시 1회 재시도 후 실패하면 로그아웃 처리하는
 /// [ApiClient]를 통해서만 호출한다(CLAUDE.md 인증 API 호출 규칙).
 class BookNoteApi {
-  BookNoteApi({required this._apiClient});
+  BookNoteApi({required this._apiClient, AttachmentLimitPolicy? attachmentLimitPolicy})
+    : _attachmentLimitPolicy =
+          attachmentLimitPolicy ?? AttachmentLimitPolicy.defaultPolicy;
 
   final ApiClient _apiClient;
+  final AttachmentLimitPolicy _attachmentLimitPolicy;
 
   /// PUT /api/me/books/{userBookId}/notes/title
   ///
@@ -270,10 +274,29 @@ class BookNoteApi {
 
   ApiException _mapError(DioException e) {
     final statusCode = e.response?.statusCode;
+    final errorCode = _responseErrorCode(e);
+    if (errorCode == AttachmentLimitErrorCodes.noteImageLimitExceeded) {
+      return ApiException(
+        _attachmentLimitPolicy.noteImageLimitMessage,
+        statusCode: statusCode,
+        errorCode: errorCode,
+        cause: e,
+      );
+    }
     final message = switch (statusCode) {
       401 => '인증에 실패했습니다.',
       _ => '요청 처리 중 오류가 발생했습니다.',
     };
-    return ApiException(message, statusCode: statusCode, cause: e);
+    return ApiException(
+      message,
+      statusCode: statusCode,
+      errorCode: errorCode,
+      cause: e,
+    );
+  }
+
+  String? _responseErrorCode(DioException e) {
+    final data = e.response?.data;
+    return data is Map ? data['errorCode'] as String? : null;
   }
 }

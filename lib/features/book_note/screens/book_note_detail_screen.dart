@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
+import '../../../core/policy/attachment_limit_policy.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/image/widgets/shared_image_viewer.dart';
 import '../../../shared/widgets/app_bar_title.dart';
@@ -212,6 +213,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
                     hintText: '제목을 입력하세요 (선택)',
                     fillColor: Colors.transparent,
                     contentPadding: EdgeInsets.symmetric(vertical: 10),
+                    counterText: '',
                   ),
                 ),
               ],
@@ -321,8 +323,17 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
     }
   }
 
+  int get _currentImageMemoCount {
+    final memos = ref.read(bookNoteDetailProvider(_args)).valueOrNull?.memos;
+    return memos?.where((memo) => memo.hasImage).length ?? 0;
+  }
+
   Future<void> _addMemo() async {
-    final draft = await showBookNoteMemoQuickComposer(context);
+    final draft = await showBookNoteMemoQuickComposer(
+      context,
+      attachmentLimitPolicy: ref.read(attachmentLimitPolicyProvider),
+      currentImageMemoCount: _currentImageMemoCount,
+    );
     if (draft == null || !mounted) return;
     if (!await _saveTitle(createWhenEmpty: true)) {
       if (mounted) AppSnackBar.error(context, '노트를 준비하지 못했습니다.');
@@ -338,7 +349,12 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
   }
 
   Future<void> _editMemo(BookNoteMemo memo) async {
-    final draft = await showBookNoteMemoEditor(context, initialMemo: memo);
+    final draft = await showBookNoteMemoEditor(
+      context,
+      initialMemo: memo,
+      attachmentLimitPolicy: ref.read(attachmentLimitPolicyProvider),
+      currentImageMemoCount: _currentImageMemoCount,
+    );
     if (draft == null || !mounted) return;
     await _saveMemo(() {
       return ref
@@ -428,9 +444,17 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
       // 사진 형식/용량 거절(FileSystemException.message)처럼 원인이 분명한
       // 경우는 그대로 보여준다 — "저장하지 못했습니다"만으로는 사용자가
       // 사진을 바꿔야 하는지조차 알 수 없다.
-      final reason = error is FileSystemException && error.message.isNotEmpty
-          ? error.message
-          : null;
+      //
+      // 노트 이미지 한도 초과는 편집 화면을 여는 시점의 스냅샷 개수로 먼저
+      // 막지만, 그 사이 동기화가 다른 기기의 사진 메모를 반영했다면
+      // 실제 로컬 쓰기 트랜잭션에서 뒤늦게 걸릴 수 있다([BookNoteDao]).
+      final reason = switch (error) {
+        FileSystemException(:final message) when message.isNotEmpty =>
+          message,
+        NoteImageLimitExceededException() =>
+          ref.read(attachmentLimitPolicyProvider).noteImageLimitMessage,
+        _ => null,
+      };
       if (mounted) {
         AppSnackBar.error(context, reason ?? '메모를 저장하지 못했습니다.');
       }

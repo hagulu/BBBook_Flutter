@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/policy/attachment_limit_policy.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/image/screens/shared_image_editor_screen.dart';
 import '../../../shared/image/services/image_gallery_picker.dart';
@@ -489,6 +490,11 @@ class _BookReflectionEditorScreenState
     if (memo == null || !mounted) return;
 
     if (memo.type == BookNoteMemoType.photo) {
+      final policy = ref.read(attachmentLimitPolicyProvider);
+      if (!policy.reflectionImageAllowed) {
+        AppSnackBar.error(context, policy.reflectionImageNotAllowedMessage);
+        return;
+      }
       await _insertPhotoMemo(memo, selection);
       return;
     }
@@ -724,6 +730,9 @@ class _BookReflectionEditorScreenState
                 onRequestPickImage: _pickAndSaveImage,
                 onImageInsert: _insertImage,
                 onPickMemo: _insertMemo,
+                imageAttachmentAllowed: ref
+                    .watch(attachmentLimitPolicyProvider)
+                    .reflectionImageAllowed,
               ),
             ],
           ),
@@ -740,6 +749,7 @@ class _ReflectionToolbar extends StatefulWidget {
     required this.onRequestPickImage,
     required this.onImageInsert,
     required this.onPickMemo,
+    required this.imageAttachmentAllowed,
   });
 
   final QuillController controller;
@@ -747,6 +757,10 @@ class _ReflectionToolbar extends StatefulWidget {
   final OnRequestPickImage onRequestPickImage;
   final OnImageInsertCallback onImageInsert;
   final VoidCallback onPickMemo;
+
+  /// 독후감 이미지 첨부 정책 허용 여부(현재는 항상 false) — false면 첨부
+  /// 목록에서 이미지 버튼 자체를 노출하지 않는다.
+  final bool imageAttachmentAllowed;
 
   @override
   State<_ReflectionToolbar> createState() => _ReflectionToolbarState();
@@ -844,16 +858,17 @@ class _ReflectionToolbarState extends State<_ReflectionToolbar> {
                                   iconTheme: null,
                                   tooltip: '메모 가져오기',
                                 ),
-                                QuillToolbarIconButton(
-                                  onPressed: _insertImage,
-                                  icon: const Icon(
-                                    PhosphorIconsRegular.image,
-                                    size: 20,
+                                if (widget.imageAttachmentAllowed)
+                                  QuillToolbarIconButton(
+                                    onPressed: _insertImage,
+                                    icon: const Icon(
+                                      PhosphorIconsRegular.image,
+                                      size: 20,
+                                    ),
+                                    isSelected: false,
+                                    iconTheme: null,
+                                    tooltip: '이미지 첨부',
                                   ),
-                                  isSelected: false,
-                                  iconTheme: null,
-                                  tooltip: '이미지 첨부',
-                                ),
                               ],
                             )
                           : const SizedBox.shrink(),

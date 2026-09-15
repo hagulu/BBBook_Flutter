@@ -20,6 +20,7 @@
 - `lib/core/storage/token_storage.dart` — refreshToken 시큐어 스토리지 래퍼
 - `lib/core/storage/client_id_storage.dart` — X-Client-Id 헤더용 설치 단위 클라이언트 식별자(UUID) 저장/재사용
 - `lib/core/storage/local_image_store.dart` — 기능별 이미지 로컬 파일 저장소(선택 이미지 저장·서버 이미지 내려받기·orphan 정리, DB에는 폴더 기준 상대 경로만 보관)
+- `lib/core/policy/attachment_limit_policy.dart` — 노트/독후감 이미지 첨부 한도 정책(현재 고정값: 노트 3·독후감 0, 추후 서버 등급별 값으로 교체 가능한 단일 지점) 및 서버 제한 에러코드 상수
 
 ## features/auth
 
@@ -219,6 +220,7 @@
 
 ## docs
 
+- `docs/review/20260915-210107-attachment-limit-review.md` — 기존 이미지는 허용하고 신규 이미지만 제한하는 기준에서 노트 최종 저장 검증과 양수 독후감 한도 처리를 점검한 리뷰
 - `docs/review/20260915-173540-bookshelf-recommendation-rereview.md` — 추천 도서 후속 수정의 언어 헤더, 진행 중 기록 동기화 순서, 상태 카드 좁은 화면 오버플로 재리뷰
 - `docs/review/20260915-154940-bookshelf-recommendation-review.md` — 빈 책장 추천 도서의 계정 간 캐시 노출, 실패 재시도 부재, 기록 동기화 경합, 상태 카드 큰 글자 오버플로 리뷰
 - `docs/review/20260915-140322-standalone-session-rereview.md` — 계정 없이 사용하기 후속 수정의 회원 탈퇴 데이터 보존 회귀, 선택 팝업 dismiss, 계정별 서버 메타데이터 승계, 로그인 전환 원자성 재리뷰

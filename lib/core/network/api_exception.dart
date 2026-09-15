@@ -2,10 +2,15 @@
 ///
 /// 내부 원인(cause)은 로그에만 남기고, [message]는 사용자에게 보여줄 짧은 문구로 유지한다.
 class ApiException implements Exception {
-  const ApiException(this.message, {this.statusCode, this.cause});
+  const ApiException(this.message, {this.statusCode, this.errorCode, this.cause});
 
   final String message;
   final int? statusCode;
+
+  /// 서버가 내려준 ErrorCode enum 이름(예: `NOTE_IMAGE_LIMIT_EXCEEDED`).
+  /// 특정 비즈니스 오류를 구분해서 처리해야 할 때만 쓰고, 그 외에는
+  /// [message]만 그대로 보여준다.
+  final String? errorCode;
   final Object? cause;
 
   /// 세션이 실제로 무효화된 경우(401/403)만 true. 그 외(네트워크 오류, 5xx,

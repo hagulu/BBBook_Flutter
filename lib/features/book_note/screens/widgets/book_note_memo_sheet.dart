@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
+import '../../../../core/policy/attachment_limit_policy.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/image/screens/shared_image_editor_screen.dart';
 import '../../../../shared/widgets/app_alert.dart';
@@ -22,6 +23,8 @@ Future<BookNoteMemoDraft?> showBookNoteMemoEditor(
   BuildContext context, {
   BookNoteMemo? initialMemo,
   BookNoteMemoDraft? initialDraft,
+  required AttachmentLimitPolicy attachmentLimitPolicy,
+  required int currentImageMemoCount,
 }) {
   assert(initialMemo == null || initialDraft == null);
   return Navigator.of(context).push<BookNoteMemoDraft>(
@@ -30,23 +33,38 @@ Future<BookNoteMemoDraft?> showBookNoteMemoEditor(
       builder: (_) => _BookNoteMemoEditorScreen(
         initialMemo: initialMemo,
         initialDraft: initialDraft,
+        attachmentLimitPolicy: attachmentLimitPolicy,
+        currentImageMemoCount: currentImageMemoCount,
       ),
     ),
   );
 }
 
-Future<BookNoteMemoDraft?> showBookNoteMemoQuickComposer(BuildContext context) {
+Future<BookNoteMemoDraft?> showBookNoteMemoQuickComposer(
+  BuildContext context, {
+  required AttachmentLimitPolicy attachmentLimitPolicy,
+  required int currentImageMemoCount,
+}) {
   return showModalBottomSheet<BookNoteMemoDraft>(
     context: context,
     isScrollControlled: true,
     showDragHandle: false,
     backgroundColor: Colors.transparent,
-    builder: (_) => const _BookNoteMemoQuickComposer(),
+    builder: (_) => _BookNoteMemoQuickComposer(
+      attachmentLimitPolicy: attachmentLimitPolicy,
+      currentImageMemoCount: currentImageMemoCount,
+    ),
   );
 }
 
 class _BookNoteMemoQuickComposer extends StatefulWidget {
-  const _BookNoteMemoQuickComposer();
+  const _BookNoteMemoQuickComposer({
+    required this.attachmentLimitPolicy,
+    required this.currentImageMemoCount,
+  });
+
+  final AttachmentLimitPolicy attachmentLimitPolicy;
+  final int currentImageMemoCount;
 
   @override
   State<_BookNoteMemoQuickComposer> createState() =>
@@ -238,6 +256,8 @@ class _BookNoteMemoQuickComposerState
     final draft = await showBookNoteMemoEditor(
       context,
       initialDraft: initialDraft,
+      attachmentLimitPolicy: widget.attachmentLimitPolicy,
+      currentImageMemoCount: widget.currentImageMemoCount,
     );
     if (!mounted) return;
     Navigator.of(context).pop<BookNoteMemoDraft>(draft);
@@ -248,10 +268,18 @@ class _BookNoteMemoEditorScreen extends StatefulWidget {
   const _BookNoteMemoEditorScreen({
     required this.initialMemo,
     required this.initialDraft,
+    required this.attachmentLimitPolicy,
+    required this.currentImageMemoCount,
   });
 
   final BookNoteMemo? initialMemo;
   final BookNoteMemoDraft? initialDraft;
+  final AttachmentLimitPolicy attachmentLimitPolicy;
+
+  /// 이 노트 안에서 이미지가 첨부된(삭제되지 않은) 메모의 현재 개수. 지금
+  /// 편집 중인 메모 자체가 이미 이미지가 있었다면([_memoAlreadyHasImage])
+  /// 이 개수에 포함돼 있으므로, 교체는 한도와 무관하게 항상 허용한다.
+  final int currentImageMemoCount;
 
   @override
   State<_BookNoteMemoEditorScreen> createState() =>
@@ -278,6 +306,16 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
   /// 돌려준다([MemoImageChange]).
   bool _imageRemoved = false;
   String? _errorText;
+
+  /// 편집을 시작한 시점에 이 메모가 이미 이미지를 갖고 있었는지(로컬 DB
+  /// 기준). 편집 중 제거/재선택 여부와 무관하게 고정된 값이다 — 한도 계산은
+  /// "지금 이 메모가 이미 한 자리를 차지하고 있었는가"만 보면 된다.
+  bool get _memoAlreadyHasImage => widget.initialMemo?.hasImage ?? false;
+
+  bool get _canAttachImage => widget.attachmentLimitPolicy.canAttachNoteImage(
+    currentImageMemoCount: widget.currentImageMemoCount,
+    memoAlreadyHasImage: _memoAlreadyHasImage,
+  );
 
   @override
   void initState() {
@@ -352,6 +390,13 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
             lockToSelectedType:
                 widget.initialMemo?.type == BookNoteMemoType.photo,
             onSelected: (type) {
+              if (type == BookNoteMemoType.photo && !_canAttachImage) {
+                AppSnackBar.error(
+                  context,
+                  widget.attachmentLimitPolicy.noteImageLimitMessage,
+                );
+                return;
+              }
               setState(() {
                 _type = type;
                 _errorText = null;
@@ -500,6 +545,13 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
   }
 
   Future<void> _pickPhoto() async {
+    if (!_canAttachImage) {
+      AppSnackBar.error(
+        context,
+        widget.attachmentLimitPolicy.noteImageLimitMessage,
+      );
+      return;
+    }
     _contentFocusNode.unfocus();
     final capturedPath = await captureMemoPhoto(context);
     if (capturedPath == null || !mounted) return;

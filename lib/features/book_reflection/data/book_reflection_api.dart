@@ -5,6 +5,7 @@ import 'package:path/path.dart' as path;
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/policy/attachment_limit_policy.dart';
 import '../models/book_reflection.dart';
 import '../models/book_reflection_sync_changes_result.dart';
 
@@ -19,9 +20,14 @@ import '../models/book_reflection_sync_changes_result.dart';
 /// 인증 필요 요청이므로 401 시 1회 재시도 후 실패하면 로그아웃 처리하는
 /// [ApiClient]를 통해서만 호출한다(CLAUDE.md 인증 API 호출 규칙).
 class BookReflectionApi {
-  BookReflectionApi({required this._apiClient});
+  BookReflectionApi({
+    required this._apiClient,
+    AttachmentLimitPolicy? attachmentLimitPolicy,
+  }) : _attachmentLimitPolicy =
+           attachmentLimitPolicy ?? AttachmentLimitPolicy.defaultPolicy;
 
   final ApiClient _apiClient;
+  final AttachmentLimitPolicy _attachmentLimitPolicy;
 
   /// POST /api/me/books/{userBookId}/reflections — 독후감 생성.
   Future<BookReflectionServerResult> create({
@@ -166,12 +172,31 @@ class BookReflectionApi {
 
   ApiException _mapError(DioException e) {
     final statusCode = e.response?.statusCode;
+    final errorCode = _responseErrorCode(e);
+    if (errorCode == AttachmentLimitErrorCodes.reflectionImageNotAllowed) {
+      return ApiException(
+        _attachmentLimitPolicy.reflectionImageNotAllowedMessage,
+        statusCode: statusCode,
+        errorCode: errorCode,
+        cause: e,
+      );
+    }
     final message = switch (statusCode) {
       401 => '인증에 실패했습니다.',
       400 => '입력한 내용을 확인해 주세요.',
       404 => '독후감을 찾을 수 없습니다.',
       _ => '요청 처리 중 오류가 발생했습니다.',
     };
-    return ApiException(message, statusCode: statusCode, cause: e);
+    return ApiException(
+      message,
+      statusCode: statusCode,
+      errorCode: errorCode,
+      cause: e,
+    );
+  }
+
+  String? _responseErrorCode(DioException e) {
+    final data = e.response?.data;
+    return data is Map ? data['errorCode'] as String? : null;
   }
 }

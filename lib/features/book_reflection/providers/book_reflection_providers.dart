@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/policy/attachment_limit_policy.dart';
 import '../../auth/providers/auth_access_providers.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
@@ -16,7 +17,10 @@ final bookReflectionDaoProvider = Provider<BookReflectionDao>((ref) {
 });
 
 final bookReflectionApiProvider = Provider<BookReflectionApi>((ref) {
-  return BookReflectionApi(apiClient: ref.watch(apiClientProvider));
+  return BookReflectionApi(
+    apiClient: ref.watch(apiClientProvider),
+    attachmentLimitPolicy: ref.watch(attachmentLimitPolicyProvider),
+  );
 });
 
 final bookReflectionRepositoryProvider = Provider<BookReflectionRepository>((

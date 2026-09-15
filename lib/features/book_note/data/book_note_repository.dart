@@ -3,6 +3,7 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/policy/attachment_limit_policy.dart';
 import '../../../core/storage/local_image_store.dart';
 import '../../bookshelf/data/bookshelf_repository.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
@@ -39,8 +40,11 @@ class BookNoteRepository {
     this._dao = const BookNoteDao(),
     LocalImageStore? imageStore,
     StorageModeStore? storageMode,
+    AttachmentLimitPolicy? attachmentLimitPolicy,
   }) : _imageStore = imageStore ?? noteMemoImageStore,
-       _storageMode = storageMode ?? storageModeStore;
+       _storageMode = storageMode ?? storageModeStore,
+       _attachmentLimitPolicy =
+           attachmentLimitPolicy ?? AttachmentLimitPolicy.defaultPolicy;
 
   final BookNoteApi _api;
   final RecordSyncApi _recordSyncApi;
@@ -48,6 +52,7 @@ class BookNoteRepository {
   final BookNoteDao _dao;
   final LocalImageStore _imageStore;
   final StorageModeStore _storageMode;
+  final AttachmentLimitPolicy _attachmentLimitPolicy;
 
   /// 세션 동안 기억할 "서버에 없는 사진" URL 상한([_rememberUnavailable]).
   static const _maxUnavailableImageUrls = 200;
@@ -148,6 +153,7 @@ class BookNoteRepository {
         noteId: noteId,
         draft: draft,
         localImagePath: localImagePath,
+        noteImageLimit: _attachmentLimitPolicy.noteImageLimit,
       );
       developer.log(
         '[메모 생성] userId=$ownerUserId bookId=$userBookId '
@@ -184,6 +190,7 @@ class BookNoteRepository {
         noteMemoId: noteMemoId,
         draft: draft,
         localImagePath: localImagePath,
+        noteImageLimit: _attachmentLimitPolicy.noteImageLimit,
       );
       // 사진을 실제로 바꾸거나 지웠을 때만 이전 파일을 정리한다(그대로 둔
       // 경우 `previousLocalImagePath`가 여전히 이 메모의 사진이다).

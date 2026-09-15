@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:bbbook/core/policy/attachment_limit_policy.dart';
 import 'package:bbbook/features/book_note/data/book_note_dao.dart';
 import 'package:bbbook/features/book_note/models/book_note.dart';
 import 'package:bbbook/features/bookshelf/data/bookshelf_database.dart';
@@ -283,5 +284,128 @@ void main() {
     expect(synced.isDirty, isFalse);
     expect(synced.imageUrl, 'https://cdn.example.com/notes/400/uploaded.jpg');
     expect(synced.localImagePath, 'memo_images/memo_2.jpg');
+  });
+
+  group('노트 이미지 한도 원자적 재검사', () {
+    const limit = 2;
+
+    Future<BookNote> createNoteWithPhotoMemos(int photoCount) async {
+      final note = await dao.createNote(
+        ownerUserId: 7,
+        userBookId: 20,
+        title: null,
+      );
+      for (var i = 0; i < photoCount; i++) {
+        await dao.createNoteMemo(
+          ownerUserId: 7,
+          userBookId: 20,
+          noteId: note.id,
+          draft: const BookNoteMemoDraft(
+            type: BookNoteMemoType.photo,
+            imageChange: MemoImageChange.replaced,
+          ),
+          localImagePath: 'memo_images/seed_$i.jpg',
+          noteImageLimit: limit,
+        );
+      }
+      return note;
+    }
+
+    test('편집 화면을 연 뒤 다른 곳에서 채워진 한도는 실제 생성 시점에 다시 걸린다', () async {
+      // 편집 화면이 스냅샷을 읽은 뒤(예: 개수 0) 백그라운드 동기화 등으로
+      // 노트가 이미 한도만큼 채워진 상태를 흉내낸다.
+      final note = await createNoteWithPhotoMemos(limit);
+
+      expect(
+        () => dao.createNoteMemo(
+          ownerUserId: 7,
+          userBookId: 20,
+          noteId: note.id,
+          draft: const BookNoteMemoDraft(
+            type: BookNoteMemoType.photo,
+            imageChange: MemoImageChange.replaced,
+          ),
+          localImagePath: 'memo_images/new.jpg',
+          noteImageLimit: limit,
+        ),
+        throwsA(isA<NoteImageLimitExceededException>()),
+      );
+      // 실패한 시도는 아무 것도 남기지 않는다(rawQuery로 재확인).
+      final count = (await dao.getAllMemosForNote(note.id)).length;
+      expect(count, limit);
+    });
+
+    test('이미 한도에 도달해도 기존 이미지가 있던 메모의 교체는 통과한다', () async {
+      final note = await createNoteWithPhotoMemos(limit);
+      final target = (await dao.getAllMemosForNote(note.id)).first;
+
+      final updated = await dao.updateNoteMemo(
+        ownerUserId: 7,
+        userBookId: 20,
+        noteId: note.id,
+        noteMemoId: target.id,
+        draft: const BookNoteMemoDraft(
+          type: BookNoteMemoType.photo,
+          imageChange: MemoImageChange.replaced,
+        ),
+        localImagePath: 'memo_images/replacement.jpg',
+        noteImageLimit: limit,
+      );
+
+      expect(updated.localImagePath, 'memo_images/replacement.jpg');
+    });
+
+    test('이미 한도에 도달했으면 텍스트 메모를 사진으로 전환해 새 이미지를 추가할 수 없다', () async {
+      final note = await createNoteWithPhotoMemos(limit);
+      final textMemo = await dao.createNoteMemo(
+        ownerUserId: 7,
+        userBookId: 20,
+        noteId: note.id,
+        draft: const BookNoteMemoDraft(
+          type: BookNoteMemoType.thought,
+          content: '텍스트 메모',
+        ),
+        localImagePath: null,
+        // 이 생성 자체는 이미지가 없으므로 한도 검사 대상이 아니다.
+        noteImageLimit: limit,
+      );
+
+      expect(
+        () => dao.updateNoteMemo(
+          ownerUserId: 7,
+          userBookId: 20,
+          noteId: note.id,
+          noteMemoId: textMemo.id,
+          draft: const BookNoteMemoDraft(
+            type: BookNoteMemoType.photo,
+            imageChange: MemoImageChange.replaced,
+          ),
+          localImagePath: 'memo_images/converted.jpg',
+          noteImageLimit: limit,
+        ),
+        throwsA(isA<NoteImageLimitExceededException>()),
+      );
+    });
+
+    test('사진을 지우는 수정은 한도와 무관하게 항상 통과한다', () async {
+      final note = await createNoteWithPhotoMemos(limit);
+      final target = (await dao.getAllMemosForNote(note.id)).first;
+
+      final cleared = await dao.updateNoteMemo(
+        ownerUserId: 7,
+        userBookId: 20,
+        noteId: note.id,
+        noteMemoId: target.id,
+        draft: const BookNoteMemoDraft(
+          type: BookNoteMemoType.thought,
+          content: '사진 제거',
+          imageChange: MemoImageChange.cleared,
+        ),
+        localImagePath: null,
+        noteImageLimit: limit,
+      );
+
+      expect(cleared.localImagePath, isNull);
+    });
   });
 }
