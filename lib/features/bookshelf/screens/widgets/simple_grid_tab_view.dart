@@ -10,6 +10,7 @@ import '../../providers/bookshelf_providers.dart';
 import 'book_cover.dart';
 import 'bookshelf_async_body.dart';
 import 'bookshelf_refresh_indicator.dart';
+import 'recommended_books_section.dart';
 
 /// 표지(2:3) + 제목 2줄 + 저자 1줄이 셀 안에 다 들어가도록 여유를 둔 비율.
 /// 0.56이면 좁은 화면에서 텍스트가 넘쳐 RenderFlex 오버플로우(디버그 모드의
@@ -32,10 +33,19 @@ class SimpleGridTabView extends ConsumerWidget {
     final provider = gridTabProvider(status);
     final books = ref.watch(provider);
     return BookshelfRefreshIndicator(
+      recommendationStatus: status == BookStatus.wantToRead
+          ? BookStatus.wantToRead
+          : null,
       child: BookshelfAsyncBody<BookItem>(
         value: books,
         emptyText: emptyText,
         onRetry: () => ref.invalidate(provider),
+        emptyBuilder: status == BookStatus.wantToRead
+            ? (context) => RecommendedBooksSection(
+                status: BookStatus.wantToRead,
+                emptyText: emptyText,
+              )
+            : null,
         builder: (context, items) {
           return GridView.builder(
             physics: const AlwaysScrollableScrollPhysics(),

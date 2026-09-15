@@ -61,8 +61,10 @@
 - `lib/features/bookshelf/data/bookshelf_repository.dart` — 책장 기능 source of truth(화면은 항상 이 레포지토리의 로컬 조회만 사용), 최초엔 전체·이후엔 증분 동기화, 카테고리는 로컬 캐시 우선 조회
 - `lib/features/bookshelf/services/book_cover_image_store.dart` — 로컬 저장 모드에서 사용자가 고른 책 표지를 보관하는 `LocalImageStore` 인스턴스(`book_covers/` 폴더)
 - `lib/features/bookshelf/data/finished_cover_cache_manager.dart` — 완독 목록 표지 전용 디스크 캐시(원본 바이트 저장, 디코딩 크기 제한은 `BookCover`의 `ResizeImage`가 담당)
-- `lib/features/bookshelf/providers/bookshelf_providers.dart` — 책장 관련 Riverpod provider(동기화 컨트롤러, 탭별 목록, 완독 필터, 공개 설정, 카테고리 목록)
+- `lib/features/bookshelf/data/recommendation_api.dart` — 추천 도서 API 호출(`GET /api/me/recommendations/books`, 카테고리·문구 선정은 서버 전담)
+- `lib/features/bookshelf/providers/bookshelf_providers.dart` — 책장 관련 Riverpod provider(동기화 컨트롤러, 탭별 목록, 완독 필터, 공개 설정, 카테고리 목록, 읽는 중·읽을 책 탭별 추천 도서)
 - `lib/features/bookshelf/models/record_patch.dart` — 책 기록 PATCH 요청 필드 묶음(바꾼 필드만 담는 요청 body 생성, dirty 스냅샷 → 요청 변환)
+- `lib/features/bookshelf/models/book_recommendation.dart` — 추천 도서 API 응답 모델(추천 목록·문구·책 목록)
 
 ## features/book_record
 
@@ -217,6 +219,8 @@
 
 ## docs
 
+- `docs/review/20260915-173540-bookshelf-recommendation-rereview.md` — 추천 도서 후속 수정의 언어 헤더, 진행 중 기록 동기화 순서, 상태 카드 좁은 화면 오버플로 재리뷰
+- `docs/review/20260915-154940-bookshelf-recommendation-review.md` — 빈 책장 추천 도서의 계정 간 캐시 노출, 실패 재시도 부재, 기록 동기화 경합, 상태 카드 큰 글자 오버플로 리뷰
 - `docs/review/20260915-140322-standalone-session-rereview.md` — 계정 없이 사용하기 후속 수정의 회원 탈퇴 데이터 보존 회귀, 선택 팝업 dismiss, 계정별 서버 메타데이터 승계, 로그인 전환 원자성 재리뷰
 - `docs/review/20260915-104037-standalone-session-review.md` — 계정 없이 사용하기의 로그아웃 안내 불일치, 소유권 전환 원자성, 서버 삭제 보류 유실, 공개 조회 인증 경합 리뷰
 - `docs/review/20260911-144837-external-import-selection-review.md` — 외부 기록 가져오기 선택·덮어쓰기·복구 메모 정리·로그·대용량 목록 후속 리뷰

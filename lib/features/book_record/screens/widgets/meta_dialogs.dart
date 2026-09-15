@@ -26,9 +26,9 @@ Future<BookStatus?> showReadingStatusDialog(
       title: '독서 상태',
       content: IconOptionSelector<BookStatus>(
         crossAxisCount: 3,
-        // 상태 카드에는 상·하단 패딩, 아이콘, 라벨이 함께 들어간다. 좁은
-        // 화면에서도 고정 콘텐츠가 넘치지 않도록 충분한 행 높이를 준다.
-        childAspectRatio: 1.2,
+        // 상태 카드에는 상·하단 패딩, 아이콘, 라벨이 함께 들어간다. 라벨이
+        // 한 줄로 끝나는 길이라 콘텐츠 높이에 맞춰 카드 비율을 넉넉히 준다.
+        childAspectRatio: 1.6,
         options: [
           for (final status in BookStatus.values)
             IconOption(value: status, icon: status.icon, label: status.label),

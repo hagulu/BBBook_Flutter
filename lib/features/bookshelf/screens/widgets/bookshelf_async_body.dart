@@ -14,12 +14,18 @@ class BookshelfAsyncBody<T> extends StatelessWidget {
     required this.builder,
     required this.emptyText,
     this.onRetry,
+    this.emptyBuilder,
   });
 
   final AsyncValue<List<T>> value;
   final Widget Function(BuildContext context, List<T> items) builder;
   final String emptyText;
   final VoidCallback? onRetry;
+
+  /// 빈 목록일 때 기본 안내 문구([_ScrollableMessage]) 대신 보여줄 위젯(예:
+  /// 읽는 중/읽을 책 탭의 추천 도서 영역). 완독/읽기 중단 탭처럼 별도 처리가
+  /// 필요 없는 곳은 넘기지 않아 기존 빈 상태를 그대로 유지한다.
+  final WidgetBuilder? emptyBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +41,7 @@ class BookshelfAsyncBody<T> extends StatelessWidget {
     final items = value.valueOrNull;
     if (items != null) {
       if (items.isEmpty) {
-        return _ScrollableMessage(text: emptyText);
+        return emptyBuilder?.call(context) ?? _ScrollableMessage(text: emptyText);
       }
       return builder(context, items);
     }

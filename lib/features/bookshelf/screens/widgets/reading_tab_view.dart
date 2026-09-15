@@ -10,6 +10,7 @@ import '../../providers/bookshelf_providers.dart';
 import 'book_cover.dart';
 import 'bookshelf_async_body.dart';
 import 'bookshelf_refresh_indicator.dart';
+import 'recommended_books_section.dart';
 
 /// 읽는 중 탭: READING 리스트 카드(진행률 바 + 경과일 배지).
 ///
@@ -21,10 +22,15 @@ class ReadingTabView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final books = ref.watch(readingTabProvider);
     return BookshelfRefreshIndicator(
+      recommendationStatus: BookStatus.reading,
       child: BookshelfAsyncBody<BookItem>(
         value: books,
         emptyText: '읽는 중인 책이 없습니다.',
         onRetry: () => ref.invalidate(readingTabProvider),
+        emptyBuilder: (context) => const RecommendedBooksSection(
+          status: BookStatus.reading,
+          emptyText: '읽는 중인 책이 없습니다.',
+        ),
         builder: (context, items) {
           return ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),

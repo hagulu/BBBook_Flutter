@@ -1,15 +1,19 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/providers/auth_access_providers.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../book_detail/data/book_detail_api.dart';
 import '../../book_record/data/book_record_api.dart';
 import '../../book_search/data/book_search_api.dart';
 import '../data/bookshelf_api.dart';
 import '../data/bookshelf_repository.dart';
+import '../data/recommendation_api.dart';
 import '../models/book_category.dart';
 import '../models/book_item.dart';
+import '../models/book_recommendation.dart';
 import '../models/book_status.dart';
 import '../models/book_tag.dart';
 import '../models/finished_filter.dart';
@@ -261,3 +265,37 @@ final privacySettingControllerProvider =
     AsyncNotifierProvider<PrivacySettingController, bool>(
       PrivacySettingController.new,
     );
+
+final recommendationApiProvider = Provider<RecommendationApi>((ref) {
+  return RecommendationApi(apiClient: ref.watch(apiClientProvider));
+});
+
+/// 읽는 중/읽을 책 탭이 비어 있을 때만 각 화면이 구독하는 추천 도서
+/// provider(`BookStatus.reading`/`BookStatus.wantToRead`로 구분해 호출
+/// 시점을 분리 — "각 화면에서 호출한 시점의 응답을 그대로 노출" 요구사항).
+///
+/// 계정 없이 쓰는 사용자는 인증이 필요한 이 API를 호출하지 않는다(401 재시도
+/// 실패 시 로그아웃 처리로 이어져 책장 기능에 영향을 줄 수 있다).
+/// API 실패는 기존 빈 상태를 그대로 유지해야 하므로 예외를 밖으로 던지지
+/// 않고 빈 목록으로 흡수한다.
+///
+/// [recordOwnerIdProvider]를 watch해 로그아웃·다른 계정 로그인처럼 기록
+/// 소유자가 바뀔 때마다 이전 계정의 추천 결과를 들고 있지 않고 다시
+/// 조회하게 한다(readingTabProvider 등이 `bookshelfSyncVersionProvider`를
+/// watch해 재조회하는 것과 같은 패턴). 실패 후 재시도는
+/// [BookshelfRefreshIndicator]가 당겨서 새로고침 시 이 provider를
+/// invalidate해 처리한다.
+final bookRecommendationsProvider =
+    FutureProvider.family<List<BookRecommendationGroup>, BookStatus>((
+      ref,
+      status,
+    ) async {
+      ref.watch(recordOwnerIdProvider);
+      if (!ref.watch(canUseAccountFeaturesProvider)) return const [];
+      try {
+        return await ref.watch(recommendationApiProvider).getRecommendations();
+      } catch (e) {
+        developer.log('[추천 조회] result=FAIL reason=${e.runtimeType}');
+        return const [];
+      }
+    });
