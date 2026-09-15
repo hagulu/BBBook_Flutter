@@ -28,34 +28,42 @@ class IconOptionSelector<T> extends StatelessWidget {
     required this.selected,
     required this.onSelected,
     this.crossAxisCount,
-    this.childAspectRatio = 1.5,
   });
 
   final List<IconOption<T>> options;
   final T? selected;
   final ValueChanged<T> onSelected;
   final int? crossAxisCount;
-  final double childAspectRatio;
 
   @override
   Widget build(BuildContext context) {
     final columns = crossAxisCount;
     if (columns != null) {
-      return GridView.count(
-        crossAxisCount: columns,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        childAspectRatio: childAspectRatio,
-        children: [
-          for (final option in options)
-            _OptionCell(
-              option: option,
-              selected: option.value == selected,
-              onTap: () => onSelected(option.value),
-            ),
-        ],
+      const spacing = 8.0;
+      // 고정 childAspectRatio의 GridView는 셀 높이를 고정해, 큰 글자
+      // 배율(textScaler)에서 아이콘+라벨이 그 안에 안 들어가 오버플로가
+      // 났다(review). 셀 너비만 고정하고 높이는 콘텐츠에 맞춰 늘어나도록
+      // Wrap으로 배치한다.
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final cellWidth =
+              (constraints.maxWidth - spacing * (columns - 1)) / columns;
+          return Wrap(
+            spacing: spacing,
+            runSpacing: spacing,
+            children: [
+              for (final option in options)
+                SizedBox(
+                  width: cellWidth,
+                  child: _OptionCell(
+                    option: option,
+                    selected: option.value == selected,
+                    onTap: () => onSelected(option.value),
+                  ),
+                ),
+            ],
+          );
+        },
       );
     }
 
