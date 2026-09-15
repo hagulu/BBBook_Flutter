@@ -53,7 +53,7 @@
 
 ## features/bookshelf
 
-- `lib/features/bookshelf/screens/bookshelf_screen.dart` — 책장 탭 콘텐츠(읽고 싶음/읽는 중/완독/중단 4탭, 기본은 읽는 중)
+- `lib/features/bookshelf/screens/bookshelf_screen.dart` — 책장 탭 콘텐츠(읽고 싶음/읽는 중/완독 + 중단 책이 있을 때만 노출되는 중단 탭), 로컬 데이터 최초 로딩 완료 시 읽는 중→읽을 책 우선순위로 기본 탭 1회 결정
 - `lib/features/bookshelf/data/bookshelf_api.dart` — 책장 API 호출(전체 동기화, 증분 동기화, 완독 공개 설정 조회/수정, 카테고리 목록 GET)
 - `lib/features/bookshelf/data/bookshelf_database.dart` — 로컬 DB(sqflite) 스키마, 기존 데이터 보존하며 오프라인 삭제·CREATE 전송 여부·표지 사본 컬럼 보강
 - `lib/features/bookshelf/data/bookshelf_dao.dart` — 로컬 DB 쿼리·동기화 reconcile/applyChanges(dirty 행 보호), 태그는 `tag`/`user_book_tag_map`을 조인해 조회만 함(쓰기는 `TagDao` 전담)
