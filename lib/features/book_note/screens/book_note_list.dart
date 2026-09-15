@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../auth/providers/auth_notifier.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../models/book_note.dart';
 import '../providers/book_note_providers.dart';
 import 'book_note_detail_screen.dart';
@@ -25,9 +25,7 @@ class BookNoteList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ownerUserId = ref.watch(
-      authNotifierProvider.select((auth) => auth.user?.id),
-    );
+    final ownerUserId = ref.watch(recordOwnerIdProvider);
     final asyncNotes = ref.watch(bookNoteListProvider(userBookId));
 
     return BookNoteRefreshIndicator(

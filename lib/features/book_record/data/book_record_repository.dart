@@ -203,14 +203,13 @@ class BookRecordRepository {
 
   /// 태그 추가. 로컬 우선이다 — 즉시 로컬에 반영하고, 서버 push는
   /// [TagRepository]가 뒤에서 조용히 시도한다(실패해도 dirty로 남아 다음
-  /// 동기화가 재시도한다). [BookItem.tags]는 저장된 값이 아니라 조회 시점에
+  /// 동기화가 재시도한다). 로컬 저장 모드(계정 없이 쓰는 사용자 포함)에서는
+  /// 그 push 자체가 생략되므로([TagRepository._pushOneMapping]) 서버 없이도
+  /// 태그를 그대로 쓸 수 있다. [BookItem.tags]는 저장된 값이 아니라 조회 시점에
   /// `tag`/`user_book_tag_map`을 조인한 값이므로([BookshelfDao._attachTags]),
   /// 로컬 반영 직후 다시 읽기만 하면 최신 태그가 그대로 보인다.
   Future<BookItem> addTag(int userBookId, String name) async {
     final current = await _requireLocal(userBookId);
-    if (await _storageMode.isLocal()) {
-      throw const ApiException('로컬 저장 모드에서는 서버가 필요한 기능을 쓸 수 없습니다.');
-    }
     final trimmed = name.trim();
     if (trimmed.isEmpty) throw const ApiException('태그명을 입력해주세요.');
     if (trimmed.length > 15) {
@@ -228,9 +227,6 @@ class BookRecordRepository {
   /// 없을 수 있어, 화면은 항상 로컬 ID로 태그를 가리킨다.
   Future<BookItem> removeTag(int userBookId, int tagId) async {
     await _requireLocal(userBookId);
-    if (await _storageMode.isLocal()) {
-      throw const ApiException('로컬 저장 모드에서는 서버가 필요한 기능을 쓸 수 없습니다.');
-    }
     await _tagRepository.removeTag(userBookId: userBookId, tagLocalId: tagId);
     return _requireLocal(userBookId);
   }

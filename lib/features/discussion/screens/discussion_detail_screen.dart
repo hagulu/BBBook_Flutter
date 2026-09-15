@@ -13,6 +13,7 @@ import '../../../shared/widgets/app_pagination.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../../book_detail/screens/widgets/report_dialog.dart';
 import '../models/discussion_answer.dart';
 import '../models/discussion_topic.dart';
@@ -402,6 +403,9 @@ class _DiscussionDetailScreenState
     final answersState = ref.watch(
       discussionAnswersControllerProvider(widget.topicId),
     );
+    // 토론 조회는 인증이 필요 없지만 답변 작성·공감·신고·선택지 투표는
+    // 계정이 있어야 한다. 계정이 없으면 그 진입점을 아예 만들지 않는다.
+    final allowAccountActions = ref.watch(canUseAccountFeaturesProvider);
 
     if (widget.highlightAnswerId != null && answersState.valueOrNull != null) {
       // build 도중 바로 실행하면 `_ensureHighlightVisible`이 첫 await 전에
@@ -445,9 +449,15 @@ class _DiscussionDetailScreenState
                 onDelete: _deleteTopic,
                 onReport: _reportTopic,
                 onToggleLike: _isTogglingTopicLike ? null : _toggleTopicLike,
-                pollSection: topic.hasOptions ? _buildPollSection(topic) : null,
+                pollSection: topic.hasOptions
+                    ? _buildPollSection(
+                        topic,
+                        allowAccountActions: allowAccountActions,
+                      )
+                    : null,
+                allowAccountActions: allowAccountActions,
               ),
-              if (!topic.hasOptions) ...[
+              if (!topic.hasOptions && allowAccountActions) ...[
                 const SizedBox(height: 12),
                 _FreeAnswerCard(
                   isClosed: topic.isClosed,
@@ -468,6 +478,7 @@ class _DiscussionDetailScreenState
                   onPageChanged: _goToAnswerPage,
                   highlightAnswerId: widget.highlightAnswerId,
                   highlightKey: _highlightedAnswerKey,
+                  allowAccountActions: allowAccountActions,
                 ),
                 AsyncError() => CommunityContentErrorState(
                   message: '답변을 불러오지 못했습니다.',
@@ -487,10 +498,13 @@ class _DiscussionDetailScreenState
     );
   }
 
-  Widget _buildPollSection(DiscussionTopicDetail topic) {
+  Widget _buildPollSection(
+    DiscussionTopicDetail topic, {
+    required bool allowAccountActions,
+  }) {
     return DiscussionPoll(
       detail: topic,
-      interactive: !topic.isClosed,
+      interactive: !topic.isClosed && allowAccountActions,
       onSelect: (optionId) => _openPollAnswerSheet(topic, optionId),
     );
   }
@@ -509,6 +523,7 @@ class _TopicCard extends StatelessWidget {
     required this.onReport,
     required this.onToggleLike,
     required this.pollSection,
+    required this.allowAccountActions,
   });
 
   final DiscussionTopicDetail topic;
@@ -520,6 +535,9 @@ class _TopicCard extends StatelessWidget {
   final VoidCallback onReport;
   final VoidCallback? onToggleLike;
   final Widget? pollSection;
+
+  /// 서버 계정이 필요한 액션(공감·신고·작성자 메뉴)을 노출할지.
+  final bool allowAccountActions;
 
   @override
   Widget build(BuildContext context) {
@@ -536,7 +554,9 @@ class _TopicCard extends StatelessWidget {
               if (topic.isClosed) const DiscussionBadge.closed(),
               if (topic.isSpoiler) const DiscussionBadge.spoiler(),
             ],
-            trailing: topic.isMine
+            trailing: !allowAccountActions
+                ? null
+                : topic.isMine
                 ? _TopicMenu(
                     topic: topic,
                     onEdit: onEdit,
@@ -597,11 +617,13 @@ class _TopicCard extends StatelessWidget {
           const SizedBox(height: 10),
           Align(
             alignment: Alignment.centerLeft,
-            child: CommunityLikeButton(
-              isLiked: topic.likedByMe,
-              likeCount: topic.likeCount,
-              onTap: onToggleLike,
-            ),
+            child: allowAccountActions
+                ? CommunityLikeButton(
+                    isLiked: topic.likedByMe,
+                    likeCount: topic.likeCount,
+                    onTap: onToggleLike,
+                  )
+                : CommunityLikeCount(likeCount: topic.likeCount),
           ),
         ],
       ),
@@ -760,6 +782,7 @@ class _AnswerList extends StatelessWidget {
     required this.onPageChanged,
     this.highlightAnswerId,
     this.highlightKey,
+    required this.allowAccountActions,
   });
 
   final DiscussionAnswerPageState state;
@@ -775,6 +798,9 @@ class _AnswerList extends StatelessWidget {
   /// "내가 작성한 토론 댓글" 목록에서 진입했을 때 스크롤·강조할 답변 ID.
   final int? highlightAnswerId;
   final GlobalKey? highlightKey;
+
+  /// 서버 계정이 필요한 액션(공감·신고·본인 답변 관리)을 노출할지.
+  final bool allowAccountActions;
 
   @override
   Widget build(BuildContext context) {
@@ -820,6 +846,7 @@ class _AnswerList extends StatelessWidget {
                         onToggleLike: pendingLikeIds.contains(answer.id)
                             ? null
                             : () => onToggleLike(answer),
+                        allowAccountActions: allowAccountActions,
                       ),
                     ),
                     const SizedBox(height: 10),

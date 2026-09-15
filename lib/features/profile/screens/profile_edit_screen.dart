@@ -228,7 +228,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
       // 서버가 이미 리프레시 토큰을 만료시켰으므로, 로그아웃 API 호출 실패
       // 여부와 무관하게 로컬 인증 상태·서재 캐시를 정리한다(logout()의
       // try/finally가 보장). 라우터가 상태 변화를 감지해 루트로 이동한다.
-      await ref.read(authNotifierProvider.notifier).logout();
+      // 로컬 저장 모드라도 탈퇴는 "모든 기록이 영구 삭제된다"고 이미
+      // 확인받았다 — 일반 로그아웃과 달리 로컬 기록을 보존하지 않는다.
+      await ref
+          .read(authNotifierProvider.notifier)
+          .logout(deletingAccount: true);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _isDeletingAccount = false);

@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../../book_reflection/screens/book_reflection_editor_screen.dart';
 import '../../book_reflection/screens/widgets/reflection_image_embed_builder.dart';
 import '../../book_reflection/screens/widgets/reflection_title_body_divider.dart';
@@ -142,9 +143,11 @@ class _PublicReflectionReaderScreenState
         elevation: 0,
       ),
       body: switch (state) {
+        // 공개 독후감 조회는 인증이 필요 없지만 공감은 계정이 있어야 한다.
         AsyncData(:final value) => _ReaderBody(
           detail: value,
           onLike: _isLikeUpdating ? null : () => _toggleLike(args),
+          allowLike: ref.watch(canUseAccountFeaturesProvider),
         ),
         AsyncError(:final error) => CommunityContentErrorState(
           message: error is ApiException ? error.message : '독후감을 불러오지 못했습니다.',
@@ -157,10 +160,15 @@ class _PublicReflectionReaderScreenState
 }
 
 class _ReaderBody extends StatelessWidget {
-  const _ReaderBody({required this.detail, required this.onLike});
+  const _ReaderBody({
+    required this.detail,
+    required this.onLike,
+    required this.allowLike,
+  });
 
   final PublicReflectionDetail detail;
   final VoidCallback? onLike;
+  final bool allowLike;
 
   @override
   Widget build(BuildContext context) {
@@ -190,11 +198,13 @@ class _ReaderBody extends StatelessWidget {
                 const SizedBox(height: 10),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: CommunityLikeButton(
-                    isLiked: detail.likedByMe,
-                    likeCount: detail.likeCount,
-                    onTap: onLike,
-                  ),
+                  child: allowLike
+                      ? CommunityLikeButton(
+                          isLiked: detail.likedByMe,
+                          likeCount: detail.likeCount,
+                          onTap: onLike,
+                        )
+                      : CommunityLikeCount(likeCount: detail.likeCount),
                 ),
               ],
             ),

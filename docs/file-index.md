@@ -23,17 +23,20 @@
 
 ## features/auth
 
-- `lib/features/auth/screens/onboarding_screen.dart` — 온보딩(로그인) 화면
-- `lib/features/auth/providers/auth_notifier.dart` — 로컬 계정으로 먼저 진입하고 뒤에서 인증 복구, 인증 무효 시 로컬 기록 보존·재로그인, 다른 계정은 확인 후 로컬 초기화
-- `lib/features/auth/data/local_auth_store.dart` — 기록 DB에 계정 소유자 캐시, 기존 설치의 동기화 메타데이터에서 오프라인 계정 복원
+- `lib/features/auth/screens/onboarding_screen.dart` — 온보딩(로그인) 화면, 소셜 로그인 아래 "로그인 없이 사용하기" 진입점
+- `lib/features/auth/providers/auth_notifier.dart` — 로컬 계정으로 먼저 진입하고 뒤에서 인증 복구, 인증 무효 시 로컬 기록 보존·재로그인, 다른 계정은 확인 후 로컬 초기화, 계정 없이 시작/로그인 전환(소유자 리키)·저장 방식별 로그아웃 처리
+- `lib/features/auth/providers/auth_access_providers.dart` — 로컬 기록 소유자 id(`recordOwnerIdProvider`)와 계정 필요 기능 노출 여부(`canUseAccountFeaturesProvider`) 단일 기준
+- `lib/features/auth/models/standalone_session.dart` — 계정 없이 쓰는 사용자의 기록 소유자 sentinel과 로그인 시 기록 처리 선택지
+- `lib/features/auth/data/local_auth_store.dart` — 기록 DB에 계정 소유자 캐시, 계정 없이 사용 중 표시 저장, 기록 소유자 일괄 변경, 기존 설치의 동기화 메타데이터에서 오프라인 계정 복원
 - `lib/features/auth/data/auth_repository.dart` — 인증 세션 source of truth(API·시큐어 스토리지·소셜 SDK 오케스트레이션)
 - `lib/features/auth/data/auth_api.dart` — 인증 API 호출(로그인/refresh/logout/getMe)
 - `lib/features/auth/data/social_auth_service.dart` — Google/Apple/Kakao/Naver 네이티브 로그인, 공급자 토큰 획득·SDK 로그아웃
+- `lib/features/auth/widgets/social_login_section.dart` — 소셜 로그인 버튼 묶음과 로그인 후처리(계정 변경 확인, 계정 없이 남긴 기록 이어가기 선택, 저장 방식 전환 화면 연결) 공용 위젯, 온보딩·MY 화면이 공유
 - `lib/features/auth/widgets/auth_loading_gate.dart` — 인증 확인·라우터 전환 사이 빈 배경 표시, 로그인 사용자의 온보딩 순간 노출 방지
 
 ## features/profile
 
-- `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 리포트 카드/내 글 모아보기 2×2 바로가기/로그아웃), `docs/porting-reference/profile-main-screen.md` 대응
+- `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 리포트 카드/내 글 모아보기 2×2 바로가기/로그아웃, 계정이 없으면 상단을 로그인 유도 카드로 대체하고 계정 전용 메뉴는 숨김), `docs/porting-reference/profile-main-screen.md` 대응
 - `lib/features/profile/screens/profile_edit_screen.dart` — 프로필 수정 화면(닉네임·프로필 이미지 변경/삭제, 저장, 회원 탈퇴), `docs/porting-reference/profile-edit-screen.md` 대응
 - `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(상단 공지사항, 밝은·다크·시스템 테마 선택, 오픈소스 라이선스 목록·전문, 하단 이용약관·개인정보처리방침·앱 버전, 저장 방식(서버/로컬) 전환 및 내 기록 ZIP/외부 서비스 기록 가져오기 진입점), 프로필 탭 AppBar 설정 아이콘으로 진입
 - `lib/features/profile/screens/my_reflections_screen.dart` — 내가 작성한 독후감 목록(커서 무한 스크롤), 정상 항목은 서버 reflectionId로 로컬 행을 찾아 기존 `BookReflectionDetailScreen`(수정·삭제 포함)으로 이동
@@ -109,7 +112,7 @@
 
 ## features/storage_mode
 
-- `lib/features/storage_mode/data/storage_mode_store.dart` — 저장 모드(서버/로컬)와 서버 정리 미완료 여부 읽기·쓰기 단일 창구(동기화·push 게이트가 참조, 로그아웃 시 기본값으로 초기화)
+- `lib/features/storage_mode/data/storage_mode_store.dart` — 저장 모드(서버/로컬)와 소유자·서버 정리 미완료 여부 읽기·쓰기 단일 창구(동기화·push 게이트가 참조, 계정 없이 사용 시 로컬 고정, 로그아웃 시 기본값으로 초기화)
 - `lib/features/storage_mode/services/local_storage_migration_service.dart` — 서버 → 로컬 이전 단계 실행(기록 동기화 → 이미지 전체 확보 → 검증 → 모드 전환 → 서버 소프트 삭제 순서 보장)
 - `lib/features/storage_mode/data/local_storage_migration_steps.dart` — 이전 각 단계를 기존 동기화 Repository·API로 구현
 - `lib/features/storage_mode/providers/storage_mode_providers.dart` — 현재 저장 모드 및 이전 진행 상태 Riverpod provider
@@ -214,6 +217,8 @@
 
 ## docs
 
+- `docs/review/20260915-140322-standalone-session-rereview.md` — 계정 없이 사용하기 후속 수정의 회원 탈퇴 데이터 보존 회귀, 선택 팝업 dismiss, 계정별 서버 메타데이터 승계, 로그인 전환 원자성 재리뷰
+- `docs/review/20260915-104037-standalone-session-review.md` — 계정 없이 사용하기의 로그아웃 안내 불일치, 소유권 전환 원자성, 서버 삭제 보류 유실, 공개 조회 인증 경합 리뷰
 - `docs/review/20260911-144837-external-import-selection-review.md` — 외부 기록 가져오기 선택·덮어쓰기·복구 메모 정리·로그·대용량 목록 후속 리뷰
 - `docs/review/20260910-201039-external-record-import-review.md` — 외부 기록 가져오기의 기존 책 필드 유실·공유/설정 동시 Import 충돌·CSV 식별자 충돌 리뷰
 - `docs/review/20260910-181343-kakao-login-review.md` — 카카오 로그인 연동의 릴리스 키 주입, iOS 설정 재현성, SDK 초기화 경합·예외 분류 리뷰

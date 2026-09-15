@@ -8,6 +8,7 @@ import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../models/book_reflection.dart';
 import '../providers/book_reflection_providers.dart';
 import '../services/book_reflection_content_adapter.dart';
@@ -94,6 +95,9 @@ class BookReflectionDetailScreen extends ConsumerWidget {
     // 써서 바깥 화면의 context를 가린다 — 시트가 닫힌 뒤에도 안내를 보여줄
     // 수 있도록 화면 context를 별도 이름으로 미리 잡아 둔다.
     final screenContext = context;
+    // 공개는 서버에 올리는 기능이다 — 계정이 없으면 토글 자체를 만들지 않고
+    // 수정/삭제만 남긴다(로컬 독후감 작성·수정은 그대로 가능하다).
+    final canPublish = ref.read(canUseAccountFeaturesProvider);
     var isPublic = reflection.isPublic;
     var isUpdatingVisibility = false;
     final result =
@@ -108,62 +112,64 @@ class BookReflectionDetailScreen extends ConsumerWidget {
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  RecordDialogToggleTile(
-                    value: isPublic,
-                    onChanged: (value) async {
-                      if (isUpdatingVisibility) return;
-                      final previousValue = isPublic;
-                      // await 뒤에 쓸 provider는 지금(반드시 mounted인
-                      // 시점) 미리 확보해 둔다 — 시트가 닫힌 뒤 화면
-                      // 자체가 dispose되면 await 뒤의 `ref.read()`가
-                      // 예외를 던지기 때문이다. `bookReflectionDetailProvider`는
-                      // 이 값을 watch하므로 별도 invalidate 없이도
-                      // 갱신된다.
-                      final syncVersionNotifier = ref.read(
-                        bookReflectionSyncVersionProvider.notifier,
-                      );
-                      final repository = ref.read(
-                        bookReflectionRepositoryProvider,
-                      );
-                      setSheetState(() {
-                        isPublic = value;
-                        isUpdatingVisibility = true;
-                      });
-                      try {
-                        await repository.setPublic(
-                          ownerUserId: ownerUserId,
-                          userBookId: userBookId,
-                          reflectionId: reflection.id,
-                          isPublic: value,
+                  if (canPublish) ...[
+                    RecordDialogToggleTile(
+                      value: isPublic,
+                      onChanged: (value) async {
+                        if (isUpdatingVisibility) return;
+                        final previousValue = isPublic;
+                        // await 뒤에 쓸 provider는 지금(반드시 mounted인
+                        // 시점) 미리 확보해 둔다 — 시트가 닫힌 뒤 화면
+                        // 자체가 dispose되면 await 뒤의 `ref.read()`가
+                        // 예외를 던지기 때문이다. `bookReflectionDetailProvider`는
+                        // 이 값을 watch하므로 별도 invalidate 없이도
+                        // 갱신된다.
+                        final syncVersionNotifier = ref.read(
+                          bookReflectionSyncVersionProvider.notifier,
                         );
-                        // 요청이 성공하면 시트가 이미 닫혔더라도 상세
-                        // 화면의 캐시된 공개 여부는 항상 최신화한다 —
-                        // 시트 생명주기와 서버 반영 여부는 별개다.
-                        syncVersionNotifier.state++;
-                        if (sheetContext.mounted) {
-                          setSheetState(() => isUpdatingVisibility = false);
-                        }
-                      } catch (_) {
-                        if (sheetContext.mounted) {
-                          setSheetState(() {
-                            isPublic = previousValue;
-                            isUpdatingVisibility = false;
-                          });
-                        } else if (screenContext.mounted) {
-                          AppSnackBar.error(
-                            screenContext,
-                            '공개 여부를 변경하지 못했습니다.',
+                        final repository = ref.read(
+                          bookReflectionRepositoryProvider,
+                        );
+                        setSheetState(() {
+                          isPublic = value;
+                          isUpdatingVisibility = true;
+                        });
+                        try {
+                          await repository.setPublic(
+                            ownerUserId: ownerUserId,
+                            userBookId: userBookId,
+                            reflectionId: reflection.id,
+                            isPublic: value,
                           );
+                          // 요청이 성공하면 시트가 이미 닫혔더라도 상세
+                          // 화면의 캐시된 공개 여부는 항상 최신화한다 —
+                          // 시트 생명주기와 서버 반영 여부는 별개다.
+                          syncVersionNotifier.state++;
+                          if (sheetContext.mounted) {
+                            setSheetState(() => isUpdatingVisibility = false);
+                          }
+                        } catch (_) {
+                          if (sheetContext.mounted) {
+                            setSheetState(() {
+                              isPublic = previousValue;
+                              isUpdatingVisibility = false;
+                            });
+                          } else if (screenContext.mounted) {
+                            AppSnackBar.error(
+                              screenContext,
+                              '공개 여부를 변경하지 못했습니다.',
+                            );
+                          }
                         }
-                      }
-                    },
-                    icon: isPublic
-                        ? PhosphorIconsRegular.globe
-                        : PhosphorIconsRegular.lock,
-                    title: '공개 여부',
-                    subtitle: isPublic ? '공개' : '비공개',
-                  ),
-                  const SizedBox(height: RecordDialogMetrics.itemSpacing),
+                      },
+                      icon: isPublic
+                          ? PhosphorIconsRegular.globe
+                          : PhosphorIconsRegular.lock,
+                      title: '공개 여부',
+                      subtitle: isPublic ? '공개' : '비공개',
+                    ),
+                    const SizedBox(height: RecordDialogMetrics.itemSpacing),
+                  ],
                   RecordDialogActionTile(
                     icon: PhosphorIconsRegular.pencil,
                     label: '수정',

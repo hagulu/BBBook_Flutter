@@ -3,7 +3,7 @@ import 'dart:developer' as developer;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/providers/auth_notifier.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../../book_note/providers/book_note_providers.dart';
 import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
@@ -28,12 +28,14 @@ class RecordArchiveController extends Notifier<bool> {
         ref.read(serverStorageMigrationControllerProvider).isRunning) {
       return null;
     }
-    final owner = ref.read(authNotifierProvider).user?.id;
+    // ZIP 내보내기/가져오기는 서버를 쓰지 않는 로컬 작업이라 계정 없이 쓰는
+    // 사용자도 그대로 쓴다(소유자만 그 사용자의 sentinel이 된다).
+    final owner = ref.read(recordOwnerIdProvider);
     if (owner == null) return '로그인 상태를 확인해 주세요.';
     final generation = BookshelfDatabase.sessionGeneration;
     void checkSession() {
       if (generation != BookshelfDatabase.sessionGeneration ||
-          ref.read(authNotifierProvider).user?.id != owner) {
+          ref.read(recordOwnerIdProvider) != owner) {
         throw const ArchiveException('계정 상태가 변경되어 작업을 중단했습니다.');
       }
     }

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../auth/providers/auth_providers.dart';
+import '../../bookshelf/providers/bookshelf_providers.dart';
+import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../data/book_detail_api.dart';
 import '../models/book_detail.dart';
 import '../models/book_review.dart';
@@ -36,6 +38,11 @@ class BookDetailData {
 /// 책 상세 조회 + 서재 포함 여부 확인(`getBookshelfExists` 대응). [isbn]은
 /// ISBN10/13 어느 쪽이든 받되, 이후 서재 담기/리뷰 API는 응답의 canonical
 /// ISBN13([BookDetail.isbn])만 사용한다.
+///
+/// 서재 포함 여부는 로컬 저장 모드(계정 없이 쓰는 사용자 포함)에서 로컬
+/// DB로 확인한다 — 그 모드에서는 서버에 서재 사본 자체가 없어
+/// `GET /api/me/books/exists`가 의미 있는 답을 주지 못하고, 계정이 없으면
+/// 인증이 필요한 그 요청을 보낼 수도 없다.
 class BookDetailController
     extends AutoDisposeFamilyAsyncNotifier<BookDetailData, String> {
   late BookDetailApi _api;
@@ -44,6 +51,16 @@ class BookDetailController
   FutureOr<BookDetailData> build(String isbn) async {
     _api = ref.watch(bookDetailApiProvider);
     final detail = await _api.getBookDetail(isbn);
+    if (await ref.read(storageModeStoreProvider).isLocal()) {
+      final local = await ref
+          .read(bookshelfRepositoryProvider)
+          .getByIsbn13(detail.isbn);
+      return BookDetailData(
+        detail: detail,
+        existsInShelf: local != null,
+        userBookId: local?.userBookId,
+      );
+    }
     final existsResult = await _api.checkExists(detail.isbn);
     return BookDetailData(
       detail: detail,

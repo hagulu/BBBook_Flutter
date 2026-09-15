@@ -21,9 +21,14 @@ class ReviewItem extends StatefulWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onReport,
+    this.allowAccountActions = true,
   });
 
   final BookReview review;
+
+  /// 서버 계정이 필요한 액션(공감·신고·본인 글 관리)을 노출할지. 계정 없이
+  /// 쓰는 사용자에게는 버튼 자체를 만들지 않는다.
+  final bool allowAccountActions;
 
   /// 공감 요청이 진행 중이면 null을 넘겨 중복 탭(POST/DELETE 경합)을 막는다.
   final VoidCallback? onToggleLike;
@@ -99,26 +104,27 @@ class _ReviewItemState extends State<ReviewItem> {
                         ),
                         const SizedBox(width: 8),
                       ],
-                      if (review.isMine)
-                        CommunityMoreButton(
-                          tooltip: '리뷰 메뉴',
-                          iconSize: 18,
-                          onTap: () => _openMenuSheet(context),
-                        )
-                      else
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 32,
-                            minHeight: 32,
+                      if (widget.allowAccountActions)
+                        if (review.isMine)
+                          CommunityMoreButton(
+                            tooltip: '리뷰 메뉴',
+                            iconSize: 18,
+                            onTap: () => _openMenuSheet(context),
+                          )
+                        else
+                          IconButton(
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                              minWidth: 32,
+                              minHeight: 32,
+                            ),
+                            icon: Icon(
+                              PhosphorIconsRegular.flag,
+                              size: 16,
+                              color: AppColors.of(context).textMuted,
+                            ),
+                            onPressed: widget.onReport,
                           ),
-                          icon: Icon(
-                            PhosphorIconsRegular.flag,
-                            size: 16,
-                            color: AppColors.of(context).textMuted,
-                          ),
-                          onPressed: widget.onReport,
-                        ),
                     ],
                   ),
           ),
@@ -176,11 +182,13 @@ class _ReviewItemState extends State<ReviewItem> {
             const SizedBox(height: 8),
             Align(
               alignment: Alignment.centerRight,
-              child: CommunityLikeInline(
-                isLiked: review.isLiked,
-                likeCount: review.likeCount,
-                onTap: widget.onToggleLike,
-              ),
+              child: widget.allowAccountActions
+                  ? CommunityLikeInline(
+                      isLiked: review.isLiked,
+                      likeCount: review.likeCount,
+                      onTap: widget.onToggleLike,
+                    )
+                  : CommunityLikeCount(likeCount: review.likeCount),
             ),
           ],
         ],

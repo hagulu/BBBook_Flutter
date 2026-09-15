@@ -1,25 +1,21 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-
-import '../../../core/network/api_exception.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/app_snackbar.dart';
-import '../../../shared/widgets/app_confirm.dart';
-import '../data/social_auth_service.dart';
-import '../providers/auth_notifier.dart';
-import '../providers/auth_providers.dart';
-import '../widgets/social_login_button.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
-enum _LoadingProvider { none, google, apple, kakao, naver }
+import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_loading.dart';
+import '../../../shared/widgets/app_snackbar.dart';
+import '../providers/auth_notifier.dart';
+import '../widgets/social_login_section.dart';
 
 /// 온보딩(로그인) 화면.
 ///
 /// 문서: docs/porting-reference/features/auth.md,
 /// docs/porting-reference/screenshots/onboarding.jpg
 ///
+/// 소셜 로그인 아래에 "로그인 없이 사용하기"를 둔다 — 계정을 만들지 않고
+/// 이 기기에만 기록을 남기는 진입점이다(임시 서버 계정을 만들지 않는다).
+/// 다시 로그인(재인증) 진입에서는 이미 계정이 있는 사용자이므로 감춘다.
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key, this.reauthentication = false});
 
@@ -30,97 +26,28 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 }
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
-  _LoadingProvider _loading = _LoadingProvider.none;
-
-  bool get _isBusy => _loading != _LoadingProvider.none;
-
-  Future<void> _handleGoogleLogin() {
-    return _handleLogin(
-      _LoadingProvider.google,
-      () => ref
-          .read(authNotifierProvider.notifier)
-          .loginWithGoogle(confirmAccountChange: _confirmAccountChange),
-    );
-  }
-
-  Future<void> _handleKakaoLogin() {
-    return _handleLogin(
-      _LoadingProvider.kakao,
-      () => ref
-          .read(authNotifierProvider.notifier)
-          .loginWithKakao(confirmAccountChange: _confirmAccountChange),
-    );
-  }
-
-  Future<void> _handleNaverLogin() {
-    return _handleLogin(
-      _LoadingProvider.naver,
-      () => ref
-          .read(authNotifierProvider.notifier)
-          .loginWithNaver(confirmAccountChange: _confirmAccountChange),
-    );
-  }
-
-  Future<void> _handleAppleLogin() {
-    return _handleLogin(
-      _LoadingProvider.apple,
-      () => ref
-          .read(authNotifierProvider.notifier)
-          .loginWithApple(confirmAccountChange: _confirmAccountChange),
-    );
-  }
-
-  Future<void> _handleLogin(
-    _LoadingProvider provider,
-    Future<bool> Function() action,
-  ) async {
-    setState(() => _loading = provider);
+  Future<void> _continueWithoutAccount() async {
+    AppLoading.show(context);
     try {
-      final loggedIn = await action();
-      if (loggedIn && widget.reauthentication && mounted) {
-        Navigator.of(context).pop();
-      }
-    } on SocialAuthException catch (e) {
-      _showError(e.message);
-    } on ApiException catch (e) {
-      _showError(e.message);
+      await ref.read(authNotifierProvider.notifier).continueWithoutAccount();
     } catch (_) {
-      _showError('로그인하지 못했습니다. 다시 시도해 주세요.');
-    } finally {
       if (mounted) {
-        setState(() => _loading = _LoadingProvider.none);
+        AppSnackBar.error(context, '시작하지 못했습니다. 다시 시도해 주세요.');
       }
+    } finally {
+      AppLoading.hide();
     }
-  }
-
-  void _showError(String message) {
-    if (!mounted) return;
-    AppSnackBar.error(context, message);
-  }
-
-  Future<bool> _confirmAccountChange() async {
-    if (!mounted) return false;
-    return AppConfirm.show(
-      context,
-      title: '다른 계정으로 로그인',
-      message:
-          '로그인하면 이 기기에 저장된 기존 계정의 책, 노트, 메모, 독후감과 이미지가 모두 삭제됩니다. 서버에 동기화하지 못한 기록은 복구할 수 없습니다. 계속할까요?',
-      confirmText: '모두 삭제하고 로그인',
-      destructive: true,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isAppleSignInSupported = ref
-        .watch(socialAuthServiceProvider)
-        .isAppleSignInSupported;
+    final colors = AppColors.of(context);
 
     return Scaffold(
       appBar: widget.reauthentication
           ? AppBar(title: const Text('다시 로그인'))
           : null,
-      backgroundColor: AppColors.of(context).pageBackground,
+      backgroundColor: colors.pageBackground,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -130,11 +57,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               child: Container(
                 padding: const EdgeInsets.all(32),
                 decoration: BoxDecoration(
-                  color: AppColors.of(context).surface,
+                  color: colors.surface,
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.of(context).shadowSoft,
+                      color: colors.shadowSoft,
                       blurRadius: 24,
                       offset: Offset(0, 8),
                     ),
@@ -147,12 +74,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       width: 56,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: AppColors.of(context).accentFill,
+                        color: colors.accentFill,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Icon(
                         PhosphorIconsRegular.bookOpen,
-                        color: AppColors.of(context).textStrong,
+                        color: colors.textStrong,
                         size: 30,
                       ),
                     ),
@@ -162,7 +89,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.of(context).textStrong,
+                        color: colors.textStrong,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -170,16 +97,39 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       widget.reauthentication
                           ? '기록을 동기화하려면 같은 계정으로 로그인해 주세요.'
                           : '로그인하고 기록을 시작하세요.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.of(context).textMuted,
-                      ),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: colors.textMuted),
                     ),
                     const SizedBox(height: 28),
-                    ..._buildSocialLoginButtons(
-                      context,
-                      isAppleSignInSupported: isAppleSignInSupported,
+                    SocialLoginSection(
+                      onLoggedIn: widget.reauthentication
+                          ? () {
+                              if (mounted) Navigator.of(context).pop();
+                            }
+                          : null,
                     ),
+                    if (!widget.reauthentication) ...[
+                      const SizedBox(height: 20),
+                      Divider(height: 1, color: colors.border),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: _continueWithoutAccount,
+                        style: TextButton.styleFrom(
+                          foregroundColor: colors.textBody,
+                          minimumSize: const Size.fromHeight(44),
+                        ),
+                        child: const Text(
+                          '로그인 없이 사용하기',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '기록은 이 기기에만 저장되고 다른 기기와 동기화되지 않습니다.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: colors.textMuted),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -188,94 +138,5 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         ),
       ),
     );
-  }
-
-  List<Widget> _buildSocialLoginButtons(
-    BuildContext context, {
-    required bool isAppleSignInSupported,
-  }) {
-    // Google 로그인 브랜딩 가이드라인의 플랫폼별 좌측 여백(로고 → 버튼 좌측)
-    // 규격. iOS: 16, Android: 12.
-    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
-    final googleLeadingPadding = isIOS ? 16.0 : 12.0;
-    final appleButtonHeight = MediaQuery.textScalerOf(context).scale(48);
-    const appleButtonRadius = BorderRadius.all(Radius.circular(12));
-
-    final buttons = <Widget>[
-      if (isAppleSignInSupported)
-        MediaQuery.withNoTextScaling(
-          // 패키지는 높이로 글자 크기를 계산하므로 배율은 높이에 한 번만 적용한다.
-          child: SizedBox(
-            height: appleButtonHeight,
-            width: double.infinity,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                SignInWithAppleButton(
-                  text: 'Apple로 계속하기',
-                  height: appleButtonHeight,
-                  borderRadius: appleButtonRadius,
-                  iconAlignment: SignInWithAppleIconAlignment.left,
-                  onPressed: _isBusy ? null : _handleAppleLogin,
-                ),
-                if (_loading == _LoadingProvider.apple)
-                  const Positioned.fill(
-                    child: ClipRRect(
-                      borderRadius: appleButtonRadius,
-                      child: ColoredBox(
-                        color: Colors.black87,
-                        child: Center(
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      SocialLoginButton(
-        iconAsset: 'assets/icon/social/google.svg',
-        label: 'Google로 계속하기',
-        backgroundColor: Colors.white,
-        foregroundColor: AppBrandColors.googleLabel,
-        border: const BorderSide(color: AppBrandColors.googleBorder),
-        leadingPadding: googleLeadingPadding,
-        isLoading: _loading == _LoadingProvider.google,
-        onPressed: _isBusy ? null : _handleGoogleLogin,
-      ),
-      SocialLoginButton(
-        iconAsset: 'assets/icon/social/kakao.svg',
-        label: '카카오로 계속하기',
-        backgroundColor: AppBrandColors.kakao,
-        foregroundColor: AppBrandColors.kakaoLabel,
-        borderRadius: 12,
-        isLoading: _loading == _LoadingProvider.kakao,
-        onPressed: _isBusy ? null : _handleKakaoLogin,
-      ),
-      SocialLoginButton(
-        iconAsset: 'assets/icon/social/naver.svg',
-        label: '네이버로 계속하기',
-        backgroundColor: AppBrandColors.naver,
-        foregroundColor: Colors.white,
-        leadingPadding: 20,
-        isLoading: _loading == _LoadingProvider.naver,
-        onPressed: _isBusy ? null : _handleNaverLogin,
-      ),
-    ];
-
-    return [
-      for (var i = 0; i < buttons.length; i++) ...[
-        if (i > 0) const SizedBox(height: 12),
-        buttons[i],
-      ],
-    ];
   }
 }

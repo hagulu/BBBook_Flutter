@@ -105,6 +105,9 @@ class BackgroundRecordSync with WidgetsBindingObserver {
         _migrationRunning;
     try {
       if (stopped()) return;
+      // 계정이 없으면 올릴 곳도 받을 곳도 없다. 세션 준비를 시도하기 전에
+      // 끊어, 30초마다 세션 없음 예외가 반복되지 않게 한다.
+      if (ref.read(authNotifierProvider).isStandalone) return;
       await ref.read(authNotifierProvider.notifier).ensureSession();
       if (stopped() || await ref.read(storageModeStoreProvider).isLocal()) {
         return;

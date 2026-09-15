@@ -4,8 +4,10 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_confirm.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../../auth/providers/auth_notifier.dart';
 import '../../auth/screens/onboarding_screen.dart';
+import '../../auth/widgets/social_login_section.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../models/profile_me.dart';
 import '../models/profile_stats_summary.dart';
@@ -26,6 +28,12 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 계정이 없으면 서버 프로필도, 내가 쓴 공개 글도 없다. 상단만 로그인
+    // 유도로 바꾸고 로컬 데이터로 만들 수 있는 독서 리포트는 그대로 둔다.
+    if (!ref.watch(canUseAccountFeaturesProvider)) {
+      return const _StandaloneProfileContent();
+    }
+
     final profileAsync = ref.watch(profileMeProvider);
     final user = ref.watch(authNotifierProvider.select((auth) => auth.user));
     final localProfile = user == null
@@ -54,6 +62,81 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
       data: (profile) => _ProfileContent(profile: profile),
+    );
+  }
+}
+
+/// 로그인하지 않고 쓰는 사용자의 MY 화면.
+///
+/// 기존 프로필 카드 자리를 로그인 유도로 바꾸고(요구사항 6), 서버 계정을
+/// 전제로 하는 "내 글 모아보기"와 로그아웃은 감춘다. 독서 리포트는 로컬
+/// 서재 데이터로만 계산하므로 그대로 보여준다.
+class _StandaloneProfileContent extends StatelessWidget {
+  const _StandaloneProfileContent();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [_LoginPromptCard(), SizedBox(height: 16), _StatsCard()],
+      ),
+    );
+  }
+}
+
+/// 프로필 영역 자리에 들어가는 로그인 유도 카드. 별도의 큰 로그인 전용
+/// 영역을 만들지 않고, 안내 한 줄 + 소셜 로그인 버튼만 간결하게 둔다.
+class _LoginPromptCard extends StatelessWidget {
+  const _LoginPromptCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return _SectionCard(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: colors.accentSurface,
+                child: Icon(
+                  PhosphorIconsRegular.userCircle,
+                  size: 22,
+                  color: colors.accentForeground,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '로그인하고 더 많은 기능을 사용해보세요',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: colors.textStrong,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '기록 동기화, 독자평·토론 참여를 쓸 수 있습니다.',
+                      style: TextStyle(fontSize: 12, color: colors.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const SocialLoginSection(compact: true),
+        ],
+      ),
     );
   }
 }
@@ -546,10 +629,13 @@ class _LogoutButton extends ConsumerWidget {
   }
 
   Future<void> _logout(BuildContext context, WidgetRef ref) async {
-    // 로그아웃은 저장 모드와 무관하게 로컬 DB·사진을 항상 지운다
-    // (auth_notifier.dart의 logout()). 로컬 저장 모드는 서버 사본이 없는
-    // 유일본이라 그 사실을 먼저 알려야 한다(포팅 문서는 이 앱에만 있는
-    // 저장 모드 개념을 다루지 않아 별도로 안내한다).
+    // 로그아웃 시 로컬 데이터 처리는 저장 방식을 따른다
+    // (auth_notifier.dart의 logout()). 두 경우의 결과가 정반대라 무엇이
+    // 남고 무엇이 사라지는지 먼저 정확히 알려야 한다.
+    // - 로컬 저장: 서버에 사본이 없는 유일본이라 기록을 지우지 않고 계정
+    //   연결만 끊는다. 이후 "로그인 없이 사용하기"로 그대로 이어 쓴다.
+    // - 서버 동기화: 서버 사본이 있으므로 이 기기의 사본을 비운다. 아직
+    //   올리지 못한 변경만 복구할 수 없다.
     //
     // storageModeProvider(FutureProvider)를 read해 valueOrNull만 보면, 이
     // 화면 진입 전에 아무도 이 provider를 구독하지 않았을 경우 최초 상태가
@@ -561,13 +647,14 @@ class _LogoutButton extends ConsumerWidget {
       context,
       title: '로그아웃',
       message: isLocal
-          ? '로컬 저장 모드입니다. 로그아웃하면 이 기기에 저장된 모든 기록과 사진이 '
-                '삭제되며 서버에도 사본이 없어 복구할 수 없습니다. 로그아웃할까요?'
+          ? '동기화가 꺼져 있어 기록은 이 기기에만 있습니다. 로그아웃해도 기록과 '
+                '사진은 지우지 않고 계정 연결만 해제하며, "로그인 없이 사용하기"로 '
+                '다시 들어오면 그대로 이어서 볼 수 있습니다. 로그아웃할까요?'
           : '아직 서버에 동기화되지 않은 메모와 사진은 이 기기에서 '
                 '삭제되어 복구할 수 없습니다. 로그아웃할까요?',
       confirmText: '로그아웃',
       cancelText: '취소',
-      destructive: true,
+      destructive: !isLocal,
     );
     if (!confirmed) return;
     await ref.read(authNotifierProvider.notifier).logout();

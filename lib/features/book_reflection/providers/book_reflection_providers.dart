@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/providers/auth_notifier.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../record_sync/providers/record_sync_providers.dart';
@@ -62,9 +62,7 @@ class BookReflectionSyncController extends AsyncNotifier<DateTime?> {
   }
 
   Future<void> _runSync() async {
-    final ownerUserId = ref.read(
-      authNotifierProvider.select((auth) => auth.user?.id),
-    );
+    final ownerUserId = ref.read(recordOwnerIdProvider);
     if (ownerUserId == null) return;
 
     state = const AsyncValue<DateTime?>.loading().copyWithPrevious(state);
@@ -90,9 +88,7 @@ final bookReflectionSyncControllerProvider =
 
 final bookReflectionListProvider = FutureProvider.autoDispose
     .family<List<BookReflection>, int>((ref, userBookId) async {
-      final ownerUserId = ref.watch(
-        authNotifierProvider.select((auth) => auth.user?.id),
-      );
+      final ownerUserId = ref.watch(recordOwnerIdProvider);
       if (ownerUserId == null) return const [];
       ref.watch(bookReflectionSyncVersionProvider);
       return ref
@@ -125,9 +121,7 @@ class BookReflectionDetailArgs {
 
 final bookReflectionDetailProvider = FutureProvider.autoDispose
     .family<BookReflection?, BookReflectionDetailArgs>((ref, args) async {
-      final currentUserId = ref.watch(
-        authNotifierProvider.select((auth) => auth.user?.id),
-      );
+      final currentUserId = ref.watch(recordOwnerIdProvider);
       if (currentUserId != args.ownerUserId) return null;
       ref.watch(bookReflectionSyncVersionProvider);
       return ref

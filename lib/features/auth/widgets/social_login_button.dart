@@ -17,6 +17,7 @@ class SocialLoginButton extends StatelessWidget {
     this.border,
     this.borderRadius = 14,
     this.leadingPadding = 16,
+    this.minimumHeight = 48,
   });
 
   final String iconAsset;
@@ -28,6 +29,9 @@ class SocialLoginButton extends StatelessWidget {
   final BorderSide? border;
   final double borderRadius;
   final double leadingPadding;
+
+  /// 좁은 영역(MY 화면)에서는 기본보다 낮은 버튼을 쓴다.
+  final double minimumHeight;
 
   static const _iconSize = 20.0;
 
@@ -64,7 +68,7 @@ class SocialLoginButton extends StatelessWidget {
           disabledBackgroundColor: backgroundColor.withValues(alpha: 0.5),
           disabledForegroundColor: foregroundColor.withValues(alpha: 0.5),
           elevation: 0,
-          minimumSize: const Size.fromHeight(48),
+          minimumSize: Size.fromHeight(minimumHeight),
           padding: const EdgeInsets.symmetric(vertical: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(borderRadius),

@@ -5,6 +5,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/community_content.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../models/discussion_topic.dart';
 import '../providers/discussion_providers.dart';
 import 'discussion_detail_screen.dart';
@@ -113,14 +114,17 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
           _ => const CommunityContentLoadingState(),
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openForm,
-        tooltip: '토론 작성',
-        shape: const CircleBorder(),
-        backgroundColor: AppColors.of(context).accentFill,
-        foregroundColor: AppColors.of(context).textStrong,
-        child: const Icon(PhosphorIconsRegular.plus),
-      ),
+      // 토론 목록 조회는 인증이 필요 없지만 작성은 계정이 있어야 한다.
+      floatingActionButton: ref.watch(canUseAccountFeaturesProvider)
+          ? FloatingActionButton(
+              onPressed: _openForm,
+              tooltip: '토론 작성',
+              shape: const CircleBorder(),
+              backgroundColor: AppColors.of(context).accentFill,
+              foregroundColor: AppColors.of(context).textStrong,
+              child: const Icon(PhosphorIconsRegular.plus),
+            )
+          : null,
     );
   }
 }

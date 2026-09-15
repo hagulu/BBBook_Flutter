@@ -14,6 +14,13 @@ class InitialRecordSyncGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 계정 없이 쓰는 사용자는 서버에서 내려받을 기록이 없다 — 이 게이트를
+    // 그대로 통과시킨다(서버 계정 id가 없어 아래 컨트롤러를 만들 수 없다).
+    final isStandalone = ref.watch(
+      authNotifierProvider.select((auth) => auth.isStandalone),
+    );
+    if (isStandalone) return child;
+
     final userId = ref.watch(
       authNotifierProvider.select((auth) => auth.user?.id),
     );

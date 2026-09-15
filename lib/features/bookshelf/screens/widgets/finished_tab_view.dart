@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../auth/providers/auth_access_providers.dart';
 import '../../../../core/utils/author_display.dart';
 import '../../../../shared/widgets/app_alert.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
@@ -745,7 +746,12 @@ class _FinishedIconBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final privacyState = ref.watch(privacySettingControllerProvider);
+    // 완독 책장 공개는 서버 계정 설정(`/api/me/privacy-setting`)이다 —
+    // 계정이 없으면 공개할 책장 자체가 없어 토글과 안내를 함께 숨긴다.
+    final canPublishShelf = ref.watch(canUseAccountFeaturesProvider);
+    final privacyState = canPublishShelf
+        ? ref.watch(privacySettingControllerProvider)
+        : const AsyncValue<bool>.data(false);
     final isPublic = privacyState.valueOrNull ?? false;
     final isListMode = viewMode == _FinishedViewMode.list;
 
@@ -787,54 +793,58 @@ class _FinishedIconBar extends ConsumerWidget {
                   ),
                   onPressed: onViewModeTap,
                 ),
-                IconButton(
-                  constraints: const BoxConstraints(
-                    minWidth: 44,
-                    minHeight: 44,
-                  ),
-                  padding: EdgeInsets.zero,
-                  tooltip: isPublic
-                      ? '완독 책장 공개 중 (탭하면 비공개로 전환)'
-                      : '완독 책장 비공개 중 (탭하면 공개로 전환)',
-                  icon: Icon(
-                    isPublic
-                        ? PhosphorIconsRegular.globe
-                        : PhosphorIconsRegular.lock,
-                    color: AppColors.of(context).accentForeground,
-                    size: 20,
-                  ),
-                  onPressed: privacyState.isLoading
-                      ? null
-                      : () async {
-                          try {
-                            await ref
-                                .read(privacySettingControllerProvider.notifier)
-                                .toggle(!isPublic);
-                          } catch (_) {
-                            if (context.mounted) {
-                              AppSnackBar.error(context, '공개 설정 변경에 실패했습니다.');
+                if (canPublishShelf) ...[
+                  IconButton(
+                    constraints: const BoxConstraints(
+                      minWidth: 44,
+                      minHeight: 44,
+                    ),
+                    padding: EdgeInsets.zero,
+                    tooltip: isPublic
+                        ? '완독 책장 공개 중 (탭하면 비공개로 전환)'
+                        : '완독 책장 비공개 중 (탭하면 공개로 전환)',
+                    icon: Icon(
+                      isPublic
+                          ? PhosphorIconsRegular.globe
+                          : PhosphorIconsRegular.lock,
+                      color: AppColors.of(context).accentForeground,
+                      size: 20,
+                    ),
+                    onPressed: privacyState.isLoading
+                        ? null
+                        : () async {
+                            try {
+                              await ref
+                                  .read(
+                                    privacySettingControllerProvider.notifier,
+                                  )
+                                  .toggle(!isPublic);
+                            } catch (_) {
+                              if (context.mounted) {
+                                AppSnackBar.error(context, '공개 설정 변경에 실패했습니다.');
+                              }
                             }
-                          }
-                        },
-                ),
-                IconButton(
-                  constraints: const BoxConstraints(
-                    minWidth: 40,
-                    minHeight: 40,
+                          },
                   ),
-                  padding: EdgeInsets.zero,
-                  tooltip: '완독 책장 공개 안내',
-                  icon: Icon(
-                    PhosphorIconsRegular.question,
-                    color: AppColors.of(context).controlInactive,
-                    size: 18,
+                  IconButton(
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
+                    padding: EdgeInsets.zero,
+                    tooltip: '완독 책장 공개 안내',
+                    icon: Icon(
+                      PhosphorIconsRegular.question,
+                      color: AppColors.of(context).controlInactive,
+                      size: 18,
+                    ),
+                    onPressed: () => AppAlert.show(
+                      context,
+                      title: '완독 책장 공개',
+                      message: '공개로 설정하면 다른 사용자가 내 완독 책장을 볼 수 있습니다.',
+                    ),
                   ),
-                  onPressed: () => AppAlert.show(
-                    context,
-                    title: '완독 책장 공개',
-                    message: '공개로 설정하면 다른 사용자가 내 완독 책장을 볼 수 있습니다.',
-                  ),
-                ),
+                ],
               ],
             ),
           ],

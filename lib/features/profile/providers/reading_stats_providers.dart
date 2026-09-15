@@ -10,7 +10,7 @@ library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/providers/auth_notifier.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../../book_note/providers/book_note_providers.dart';
 import '../../bookshelf/models/book_category.dart';
 import '../../bookshelf/models/book_status.dart';
@@ -38,9 +38,7 @@ final readingStatsSummaryProvider = FutureProvider.autoDispose
       ref.watch(bookshelfSyncVersionProvider);
       ref.watch(bookNoteSyncVersionProvider);
 
-      final ownerUserId = ref.watch(
-        authNotifierProvider.select((auth) => auth.user?.id),
-      );
+      final ownerUserId = ref.watch(recordOwnerIdProvider);
 
       final repository = ref.watch(bookshelfRepositoryProvider);
       final allFinished = await repository.getGridTab(BookStatus.finished);

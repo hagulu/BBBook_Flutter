@@ -81,8 +81,40 @@ class ApiClient {
     _retryAfter = null;
   }
 
-  bool _isPublic(RequestOptions options) =>
-      options.method == 'GET' && options.path == '/api/books/categories';
+  /// 인증과 전혀 무관한 조회(응답이 사용자에 따라 달라지지 않는다).
+  /// 토큰을 붙이지 않는다 — 만료된 토큰 때문에 로그아웃 사용자의 조회가
+  /// 401로 막히지 않게 하기 위함이다.
+  static final _anonymousGetPaths = <RegExp>[
+    RegExp(r'^/api/books/categories$'),
+    // 정적 상수 기반 플랫폼 목록이라 사용자와 무관하다(api-books-options-get.md).
+    RegExp(r'^/api/books/options$'),
+    RegExp(r'^/api/notices(?:/\d+)?$'),
+  ];
+
+  /// 인증이 선택인 공개 조회(api-doc의 `Authorization ... (선택)` 엔드포인트).
+  ///
+  /// 비로그인 사용자도 그대로 조회할 수 있고, 토큰이 있으면 함께 보내
+  /// `isMine`/`likedByMe`가 내 기준으로 채워진다. 응답이 사용자와 무관한
+  /// `categories`/`options`는 [_anonymousGetPaths]가 맡으므로 여기서 뺀다
+  /// (두 목록은 서로 겹치지 않게 유지한다).
+  static final _authOptionalGetPaths = <RegExp>[
+    RegExp(r'^/api/books$'),
+    RegExp(r'^/api/books/(?!categories$|options$)[^/]+$'),
+    RegExp(
+      r'^/api/books/[^/]+/(?:reviews|reflections|discussions'
+      r'|community-preview|community-counts)$',
+    ),
+    RegExp(r'^/api/discussions/\d+(?:/answers)?$'),
+    RegExp(r'^/api/reflections/\d+$'),
+  ];
+
+  bool _isAnonymous(RequestOptions options) =>
+      options.method == 'GET' &&
+      _anonymousGetPaths.any((path) => path.hasMatch(options.path));
+
+  bool _isAuthOptional(RequestOptions options) =>
+      options.method == 'GET' &&
+      _authOptionalGetPaths.any((path) => path.hasMatch(options.path));
 
   /// 로컬 기록에 의존하는 온라인 작업만 명시적으로 사용한다.
   /// 동기화 자체의 API에는 붙이지 않아 재귀 대기를 피한다.
@@ -118,13 +150,33 @@ class ApiClient {
       if (_retryAfter case final retryAfter? when _now().isBefore(retryAfter)) {
         throw const ApiException('네트워크 연결 후 다시 시도해 주세요.');
       }
-      if (!_isPublic(options)) await _prepareSession?.call();
+      final anonymous = _isAnonymous(options);
+      // 세션 준비에 성공했을 때만 토큰을 싣는다. 실패를 무시하고 그때의
+      // [_readAccessToken] 값을 그대로 붙이면, 로그아웃이 시작돼
+      // ([AuthNotifier.logout]이 상태를 비우기 전) 아직 남아 있는 이전 계정
+      // 토큰이 공개 조회에 실려 `isMine`/`likedByMe`가 이전 계정 기준으로
+      // 내려올 수 있다.
+      var sessionReady = true;
+      if (!anonymous) {
+        if (_isAuthOptional(options)) {
+          // 비로그인 사용자도 볼 수 있는 조회다. 세션을 준비하지 못했다고
+          // (계정이 없거나 로그인 상태가 바뀌는 중이라고) 공개 콘텐츠까지
+          // 막지는 않고, 대신 익명 요청으로 보낸다.
+          try {
+            await _prepareSession?.call();
+          } catch (_) {
+            sessionReady = false;
+          }
+        } else {
+          await _prepareSession?.call();
+        }
+      }
       if (options.extra['requiresRecordSync'] == true) {
         await _waitForRecordSync();
       }
       if (generation != _sessionGeneration) throw _sessionChanged(options);
       final token = _readAccessToken?.call();
-      if (token != null && !_isPublic(options)) {
+      if (token != null && !anonymous && sessionReady) {
         options.headers['Authorization'] = 'Bearer $token';
       } else {
         options.headers.remove('Authorization');

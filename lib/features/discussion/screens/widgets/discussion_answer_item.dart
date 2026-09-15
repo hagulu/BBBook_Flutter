@@ -23,9 +23,14 @@ class DiscussionAnswerItem extends StatefulWidget {
     required this.onDelete,
     required this.onReport,
     required this.onToggleLike,
+    this.allowAccountActions = true,
   });
 
   final DiscussionAnswer answer;
+
+  /// 서버 계정이 필요한 액션(공감·신고·본인 답변 관리)을 노출할지. 계정 없이
+  /// 쓰는 사용자에게는 버튼 자체를 만들지 않는다.
+  final bool allowAccountActions;
 
   /// 선택 배너 색·라벨을 찾기 위한 주제의 선택지 목록(자유 토론이면 비어 있다).
   final List<DiscussionOption> options;
@@ -145,11 +150,13 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerRight,
-                child: CommunityLikeInline(
-                  isLiked: answer.likedByMe,
-                  likeCount: answer.likeCount,
-                  onTap: widget.onToggleLike,
-                ),
+                child: widget.allowAccountActions
+                    ? CommunityLikeInline(
+                        isLiked: answer.likedByMe,
+                        likeCount: answer.likeCount,
+                        onTap: widget.onToggleLike,
+                      )
+                    : CommunityLikeCount(likeCount: answer.likeCount),
               ),
             ],
           ],
@@ -158,7 +165,8 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
     );
   }
 
-  Widget _buildMenu(DiscussionAnswer answer) {
+  Widget? _buildMenu(DiscussionAnswer answer) {
+    if (!widget.allowAccountActions) return null;
     if (!answer.isMine) {
       return IconButton(
         padding: EdgeInsets.zero,

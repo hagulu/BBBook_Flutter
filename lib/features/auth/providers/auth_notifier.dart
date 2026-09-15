@@ -15,6 +15,8 @@ import '../../server_storage_migration/providers/server_storage_migration_provid
 import '../../tag/providers/tag_providers.dart';
 import '../data/auth_api.dart' show SocialProvider;
 import '../data/auth_repository.dart';
+import '../models/auth_user.dart';
+import '../models/standalone_session.dart';
 import 'auth_providers.dart';
 import 'auth_state.dart';
 
@@ -56,6 +58,12 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void> _bootstrap() async {
     try {
       final store = ref.read(localAuthStoreProvider);
+      // 로그인 없이 사용하기로 진입한 상태는 앱을 다시 켜도 유지한다. 서버
+      // 계정이 없으므로 세션 복원도 시도하지 않는다.
+      if (await store.isStandaloneSessionActive()) {
+        state = const AuthState(status: AuthStatus.standalone);
+        return;
+      }
       final user = await store.readUser();
       state = AuthState(
         status: user != null && await store.canUseRecords(user.id)
@@ -69,9 +77,50 @@ class AuthNotifier extends Notifier<AuthState> {
     } finally {
       _localReady.complete();
     }
+    if (state.isStandalone) return;
     await recoverSession();
     if (state.isAuthLoading) {
       state = AuthState(status: AuthStatus.unauthenticated, user: state.user);
+    }
+  }
+
+  /// 로그인 없이 사용하기. 임시 서버 계정을 만들지 않고 저장 모드만 기기
+  /// 로컬로 고정한다 — 동기화·push 게이트가 이미 그 모드를 보고 있어
+  /// ([BookshelfRepository.sync], [BackgroundRecordSync]) 기록 계열 코드에
+  /// 별도의 비로그인 분기를 두지 않아도 서버와 통신하지 않는다.
+  ///
+  /// 로컬 저장 모드로 로그아웃하며 남겨 둔 기록이 있으면 그대로 이어서 쓴다
+  /// (로그아웃 시 소유자를 계정 없음으로 바꿔 두었다 — [_detachAccountFromRecords]).
+  Future<void> continueWithoutAccount() async {
+    await _localReady.future;
+    if (_changingSession || state.canUseApp) return;
+    _changingSession = true;
+    try {
+      final localStore = ref.read(localAuthStoreProvider);
+      // 저장 모드와 세션 표시를 한 트랜잭션으로 함께 남긴다 — 둘 중 하나만
+      // 반영된 채 앱이 종료되면 다음 실행의 조회 기준이 어긋난다.
+      await ref
+          .read(storageModeStoreProvider)
+          .switchToStandalone(alongside: localStore.startStandaloneSessionIn);
+      // 계정을 쓰지 않기로 한 이상 남아 있던 토큰도 들고 있지 않는다(이 상태의
+      // 요청은 어차피 세션을 만들지 않는다 — [ensureSession]).
+      try {
+        await _repository.clearLocalSession();
+      } catch (_) {
+        developer.log('[계정 없이 시작] result=WARN reason=storage_error');
+      }
+      _generation++;
+      ref.read(apiClientProvider).invalidateSession();
+      _retryAfter = null;
+      state = const AuthState(status: AuthStatus.standalone);
+      developer.log('[계정 없이 시작] result=SUCCESS');
+      _invalidateRecordCaches();
+      unawaited(_prefetchCategories());
+    } catch (e) {
+      developer.log('[계정 없이 시작] result=FAIL reason=${e.runtimeType}');
+      rethrow;
+    } finally {
+      _changingSession = false;
     }
   }
 
@@ -79,6 +128,12 @@ class AuthNotifier extends Notifier<AuthState> {
   /// 공유해 계정 확인 이전에 기록을 다른 계정으로 전송하지 않는다.
   Future<void> ensureSession() async {
     await _localReady.future;
+    // 계정이 없는 사용자는 세션 자체가 없다. 인증이 필요한 요청은 여기서 바로
+    // 끊어 익명 요청이 401을 받아 인증 해제 흐름을 타는 일이 없게 한다(인증이
+    // 필요 없는 공개 조회는 [ApiClient]가 이 실패를 받아 토큰 없이 보낸다).
+    if (state.isStandalone) {
+      throw const ApiException('로그인이 필요한 기능입니다.');
+    }
     if (_changingSession || state.requiresLogin) {
       throw const ApiException('같은 계정으로 다시 로그인해 주세요.');
     }
@@ -151,28 +206,45 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<bool> loginWithGoogle({
     Future<bool> Function()? confirmAccountChange,
-  }) =>
-      _login(SocialProvider.google, confirmAccountChange: confirmAccountChange);
+    Future<StandaloneRecordAction?> Function()? askStandaloneRecordAction,
+  }) => _login(
+    SocialProvider.google,
+    confirmAccountChange: confirmAccountChange,
+    askStandaloneRecordAction: askStandaloneRecordAction,
+  );
 
   Future<bool> loginWithApple({
     Future<bool> Function()? confirmAccountChange,
-  }) =>
-      _login(SocialProvider.apple, confirmAccountChange: confirmAccountChange);
+    Future<StandaloneRecordAction?> Function()? askStandaloneRecordAction,
+  }) => _login(
+    SocialProvider.apple,
+    confirmAccountChange: confirmAccountChange,
+    askStandaloneRecordAction: askStandaloneRecordAction,
+  );
 
   Future<bool> loginWithKakao({
     Future<bool> Function()? confirmAccountChange,
-  }) =>
-      _login(SocialProvider.kakao, confirmAccountChange: confirmAccountChange);
+    Future<StandaloneRecordAction?> Function()? askStandaloneRecordAction,
+  }) => _login(
+    SocialProvider.kakao,
+    confirmAccountChange: confirmAccountChange,
+    askStandaloneRecordAction: askStandaloneRecordAction,
+  );
 
   Future<bool> loginWithNaver({
     Future<bool> Function()? confirmAccountChange,
-  }) =>
-      _login(SocialProvider.naver, confirmAccountChange: confirmAccountChange);
+    Future<StandaloneRecordAction?> Function()? askStandaloneRecordAction,
+  }) => _login(
+    SocialProvider.naver,
+    confirmAccountChange: confirmAccountChange,
+    askStandaloneRecordAction: askStandaloneRecordAction,
+  );
 
   /// [SocialAuthException], [ApiException]은 그대로 던져 화면(SnackBar)에서 처리한다.
   Future<bool> _login(
     SocialProvider provider, {
     Future<bool> Function()? confirmAccountChange,
+    Future<StandaloneRecordAction?> Function()? askStandaloneRecordAction,
   }) async {
     await _localReady.future;
     if (_changingSession) return false;
@@ -185,22 +257,22 @@ class AuthNotifier extends Notifier<AuthState> {
       } catch (_) {}
       await _unauthorizing;
       final session = await _repository.loginWithProvider(provider);
-      final localStore = ref.read(localAuthStoreProvider);
-      final owner = await localStore.readUser();
-      // 소유자 정보가 유실된 구형 기록도 새 로그인 계정에 임의로 합치지 않는다.
-      final needsReset = owner != null
-          ? owner.id != session.user.id
-          : await localStore.hasLocalRecords();
-      if (needsReset) {
-        if (confirmAccountChange == null || !await confirmAccountChange()) {
-          return false;
-        }
-        _generation++;
-        ref.read(apiClientProvider).invalidateSession();
-        await _clearLocalBookshelf();
-      }
-      await ref.read(localAuthStoreProvider).saveUser(session.user);
-      await _repository.saveSession(session);
+      final continued = await _adoptLocalRecordsForLogin(
+        session.user,
+        confirmAccountChange: confirmAccountChange,
+        askStandaloneRecordAction: askStandaloneRecordAction,
+        // 계정 없이 쓰던 기록을 이어받는 두 경로(아래)는 이 콜백을 로컬 DB
+        // 커밋보다 먼저 실행한다 — 세션 저장이 실패하면 DB에 손대지 않은
+        // 채로 끝나, 다음 실행이 여전히 계정 없는 상태로 안전하게 복원된다.
+        // 반대 순서면 DB만 새 계정으로 바뀐 채 세션 저장이 실패할 수 있고,
+        // 그러면 메모리 상태는 계정 없음으로 남아 이미 그 계정 소유가 된
+        // 기록을 찾지 못한다.
+        persistSession: () async {
+          await ref.read(localAuthStoreProvider).saveUser(session.user);
+          await _repository.saveSession(session);
+        },
+      );
+      if (!continued) return false;
       _generation++;
       ref.read(apiClientProvider).invalidateSession();
       _retryAfter = null;
@@ -222,10 +294,89 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  /// 로그인 직전, 이 기기에 남아 있는 로컬 기록을 새 계정으로 어떻게 이어
+  /// 갈지 정한다. 계속 진행해도 되면 true, 사용자가 취소했으면 false.
+  ///
+  /// 계정 없이 쓰던 사용자의 기록은 지우지 않는다 — 소유자만 새 계정으로
+  /// 바꿔 끼우고([LocalAuthStore.rekeyRecordOwner]) 로컬 저장 모드를 그대로
+  /// 유지한다. "계정에 올리기"를 고른 경우에도 여기서 업로드하지 않고, 기존
+  /// 로컬 → 서버 저장 방식 전환(Import) 흐름을 호출부가 그대로 실행한다
+  /// (`ServerStorageMigrationScreen` — 새 이전 기능을 만들지 않는다).
+  Future<bool> _adoptLocalRecordsForLogin(
+    AuthUser user, {
+    required Future<bool> Function()? confirmAccountChange,
+    required Future<StandaloneRecordAction?> Function()?
+    askStandaloneRecordAction,
+    required Future<void> Function() persistSession,
+  }) async {
+    final localStore = ref.read(localAuthStoreProvider);
+    final storageMode = ref.read(storageModeStoreProvider);
+
+    if (await storageMode.isStandaloneOwned()) {
+      if (!await localStore.hasLocalRecords()) {
+        // 기록 없이 둘러보기만 한 경우 — 흔적만 지우고 평소 로그인과 같은
+        // 서버 저장 모드로 시작한다(최초 기록 동기화가 정상 동작한다).
+        // 저장 모드 삭제와 standalone 세션 표시 삭제는 한 트랜잭션으로
+        // 묶는다 — 일부만 반영된 채 종료되면 저장 모드는 서버인데
+        // standalone 표시만 남는 조합이 복원된다.
+        await persistSession();
+        await storageMode.resetToServer(
+          alongside: (txn) => localStore.endStandaloneSessionIn(txn),
+        );
+        return true;
+      }
+      final action = await askStandaloneRecordAction?.call();
+      if (action == null) return false;
+      await persistSession();
+      // 기록 소유자·저장 모드 소유자·세션 표시를 한 트랜잭션으로 함께 바꾼다.
+      // 일부만 반영된 채 앱이 종료되면 다음 실행이 여전히 계정 없는 상태로
+      // 복원되면서 소유자만 계정으로 바뀐 노트·독후감을 못 찾는다.
+      await storageMode.adoptOwner(
+        user.id,
+        alongside: (txn) async {
+          await localStore.rekeyRecordOwnerIn(
+            txn,
+            from: standaloneOwnerUserId,
+            to: user.id,
+          );
+          await localStore.endStandaloneSessionIn(txn);
+        },
+      );
+      _invalidateRecordCaches();
+      developer.log(
+        '[로그인 전환] userId=${user.id} records=${action.name} result=SUCCESS',
+      );
+      return true;
+    }
+
+    final owner = await localStore.readUser();
+    // 소유자 정보가 유실된 구형 기록도 새 로그인 계정에 임의로 합치지 않는다.
+    final needsReset = owner != null
+        ? owner.id != user.id
+        : await localStore.hasLocalRecords();
+    if (!needsReset) {
+      await persistSession();
+      return true;
+    }
+    if (confirmAccountChange == null || !await confirmAccountChange()) {
+      return false;
+    }
+    _generation++;
+    ref.read(apiClientProvider).invalidateSession();
+    await _clearLocalBookshelf();
+    await persistSession();
+    return true;
+  }
+
   /// null은 "저장된 refresh token 없음" 또는 "실제 인증 실패(401/403)"일 때만
   /// 반환한다. 네트워크/서버 오류 등 일시적인 실패는 [ApiException]을 그대로
   /// 던져, 호출부(ApiClient)가 이를 로그아웃과 구분해서 처리하게 한다.
   Future<String?> _refreshAccessToken() {
+    // 계정이 없는 사용자에게는 갱신할 세션 자체가 없다. null을 돌려주면
+    // [ApiClient]가 인증 해제(로그아웃) 흐름으로 오인하므로 오류로 끊는다.
+    if (state.isStandalone) {
+      return Future.error(const ApiException('로그인이 필요한 기능입니다.'));
+    }
     if (_changingSession || state.requiresLogin) {
       return Future.error(const ApiException('로그인 상태가 변경되었습니다.'));
     }
@@ -276,11 +427,27 @@ class AuthNotifier extends Notifier<AuthState> {
 
   /// 서버 로그아웃 요청이나 소셜 SDK 로그아웃이 실패해도, 상태 초기화는
   /// finally로 항상 보장한다(둘 중 하나가 막혀 로그아웃이 안 되는 상황 방지).
-  Future<void> logout() async {
+  ///
+  /// 로컬 데이터 처리는 현재 저장 방식을 따른다.
+  /// - 서버 동기화 모드: 서버에 사본이 있으므로 이 계정의 로컬 기록을 지운다
+  ///   (다음 로그인 사용자에게 남지 않고, 재로그인하면 다시 내려받는다).
+  /// - 로컬 저장 모드: 서버에 사본이 없는 유일본이다. 기록은 그대로 두고
+  ///   계정만 떼어내, 이후 "로그인 없이 사용하기"로 그대로 이어 쓸 수 있게
+  ///   한다([_detachAccountFromRecords]).
+  ///
+  /// [deletingAccount]는 회원 탈퇴 직후에만 true로 넘긴다 — 계정을 지운
+  /// 이상 "로그인 없이 사용하기"로 이어 쓸 대상 자체가 없으므로, 저장
+  /// 방식과 무관하게 로컬 기록·이미지를 항상 지운다([ProfileEditScreen]이
+  /// "모든 독서 기록과 데이터가 영구적으로 삭제됩니다"로 이미 확인받았다 —
+  /// 이 약속을 지키려면 로컬 저장 모드에서도 예외를 두면 안 된다).
+  Future<void> logout({bool deletingAccount = false}) async {
     _changingSession = true;
     _generation++;
     ref.read(apiClientProvider).invalidateSession();
     BookshelfDatabase.sessionGeneration++;
+    // 로그아웃 처리 중 DB가 바뀌기 전에 현재 저장 방식과 소유자를 확정해 둔다.
+    final keepRecords = !deletingAccount && await _readIsLocalStorage();
+    final previousUserId = state.user?.id;
     try {
       try {
         await _restoring;
@@ -288,10 +455,16 @@ class AuthNotifier extends Notifier<AuthState> {
       } catch (_) {}
       await _unauthorizing;
       await _repository.logout();
-      developer.log('[로그아웃] result=SUCCESS');
+      developer.log(
+        '[로그아웃] result=SUCCESS mode=${keepRecords ? 'LOCAL' : 'SERVER'}',
+      );
     } finally {
       try {
-        await _clearLocalBookshelf();
+        if (keepRecords) {
+          await _detachAccountFromRecords(previousUserId);
+        } else {
+          await _clearLocalBookshelf();
+        }
       } finally {
         state = const AuthState(status: AuthStatus.unauthenticated);
         _changingSession = false;
@@ -299,10 +472,70 @@ class AuthNotifier extends Notifier<AuthState> {
     }
   }
 
+  /// 저장 방식 조회가 실패해도 로그아웃 자체는 진행한다. 판단이 서지 않으면
+  /// 기존 동작(로컬 정리)으로 되돌려 이전 계정 기록이 남지 않게 한다.
+  Future<bool> _readIsLocalStorage() async {
+    try {
+      return await ref.read(storageModeStoreProvider).isLocal();
+    } catch (e) {
+      developer.log('[로그아웃 저장 방식 확인] result=FAIL reason=${e.runtimeType}');
+      return false;
+    }
+  }
+
+  /// 로컬 저장 모드 로그아웃: 기록·이미지는 그대로 두고 소유자만 계정에서
+  /// 떼어낸다. 계정 정보(`local_auth_user`)를 지우지 않으면 다음 실행에서
+  /// 로그인 없이 그 계정으로 복원되고, 소유자를 그대로 두면 이후 "로그인
+  /// 없이 사용하기"로 진입했을 때 노트·독후감이 조회되지 않는다.
+  Future<void> _detachAccountFromRecords(int? previousUserId) async {
+    try {
+      final localStore = ref.read(localAuthStoreProvider);
+      final storageMode = ref.read(storageModeStoreProvider);
+      // 인증이 먼저 풀려 `state.user`가 비어 있는 채로 로그아웃할 수 있다.
+      // 소유자를 모른 채 저장 모드만 바꾸면 노트·독후감이 조회 기준과 어긋나
+      // 통째로 보이지 않으므로, 로컬에 남은 소유자 정보를 끝까지 찾는다.
+      final ownerUserId =
+          previousUserId ??
+          await storageMode.ownerUserId() ??
+          (await localStore.readUser())?.id;
+      if (ownerUserId == null) {
+        // 여기까지 와도 모르면 기록과 저장 모드를 그대로 둔다 — 잘못 바꾸는
+        // 것보다 다음 로그인에서 계정 변경 확인을 받는 편이 안전하다.
+        developer.log('[로컬 기록 계정 분리] result=SKIP reason=owner_unknown');
+        await localStore.clearUser();
+        await localStore.endStandaloneSession();
+        return;
+      }
+      // 기록 소유자·저장 모드 소유자·계정 정보를 한 트랜잭션으로 함께 바꾼다.
+      // 일부만 반영된 채 앱이 종료되면 다음 실행이 옛 계정으로 복원되면서
+      // 소유자가 이미 바뀐 노트·독후감을 못 찾는다.
+      await storageMode.switchToStandalone(
+        alongside: (txn) async {
+          await localStore.rekeyRecordOwnerIn(
+            txn,
+            from: ownerUserId,
+            to: standaloneOwnerUserId,
+          );
+          await localStore.clearUserIn(txn);
+          // 로그아웃 직후에는 로그인 화면으로 돌아간다. "로그인 없이
+          // 사용하기"를 다시 고를 때 비로소 그 상태가 된다.
+          await localStore.endStandaloneSessionIn(txn);
+        },
+      );
+    } catch (e) {
+      developer.log('[로컬 기록 계정 분리] result=FAIL reason=${e.runtimeType}');
+    } finally {
+      _invalidateRecordCaches();
+    }
+  }
+
   Future<void> _handleUnauthorized() => _unauthorizing ??= _revokeSession()
       .whenComplete(() => _unauthorizing = null);
 
   Future<void> _revokeSession() async {
+    // 계정이 없는 사용자에게는 해제할 세션이 없다. 공개 조회 요청이 어쩌다
+    // 401을 받아도 로컬 전용 상태를 건드리지 않는다.
+    if (state.isStandalone) return;
     if (state.requiresLogin || _changingSession) return;
     _generation++;
     ref.read(apiClientProvider).invalidateSession();
@@ -345,35 +578,45 @@ class AuthNotifier extends Notifier<AuthState> {
       developer.log('[책장 로컬 DB 초기화] result=FAIL reason=${e.runtimeType}');
       rethrow;
     } finally {
-      ref.invalidate(storageModeProvider);
-      ref.invalidate(localStorageMigrationControllerProvider);
-      ref.invalidate(serverStorageMigrationControllerProvider);
-      ref.invalidate(serverDeletePendingProvider);
-      ref.invalidate(bookshelfSyncControllerProvider);
-      ref.invalidate(privacySettingControllerProvider);
-      ref.invalidate(finishedFilterProvider);
-      // autoDispose family라 보통은 화면을 벗어나며 스스로 폐기되지만, 책
-      // 기록 화면이 열린 채로 로그아웃하는 경우까지 대비해 명시적으로도 비운다.
-      ref.invalidate(bookRecordControllerProvider);
-      ref.read(bookshelfSyncVersionProvider.notifier).state++;
-      // 노트 동기화 컨트롤러도 같은 이유로 비운다 — 안 비우면 다음 로그인
-      // 사용자 세션에서도 이전 계정의 "마지막 동기화 시각"이 캐시된 채
-      // 남아, 실제로는 방금 clearLocal()로 로컬 DB의 sync_meta까지 비웠는데
-      // 화면은 여전히 그 값을 들고 있게 된다. 목록/상세 provider도(autoDispose
-      // family) 책 기록 화면과 같은 이유로 명시적으로 비운다.
-      ref.invalidate(bookNoteSyncControllerProvider);
-      ref.invalidate(bookNoteListProvider);
-      ref.invalidate(bookNoteDetailProvider);
-      ref.read(bookNoteSyncVersionProvider.notifier).state++;
-      // 독후감 동기화 컨트롤러/목록/상세도 같은 이유로 비운다.
-      ref.invalidate(bookReflectionSyncControllerProvider);
-      ref.invalidate(bookReflectionListProvider);
-      ref.invalidate(bookReflectionDetailProvider);
-      ref.read(bookReflectionSyncVersionProvider.notifier).state++;
-      // 태그 동기화 컨트롤러도 같은 이유로 비운다.
-      ref.invalidate(tagSyncControllerProvider);
-      ref.read(tagSyncVersionProvider.notifier).state++;
+      _invalidateRecordCaches();
     }
+  }
+
+  /// 기록 계열 Riverpod 캐시를 통째로 비운다.
+  ///
+  /// 로컬 DB를 지울 때뿐 아니라, 지우지 않고 소유자만 바꾸는 경우(계정 없이
+  /// 쓰던 기록을 로그인 계정으로 넘기거나 그 반대)에도 반드시 필요하다 —
+  /// 노트·독후감 목록/상세 provider는 소유자 id를 인자로 캐시하므로, 비우지
+  /// 않으면 화면이 이전 소유자 기준의 빈 목록을 계속 보여준다.
+  void _invalidateRecordCaches() {
+    ref.invalidate(storageModeProvider);
+    ref.invalidate(localStorageMigrationControllerProvider);
+    ref.invalidate(serverStorageMigrationControllerProvider);
+    ref.invalidate(serverDeletePendingProvider);
+    ref.invalidate(bookshelfSyncControllerProvider);
+    ref.invalidate(privacySettingControllerProvider);
+    ref.invalidate(finishedFilterProvider);
+    // autoDispose family라 보통은 화면을 벗어나며 스스로 폐기되지만, 책
+    // 기록 화면이 열린 채로 로그아웃하는 경우까지 대비해 명시적으로도 비운다.
+    ref.invalidate(bookRecordControllerProvider);
+    ref.read(bookshelfSyncVersionProvider.notifier).state++;
+    // 노트 동기화 컨트롤러도 같은 이유로 비운다 — 안 비우면 다음 로그인
+    // 사용자 세션에서도 이전 계정의 "마지막 동기화 시각"이 캐시된 채
+    // 남아, 실제로는 방금 clearLocal()로 로컬 DB의 sync_meta까지 비웠는데
+    // 화면은 여전히 그 값을 들고 있게 된다. 목록/상세 provider도(autoDispose
+    // family) 책 기록 화면과 같은 이유로 명시적으로 비운다.
+    ref.invalidate(bookNoteSyncControllerProvider);
+    ref.invalidate(bookNoteListProvider);
+    ref.invalidate(bookNoteDetailProvider);
+    ref.read(bookNoteSyncVersionProvider.notifier).state++;
+    // 독후감 동기화 컨트롤러/목록/상세도 같은 이유로 비운다.
+    ref.invalidate(bookReflectionSyncControllerProvider);
+    ref.invalidate(bookReflectionListProvider);
+    ref.invalidate(bookReflectionDetailProvider);
+    ref.read(bookReflectionSyncVersionProvider.notifier).state++;
+    // 태그 동기화 컨트롤러도 같은 이유로 비운다.
+    ref.invalidate(tagSyncControllerProvider);
+    ref.read(tagSyncVersionProvider.notifier).state++;
   }
 
   /// 카테고리 마스터 데이터는 계정과 무관하지만(인증 불필요 API), 앱 전반에서

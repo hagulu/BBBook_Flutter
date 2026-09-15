@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../auth/providers/auth_notifier.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../models/book_reflection.dart';
 import '../providers/book_reflection_providers.dart';
 import 'book_reflection_detail_screen.dart';
@@ -29,9 +29,10 @@ class BookReflectionList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ownerUserId = ref.watch(
-      authNotifierProvider.select((auth) => auth.user?.id),
-    );
+    final ownerUserId = ref.watch(recordOwnerIdProvider);
+    // 공개/비공개 구분은 서버에 올린 독후감에만 의미가 있다 — 계정이 없으면
+    // 모두 이 기기에만 있는 글이라 배지를 보여주지 않는다.
+    final showVisibility = ref.watch(canUseAccountFeaturesProvider);
     final asyncReflections = ref.watch(bookReflectionListProvider(userBookId));
 
     return BookReflectionRefreshIndicator(
@@ -88,6 +89,7 @@ class BookReflectionList extends ConsumerWidget {
                   final reflection = value[index];
                   return _ReflectionCard(
                     reflection: reflection,
+                    showVisibility: showVisibility,
                     onTap: ownerUserId == null
                         ? null
                         : () => _openReflection(
@@ -147,9 +149,14 @@ class BookReflectionList extends ConsumerWidget {
 }
 
 class _ReflectionCard extends StatelessWidget {
-  const _ReflectionCard({required this.reflection, required this.onTap});
+  const _ReflectionCard({
+    required this.reflection,
+    required this.showVisibility,
+    required this.onTap,
+  });
 
   final BookReflection reflection;
+  final bool showVisibility;
   final VoidCallback? onTap;
 
   @override
@@ -200,17 +207,19 @@ class _ReflectionCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Semantics(
-                          label: reflection.isPublic ? '공개 독후감' : '비공개 독후감',
-                          child: Icon(
-                            reflection.isPublic
-                                ? PhosphorIconsRegular.globe
-                                : PhosphorIconsRegular.lock,
-                            size: 14,
-                            color: AppColors.of(context).textMuted,
+                        if (showVisibility) ...[
+                          const SizedBox(width: 8),
+                          Semantics(
+                            label: reflection.isPublic ? '공개 독후감' : '비공개 독후감',
+                            child: Icon(
+                              reflection.isPublic
+                                  ? PhosphorIconsRegular.globe
+                                  : PhosphorIconsRegular.lock,
+                              size: 14,
+                              color: AppColors.of(context).textMuted,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                     if (!reflection.isHidden &&

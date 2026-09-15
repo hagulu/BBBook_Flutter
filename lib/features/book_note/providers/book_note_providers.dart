@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/providers/auth_notifier.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../record_sync/providers/record_sync_providers.dart';
@@ -73,9 +73,7 @@ class BookNoteSyncController extends AsyncNotifier<DateTime?> {
   }
 
   Future<void> _runSync({required bool forceFullSync}) async {
-    final ownerUserId = ref.read(
-      authNotifierProvider.select((auth) => auth.user?.id),
-    );
+    final ownerUserId = ref.read(recordOwnerIdProvider);
     if (ownerUserId == null) return;
 
     state = const AsyncValue<DateTime?>.loading().copyWithPrevious(state);
@@ -104,9 +102,7 @@ final bookNoteSyncControllerProvider =
 
 final bookNoteListProvider = FutureProvider.autoDispose
     .family<List<BookNoteSummary>, int>((ref, userBookId) async {
-      final ownerUserId = ref.watch(
-        authNotifierProvider.select((auth) => auth.user?.id),
-      );
+      final ownerUserId = ref.watch(recordOwnerIdProvider);
       if (ownerUserId == null) return const [];
       ref.watch(bookNoteSyncVersionProvider);
       return ref
@@ -150,9 +146,7 @@ class BookNoteDetailController
     _disposed = false;
     ref.onDispose(() => _disposed = true);
     ref.watch(bookNoteSyncVersionProvider);
-    final currentUserId = ref.watch(
-      authNotifierProvider.select((auth) => auth.user?.id),
-    );
+    final currentUserId = ref.watch(recordOwnerIdProvider);
     if (currentUserId != args.ownerUserId) {
       return const BookNoteDetail.empty();
     }

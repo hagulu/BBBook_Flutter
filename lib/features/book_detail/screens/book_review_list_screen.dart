@@ -8,6 +8,7 @@ import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../models/book_review.dart';
 import '../providers/book_detail_providers.dart';
 import 'widgets/report_dialog.dart';
@@ -153,6 +154,9 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(reviewsControllerProvider(widget.isbn13));
+    // 독자평 조회는 인증이 필요 없지만 작성·공감·신고는 계정이 있어야 한다.
+    // 계정이 없으면 비활성화가 아니라 버튼 자체를 만들지 않는다.
+    final allowAccountActions = ref.watch(canUseAccountFeaturesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -175,6 +179,7 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
             onEdit: _handleEdit,
             onDelete: _handleDelete,
             onReport: _handleReport,
+            allowAccountActions: allowAccountActions,
           ),
           AsyncError() => CommunityContentErrorState(
             message: '독자평을 불러오지 못했습니다.',
@@ -184,14 +189,16 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
           _ => const CommunityContentLoadingState(),
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _handleCreate,
-        tooltip: '독자평 쓰기',
-        shape: const CircleBorder(),
-        backgroundColor: AppColors.of(context).accentFill,
-        foregroundColor: AppColors.of(context).textStrong,
-        child: const Icon(PhosphorIconsRegular.plus),
-      ),
+      floatingActionButton: allowAccountActions
+          ? FloatingActionButton(
+              onPressed: _handleCreate,
+              tooltip: '독자평 쓰기',
+              shape: const CircleBorder(),
+              backgroundColor: AppColors.of(context).accentFill,
+              foregroundColor: AppColors.of(context).textStrong,
+              child: const Icon(PhosphorIconsRegular.plus),
+            )
+          : null,
     );
   }
 }
@@ -206,6 +213,7 @@ class _ReviewList extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onReport,
+    required this.allowAccountActions,
   });
 
   final ScrollController scrollController;
@@ -216,6 +224,7 @@ class _ReviewList extends StatelessWidget {
   final void Function(BookReview review) onEdit;
   final void Function(BookReview review) onDelete;
   final void Function(BookReview review) onReport;
+  final bool allowAccountActions;
 
   @override
   Widget build(BuildContext context) {
@@ -250,6 +259,7 @@ class _ReviewList extends StatelessWidget {
             onEdit: () => onEdit(review),
             onDelete: () => onDelete(review),
             onReport: () => onReport(review),
+            allowAccountActions: allowAccountActions,
           );
         },
       ),

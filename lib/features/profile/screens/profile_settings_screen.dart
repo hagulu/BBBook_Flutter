@@ -14,6 +14,7 @@ import '../../../shared/widgets/app_alert.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../../notices/screens/notices_list_screen.dart';
 import '../../external_record_import/models/external_import_models.dart';
 import '../../external_record_import/screens/external_import_screen.dart';
@@ -33,6 +34,11 @@ class ProfileSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 계정이 없으면 기록은 항상 이 기기에만 있다 — 서버 동기화 설정과 서버
+    // Import 세션이 필요한 "다른 서비스 기록 가져오기"는 아예 감춘다(별도의
+    // 로컬 모드 설정도 두지 않는다). ZIP 내보내기/가져오기는 서버를 쓰지
+    // 않으므로 그대로 남긴다.
+    final hasAccount = ref.watch(canUseAccountFeaturesProvider);
     final mode =
         ref.watch(storageModeProvider).valueOrNull ?? StorageMode.server;
     final isLocal = mode == StorageMode.local;
@@ -65,24 +71,26 @@ class ProfileSettingsScreen extends ConsumerWidget {
                       padding: EdgeInsets.symmetric(vertical: 18),
                       child: _ThemeModeCard(),
                     ),
-                    const Divider(),
-                    Padding(
-                      padding: EdgeInsets.zero,
-                      child: _StorageModeCard(
-                        isLocal: isLocal,
-                        serverCleanupPending:
-                            isLocal &&
-                            (ref
-                                    .watch(serverDeletePendingProvider)
-                                    .valueOrNull ??
-                                false),
-                        onSwitchToLocal: () => _startMigration(context, ref),
-                        onSwitchToServer: () =>
-                            _startReverseMigration(context, ref),
-                        onRetryServerCleanup: () =>
-                            _retryServerCleanup(context, ref),
+                    if (hasAccount) ...[
+                      const Divider(),
+                      Padding(
+                        padding: EdgeInsets.zero,
+                        child: _StorageModeCard(
+                          isLocal: isLocal,
+                          serverCleanupPending:
+                              isLocal &&
+                              (ref
+                                      .watch(serverDeletePendingProvider)
+                                      .valueOrNull ??
+                                  false),
+                          onSwitchToLocal: () => _startMigration(context, ref),
+                          onSwitchToServer: () =>
+                              _startReverseMigration(context, ref),
+                          onRetryServerCleanup: () =>
+                              _retryServerCleanup(context, ref),
+                        ),
                       ),
-                    ),
+                    ],
                     const Divider(),
                     _SettingsMenuTile(
                       icon: PhosphorIconsRegular.export,
@@ -99,14 +107,16 @@ class ProfileSettingsScreen extends ConsumerWidget {
                           ? null
                           : () => _archive(context, ref, importing: true),
                     ),
-                    const Divider(),
-                    _SettingsMenuTile(
-                      icon: PhosphorIconsRegular.files,
-                      label: '다른 서비스 기록 가져오기',
-                      onTap: isSwitching
-                          ? null
-                          : () => _openExternalImport(context),
-                    ),
+                    if (hasAccount) ...[
+                      const Divider(),
+                      _SettingsMenuTile(
+                        icon: PhosphorIconsRegular.files,
+                        label: '다른 서비스 기록 가져오기',
+                        onTap: isSwitching
+                            ? null
+                            : () => _openExternalImport(context),
+                      ),
+                    ],
                     const Divider(),
                     const _OpenSourceLicenseMenu(),
                   ],

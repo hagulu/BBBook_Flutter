@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/widgets/app_snackbar.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../../auth/providers/auth_notifier.dart';
 import '../models/external_import_models.dart';
 import '../providers/external_import_providers.dart';
@@ -73,6 +75,13 @@ class _ExternalImportShareCoordinatorState
 
   void _openNextWhenReady() {
     if (!mounted || _opening || _pending.isEmpty) return;
+    // 외부 기록 가져오기는 서버 Import 세션을 쓴다 — 계정이 없으면 설정
+    // 메뉴에서도 감춰 둔 기능이라 여기서도 열지 않고, 앱 밖에서 시작한
+    // 동작이라 이유만 알리고 대기열을 비운다.
+    if (!ref.read(canUseAccountFeaturesProvider)) {
+      _discardPending();
+      return;
+    }
     if (!ref.read(authNotifierProvider).canUseApp) return;
     if (ref.read(externalImportExecutionLockProvider) != null) return;
     final navigator = widget.navigatorKey.currentState;
@@ -88,20 +97,34 @@ class _ExternalImportShareCoordinatorState
             MaterialPageRoute(builder: (_) => ExternalImportScreen(file: file)),
           )
           .whenComplete(() async {
-            if (file.deleteWhenDone && file.path.isNotEmpty) {
-              try {
-                final cachedFile = File(file.path);
-                if (await cachedFile.exists()) await cachedFile.delete();
-              } catch (_) {
-                developer.log(
-                  '[외부 파일 임시 정리] result=FAIL reason=file_delete_failed',
-                );
-              }
-            }
+            await _deleteCachedFile(file);
             _opening = false;
             _openNextWhenReady();
           }),
     );
+  }
+
+  void _discardPending() {
+    final files = _pending.toList(growable: false);
+    _pending.clear();
+    for (final file in files) {
+      unawaited(_deleteCachedFile(file));
+    }
+    developer.log('[외부 파일 공유] result=SKIP reason=login_required');
+    final context = widget.navigatorKey.currentContext;
+    if (context != null && context.mounted) {
+      AppSnackBar.info(context, '다른 서비스 기록 가져오기는 로그인 후 사용할 수 있습니다.');
+    }
+  }
+
+  Future<void> _deleteCachedFile(ExternalImportFileReference file) async {
+    if (!file.deleteWhenDone || file.path.isEmpty) return;
+    try {
+      final cachedFile = File(file.path);
+      if (await cachedFile.exists()) await cachedFile.delete();
+    } catch (_) {
+      developer.log('[외부 파일 임시 정리] result=FAIL reason=file_delete_failed');
+    }
   }
 
   @override
