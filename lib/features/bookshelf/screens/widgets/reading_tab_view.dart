@@ -34,11 +34,11 @@ class ReadingTabView extends ConsumerWidget {
         builder: (context, items) {
           return ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsets.fromLTRB(
               16,
               8,
               16,
-              bookshelfFabBottomPadding,
+              bookshelfBottomContentPadding(context),
             ),
             itemCount: items.length,
             separatorBuilder: (context, index) => const SizedBox(height: 12),

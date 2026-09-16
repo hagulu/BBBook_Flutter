@@ -541,11 +541,11 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     if (!filter.isDefaultMode) {
       return [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(
+          padding: EdgeInsets.fromLTRB(
             16,
             0,
             16,
-            bookshelfFabBottomPadding,
+            bookshelfBottomContentPadding(context),
           ),
           sliver: _bookSliver(items),
         ),
@@ -603,8 +603,8 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
             ),
           ],
         ),
-      const SliverToBoxAdapter(
-        child: SizedBox(height: bookshelfFabBottomPadding),
+      SliverToBoxAdapter(
+        child: SizedBox(height: bookshelfBottomContentPadding(context)),
       ),
     ];
   }

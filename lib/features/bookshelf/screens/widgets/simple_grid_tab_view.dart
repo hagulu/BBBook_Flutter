@@ -49,11 +49,11 @@ class SimpleGridTabView extends ConsumerWidget {
         builder: (context, items) {
           return GridView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsets.fromLTRB(
               16,
               8,
               16,
-              bookshelfFabBottomPadding,
+              bookshelfBottomContentPadding(context),
             ),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,

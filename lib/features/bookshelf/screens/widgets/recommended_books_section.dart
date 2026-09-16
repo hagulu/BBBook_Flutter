@@ -39,7 +39,12 @@ class RecommendedBooksSection extends ConsumerWidget {
       builder: (context, constraints) {
         return SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(16, 24, 16, bookshelfFabBottomPadding),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            24,
+            16,
+            bookshelfBottomContentPadding(context),
+          ),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
             child: hasRecommendations

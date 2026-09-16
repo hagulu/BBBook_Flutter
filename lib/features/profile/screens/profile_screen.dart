@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
+
+import '../../../app/main_shell_layout.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_confirm.dart';
@@ -76,9 +78,14 @@ class _StandaloneProfileContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, 32),
-      child: Column(
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        MainShellNavigationLayout.contentBottomPadding(context),
+      ),
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [_LoginPromptCard(), SizedBox(height: 16), _StatsCard()],
       ),
@@ -172,7 +179,12 @@ class _ProfileContent extends ConsumerWidget {
       authNotifierProvider.select((auth) => auth.requiresLogin),
     );
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        MainShellNavigationLayout.contentBottomPadding(context),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

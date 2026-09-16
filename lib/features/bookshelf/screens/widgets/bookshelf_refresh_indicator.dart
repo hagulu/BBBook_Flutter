@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../app/main_shell_layout.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../tag/providers/tag_providers.dart';
 import '../../models/book_status.dart';
 import '../../providers/bookshelf_providers.dart';
 
-/// `MainShell`의 56dp FAB와 기본 여백을 피해 마지막 책까지 온전히 스크롤할
-/// 수 있도록 책장 목록 아래에 확보하는 공통 여백.
-const bookshelfFabBottomPadding = 88.0;
+/// 플로팅 하단 메뉴와 기기 안전 영역을 피해 마지막 책까지 온전히
+/// 스크롤할 수 있도록 책장 목록 아래에 확보하는 공통 여백.
+double bookshelfBottomContentPadding(BuildContext context) =>
+    MainShellNavigationLayout.contentBottomPadding(context);
 
 /// 책장 탭 공통 Pull to Refresh(동기화: 최초엔 전체, 이후엔 증분). 실패 시 SnackBar로 안내한다.
 class BookshelfRefreshIndicator extends ConsumerWidget {

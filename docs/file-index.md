@@ -220,6 +220,8 @@
 
 ## docs
 
+- `docs/review/20260916-140626-floating-navigation-rereview.md` — 플로팅 하단 메뉴의 공통 스크롤 여백·큰 글자 세로 배치 후속 리뷰
+- `docs/review/20260916-134252-floating-navigation-review.md` — 플로팅 하단 메뉴의 프로필 마지막 버튼 가림·큰 글자 가로 오버플로 리뷰
 - `docs/review/20260915-210107-attachment-limit-review.md` — 기존 이미지는 허용하고 신규 이미지만 제한하는 기준에서 노트 최종 저장 검증과 양수 독후감 한도 처리를 점검한 리뷰
 - `docs/review/20260915-173540-bookshelf-recommendation-rereview.md` — 추천 도서 후속 수정의 언어 헤더, 진행 중 기록 동기화 순서, 상태 카드 좁은 화면 오버플로 재리뷰
 - `docs/review/20260915-154940-bookshelf-recommendation-review.md` — 빈 책장 추천 도서의 계정 간 캐시 노출, 실패 재시도 부재, 기록 동기화 경합, 상태 카드 큰 글자 오버플로 리뷰
