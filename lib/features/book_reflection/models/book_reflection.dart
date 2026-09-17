@@ -66,6 +66,38 @@ class BookReflectionDraft {
   final bool isPublic;
 }
 
+/// AI 독후감 초안 생성(`POST .../notes/{noteId}/reflections/ai`) 응답.
+///
+/// 이 API는 DB에 아무 것도 저장하지 않는다(api-doc 참고) — 화면이 이 값을
+/// 그대로 에디터에 띄워 사용자가 검토·수정하게 하고, 저장을 원하면 일반
+/// 독후감 생성 흐름([BookReflectionRepository.save], reflectionId: null)을
+/// 그대로 태워야 한다.
+class BookReflectionAiDraft {
+  const BookReflectionAiDraft({
+    required this.title,
+    required this.contentJson,
+    required this.contentText,
+  });
+
+  factory BookReflectionAiDraft.fromJson(Map<String, dynamic> json) {
+    final title = json['title'] as String?;
+    final contentJson = json['contentJson'] as Map<String, dynamic>?;
+    final contentText = json['contentText'] as String?;
+    if (title == null || contentJson == null || contentText == null) {
+      throw const FormatException('Invalid AI reflection draft response');
+    }
+    return BookReflectionAiDraft(
+      title: title,
+      contentJson: contentJson,
+      contentText: contentText,
+    );
+  }
+
+  final String title;
+  final Map<String, dynamic> contentJson;
+  final String contentText;
+}
+
 /// 독후감 CREATE/PATCH 응답 중 로컬 확정에 필요한 공통 필드.
 class BookReflectionServerResult {
   const BookReflectionServerResult({

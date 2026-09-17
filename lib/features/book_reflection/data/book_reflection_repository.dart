@@ -139,6 +139,37 @@ class BookReflectionRepository {
     }
   }
 
+  /// 노트의 메모를 AI로 재구성해 독후감 초안(title/contentJson/contentText)만
+  /// 만든다. **아무 것도 로컬/서버에 저장하지 않는다** — api-doc 정책대로
+  /// 호출부가 이 값을 에디터에 그대로 띄워 사용자가 검토·수정하게 하고,
+  /// 저장은 일반 생성 흐름([save], reflectionId: null)이 그대로 맡는다.
+  ///
+  /// [serverUserBookId]/[serverNoteId]는 호출부가 먼저 확보해 넘긴다 —
+  /// 노트의 서버 ID는 `book_note` 도메인 소관이라 이 Repository가 직접
+  /// 해석하지 않는다.
+  Future<BookReflectionAiDraft> generateAiDraft({
+    required int serverUserBookId,
+    required int serverNoteId,
+  }) async {
+    if (await _storageMode.isLocal()) {
+      throw const ApiException('로컬 저장 모드에서는 AI 기능을 사용할 수 없습니다.');
+    }
+    try {
+      final draft = await _api.createAiReflection(
+        userBookId: serverUserBookId,
+        noteId: serverNoteId,
+      );
+      developer.log('[AI 독후감 초안 생성] serverNoteId=$serverNoteId result=SUCCESS');
+      return draft;
+    } catch (error) {
+      developer.log(
+        '[AI 독후감 초안 생성] serverNoteId=$serverNoteId '
+        'result=FAIL reason=${_reasonOf(error)}',
+      );
+      rethrow;
+    }
+  }
+
   Future<BookReflection> setPublic({
     required int ownerUserId,
     required int userBookId,

@@ -17,7 +17,8 @@ import '../models/book_note_sync_changes_result.dart';
 /// api-me-books-userBookId-notes-memos-noteMemoId-patch.md,
 /// api-me-books-userBookId-notes-memos-noteMemoId-delete.md,
 /// api-me-books-userBookId-notes-noteId-delete.md,
-/// api-notes-noteId-images-post.md, api-me-notes-sync-changes-get.md
+/// api-notes-noteId-images-post.md, api-me-notes-sync-changes-get.md,
+/// api-me-books-userBookId-notes-memos-ai-post.md
 ///
 /// PHOTO 메모 생성은 [postPhotoNoteMemo](사진 파일 + noteId=null/기존
 /// noteId를 한 요청으로 처리) 전용이고, [postNoteMemo]는
@@ -244,6 +245,40 @@ class BookNoteApi {
     }
   }
 
+  /// POST /api/me/books/{userBookId}/notes/memos/ai
+  ///
+  /// 사용자가 입력한 긴 텍스트를 AI로 분석해 SUMMARY/QUOTE/THOUGHT 메모
+  /// 여러 건을 한 번에 생성한다. [noteId]가 null이면 새 노트를 함께
+  /// 생성한다(get-or-create 정책은 [postNoteMemo]와 동일). Gemini 호출에
+  /// 수 초~수십 초가 걸릴 수 있어 공통 timeout보다 넉넉한 값을 이 요청에만
+  /// 적용한다(전역 설정은 건드리지 않는다).
+  Future<({int noteId, List<ServerBookNoteMemo> memos})> postAiMemos({
+    required int userBookId,
+    required int? noteId,
+    required String text,
+  }) async {
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/api/me/books/$userBookId/notes/memos/ai',
+        data: {'noteId': noteId, 'text': text},
+        options: Options(receiveTimeout: const Duration(seconds: 60)),
+      );
+      final data = _unwrapMap(response);
+      final memos = (data['memos'] as List<dynamic>)
+          .map(
+            (memo) => ServerBookNoteMemo.fromJson(memo as Map<String, dynamic>),
+          )
+          .toList(growable: false);
+      return (noteId: data['noteId'] as int, memos: memos);
+    } on DioException catch (e) {
+      throw _mapAiError(e);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('서버 응답 형식이 올바르지 않습니다.', cause: e);
+    }
+  }
+
   /// GET /api/me/notes/sync/changes — since 이후 변경분만 조회하는 증분 동기화.
   Future<BookNoteSyncChangesResult> getSyncChanges({
     required DateTime since,
@@ -270,6 +305,32 @@ class BookNoteApi {
       throw const ApiException('서버 응답을 처리할 수 없습니다.');
     }
     return body['data'] as Map<String, dynamic>;
+  }
+
+  /// AI 메모 생성([postAiMemos]) 전용 오류 메시지. 일반 [_mapError]와
+  /// errorCode 분기가 겹치지 않아 별도로 둔다(api-doc
+  /// api-me-books-userBookId-notes-memos-ai-post.md의 Error 표).
+  ApiException _mapAiError(DioException e) {
+    final statusCode = e.response?.statusCode;
+    final errorCode = _responseErrorCode(e);
+    final message = switch (errorCode) {
+      'AI_INPUT_TOO_SHORT' => '내용을 20자 이상 입력해 주세요.',
+      'AI_RESPONSE_INVALID' => 'AI가 메모를 생성하지 못했습니다. 다시 시도해 주세요.',
+      'USER_BOOK_NOT_FOUND' => '책장에서 이 책을 찾을 수 없습니다.',
+      'BOOK_NOTE_NOT_FOUND' => '노트를 찾을 수 없습니다.',
+      'AI_PROVIDER_ERROR' => 'AI 서비스에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+      _ => switch (statusCode) {
+        401 => '인증에 실패했습니다.',
+        400 => '입력한 내용을 확인해 주세요.',
+        _ => '메모를 생성하지 못했습니다.',
+      },
+    };
+    return ApiException(
+      message,
+      statusCode: statusCode,
+      errorCode: errorCode,
+      cause: e,
+    );
   }
 
   ApiException _mapError(DioException e) {

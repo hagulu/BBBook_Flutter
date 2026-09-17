@@ -310,13 +310,26 @@ class BookReflectionEditorScreen extends ConsumerStatefulWidget {
     required this.bookTitle,
     this.reflection,
     this.visibilityOverride,
-  });
+    this.initialDraftTitle,
+    this.initialDraftContentJson,
+  }) : assert(
+         reflection == null ||
+             (initialDraftTitle == null && initialDraftContentJson == null),
+         '기존 독후감 수정과 AI 초안 미리 채우기는 동시에 쓰지 않는다',
+       );
 
   final int ownerUserId;
   final int userBookId;
   final String bookTitle;
   final BookReflection? reflection;
   final bool? visibilityOverride;
+
+  /// AI 독후감 초안(`generateAiDraft`) 등 아직 저장되지 않은 내용을 새
+  /// 독후감 작성 화면에 미리 채운다. [reflection]과 달리 이 화면은 여전히
+  /// "신규 작성" 상태로 동작한다 — 저장하면 일반 생성 API가 새 독후감을
+  /// 만든다(중복 생성 걱정 없이 처음부터 정상적인 생성 흐름을 탄다).
+  final String? initialDraftTitle;
+  final Map<String, dynamic>? initialDraftContentJson;
 
   @override
   ConsumerState<BookReflectionEditorScreen> createState() =>
@@ -338,15 +351,24 @@ class _BookReflectionEditorScreenState
   bool _isSaving = false;
   bool _allowPop = false;
   bool _isConfirmingPop = false;
+  bool _hasUnsavedInitialDraft = false;
 
   @override
   void initState() {
     super.initState();
     final reflection = widget.reflection;
+    // API 문서상 AI 초안 생성 단계에서 255자 초과 제목을 거절하지만,
+    // 에디터의 `maxLength: 255` 제약과 항상 일치하도록 초기값에서도
+    // 방어적으로 잘라 둔다.
+    final rawInitialTitle = reflection?.title ?? widget.initialDraftTitle ?? '';
     _titleController = _NoComposingUnderlineTextController(
-      text: reflection?.title ?? '',
+      text: rawInitialTitle.length > 255
+          ? rawInitialTitle.substring(0, 255)
+          : rawInitialTitle,
     );
-    final document = _adapter.fromServerJson(reflection?.contentJson);
+    final document = _adapter.fromServerJson(
+      reflection?.contentJson ?? widget.initialDraftContentJson,
+    );
     _quillController = QuillController(
       document: document,
       selection: TextSelection.collapsed(
@@ -358,6 +380,10 @@ class _BookReflectionEditorScreenState
     _initialDocumentJson = jsonEncode(
       _quillController.document.toDelta().toJson(),
     );
+    _hasUnsavedInitialDraft =
+        reflection == null &&
+        (widget.initialDraftTitle != null ||
+            widget.initialDraftContentJson != null);
     if (reflection != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _editorFocusNode.requestFocus();
@@ -428,6 +454,7 @@ class _BookReflectionEditorScreenState
             ),
           );
       ref.read(bookReflectionSyncVersionProvider.notifier).state++;
+      _hasUnsavedInitialDraft = false;
       await _popWithoutGuard(reflection.id);
     } catch (_) {
       if (mounted) AppSnackBar.error(context, '독후감을 저장하지 못했습니다.');
@@ -533,6 +560,7 @@ class _BookReflectionEditorScreenState
   }
 
   bool get _hasUnsavedChanges =>
+      _hasUnsavedInitialDraft ||
       _titleController.text != _initialTitle ||
       jsonEncode(_quillController.document.toDelta().toJson()) !=
           _initialDocumentJson;
@@ -677,9 +705,10 @@ class _BookReflectionEditorScreenState
                                       counterText: '',
                                       isDense: true,
                                       filled: false,
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        vertical: 6,
-                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            vertical: 6,
+                                          ),
                                       border: InputBorder.none,
                                       enabledBorder: InputBorder.none,
                                       focusedBorder: InputBorder.none,

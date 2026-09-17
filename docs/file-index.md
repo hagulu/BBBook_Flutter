@@ -91,7 +91,8 @@
 - `lib/features/book_note/screens/book_note_list.dart` — 책 기록 상세의 노트 목록 탭(노트 추가·상세 진입, 당겨서 새로고침)
 - `lib/features/book_note/screens/book_note_detail_screen.dart` — 노트 제목 자동 저장과 타입별 메모 타임라인·로컬 CRUD 화면
 - `lib/features/book_note/screens/memo_photo_camera_screen.dart` — 공용 카메라(`shared/image`)에 메모 사진 촬영 정책을 얹은 진입점(세로 미리보기·갤러리 재인코딩·5MB 촬영 게이트)
-- `lib/features/book_note/data/book_note_api.dart` — 노트 제목 PUT, 메모 생성/수정/삭제, 사진 업로드, 증분 동기화 조회 API 호출
+- `lib/features/book_note/screens/widgets/book_note_ai_memo_composer_screen.dart` — AI 메모 생성 전용 긴 텍스트 입력 화면(메모 추가 시트의 "AI로 메모 만들기" 진입점), 생성 실패 시 입력 내용 보존
+- `lib/features/book_note/data/book_note_api.dart` — 노트 제목 PUT, 메모 생성/수정/삭제, 사진 업로드, AI 메모 생성, 증분 동기화 조회 API 호출
 - `lib/features/book_note/data/book_note_dao.dart` — 로컬 DB 쿼리·dirty push 확정·전체/증분 reconcile(dirty 행 보호, 로컬 PK와 server_id 분리)
 - `lib/features/book_note/data/book_note_repository.dart` — 노트 화면 source of truth, 로컬 우선 CRUD 직후 조용히 서버 push하고 실패 시 dirty 유지, 최초엔 전체(`/api/me/records`)·이후엔 증분(`/api/me/notes/sync/changes`) 동기화, 사진은 로컬 사본 우선(업로드 후에도 유지·서버 사진은 노트를 열 때 내려받기)
 - `lib/features/book_note/providers/book_note_providers.dart` — 책별 노트 목록·상세 상태 및 노트 동기화 컨트롤러 Riverpod provider
@@ -106,7 +107,7 @@
 - `lib/features/book_reflection/screens/book_reflection_list.dart` — 책 기록 상세의 독후감 탭(로컬 목록, 당겨서 새로고침), 작성·상세 진입점
 - `lib/features/book_reflection/screens/book_reflection_detail_screen.dart` — 독후감 상세(Quill Delta·레거시 Tiptap 리치 텍스트/이미지 읽기 및 수정 진입)
 - `lib/features/book_reflection/screens/book_reflection_editor_screen.dart` — Flutter Quill 기반 독후감 작성/수정 화면(순환형 제목·목록 툴바, 본문 이미지 크기·삭제 메뉴)
-- `lib/features/book_reflection/data/book_reflection_api.dart` — 독후감 작성·수정·본문 이미지 업로드·증분 동기화 API 호출
+- `lib/features/book_reflection/data/book_reflection_api.dart` — 독후감 작성·수정·본문 이미지 업로드·AI 독후감 초안 생성(DB 미저장)·증분 동기화 API 호출
 - `lib/features/book_reflection/data/book_reflection_dao.dart` — 독후감 로컬 우선 CRUD·dirty push 확정·전체/증분 동기화 반영·본문 이미지 매칭(`reflection_image_local`) 관리
 - `lib/features/book_reflection/data/book_reflection_repository.dart` — 독후감 화면 source of truth(로컬 우선 작성/수정 후 조용히 push, dirty 재시도, 전체/증분 동기화), 본문 이미지는 로컬 저장 후 push 때 업로드·치환하고 서버 이미지는 독후감을 열 때 내려받기
 - `lib/features/book_reflection/providers/book_reflection_providers.dart` — 독후감 목록·상세 조회, 동기화 컨트롤러, 본문 이미지 로컬 매칭 Riverpod provider
@@ -207,6 +208,7 @@
 - `lib/shared/widgets/app_bar_title.dart` — 공통 앱바 타이틀(전역 축소 글씨 크기, `subtitle` 지정 시 제목 아래 작게 배치)
 - `lib/shared/widgets/app_confirm.dart` — 공통 Confirm 팝업(확인/취소, Future<bool> 반환)
 - `lib/shared/widgets/app_loading.dart` — 공통 Loading(전체 화면 `AppLoading`, 영역 단위 `AppLoadingOverlay`)
+- `lib/shared/widgets/ai_generating_view.dart` — AI 생성 전용 대기 표시(반짝이는 아이콘 애니메이션 + 직관적 상태 문구 + 순차 점 3개, `AiGeneratingView`), 전체 화면 오버레이 버전 `AppAiLoading` — AI 메모/독후감 생성 두 진입점만 공유
 - `lib/shared/widgets/app_snackbar.dart` — 공통 SnackBar(pill 형태, 성공/정보는 아이덴티티 컬러·에러는 에러 컬러 반투명 배경 + 상태 아이콘)
 - `lib/shared/widgets/app_pagination.dart` — 공통 숫자 페이지네이션(항상 첫/마지막 페이지 노출, 현재 페이지 주변만 펼치고 나머지는 `···` 생략, `buildPaginationRange` 순수 함수 + `AppPagination` 위젯)
 - `lib/shared/widgets/record_dialog_shell.dart` — 여러 기능의 선택·수정 폼이 공유하는 바텀시트 셸(드래그 핸들·제목·콘텐츠·공통 버튼)
@@ -220,6 +222,8 @@
 
 ## docs
 
+- `docs/review/20260917-184951-ai-note-reflection-rereview.md` — AI 메모·독후감 생성 후속 리뷰(직전 6건 처리 현황, 제목 push 실패 노트의 제목 유실, 초안 이탈 유실·롤백 확인 누락)
+- `docs/review/20260917-132747-ai-note-reflection-review.md` — AI 메모·독후감 생성의 실패 시 빈 노트, 미동기화 원본, 전역 로딩·초안 유실, 저장 모드·제목 길이 검증 리뷰
 - `docs/review/20260916-140626-floating-navigation-rereview.md` — 플로팅 하단 메뉴의 공통 스크롤 여백·큰 글자 세로 배치 후속 리뷰
 - `docs/review/20260916-134252-floating-navigation-review.md` — 플로팅 하단 메뉴의 프로필 마지막 버튼 가림·큰 글자 가로 오버플로 리뷰
 - `docs/review/20260915-210107-attachment-limit-review.md` — 기존 이미지는 허용하고 신규 이미지만 제한하는 기준에서 노트 최종 저장 검증과 양수 독후감 한도 처리를 점검한 리뷰

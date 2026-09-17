@@ -56,6 +56,33 @@ class BookReflectionApi {
     }
   }
 
+  /// POST /api/me/books/{userBookId}/notes/{noteId}/reflections/ai
+  ///
+  /// 지정한 노트의 메모들을 AI로 재구성해 독후감 초안(title/contentJson/
+  /// contentText)만 반환한다 — **이 API는 DB에 아무 것도 저장하지 않는다**
+  /// (api-doc). 사용자가 저장을 원하면 일반 생성 API([create])를 그대로
+  /// 다시 호출해야 한다. Gemini 호출에 수 초~수십 초가 걸릴 수 있어 공통
+  /// timeout보다 넉넉한 값을 이 요청에만 적용한다(전역 설정은 건드리지
+  /// 않는다).
+  Future<BookReflectionAiDraft> createAiReflection({
+    required int userBookId,
+    required int noteId,
+  }) async {
+    try {
+      final response = await _apiClient.dio.post<Map<String, dynamic>>(
+        '/api/me/books/$userBookId/notes/$noteId/reflections/ai',
+        options: Options(receiveTimeout: const Duration(seconds: 60)),
+      );
+      return BookReflectionAiDraft.fromJson(_unwrapMap(response));
+    } on DioException catch (e) {
+      throw _mapAiError(e);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('서버 응답 형식이 올바르지 않습니다.', cause: e);
+    }
+  }
+
   /// PATCH /api/reflections/{reflectionId} — 독후감 수정.
   Future<BookReflectionServerResult> update({
     required int reflectionId,
@@ -168,6 +195,30 @@ class BookReflectionApi {
       throw const ApiException('서버 응답을 처리할 수 없습니다.');
     }
     return body['data'] as Map<String, dynamic>;
+  }
+
+  /// AI 독후감 생성([createAiReflection]) 전용 오류 메시지(api-doc
+  /// api-me-books-userBookId-notes-noteId-reflections-ai-post.md의 Error 표).
+  ApiException _mapAiError(DioException e) {
+    final statusCode = e.response?.statusCode;
+    final errorCode = _responseErrorCode(e);
+    final message = switch (errorCode) {
+      'AI_NOTE_SOURCE_EMPTY' => '메모가 있는 노트에서만 독후감을 만들 수 있습니다.',
+      'AI_RESPONSE_INVALID' => 'AI가 독후감을 생성하지 못했습니다. 다시 시도해 주세요.',
+      'USER_BOOK_NOT_FOUND' => '책장에서 이 책을 찾을 수 없습니다.',
+      'BOOK_NOTE_NOT_FOUND' => '노트를 찾을 수 없습니다.',
+      'AI_PROVIDER_ERROR' => 'AI 서비스에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+      _ => switch (statusCode) {
+        401 => '인증에 실패했습니다.',
+        _ => '독후감을 생성하지 못했습니다.',
+      },
+    };
+    return ApiException(
+      message,
+      statusCode: statusCode,
+      errorCode: errorCode,
+      cause: e,
+    );
   }
 
   ApiException _mapError(DioException e) {

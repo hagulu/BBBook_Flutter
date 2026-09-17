@@ -52,6 +52,29 @@ class _HorizontalGuide extends StatelessWidget {
 
 /// 카메라 촬영부터 단어 드래그 선택까지 진행하고 발췌문을 반환한다.
 Future<String?> captureMemoQuoteWithOcr(BuildContext context) async {
+  final result = await _captureAndAnalyzeOcr(context);
+  if (result == null) return null;
+  try {
+    if (!context.mounted) return null;
+    return await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _MemoOcrSelectionScreen(
+          imagePath: result.imagePath,
+          analysis: result.analysis,
+        ),
+      ),
+    );
+  } finally {
+    await _deleteCapturedFile(result.imagePath);
+  }
+}
+
+/// 촬영·편집·OCR 인식까지 공통 단계를 처리한다. 실패 상황(인식 실패/빈
+/// 결과)의 안내 알림도 여기서 한 번에 책임진다 — 호출부([captureMemoQuoteWithOcr])는
+/// 성공 결과만 다루면 된다.
+Future<({String imagePath, BookNoteMemoOcrAnalysis analysis})?>
+_captureAndAnalyzeOcr(BuildContext context) async {
   final capturedPath = await showSharedCameraScreen(
     context,
     policy: _memoOcrCapturePolicy,
@@ -76,50 +99,61 @@ Future<String?> captureMemoQuoteWithOcr(BuildContext context) async {
     return null;
   }
 
+  BookNoteMemoOcrAnalysis? analysis;
+  AppLoading.show(context);
   try {
-    BookNoteMemoOcrAnalysis? analysis;
-    AppLoading.show(context);
-    try {
-      analysis = await const BookNoteMemoOcrService().analyzeImage(
-        analyzedPath,
-      );
-    } catch (_) {
-      analysis = null;
-    } finally {
-      AppLoading.hide();
-    }
-
-    if (!context.mounted) return null;
-    if (analysis == null) {
-      await AppAlert.show(
-        context,
-        title: '글자를 인식하지 못했습니다',
-        message: '문장이 선명하게 보이도록 다시 촬영해 주세요.',
-      );
-      return null;
-    }
-    if (analysis.words.isEmpty) {
-      await AppAlert.show(
-        context,
-        title: '인식된 글자가 없습니다',
-        message: '글자가 포함되도록 다시 촬영해 주세요.',
-      );
-      return null;
-    }
-
-    final selectedText = await Navigator.of(context).push<String>(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => _MemoOcrSelectionScreen(
-          imagePath: analyzedPath,
-          analysis: analysis!,
-        ),
-      ),
+    analysis = await const BookNoteMemoOcrService().analyzeImage(
+      analyzedPath,
     );
-    return selectedText;
+  } catch (_) {
+    analysis = null;
   } finally {
-    await _deleteCapturedFile(analyzedPath);
+    AppLoading.hide();
   }
+
+  if (!context.mounted) {
+    await _deleteCapturedFile(analyzedPath);
+    return null;
+  }
+  if (analysis == null) {
+    await AppAlert.show(
+      context,
+      title: '글자를 인식하지 못했습니다',
+      message: '문장이 선명하게 보이도록 다시 촬영해 주세요.',
+    );
+    await _deleteCapturedFile(analyzedPath);
+    return null;
+  }
+  if (analysis.words.isEmpty) {
+    await AppAlert.show(
+      context,
+      title: '인식된 글자가 없습니다',
+      message: '글자가 포함되도록 다시 촬영해 주세요.',
+    );
+    await _deleteCapturedFile(analyzedPath);
+    return null;
+  }
+
+  return (imagePath: analyzedPath, analysis: analysis);
+}
+
+/// 선택된 단어들을 줄(lineOrder) → 낱말 순서(wordOrder)로 정렬해 원래
+/// 문장/줄 배치를 복원한다([_MemoOcrSelectionScreenState._selectedText]).
+String _joinWordsAsText(List<BookNoteMemoOcrWord> words) {
+  final lines = <int, List<BookNoteMemoOcrWord>>{};
+  for (final word in words) {
+    lines.putIfAbsent(word.lineOrder, () => <BookNoteMemoOcrWord>[]).add(word);
+  }
+  final orderedLines = lines.entries.toList()
+    ..sort((left, right) => left.key.compareTo(right.key));
+  return orderedLines
+      .map((entry) {
+        entry.value.sort(
+          (left, right) => left.wordOrder.compareTo(right.wordOrder),
+        );
+        return entry.value.map((word) => word.text).join(' ');
+      })
+      .join('\n');
 }
 
 Future<void> _deleteCapturedFile(String path) async {
@@ -235,24 +269,8 @@ class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
   }
 
   String _selectedText() {
-    final selected = _selectedIndexes.toList()..sort();
-    final lines = <int, List<BookNoteMemoOcrWord>>{};
-    for (final index in selected) {
-      final word = widget.analysis.words[index];
-      lines
-          .putIfAbsent(word.lineOrder, () => <BookNoteMemoOcrWord>[])
-          .add(word);
-    }
-    final orderedLines = lines.entries.toList()
-      ..sort((left, right) => left.key.compareTo(right.key));
-    return orderedLines
-        .map((entry) {
-          entry.value.sort(
-            (left, right) => left.wordOrder.compareTo(right.wordOrder),
-          );
-          return entry.value.map((word) => word.text).join(' ');
-        })
-        .join('\n');
+    final selected = _selectedIndexes.map((index) => widget.analysis.words[index]);
+    return _joinWordsAsText(selected.toList(growable: false));
   }
 }
 

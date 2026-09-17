@@ -974,6 +974,23 @@ class BookNoteDao {
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  /// AI 메모 생성처럼 서버가 이미 저장까지 끝낸 메모를 로컬에 반영한다.
+  /// [_upsertServerMemoTxn]을 그대로 재사용해(dirty 행 보호 포함) 신규 메모
+  /// 삽입 로직을 따로 만들지 않는다 — `is_dirty=0`으로 들어가므로 다음 push가
+  /// 이 메모를 다시 서버로 보내지 않는다.
+  Future<void> upsertServerCreatedMemos({
+    required int localNoteId,
+    required List<ServerBookNoteMemo> memos,
+  }) async {
+    if (memos.isEmpty) return;
+    final db = await BookshelfDatabase.instance();
+    await db.transaction((txn) async {
+      for (final memo in memos) {
+        await _upsertServerMemoTxn(txn, localNoteId, memo);
+      }
+    });
+  }
+
   Future<int?> _findLocalNoteIdByServerId(
     Transaction txn,
     int serverNoteId,

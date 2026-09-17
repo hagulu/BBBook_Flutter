@@ -16,6 +16,7 @@ import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../models/book_note.dart';
 import '../../services/note_memo_image_store.dart';
 import '../memo_photo_camera_screen.dart';
+import 'book_note_ai_memo_composer_screen.dart';
 import 'highlight_text_field.dart';
 import 'memo_ocr_capture.dart';
 
@@ -44,7 +45,10 @@ Future<BookNoteMemoDraft?> showBookNoteMemoQuickComposer(
   BuildContext context, {
   required AttachmentLimitPolicy attachmentLimitPolicy,
   required int currentImageMemoCount,
+  bool aiMemoEnabled = false,
+  Future<void> Function(String text)? onGenerateAiMemos,
 }) {
+  assert(!aiMemoEnabled || onGenerateAiMemos != null);
   return showModalBottomSheet<BookNoteMemoDraft>(
     context: context,
     isScrollControlled: true,
@@ -53,6 +57,8 @@ Future<BookNoteMemoDraft?> showBookNoteMemoQuickComposer(
     builder: (_) => _BookNoteMemoQuickComposer(
       attachmentLimitPolicy: attachmentLimitPolicy,
       currentImageMemoCount: currentImageMemoCount,
+      aiMemoEnabled: aiMemoEnabled,
+      onGenerateAiMemos: onGenerateAiMemos,
     ),
   );
 }
@@ -61,10 +67,14 @@ class _BookNoteMemoQuickComposer extends StatefulWidget {
   const _BookNoteMemoQuickComposer({
     required this.attachmentLimitPolicy,
     required this.currentImageMemoCount,
+    required this.aiMemoEnabled,
+    required this.onGenerateAiMemos,
   });
 
   final AttachmentLimitPolicy attachmentLimitPolicy;
   final int currentImageMemoCount;
+  final bool aiMemoEnabled;
+  final Future<void> Function(String text)? onGenerateAiMemos;
 
   @override
   State<_BookNoteMemoQuickComposer> createState() =>
@@ -160,6 +170,17 @@ class _BookNoteMemoQuickComposerState
                   ],
                 ),
               ),
+              if (widget.aiMemoEnabled)
+                IconButton(
+                  onPressed: _openAiComposer,
+                  tooltip: 'AI로 메모 만들기',
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
+                    PhosphorIconsFill.sparkle,
+                    size: 18,
+                    color: AppColors.of(context).accentForeground,
+                  ),
+                ),
               IconButton(
                 onPressed: _expand,
                 tooltip: '전체 편집 화면으로 확장',
@@ -261,6 +282,23 @@ class _BookNoteMemoQuickComposerState
     );
     if (!mounted) return;
     Navigator.of(context).pop<BookNoteMemoDraft>(draft);
+  }
+
+  /// AI 생성은 서버가 즉시 저장까지 끝내므로([onGenerateAiMemos]) 되돌려줄
+  /// draft가 없다 — 성공하면 이 시트를 그냥 닫는다(생성 결과는 이미 화면에
+  /// 반영돼 있다).
+  Future<void> _openAiComposer() async {
+    final onGenerateAiMemos = widget.onGenerateAiMemos;
+    if (onGenerateAiMemos == null) return;
+    final generated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) =>
+            BookNoteAiMemoComposerScreen(onGenerate: onGenerateAiMemos),
+      ),
+    );
+    if (!mounted || generated != true) return;
+    Navigator.of(context).pop<BookNoteMemoDraft>(null);
   }
 }
 

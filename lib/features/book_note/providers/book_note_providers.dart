@@ -221,6 +221,58 @@ class BookNoteDetailController
     state = AsyncValue.data(current.copyWith(memos: [...current.memos, memo]));
   }
 
+  /// AI로 텍스트를 분석해 메모 여러 건을 한 번에 만든다. 노트가 아직 없으면
+  /// (신규 작성 중) 기존 신규 노트 생성 흐름([saveTitle])을 그대로 재사용해
+  /// 로컬 노트를 먼저 만든다 — [createNoteMemo]가 화면에서 쓰이는 방식과
+  /// 같다. 서버가 이미 저장을 끝낸 결과이므로 저장 후에는 로컬 상태를
+  /// [_repository.findDetail]로 다시 읽어 서버 정렬 순서를 그대로 반영한다.
+  Future<void> createAiMemos(String text) async {
+    var noteId = _noteId;
+    final createdNoteForThisCall = noteId == null;
+    if (noteId == null) {
+      final note = await saveTitle(null);
+      noteId = note.id;
+    }
+    try {
+      await _repository.createAiMemos(
+        ownerUserId: arg.ownerUserId,
+        userBookId: arg.userBookId,
+        noteId: noteId,
+        text: text,
+      );
+    } catch (error) {
+      // 이 호출을 위해 방금 만든 빈 노트라면(신규 작성 중이었다면) 실패
+      // 시 되돌린다 — 그러지 않으면 제목도 메모도 없는 노트가 목록에
+      // 계속 남는다.
+      if (createdNoteForThisCall) {
+        final discarded = await _repository.discardIfEmptyAndUnsynced(noteId);
+        if (!_disposed && discarded) {
+          _noteId = null;
+          state = const AsyncValue.data(BookNoteDetail.empty());
+        } else if (!_disposed) {
+          // AI 응답이 서버 노트를 만든 뒤 로컬 메모 반영에서 실패한 경우처럼
+          // 롤백할 수 없는 상태면 살아 있는 노트를 다시 읽는다. 화면만 빈
+          // 상태로 돌려 같은 책에 노트를 하나 더 만드는 일을 막는다.
+          final refreshed = await _repository.findDetail(
+            ownerUserId: arg.ownerUserId,
+            userBookId: arg.userBookId,
+            noteId: noteId,
+          );
+          if (refreshed != null && !_disposed) {
+            state = AsyncValue.data(refreshed);
+          }
+        }
+      }
+      rethrow;
+    }
+    final refreshed = await _repository.findDetail(
+      ownerUserId: arg.ownerUserId,
+      userBookId: arg.userBookId,
+      noteId: noteId,
+    );
+    if (refreshed != null) state = AsyncValue.data(refreshed);
+  }
+
   Future<void> updateNoteMemo(int noteMemoId, BookNoteMemoDraft draft) async {
     final noteId = _noteId;
     if (noteId == null) throw StateError('Note not found');

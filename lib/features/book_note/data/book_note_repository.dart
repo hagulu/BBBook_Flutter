@@ -238,6 +238,104 @@ class BookNoteRepository {
     );
   }
 
+  /// 노트를 텍스트로 AI에 넘겨 SUMMARY/QUOTE/THOUGHT 메모 여러 건을 한 번에
+  /// 생성한다. [noteId]는 로컬 PK다(신규 작성 중인 노트도 화면이 먼저 로컬
+  /// 노트를 만들어 이 값을 넘긴다 — [createNoteMemo]와 같은 전제).
+  ///
+  /// 노트가 아직 서버에 없으면(dirty) 먼저 [pushNote]로 확보를 시도한다.
+  /// 제목이 있는데도 서버 ID가 없으면 제목 push가 실패한 상태이므로 AI
+  /// 호출을 중단해, 서버가 제목 없는 별도 노트를 만들고 로컬 제목의 dirty가
+  /// 잘못 해제되는 일을 막는다. 제목 없는 완전 신규 노트만 AI API의
+  /// get-or-create 정책(`noteId: null`)에 맡기고, 응답의 새 노트 ID를
+  /// [BookNoteDao.confirmNoteCreated]로 연결한다.
+  Future<void> createAiMemos({
+    required int ownerUserId,
+    required int userBookId,
+    required int noteId,
+    required String text,
+  }) async {
+    if (await _storageMode.isLocal()) {
+      throw const ApiException('로컬 저장 모드에서는 AI 기능을 사용할 수 없습니다.');
+    }
+    try {
+      final serverUserBookId = await _resolveServerUserBookId(userBookId);
+      if (serverUserBookId == null) {
+        throw const ApiException('책장을 서버와 동기화하지 못했습니다. 네트워크 연결을 확인해 주세요.');
+      }
+      await pushNote(noteId);
+      final note = await _dao.getNoteByLocalId(noteId);
+      if (note == null) throw StateError('Note not found');
+      if (note.serverId == null && note.title != null) {
+        throw const ApiException('노트 제목을 동기화하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      }
+      final capturedUpdatedAt = note.updatedAt;
+      final response = await _api.postAiMemos(
+        userBookId: serverUserBookId,
+        noteId: note.serverId,
+        text: text,
+      );
+      if (note.serverId == null) {
+        await _dao.confirmNoteCreated(
+          localId: noteId,
+          serverId: response.noteId,
+          capturedUpdatedAt: capturedUpdatedAt,
+        );
+      }
+      await _dao.upsertServerCreatedMemos(
+        localNoteId: noteId,
+        memos: response.memos,
+      );
+      developer.log(
+        '[AI 메모 생성] userId=$ownerUserId bookId=$userBookId noteId=$noteId '
+        'result=SUCCESS count=${response.memos.length}',
+      );
+      unawaited(pushNote(noteId));
+    } catch (error) {
+      developer.log(
+        '[AI 메모 생성] userId=$ownerUserId bookId=$userBookId noteId=$noteId '
+        'result=FAIL reason=${_reasonOf(error)}',
+      );
+      rethrow;
+    }
+  }
+
+  /// 이 노트가 **완전히** 서버와 동기화된 상태의 서버 ID. 아직 서버에 없으면
+  /// (dirty) 먼저 push를 시도해 확보하고, push 후에도 노트 자체나 메모 중
+  /// 하나라도 dirty가 남아 있으면(개별 push 실패는 로그만 남기고 조용히
+  /// 넘어가는 [pushNote]의 계약상 그럴 수 있다) null을 반환한다 — AI
+  /// 독후감 생성처럼 "서버에 있는 내용 그대로"를 전제해야 하는 호출부가
+  /// 최신 반영 여부를 알 수 없는 채로 진행하지 않도록 하기 위함이다
+  /// ([BookNoteDetailScreen]의 AI 독후감 생성 진입점 참고).
+  Future<int?> ensureNoteSyncedServerId(int localNoteId) async {
+    await pushNote(localNoteId);
+    final note = await _dao.getNoteByLocalId(localNoteId);
+    if (note == null || note.serverId == null || note.isDirty) return null;
+    final dirtyMemos = await _dao.getDirtyMemosForNote(localNoteId);
+    if (dirtyMemos.isNotEmpty) return null;
+    return note.serverId;
+  }
+
+  /// [_resolveServerUserBookId]의 공개 버전. 다른 기능(AI 독후감 생성 등)이
+  /// 이 책장 항목의 서버 ID가 필요할 때 쓴다.
+  Future<int?> resolveServerUserBookId(int localUserBookId) =>
+      _resolveServerUserBookId(localUserBookId);
+
+  /// AI 메모 생성처럼 네트워크 호출을 위해 방금 만든 로컬 노트가 그 호출
+  /// 실패로 쓸모없어졌을 때만 안전하게 되돌린다. 아직 서버에 반영되지
+  /// 않았고(`serverId == null`) 제목도 메모도 전혀 없는 경우에만 지운다 —
+  /// 그렇지 않으면(이미 서버에 있거나 다른 내용이 붙어 있으면) 사용자의
+  /// 실제 기록을 실수로 지울 수 있으므로 아무 것도 하지 않는다. 반환값은
+  /// 노트가 이미 없거나 실제로 삭제되어 화면 상태를 비워도 되는지 여부다.
+  Future<bool> discardIfEmptyAndUnsynced(int localNoteId) async {
+    final note = await _dao.getNoteByLocalId(localNoteId);
+    if (note == null) return true;
+    if (note.serverId != null || note.title != null) return false;
+    final memos = await _dao.getAllMemosForNote(localNoteId);
+    if (memos.isNotEmpty) return false;
+    await _dao.purgeNoteAndMemos(localNoteId);
+    return true;
+  }
+
   Future<DeleteNoteMemoResult> deleteNoteMemo({
     required int ownerUserId,
     required int userBookId,

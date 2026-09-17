@@ -7,13 +7,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/policy/attachment_limit_policy.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/image/widgets/shared_image_viewer.dart';
 import '../../../shared/widgets/app_bar_title.dart';
+import '../../../shared/widgets/ai_generating_view.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../auth/providers/auth_access_providers.dart';
+import '../../book_reflection/models/book_reflection.dart';
+import '../../book_reflection/providers/book_reflection_providers.dart';
+import '../../book_reflection/screens/book_reflection_detail_screen.dart';
+import '../../book_reflection/screens/book_reflection_editor_screen.dart';
+import '../../storage_mode/data/storage_mode_store.dart';
+import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../models/book_note.dart';
 import '../providers/book_note_providers.dart';
 import '../services/note_memo_image_store.dart';
@@ -48,6 +57,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
   bool _titleInitialized = false;
   bool _importantOnly = false;
   bool _isSavingMemo = false;
+  bool _isGeneratingAiReflection = false;
   bool _allowPop = false;
   bool _isClosing = false;
   bool _scrolledToInitialPosition = false;
@@ -80,6 +90,9 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
   Widget build(BuildContext context) {
     final asyncDetail = ref.watch(bookNoteDetailProvider(_args));
     final detail = asyncDetail.valueOrNull;
+    final aiFeaturesEnabled =
+        ref.watch(canUseAccountFeaturesProvider) &&
+        ref.watch(storageModeProvider).valueOrNull == StorageMode.server;
     if (detail?.note != null) {
       final syncedTitle = detail!.note!.title ?? '';
       if (!_titleInitialized ||
@@ -101,6 +114,20 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
           foregroundColor: AppColors.of(context).textStrong,
           elevation: 0,
           actions: [
+            if (aiFeaturesEnabled &&
+                switch (asyncDetail) {
+                  AsyncData(:final value) =>
+                    value.note != null && value.memos.isNotEmpty,
+                  _ => false,
+                })
+              IconButton(
+                onPressed: _isSavingMemo ? null : _createAiReflection,
+                tooltip: 'AI로 독후감 만들기',
+                icon: Icon(
+                  PhosphorIconsFill.sparkle,
+                  color: AppColors.of(context).accentForeground,
+                ),
+              ),
             if (switch (asyncDetail) {
               AsyncData(:final value) => value.note != null,
               _ => false,
@@ -280,6 +307,10 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
 
   Future<void> _closeScreen() async {
     if (_isClosing) return;
+    if (_isGeneratingAiReflection) {
+      AppSnackBar.info(context, 'AI 독후감을 생성하고 있습니다.');
+      return;
+    }
     if (_isSavingMemo) {
       AppSnackBar.info(context, '메모를 저장하고 있습니다.');
       return;
@@ -329,10 +360,15 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
   }
 
   Future<void> _addMemo() async {
+    final aiFeaturesEnabled =
+        ref.read(canUseAccountFeaturesProvider) &&
+        ref.read(storageModeProvider).valueOrNull == StorageMode.server;
     final draft = await showBookNoteMemoQuickComposer(
       context,
       attachmentLimitPolicy: ref.read(attachmentLimitPolicyProvider),
       currentImageMemoCount: _currentImageMemoCount,
+      aiMemoEnabled: aiFeaturesEnabled,
+      onGenerateAiMemos: aiFeaturesEnabled ? _generateAiMemos : null,
     );
     if (draft == null || !mounted) return;
     if (!await _saveTitle(createWhenEmpty: true)) {
@@ -346,6 +382,98 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
           .createNoteMemo(draft);
     });
     _scrollToNewestMemo();
+  }
+
+  /// [BookNoteAiMemoComposerScreen]이 그대로 호출하는 콜백이다 — 그 화면은
+  /// 입력/로딩 표시만 책임지고, 실제 API 호출과 노트 준비(신규 노트 작성
+  /// 흐름 재사용)는 여기서 처리한다. 실패하면 그대로 예외를 던져 그 화면이
+  /// 입력 내용을 지우지 않고 오류만 보여주게 한다.
+  Future<void> _generateAiMemos(String text) async {
+    await ref.read(bookNoteDetailProvider(_args).notifier).createAiMemos(text);
+    _scrollToNewestMemo();
+  }
+
+  Future<void> _createAiReflection() async {
+    if (_isSavingMemo || _isGeneratingAiReflection) {
+      AppSnackBar.info(context, '작업을 처리하고 있습니다.');
+      return;
+    }
+    final confirmed = await AppConfirm.show(
+      context,
+      title: 'AI로 독후감 만들기',
+      message: '이 노트의 메모를 바탕으로 AI가 독후감을 생성합니다. 계속할까요?',
+      confirmText: '생성',
+    );
+    if (!confirmed || !mounted) return;
+
+    // 별도 생성 상태로 작업이 끝날 때까지 이 화면을 닫지 못하게 막는다 —
+    // 그러지 않으면 대기 중 시스템 뒤로 가기로 화면이 사라진 뒤 응답이
+    // 도착했을 때 `AppAiLoading.hide()`를 부를 대상이 없어 전역 로딩
+    // 차단막이 다음 화면까지 계속 남는다. try/finally로 성공·실패·중간
+    // dispose 어느 경로든 hide()가 정확히 한 번만 실행되게 한다.
+    setState(() => _isGeneratingAiReflection = true);
+    AppAiLoading.show(context, message: 'AI 독후감 생성 중');
+    BookReflectionAiDraft? draft;
+    try {
+      final bookNoteRepository = ref.read(bookNoteRepositoryProvider);
+      final serverUserBookId = await bookNoteRepository.resolveServerUserBookId(
+        widget.userBookId,
+      );
+      final noteId = ref
+          .read(bookNoteDetailProvider(_args))
+          .valueOrNull
+          ?.note
+          ?.id;
+      final serverNoteId = noteId == null
+          ? null
+          : await bookNoteRepository.ensureNoteSyncedServerId(noteId);
+      if (serverUserBookId == null || serverNoteId == null) {
+        throw const ApiException('노트를 서버와 동기화하지 못했습니다. 네트워크 연결을 확인해 주세요.');
+      }
+      draft = await ref
+          .read(bookReflectionRepositoryProvider)
+          .generateAiDraft(
+            serverUserBookId: serverUserBookId,
+            serverNoteId: serverNoteId,
+          );
+    } on ApiException catch (error) {
+      if (mounted) AppSnackBar.error(context, error.message);
+    } catch (_) {
+      if (mounted) AppSnackBar.error(context, '독후감을 생성하지 못했습니다.');
+    } finally {
+      AppAiLoading.hide();
+      if (mounted) setState(() => _isGeneratingAiReflection = false);
+    }
+    if (draft == null || !mounted) return;
+
+    // 이 API는 초안만 반환하고 아무 것도 저장하지 않는다(api-doc) — 아직
+    // 저장되지 않은 "신규 작성" 상태로 에디터를 열어, 사용자가 저장을
+    // 눌러야만 일반 생성 흐름(reflectionId: null)으로 실제 독후감이
+    // 만들어진다. 저장 없이 닫으면(팝값 null) 그대로 이 노트 화면으로
+    // 돌아온다.
+    final savedReflectionId = await Navigator.of(context).push<int>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => BookReflectionEditorScreen(
+          ownerUserId: widget.ownerUserId,
+          userBookId: widget.userBookId,
+          bookTitle: widget.bookTitle,
+          initialDraftTitle: draft!.title,
+          initialDraftContentJson: draft.contentJson,
+        ),
+      ),
+    );
+    if (savedReflectionId == null || !mounted) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => BookReflectionDetailScreen(
+          ownerUserId: widget.ownerUserId,
+          userBookId: widget.userBookId,
+          bookTitle: widget.bookTitle,
+          reflectionId: savedReflectionId,
+        ),
+      ),
+    );
   }
 
   Future<void> _editMemo(BookNoteMemo memo) async {
@@ -449,8 +577,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
       // 막지만, 그 사이 동기화가 다른 기기의 사진 메모를 반영했다면
       // 실제 로컬 쓰기 트랜잭션에서 뒤늦게 걸릴 수 있다([BookNoteDao]).
       final reason = switch (error) {
-        FileSystemException(:final message) when message.isNotEmpty =>
-          message,
+        FileSystemException(:final message) when message.isNotEmpty => message,
         NoteImageLimitExceededException() =>
           ref.read(attachmentLimitPolicyProvider).noteImageLimitMessage,
         _ => null,
