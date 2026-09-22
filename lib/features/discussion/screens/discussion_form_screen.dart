@@ -7,6 +7,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/community_content.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
 import '../../book_reflection/screens/widgets/reflection_title_body_divider.dart';
 import '../models/discussion_topic.dart';
@@ -21,19 +22,33 @@ import 'widgets/discussion_options_editor.dart';
 ///
 /// 작성 성공 시 생성된 주제 ID를, 수정 성공 시 true를 pop 결과로 돌려준다.
 class DiscussionFormScreen extends ConsumerStatefulWidget {
-  const DiscussionFormScreen._({required this.isbn13, this.topic});
+  const DiscussionFormScreen._({
+    required this.isbn13,
+    required this.bookTitle,
+    this.topic,
+  });
 
   /// 새 토론 작성.
-  factory DiscussionFormScreen.create({required String isbn13}) {
-    return DiscussionFormScreen._(isbn13: isbn13);
+  factory DiscussionFormScreen.create({
+    required String isbn13,
+    required String bookTitle,
+  }) {
+    return DiscussionFormScreen._(isbn13: isbn13, bookTitle: bookTitle);
   }
 
   /// 기존 토론 수정. 저장된 선택지는 잠기고 새 선택지만 뒤에 추가할 수 있다.
   factory DiscussionFormScreen.edit({required DiscussionTopicDetail topic}) {
-    return DiscussionFormScreen._(isbn13: topic.isbn13, topic: topic);
+    return DiscussionFormScreen._(
+      isbn13: topic.isbn13,
+      bookTitle: topic.book.title,
+      topic: topic,
+    );
   }
 
   final String isbn13;
+
+  /// 제목 입력 위에 표시하는 책 제목(독후감 작성 화면과 같은 자리).
+  final String bookTitle;
   final DiscussionTopicDetail? topic;
 
   @override
@@ -60,7 +75,7 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
   /// 선택지 토론 여부. 별도 모드 스위치 없이, 값이 채워진 선택지가 하나라도
   /// 있으면 선택지 토론으로 취급한다(툴바의 "선택지 추가"/"선택지 관리"에서
   /// 추가·삭제). 빈 텍스트인 선택지는 없는 것으로 본다 — 빈 채로 남겨두고
-  /// 시트를 닫아도 자유 토론 등록을 막지 않는다.
+  /// 시트를 닫아도 자유 토론 저장을 막지 않는다.
   bool get _useOptions =>
       _optionControllers.any((c) => c.text.trim().isNotEmpty);
 
@@ -95,7 +110,7 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
   List<String> get _currentOptions =>
       _optionControllers.map((c) => c.text.trim()).toList();
 
-  /// 등록/수정 버튼 활성 조건. 제목·본문이 공백이 아니고, 선택지 토론이면 모든
+  /// 저장 버튼 활성 조건. 제목·본문이 공백이 아니고, 선택지 토론이면 모든
   /// 선택지가 채워져 있고 append-only 제약도 지켜져야 한다.
   bool get _canSubmit {
     if (_isLocked || _isSaving) return false;
@@ -161,17 +176,19 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
         foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
         actions: [
-          TextButton(
+          FilledButton(
             onPressed: _canSubmit ? _submit : null,
-            style: TextButton.styleFrom(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.of(context).accentFill,
               foregroundColor: AppColors.of(context).textStrong,
+              minimumSize: const Size(64, 44),
               disabledForegroundColor: AppColors.of(context).controlInactive,
               textStyle: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            child: Text(_isSaving ? '저장 중' : (_isEdit ? '수정' : '등록')),
+            child: Text(_isSaving ? '저장 중' : '저장'),
           ),
           const SizedBox(width: 8),
         ],
@@ -179,29 +196,34 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
       body: SafeArea(
         top: false,
         child: Column(
+          // 기본값(center)이면 하단 툴바가 자기 폭만큼만 그려져 가운데에
+          // 뜬다 — 화면 가로를 꽉 채우도록 늘린다.
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: Container(
-                width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-                decoration: BoxDecoration(
-                  color: AppColors.of(context).surface,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.of(context).border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.of(context).shadowSoft,
-                      blurRadius: 4,
-                      offset: Offset(0, 1),
-                    ),
-                  ],
-                ),
-                clipBehavior: Clip.antiAlias,
+              child: CommunityContentWidth(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  padding: const EdgeInsets.only(top: 24, bottom: 48),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(
+                        // 수정 진입 시 서버가 책 제목을 비워 내려줄 수 있어
+                        // 그때는 안내 문구로 되돌린다(머리글이 비지 않게).
+                        widget.bookTitle.trim().isEmpty
+                            ? '함께 생각해 볼 질문'
+                            : widget.bookTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.of(context).accentForeground,
+                          fontSize: 13,
+                          height: 1.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
                       if (_isLocked) ...[
                         Container(
                           width: double.infinity,
@@ -227,19 +249,26 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                       ],
                       TextField(
                         controller: _titleController,
+                        minLines: 1,
+                        maxLines: 3,
                         enabled: !_isLocked,
                         maxLength: kMaxDiscussionTitleLength,
+                        keyboardType: TextInputType.text,
+                        textInputAction: TextInputAction.next,
                         inputFormatters: [
+                          FilteringTextInputFormatter.singleLineFormatter,
                           LengthLimitingTextInputFormatter(
                             kMaxDiscussionTitleLength,
                           ),
                         ],
-                        style: TextStyle(
-                          fontSize: 19,
-                          height: 1.35,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.of(context).textStrong,
-                        ),
+                        style: Theme.of(context).textTheme.headlineMedium
+                            ?.copyWith(
+                              fontSize: 22,
+                              letterSpacing: -0.3,
+                              height: 1.35,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.of(context).textStrong,
+                            ),
                         decoration: InputDecoration(
                           counterText: '',
                           isDense: true,
@@ -250,13 +279,15 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
-                          hintText: '토론 주제 제목을 입력하세요',
-                          hintStyle: TextStyle(
-                            fontSize: 19,
-                            height: 1.35,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.of(context).textMuted,
-                          ),
+                          hintText: '어떤 이야기를 나눌까요?',
+                          hintStyle: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(
+                                fontSize: 22,
+                                letterSpacing: -0.3,
+                                height: 1.35,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.of(context).textMuted,
+                              ),
                         ),
                       ),
                       const ReflectionTitleBodyDivider(horizontalInset: 0),
@@ -264,10 +295,10 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                         controller: _contentController,
                         enabled: !_isLocked,
                         minLines: 8,
-                        maxLines: 16,
+                        maxLines: null,
                         style: TextStyle(
                           fontSize: 16,
-                          height: 1.65,
+                          height: 1.8,
                           color: AppColors.of(context).textBody,
                         ),
                         decoration: const InputDecoration(
@@ -277,7 +308,7 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
-                          hintText: '토론 주제를 자세히 작성해보세요...',
+                          hintText: '질문이 떠오른 장면과 나의 생각을 들려주세요.',
                         ),
                       ),
                     ],
@@ -410,7 +441,11 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-        child: Row(
+        child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 16,
+          runSpacing: 8,
           children: [
             _SpoilerToggle(
               isSpoiler: _isSpoiler,
@@ -418,7 +453,6 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                   ? null
                   : () => setState(() => _isSpoiler = !_isSpoiler),
             ),
-            const Spacer(),
             TextButton.icon(
               onPressed: _isLocked ? null : _openOptionsSheet,
               style: TextButton.styleFrom(
@@ -455,7 +489,8 @@ class _SpoilerToggle extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        constraints: const BoxConstraints(minHeight: 44),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
           color: isSpoiler
               ? AppColors.of(context).highlightGoldSurface

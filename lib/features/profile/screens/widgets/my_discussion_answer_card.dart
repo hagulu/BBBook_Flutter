@@ -19,7 +19,6 @@ class MyDiscussionAnswerCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return CommunityContentCard(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       child: MyContentCardLayout(
         book: answer.book,
         dateLabel: formatRelativeDiscussionDateTime(answer.createdAt),
@@ -33,12 +32,13 @@ class MyDiscussionAnswerCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 18,
+                  height: 1.4,
                   fontWeight: FontWeight.w600,
                   color: AppColors.of(context).textStrong,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
             ],
             if (answer.isHidden)
               Text(
@@ -56,7 +56,7 @@ class MyDiscussionAnswerCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 13,
                   color: AppColors.of(context).textBody,
-                  height: 1.4,
+                  height: 1.5,
                 ),
               ),
           ],

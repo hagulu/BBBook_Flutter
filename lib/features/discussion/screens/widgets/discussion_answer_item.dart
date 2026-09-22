@@ -97,8 +97,7 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
     final answer = widget.answer;
 
     return CommunityContentCard(
-      padding: const EdgeInsets.all(14),
-      borderRadius: 14,
+      padding: const EdgeInsets.symmetric(vertical: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -130,7 +129,7 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
                 color: discussionOptionColorOf(widget.options, answer.optionId),
               ),
             ],
-            const SizedBox(height: 10),
+            const SizedBox(height: 16),
             if (_isEditing)
               _EditForm(
                 controller: _editController!,
@@ -142,9 +141,9 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
               Text(
                 answer.content ?? '',
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 15,
                   color: AppColors.of(context).textBody,
-                  height: 1.5,
+                  height: 1.75,
                 ),
               ),
               const SizedBox(height: 8),

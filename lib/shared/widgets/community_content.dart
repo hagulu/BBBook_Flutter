@@ -4,78 +4,96 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../core/theme/app_theme.dart';
 import 'record_dialog_shell.dart';
 
-/// 책 기반 커뮤니티 목록의 섹션 제목과 우측 제어 영역.
+/// 책 기반 글 목록의 제목·소개와 줄바꿈 가능한 제어 영역.
 class CommunityContentListHeader extends StatelessWidget {
   const CommunityContentListHeader({
     super.key,
     required this.title,
+    this.subtitle,
     this.trailing,
   });
 
   final String title;
+  final String? subtitle;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      child: Row(
+      padding: const EdgeInsets.only(top: 24, bottom: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
+          Semantics(
+            header: true,
             child: Text(
               title,
-              style: TextStyle(
-                fontSize: 17,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontSize: 24,
+                height: 1.3,
+                letterSpacing: -0.4,
                 fontWeight: FontWeight.bold,
                 color: AppColors.of(context).textStrong,
               ),
             ),
           ),
-          ?trailing,
+          if (subtitle != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              subtitle!,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.6,
+                color: AppColors.of(context).textMuted,
+              ),
+            ),
+          ],
+          if (trailing != null) ...[const SizedBox(height: 20), trailing!],
         ],
       ),
     );
   }
 }
 
-/// 토론과 공개 독후감의 목록·상세 카드가 공유하는 표면과 터치 피드백.
+/// 글 목록을 카드 중첩 없이 구분선과 여백으로 나누는 공통 표면.
 class CommunityContentCard extends StatelessWidget {
   const CommunityContentCard({
     super.key,
     required this.child,
     this.onTap,
-    this.padding = const EdgeInsets.all(16),
-    this.borderRadius = 16,
+    this.padding = const EdgeInsets.symmetric(vertical: 24),
   });
 
   final Widget child;
   final VoidCallback? onTap;
   final EdgeInsetsGeometry padding;
-  final double borderRadius;
 
   @override
   Widget build(BuildContext context) {
     final content = Container(
       width: double.infinity,
       padding: padding,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(color: AppColors.of(context).border),
-      ),
       child: child,
     );
 
     return Material(
-      color: AppColors.of(context).surface,
-      borderRadius: BorderRadius.circular(borderRadius),
-      clipBehavior: Clip.antiAlias,
-      child: onTap == null
-          ? content
-          : InkWell(
-              onTap: onTap,
-              borderRadius: BorderRadius.circular(borderRadius),
-              child: content,
-            ),
+      color: Colors.transparent,
+      child: onTap == null ? content : InkWell(onTap: onTap, child: content),
+    );
+  }
+}
+
+/// 글 목록 항목 사이에만 표시하는 짧은 구분선.
+class CommunityContentDivider extends StatelessWidget {
+  const CommunityContentDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      indent: 12,
+      endIndent: 12,
+      color: AppColors.of(context).border,
     );
   }
 }
@@ -116,7 +134,7 @@ class CommunityAuthorRow extends StatelessWidget {
     );
     final dateText = Text(
       dateLabel,
-      style: TextStyle(fontSize: 11, color: AppColors.of(context).textMuted),
+      style: TextStyle(fontSize: 12, color: AppColors.of(context).textMuted),
     );
 
     return Row(
@@ -125,10 +143,12 @@ class CommunityAuthorRow extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: layout == CommunityAuthorLayout.inline
-              ? Row(
+              ? Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Flexible(child: nicknameText),
-                    const SizedBox(width: 6),
+                    nicknameText,
                     Text(
                       '·',
                       style: TextStyle(
@@ -136,7 +156,6 @@ class CommunityAuthorRow extends StatelessWidget {
                         color: AppColors.of(context).textMuted,
                       ),
                     ),
-                    const SizedBox(width: 6),
                     dateText,
                   ],
                 )
@@ -184,31 +203,32 @@ class CommunityContentHeader extends StatelessWidget {
       children: [
         if (badges.isNotEmpty) ...[
           Wrap(spacing: 6, runSpacing: 6, children: badges),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
         ],
-        ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 44),
+        Semantics(
+          header: true,
           child: Text(
             title,
-            style: TextStyle(
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
               color: AppColors.of(context).textStrong,
-              fontSize: 19,
+              fontSize: 22,
               height: 1.35,
+              letterSpacing: -0.3,
               fontWeight: FontWeight.bold,
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 24),
         CommunityAuthorRow(
           nickname: nickname,
           profileImageUrl: profileImageUrl,
           dateLabel: dateLabel,
-          avatarRadius: 14,
+          avatarRadius: 16,
           layout: CommunityAuthorLayout.stacked,
           trailing: metadata == null ? trailing : null,
         ),
         if (metadata != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(child: metadata!),
@@ -271,7 +291,10 @@ class CommunityContentEmptyList extends StatelessWidget {
           Center(
             child: Text(
               message,
-              style: TextStyle(color: AppColors.of(context).textMuted),
+              style: TextStyle(
+                color: AppColors.of(context).textMuted,
+                height: 1.7,
+              ),
               textAlign: TextAlign.center,
             ),
           ),
@@ -347,7 +370,7 @@ class CommunityContentWidth extends StatelessWidget {
   const CommunityContentWidth({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.fromLTRB(16, 12, 16, 40),
+    this.padding = const EdgeInsets.fromLTRB(24, 24, 24, 48),
   });
 
   final Widget child;
@@ -357,9 +380,10 @@ class CommunityContentWidth extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: padding,
-      child: Center(
+      child: Align(
+        alignment: Alignment.topCenter,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
+          constraints: const BoxConstraints(maxWidth: 680),
           child: child,
         ),
       ),
@@ -463,7 +487,7 @@ class CommunityLikeInline extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

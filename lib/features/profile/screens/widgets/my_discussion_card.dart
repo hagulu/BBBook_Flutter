@@ -19,7 +19,6 @@ class MyDiscussionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return CommunityContentCard(
       onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       child: MyContentCardLayout(
         book: discussion.book,
         dateLabel: discussion.isHidden
@@ -64,22 +63,23 @@ class MyDiscussionCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 18,
+                        height: 1.4,
                         fontWeight: FontWeight.bold,
                         color: AppColors.of(context).textStrong,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     Text(
                       discussion.isSpoiler
                           ? '스포일러가 포함된 토론입니다'
                           : (discussion.previewText ?? ''),
-                      maxLines: 2,
+                      maxLines: 5,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.of(context).textMuted,
-                        height: 1.4,
+                        fontSize: 13,
+                        color: AppColors.of(context).textBody,
+                        height: 1.5,
                       ),
                     ),
                   ],

@@ -38,35 +38,38 @@ class DiscussionTopicCard extends StatelessWidget {
                 if (topic.isClosed || topic.isSpoiler) ...[
                   Wrap(
                     spacing: 6,
+                    runSpacing: 6,
                     children: [
                       if (topic.isClosed) const DiscussionBadge.closed(),
                       if (topic.isSpoiler) const DiscussionBadge.spoiler(),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                 ],
                 Text(
                   topic.title ?? '',
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 15,
+                    fontSize: 18,
+                    height: 1.4,
+                    letterSpacing: -0.2,
                     fontWeight: FontWeight.bold,
                     color: AppColors.of(context).textStrong,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 8),
                 Text(
                   topic.isSpoiler ? '스포일러가 포함된 토론입니다' : (topic.content ?? ''),
-                  maxLines: 2,
+                  maxLines: 5,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.of(context).textMuted,
-                    height: 1.4,
+                    color: AppColors.of(context).textBody,
+                    height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 20),
                 CommunityAuthorRow(
                   nickname: topic.user.nickname,
                   profileImageUrl: topic.user.profileImageUrl,

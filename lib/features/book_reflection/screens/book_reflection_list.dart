@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/community_content.dart';
 import '../../auth/providers/auth_access_providers.dart';
 import '../models/book_reflection.dart';
 import '../providers/book_reflection_providers.dart';
@@ -15,7 +16,7 @@ import 'widgets/book_reflection_refresh_indicator.dart';
 /// ([BookReflectionRefreshIndicator])으로만 일어난다 —
 /// [BookNoteList]와 같은 원칙.
 ///
-/// 상단 추가 버튼은 새 에디터로, 각 카드는 리치 텍스트 상세·수정 흐름으로
+/// 오른쪽 아래 추가 버튼은 새 에디터로, 각 카드는 리치 텍스트 상세·수정 흐름으로
 /// 연결된다.
 class BookReflectionList extends ConsumerWidget {
   const BookReflectionList({
@@ -35,86 +36,72 @@ class BookReflectionList extends ConsumerWidget {
     final showVisibility = ref.watch(canUseAccountFeaturesProvider);
     final asyncReflections = ref.watch(bookReflectionListProvider(userBookId));
 
-    return BookReflectionRefreshIndicator(
-      child: CustomScrollView(
-        key: const PageStorageKey('book-reflection-list'),
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(16, 18, 16, 12),
-            sliver: SliverToBoxAdapter(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '독후감',
-                      style: TextStyle(
-                        color: AppColors.of(context).textStrong,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+    return Stack(
+      children: [
+        BookReflectionRefreshIndicator(
+          child: CustomScrollView(
+            key: const PageStorageKey('book-reflection-list'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              switch (asyncReflections) {
+                AsyncData(:final value) when value.isEmpty =>
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _EmptyReflections(),
                   ),
-                  ElevatedButton.icon(
-                    onPressed: ownerUserId == null
-                        ? null
-                        : () => _openEditor(context, ownerUserId: ownerUserId),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(0, 36),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      textStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    icon: const Icon(PhosphorIconsRegular.plus, size: 15),
-                    label: const Text('독후감 쓰기'),
+                AsyncData(:final value) => SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 96),
+                  sliver: SliverList.separated(
+                    itemCount: value.length,
+                    separatorBuilder: (_, _) => const CommunityContentDivider(),
+                    itemBuilder: (context, index) {
+                      final reflection = value[index];
+                      return _ReflectionCard(
+                        reflection: reflection,
+                        showVisibility: showVisibility,
+                        onTap: ownerUserId == null
+                            ? null
+                            : () => _openReflection(
+                                context,
+                                ownerUserId: ownerUserId,
+                                reflectionId: reflection.id,
+                              ),
+                      );
+                    },
                   ),
-                ],
-              ),
-            ),
+                ),
+                AsyncError() => SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _ReflectionLoadError(
+                    onRetry: () =>
+                        ref.invalidate(bookReflectionListProvider(userBookId)),
+                  ),
+                ),
+                _ => const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              },
+            ],
           ),
-          switch (asyncReflections) {
-            AsyncData(:final value) when value.isEmpty =>
-              const SliverFillRemaining(
-                hasScrollBody: false,
-                child: _EmptyReflections(),
-              ),
-            AsyncData(:final value) => SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-              sliver: SliverList.separated(
-                itemCount: value.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final reflection = value[index];
-                  return _ReflectionCard(
-                    reflection: reflection,
-                    showVisibility: showVisibility,
-                    onTap: ownerUserId == null
-                        ? null
-                        : () => _openReflection(
-                            context,
-                            ownerUserId: ownerUserId,
-                            reflectionId: reflection.id,
-                          ),
-                  );
-                },
-              ),
-            ),
-            AsyncError() => SliverFillRemaining(
-              hasScrollBody: false,
-              child: _ReflectionLoadError(
-                onRetry: () =>
-                    ref.invalidate(bookReflectionListProvider(userBookId)),
-              ),
-            ),
-            _ => const SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(child: CircularProgressIndicator()),
-            ),
-          },
-        ],
-      ),
+        ),
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton(
+            heroTag: 'book-reflection-add-$userBookId',
+            onPressed: ownerUserId == null
+                ? null
+                : () => _openEditor(context, ownerUserId: ownerUserId),
+            tooltip: '독후감 추가',
+            shape: const CircleBorder(),
+            backgroundColor: AppColors.of(context).accentFill,
+            foregroundColor: AppColors.of(context).textStrong,
+            elevation: 2,
+            child: const Icon(PhosphorIconsRegular.plus),
+          ),
+        ),
+      ],
     );
   }
 
@@ -163,94 +150,68 @@ class _ReflectionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final title = reflection.title?.trim();
     final preview = reflection.contentText?.trim();
-    return Material(
-      color: AppColors.of(context).surface,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Ink(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.of(context).surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.of(context).border),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.of(context).shadowSoft,
-                blurRadius: 4,
-                offset: Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Row(
+    return CommunityContentCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            reflection.isHidden
-                                ? '숨김 처리된 독후감'
-                                : (title == null || title.isEmpty
-                                      ? '제목 없음'
-                                      : title),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: AppColors.of(context).textStrong,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        if (showVisibility) ...[
-                          const SizedBox(width: 8),
-                          Semantics(
-                            label: reflection.isPublic ? '공개 독후감' : '비공개 독후감',
-                            child: Icon(
-                              reflection.isPublic
-                                  ? PhosphorIconsRegular.globe
-                                  : PhosphorIconsRegular.lock,
-                              size: 14,
-                              color: AppColors.of(context).textMuted,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    if (!reflection.isHidden &&
-                        preview != null &&
-                        preview.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        preview,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.of(context).textBody,
-                          fontSize: 13,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 7),
-                    Text(
-                      _formatDate(reflection.createdAt),
-                      style: TextStyle(
-                        color: AppColors.of(context).textMuted,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+              Flexible(
+                child: Text(
+                  reflection.isHidden
+                      ? '숨김 처리된 독후감'
+                      : (title == null || title.isEmpty ? '제목 없음' : title),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.of(context).textStrong,
+                    fontSize: 18,
+                    height: 1.4,
+                    letterSpacing: -0.2,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
+              if (showVisibility) ...[
+                const SizedBox(width: 8),
+                Semantics(
+                  label: reflection.isPublic ? '공개 독후감' : '비공개 독후감',
+                  child: Icon(
+                    reflection.isPublic
+                        ? PhosphorIconsRegular.globe
+                        : PhosphorIconsRegular.lock,
+                    size: 14,
+                    color: AppColors.of(context).textMuted,
+                  ),
+                ),
+              ],
             ],
           ),
-        ),
+          if (!reflection.isHidden &&
+              preview != null &&
+              preview.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              preview,
+              maxLines: 5,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.of(context).textBody,
+                fontSize: 13,
+                height: 1.5,
+              ),
+            ),
+          ],
+          const SizedBox(height: 20),
+          Text(
+            _formatDate(reflection.createdAt),
+            style: TextStyle(
+              color: AppColors.of(context).textMuted,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }

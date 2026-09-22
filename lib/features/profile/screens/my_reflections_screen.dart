@@ -91,9 +91,9 @@ class _ReflectionList extends StatelessWidget {
 
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
       itemCount: items.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const CommunityContentDivider(),
       itemBuilder: (context, index) {
         final reflection = items[index];
         return MyReflectionCard(

@@ -21,7 +21,6 @@ class MyReviewCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return CommunityContentCard(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       child: MyContentCardLayout(
         book: review.book,
         dateLabel: formatRelativeDiscussionDateTime(review.createdAt),
@@ -89,11 +88,13 @@ class _ReviewBodyState extends State<_ReviewBody> {
                       color: AppColors.of(context).textMuted,
                     ),
                     SizedBox(width: 6),
-                    Text(
-                      '스포일러가 포함되어 있어요. 눌러서 보기',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.of(context).textMuted,
+                    Flexible(
+                      child: Text(
+                        '스포일러가 포함되어 있어요. 눌러서 보기',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.of(context).textMuted,
+                        ),
                       ),
                     ),
                   ],
@@ -112,7 +113,7 @@ class _ReviewBodyState extends State<_ReviewBody> {
               style: TextStyle(
                 fontSize: 13,
                 color: AppColors.of(context).textBody,
-                height: 1.4,
+                height: 1.5,
               ),
             ),
           ],

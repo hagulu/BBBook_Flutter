@@ -39,31 +39,33 @@ class RecommendedBooksSection extends ConsumerWidget {
       builder: (context, constraints) {
         return SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(
-            16,
-            24,
-            16,
-            bookshelfBottomContentPadding(context),
-          ),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
-            child: hasRecommendations
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (var i = 0; i < groups.length; i++) ...[
-                        if (i > 0) const SizedBox(height: 20),
-                        _RecommendationGroup(group: groups[i]),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                24,
+                16,
+                bookshelfBottomContentPadding(context),
+              ),
+              child: hasRecommendations
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < groups.length; i++) ...[
+                          if (i > 0) const SizedBox(height: 20),
+                          _RecommendationGroup(group: groups[i]),
+                        ],
                       ],
-                    ],
-                  )
-                : Center(
-                    child: Text(
-                      emptyText,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.of(context).textMuted),
+                    )
+                  : Center(
+                      child: Text(
+                        emptyText,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: AppColors.of(context).textMuted),
+                      ),
                     ),
-                  ),
+            ),
           ),
         );
       },

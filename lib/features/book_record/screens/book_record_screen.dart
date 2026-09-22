@@ -20,6 +20,7 @@ import '../models/record_labels.dart';
 import '../providers/book_record_providers.dart';
 import 'book_sharing_list.dart';
 import 'widgets/book_info_edit_dialog.dart';
+import 'widgets/book_record_tab_view.dart';
 import 'widgets/finish_confirm_dialog.dart';
 import 'widgets/meta_dialogs.dart';
 import 'widgets/meta_summary_card.dart';
@@ -128,7 +129,7 @@ class _BookRecordBody extends ConsumerWidget {
     return DefaultTabController(
       length: isWantToRead ? 2 : 4,
       initialIndex: 0,
-      child: NestedScrollView(
+      child: BookRecordNestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) => [
           // 책 표지·제목 헤더는 스크롤과 함께 말려 올라가고(사용자 확인
           // 사항), 탭 바만 상단에 고정한다. 헤더는 여기 한 곳에만 있고 탭
@@ -168,7 +169,7 @@ class _BookRecordBody extends ConsumerWidget {
             ),
           ),
         ],
-        body: TabBarView(
+        body: BookRecordTabView(
           children: [
             ListView(
               key: const PageStorageKey('book-record-info'),

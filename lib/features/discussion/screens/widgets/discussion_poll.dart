@@ -39,16 +39,21 @@ class DiscussionPoll extends StatelessWidget {
                   Text(
                     '의견 선택',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: AppColors.of(context).textStrong,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 8),
                   Text(
-                    interactive ? '선택하면 바로 의견을 작성할 수 있어요.' : '마감된 토론의 결과입니다.',
+                    detail.isClosed
+                        ? '마감된 토론의 결과입니다.'
+                        : interactive
+                        ? '선택하고 나의 생각을 남겨보세요.'
+                        : '독자들이 남긴 의견입니다.',
                     style: TextStyle(
                       fontSize: 12,
+                      height: 1.5,
                       color: AppColors.of(context).textMuted,
                     ),
                   ),
@@ -64,7 +69,7 @@ class DiscussionPoll extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 20),
         for (var i = 0; i < detail.options.length; i++) ...[
           _PollRow(
             label: detail.options[i].content,
@@ -73,7 +78,7 @@ class DiscussionPoll extends StatelessWidget {
             isTop: _isTopPercentage(detail.options[i].votePercentage),
             onTap: interactive ? () => onSelect(detail.options[i].id) : null,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
         ],
         _PollRow(
           label: '기타',
@@ -123,25 +128,30 @@ class _PollRow extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          height: 44,
+          constraints: const BoxConstraints(minHeight: 56),
           decoration: BoxDecoration(
             color: AppColors.of(context).surface,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.of(context).border),
           ),
           clipBehavior: Clip.antiAlias,
-          // Stack 기본 정렬(topStart)이라 라벨이 위로 붙어 있었다.
+          // 라벨 높이가 행 높이를 결정해 긴 선택지와 큰 글씨도 읽을 수 있다.
           child: Stack(
             alignment: AlignmentDirectional.centerStart,
             children: [
               // 게이지: 비율만큼 선택지 색의 옅은 톤으로 채운다.
-              FractionallySizedBox(
-                widthFactor: ratio,
-                heightFactor: 1,
-                child: ColoredBox(color: color.withValues(alpha: 0.12)),
+              Positioned.fill(
+                child: FractionallySizedBox(
+                  widthFactor: ratio,
+                  alignment: Alignment.centerLeft,
+                  child: ColoredBox(color: color.withValues(alpha: 0.12)),
+                ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
                 child: Row(
                   children: [
                     Container(
@@ -156,15 +166,15 @@ class _PollRow extends StatelessWidget {
                     Expanded(
                       child: Text(
                         label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 14,
+                          height: 1.5,
                           fontWeight: isTop ? FontWeight.bold : FontWeight.w500,
                           color: AppColors.of(context).textStrong,
                         ),
                       ),
                     ),
+                    const SizedBox(width: 12),
                     Text(
                       formatVotePercentage(percentage),
                       style: TextStyle(
@@ -211,10 +221,9 @@ class DiscussionVoteBanner extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 13,
+                height: 1.5,
                 fontWeight: FontWeight.bold,
                 color: AppColors.of(context).textStrong,
               ),

@@ -28,26 +28,28 @@ class PublicReflectionCard extends StatelessWidget {
         children: [
           Text(
             title == null || title.isEmpty ? '제목 없음' : title,
-            maxLines: 2,
+            maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 15,
+              fontSize: 18,
+              height: 1.4,
+              letterSpacing: -0.2,
               fontWeight: FontWeight.bold,
               color: AppColors.of(context).textStrong,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             preview == null || preview.isEmpty ? '내용이 없습니다.' : preview,
-            maxLines: 3,
+            maxLines: 5,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 13,
-              color: AppColors.of(context).textMuted,
-              height: 1.45,
+              color: AppColors.of(context).textBody,
+              height: 1.5,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 20),
           CommunityAuthorRow(
             nickname: reflection.user.nickname,
             profileImageUrl: reflection.user.profileImageUrl,

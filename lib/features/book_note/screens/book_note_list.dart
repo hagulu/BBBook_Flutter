@@ -28,89 +28,75 @@ class BookNoteList extends ConsumerWidget {
     final ownerUserId = ref.watch(recordOwnerIdProvider);
     final asyncNotes = ref.watch(bookNoteListProvider(userBookId));
 
-    return BookNoteRefreshIndicator(
-      child: CustomScrollView(
-        key: const PageStorageKey('book-note-list'),
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
-            sliver: SliverToBoxAdapter(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '개인 노트',
-                      style: TextStyle(
-                        color: AppColors.of(context).textStrong,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+    return Stack(
+      children: [
+        BookNoteRefreshIndicator(
+          child: CustomScrollView(
+            key: const PageStorageKey('book-note-list'),
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              switch (asyncNotes) {
+                AsyncData(:final value) when value.isEmpty =>
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _EmptyNotes(),
                   ),
-                  ElevatedButton.icon(
-                    onPressed: ownerUserId == null
-                        ? null
-                        : () =>
-                              _openNote(context, ref, ownerUserId: ownerUserId),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(0, 36),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      textStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    icon: const Icon(PhosphorIconsRegular.plus, size: 15),
-                    label: const Text('노트 추가'),
+                AsyncData(:final value) => SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+                  sliver: SliverList.separated(
+                    itemCount: value.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final summary = value[index];
+                      return _NoteCard(
+                        summary: summary,
+                        // 목록은 최신순(updated_at DESC)이므로, 오래된 항목일수록
+                        // 작은 번호가 붙도록 뒤에서부터 센다.
+                        noteNumber: value.length - index,
+                        onTap: ownerUserId == null
+                            ? null
+                            : () => _openNote(
+                                context,
+                                ref,
+                                ownerUserId: ownerUserId,
+                                noteId: summary.note.id,
+                              ),
+                      );
+                    },
                   ),
-                ],
-              ),
-            ),
+                ),
+                AsyncError() => SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _NoteLoadError(
+                    onRetry: () =>
+                        ref.invalidate(bookNoteListProvider(userBookId)),
+                  ),
+                ),
+                _ => const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              },
+            ],
           ),
-          switch (asyncNotes) {
-            AsyncData(:final value) when value.isEmpty =>
-              const SliverFillRemaining(
-                hasScrollBody: false,
-                child: _EmptyNotes(),
-              ),
-            AsyncData(:final value) => SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-              sliver: SliverList.separated(
-                itemCount: value.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final summary = value[index];
-                  return _NoteCard(
-                    summary: summary,
-                    // 목록은 최신순(updated_at DESC)이므로, 오래된 항목일수록
-                    // 작은 번호가 붙도록 뒤에서부터 센다.
-                    noteNumber: value.length - index,
-                    onTap: ownerUserId == null
-                        ? null
-                        : () => _openNote(
-                            context,
-                            ref,
-                            ownerUserId: ownerUserId,
-                            noteId: summary.note.id,
-                          ),
-                  );
-                },
-              ),
-            ),
-            AsyncError() => SliverFillRemaining(
-              hasScrollBody: false,
-              child: _NoteLoadError(
-                onRetry: () => ref.invalidate(bookNoteListProvider(userBookId)),
-              ),
-            ),
-            _ => const SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(child: CircularProgressIndicator()),
-            ),
-          },
-        ],
-      ),
+        ),
+        Positioned(
+          right: 16,
+          bottom: 16,
+          child: FloatingActionButton(
+            heroTag: 'book-note-add-$userBookId',
+            onPressed: ownerUserId == null
+                ? null
+                : () => _openNote(context, ref, ownerUserId: ownerUserId),
+            tooltip: '노트 추가',
+            shape: const CircleBorder(),
+            backgroundColor: AppColors.of(context).accentFill,
+            foregroundColor: AppColors.of(context).textStrong,
+            elevation: 2,
+            child: const Icon(PhosphorIconsRegular.plus),
+          ),
+        ),
+      ],
     );
   }
 

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_quill_extensions/flutter_quill_extensions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +17,7 @@ import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/community_content.dart';
 import '../../book_note/models/book_note.dart';
 import '../models/book_reflection.dart';
 import '../providers/book_reflection_providers.dart';
@@ -48,35 +50,35 @@ DefaultStyles _buildReflectionQuillStyles(AppPalette colors) {
   final bodyTextStyle = TextStyle(
     color: colors.textBody,
     fontSize: 16,
-    height: 1.65,
+    height: 1.8,
   );
   return DefaultStyles(
     h1: DefaultTextBlockStyle(
       TextStyle(
         color: colors.textStrong,
-        fontSize: 27,
+        fontSize: 24,
         height: 1.3,
         fontWeight: FontWeight.bold,
       ),
       HorizontalSpacing.zero,
-      VerticalSpacing(12, 0),
+      VerticalSpacing(24, 12),
       VerticalSpacing.zero,
       null,
     ),
     h2: DefaultTextBlockStyle(
       TextStyle(
         color: colors.textStrong,
-        fontSize: 22,
+        fontSize: 20,
         height: 1.3,
         fontWeight: FontWeight.bold,
       ),
       HorizontalSpacing.zero,
-      VerticalSpacing(8, 0),
+      VerticalSpacing(20, 10),
       VerticalSpacing.zero,
       null,
     ),
     placeHolder: DefaultTextBlockStyle(
-      TextStyle(color: colors.textMuted, fontSize: 16, height: 1.65),
+      TextStyle(color: colors.textMuted, fontSize: 16, height: 1.8),
       HorizontalSpacing.zero,
       VerticalSpacing.zero,
       VerticalSpacing.zero,
@@ -85,7 +87,7 @@ DefaultStyles _buildReflectionQuillStyles(AppPalette colors) {
     paragraph: DefaultTextBlockStyle(
       bodyTextStyle,
       HorizontalSpacing.zero,
-      VerticalSpacing.zero,
+      VerticalSpacing(0, 10),
       VerticalSpacing.zero,
       null,
     ),
@@ -100,8 +102,9 @@ DefaultStyles _buildReflectionQuillStyles(AppPalette colors) {
     quote: DefaultTextBlockStyle(
       TextStyle(
         color: colors.reflectionQuoteText,
+        fontSize: 16,
         fontStyle: FontStyle.italic,
-        height: 1.5,
+        height: 1.8,
       ),
       HorizontalSpacing(
         _reflectionQuoteLeftSpacing,
@@ -139,7 +142,7 @@ InlineSpan reflectionTextSpanBuilder(
     final colors = AppColors.of(context);
     final background = Color.alphaBlend(
       resolvedStyle.backgroundColor ?? Colors.transparent,
-      colors.surface,
+      colors.pageBackground,
     );
     resolvedStyle = resolvedStyle.copyWith(
       color: AppColors.readableText(
@@ -605,155 +608,146 @@ class _BookReflectionEditorScreenState
       onPopInvokedWithResult: (didPop, _) => _handlePopAttempt(didPop),
       child: Scaffold(
         resizeToAvoidBottomInset: true,
-        appBar: AppBar(
-          title: AppBarTitle(widget.reflection == null ? '독후감 작성' : '독후감 수정'),
-          backgroundColor: AppColors.of(context).pageBackground,
-          foregroundColor: AppColors.of(context).textStrong,
-          actions: [
-            TextButton(
-              onPressed: _isSaving ? null : _save,
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.of(context).textStrong,
-                textStyle: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              child: Text(_isSaving ? '저장 중' : '저장'),
-            ),
-            const SizedBox(width: 8),
-          ],
-        ),
-        body: SafeArea(
-          top: false,
-          child: Column(
-            children: [
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-                  decoration: BoxDecoration(
-                    color: AppColors.of(context).surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.of(context).border),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.of(context).shadowSoft,
-                        blurRadius: 4,
-                        offset: Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      // 제목을 화면에 고정하지 않고 본문과 함께 스크롤되게
-                      // 하기 위해, Quill 편집기는 자체 스크롤을 끄고
-                      // (scrollable: false) 제목·구분선과 한 스크롤뷰를
-                      // 공유한다. 커서를 따라가는 자동 스크롤(flutter_quill의
-                      // showCaretOnScreen)도 이 공유 컨트롤러가 붙은
-                      // 스크롤뷰를 기준으로 동작한다. 편집기 자체 스크롤이
-                      // 없어져 Scaffold의 키보드 회피와 중복이던
-                      // scrollBottomInset 설정도 함께 제거했다.
-                      return SingleChildScrollView(
-                        controller: _editorScrollController,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minHeight: constraints.maxHeight,
-                          ),
-                          // 본문이 짧아도 카드 남은 영역 전체를 눌러 편집기에
-                          // 포커스를 줄 수 있게 한다(예전 Expanded 채움과
-                          // 같은 동작 유지).
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.translucent,
-                            onTap: () {
-                              if (!_editorFocusNode.hasFocus) {
-                                _editorFocusNode.requestFocus();
-                              }
-                            },
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    16,
-                                    12,
-                                    16,
-                                    0,
-                                  ),
-                                  child: TextField(
-                                    controller: _titleController,
-                                    maxLength: 255,
-                                    textInputAction: TextInputAction.next,
-                                    onSubmitted: (_) =>
-                                        _editorFocusNode.requestFocus(),
-                                    style: TextStyle(
-                                      color: AppColors.of(context).textStrong,
-                                      fontSize: 19,
-                                      height: 1.35,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    decoration: InputDecoration(
-                                      hintText: '이 기록에 제목을 붙여보세요',
-                                      hintStyle: TextStyle(
-                                        color: AppColors.of(context).textMuted,
-                                        fontSize: 19,
-                                        height: 1.35,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      counterText: '',
-                                      isDense: true,
-                                      filled: false,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            vertical: 6,
-                                          ),
-                                      border: InputBorder.none,
-                                      enabledBorder: InputBorder.none,
-                                      focusedBorder: InputBorder.none,
-                                    ),
-                                  ),
-                                ),
-                                const ReflectionTitleBodyDivider(
-                                  horizontalInset: 16,
-                                ),
-                                ReflectionQuillEditor(
-                                  controller: _quillController,
-                                  focusNode: _editorFocusNode,
-                                  scrollController: _editorScrollController,
-                                  config: QuillEditorConfig(
-                                    scrollable: false,
-                                    padding: const EdgeInsets.fromLTRB(
-                                      16,
-                                      0,
-                                      16,
-                                      16,
-                                    ),
-                                    placeholder: '책을 읽고 느낀 점을 기록해 보세요.',
-                                    customStyles: bookReflectionQuillStyles(
-                                      context,
-                                    ),
-                                    textSpanBuilder: reflectionTextSpanBuilder,
-                                    embedBuilders: [
-                                      ReflectionImageEmbedBuilder(
-                                        localImagePaths: localImagePaths,
-                                        onDeleteImage: _deleteImage,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
+        body: Column(
+          children: [
+            Expanded(
+              child: CustomScrollView(
+                controller: _editorScrollController,
+                slivers: [
+                  SliverAppBar(
+                    title: const AppBarTitle('독후감'),
+                    pinned: false,
+                    backgroundColor: AppColors.of(context).pageBackground,
+                    foregroundColor: AppColors.of(context).textStrong,
+                    surfaceTintColor: Colors.transparent,
+                    actions: [
+                      FilledButton(
+                        onPressed: _isSaving ? null : _save,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.of(context).accentFill,
+                          foregroundColor: AppColors.of(context).textStrong,
+                          minimumSize: const Size(64, 44),
+                          textStyle: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      );
-                    },
+                        child: Text(_isSaving ? '저장 중' : '저장'),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                   ),
-                ),
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: CommunityContentWidth(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      // 앱바·제목·본문이 하나의 스크롤을 공유한다. Quill의
+                      // 자체 스크롤은 끄고 바깥 컨트롤러로 커서를 추적한다.
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTap: () {
+                          if (!_editorFocusNode.hasFocus) {
+                            _editorFocusNode.requestFocus();
+                          }
+                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                top: 24,
+                                bottom: 16,
+                              ),
+                              child: Text(
+                                widget.bookTitle,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  height: 1.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.of(context).accentForeground,
+                                ),
+                              ),
+                            ),
+                            TextField(
+                              controller: _titleController,
+                              minLines: 1,
+                              maxLines: 3,
+                              maxLength: 255,
+                              keyboardType: TextInputType.text,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.singleLineFormatter,
+                              ],
+                              textInputAction: TextInputAction.next,
+                              onSubmitted: (_) =>
+                                  _editorFocusNode.requestFocus(),
+                              style: Theme.of(context).textTheme.headlineMedium
+                                  ?.copyWith(
+                                    color: AppColors.of(context).textStrong,
+                                    fontSize: 22,
+                                    height: 1.35,
+                                    letterSpacing: -0.3,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                              decoration: InputDecoration(
+                                hintText: '제목을 적어주세요',
+                                hintStyle: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(
+                                      color: AppColors.of(context).textMuted,
+                                      fontSize: 22,
+                                      height: 1.35,
+                                      letterSpacing: -0.3,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                counterText: '',
+                                isDense: true,
+                                filled: false,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 6,
+                                ),
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                              ),
+                            ),
+                            const ReflectionTitleBodyDivider(
+                              horizontalInset: 0,
+                            ),
+                            ReflectionQuillEditor(
+                              controller: _quillController,
+                              focusNode: _editorFocusNode,
+                              scrollController: _editorScrollController,
+                              config: QuillEditorConfig(
+                                scrollable: false,
+                                padding: const EdgeInsets.fromLTRB(0, 0, 0, 48),
+                                placeholder: '책을 읽고 느낀 점을 기록해 보세요.',
+                                customStyles: bookReflectionQuillStyles(
+                                  context,
+                                ),
+                                textSpanBuilder: reflectionTextSpanBuilder,
+                                embedBuilders: [
+                                  ReflectionImageEmbedBuilder(
+                                    localImagePaths: localImagePaths,
+                                    onDeleteImage: _deleteImage,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              _ReflectionToolbar(
+            ),
+            SafeArea(
+              top: false,
+              child: _ReflectionToolbar(
                 controller: _quillController,
                 editorFocusNode: _editorFocusNode,
                 onRequestPickImage: _pickAndSaveImage,
@@ -763,8 +757,8 @@ class _BookReflectionEditorScreenState
                     .watch(attachmentLimitPolicyProvider)
                     .reflectionImageAllowed,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

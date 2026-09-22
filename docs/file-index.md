@@ -69,7 +69,7 @@
 
 ## features/book_record
 
-- `lib/features/book_record/screens/book_record_screen.dart` — 책 기록 상세 화면(자체 AppBar, 책장에서 책 선택 시 진입), 정보/노트/독후감/생각나눔 4탭과 진행률/상태/출처/난이도/태그/삭제 조립
+- `lib/features/book_record/screens/book_record_screen.dart` — 책 기록 상세 화면(자체 AppBar, 책장에서 책 선택 시 진입), 정보/노트/독후감/생각나눔 4탭과 진행률/상태/출처/난이도/태그/삭제 조립, 공통 접힘 헤더·고정 탭 바와 탭별 콘텐츠 길이·스크롤 위치 분리
 - `lib/features/book_record/screens/book_sharing_list.dart` — 책 기록 상세의 생각나눔 탭(ISBN 있으면 커뮤니티 미리보기 공용 위젯 — 독자평 버튼 항상 노출, 독후감 배지는 내 공개 독후감 수 제외, 없으면 안내용 진입 버튼)
 - `lib/features/book_record/data/book_record_api.dart` — 책 기록 API 호출(기본 정보 PATCH(RecordPatch 기준 부분 수정), 책 정보 PATCH(카테고리 포함), ISBN 연결/해제 PATCH, 태그 자동완성 목록/플랫폼 옵션 GET, 삭제 DELETE) — 태그 추가/삭제 자체는 `TagApi`가 전담
 - `lib/features/book_record/data/book_record_repository.dart` — 책 기록 화면 source of truth, 기록·책 정보·표지·출처 수정과 삭제는 로컬 우선/서버 재시도, ISBN 연결은 미전송 편집 동기화 후 직렬 처리
@@ -222,44 +222,4 @@
 
 ## docs
 
-- `docs/review/20260917-184951-ai-note-reflection-rereview.md` — AI 메모·독후감 생성 후속 리뷰(직전 6건 처리 현황, 제목 push 실패 노트의 제목 유실, 초안 이탈 유실·롤백 확인 누락)
-- `docs/review/20260917-132747-ai-note-reflection-review.md` — AI 메모·독후감 생성의 실패 시 빈 노트, 미동기화 원본, 전역 로딩·초안 유실, 저장 모드·제목 길이 검증 리뷰
-- `docs/review/20260916-140626-floating-navigation-rereview.md` — 플로팅 하단 메뉴의 공통 스크롤 여백·큰 글자 세로 배치 후속 리뷰
-- `docs/review/20260916-134252-floating-navigation-review.md` — 플로팅 하단 메뉴의 프로필 마지막 버튼 가림·큰 글자 가로 오버플로 리뷰
-- `docs/review/20260915-210107-attachment-limit-review.md` — 기존 이미지는 허용하고 신규 이미지만 제한하는 기준에서 노트 최종 저장 검증과 양수 독후감 한도 처리를 점검한 리뷰
-- `docs/review/20260915-173540-bookshelf-recommendation-rereview.md` — 추천 도서 후속 수정의 언어 헤더, 진행 중 기록 동기화 순서, 상태 카드 좁은 화면 오버플로 재리뷰
-- `docs/review/20260915-154940-bookshelf-recommendation-review.md` — 빈 책장 추천 도서의 계정 간 캐시 노출, 실패 재시도 부재, 기록 동기화 경합, 상태 카드 큰 글자 오버플로 리뷰
-- `docs/review/20260915-140322-standalone-session-rereview.md` — 계정 없이 사용하기 후속 수정의 회원 탈퇴 데이터 보존 회귀, 선택 팝업 dismiss, 계정별 서버 메타데이터 승계, 로그인 전환 원자성 재리뷰
-- `docs/review/20260915-104037-standalone-session-review.md` — 계정 없이 사용하기의 로그아웃 안내 불일치, 소유권 전환 원자성, 서버 삭제 보류 유실, 공개 조회 인증 경합 리뷰
-- `docs/review/20260911-144837-external-import-selection-review.md` — 외부 기록 가져오기 선택·덮어쓰기·복구 메모 정리·로그·대용량 목록 후속 리뷰
-- `docs/review/20260910-201039-external-record-import-review.md` — 외부 기록 가져오기의 기존 책 필드 유실·공유/설정 동시 Import 충돌·CSV 식별자 충돌 리뷰
-- `docs/review/20260910-181343-kakao-login-review.md` — 카카오 로그인 연동의 릴리스 키 주입, iOS 설정 재현성, SDK 초기화 경합·예외 분류 리뷰
-- `docs/review/20260910-132050-import-book-cover-review.md` — 로컬 책 표지 Import의 완료 후 재시도 시 기존 서버 표지 재첨부 실패 리뷰
 - `docs/policies/offline-records.md` — 오프라인 진입·인증 복구·재전송·계정 변경 삭제 정책과 검증 항목
-- `docs/review/20260910-124921-local-migration-simplification-review.md` — 로컬 전환 단순화(동기화·이미지 다운로드 단계 삭제) 리뷰(서버 이미지 무고지 유실, 실패 테스트 5개, 반대쪽 결과 문구, 계정 전환 시 컨트롤러 상태 잔존)
-- `docs/review/20260910-123012-settings-sync-inline-rereview.md` — 위 리뷰의 재검토(지적 전건 유지 + 이중 전환 동시 실행, 동기화 게이트 통과 후 서버 삭제로 인한 로컬 행 삭제 창)
-- `docs/review/20260910-122111-settings-sync-inline-review.md` — 저장 모드 전환의 설정 화면 인라인화 리뷰(전환 중 이탈 시 마무리 처리 스킵, 결과 표시 소실, 죽은 전환 화면)
-- `docs/review/20260908-005905-discussion-pagination-review.md` — 토론 답변 페이지네이션 전환의 빌드 중 provider 변경, 누적 토론 목록 갱신, 삭제 후 메타데이터 정합성 리뷰
-- `docs/review/20260907-002544-server-storage-migration-rereview.md` — 로컬 → 서버 저장 전환 후속 수정의 완료 복구, 30일 물리 삭제, 태그 삭제 반영, 빈 이미지 검증 재리뷰
-- `docs/review/20260906-233230-server-storage-migration-review.md` — 로컬 → 서버 저장 전환의 기존 PHOTO 재첨부, Import 후 충돌 기준값, 완료 후 복구 구간, 노트 제목 검증 리뷰
-- `docs/review/20260906-004203-last-commit-review.md` — 마지막 커밋의 기존 로컬 DB 태그 테이블 보완·서재 추가 예외 처리 리뷰
-- `docs/review/20260905-171808-bookshelf-description-tag-rereview.md` — 완독 목록 큰 글자 배율과 책 소개 토글 semantics 후속 리뷰
-- `docs/review/20260905-170252-bookshelf-description-tag-review.md` — 완독 리스트·책 소개 큰 글자 배율, 태그 시트 종료, 보기 모드 복원 경합 리뷰
-- `docs/review/20260905-133912-working-tree-review.md` — 미커밋 변경사항의 오프라인 명작 저장 유실·오디오북 완독 진행률·독서 상태 레이아웃 리뷰
-- `docs/review/20260830-185915-book-record-fixed-header-review.md` — 책 기록 상세 고정 헤더의 작은 세로 화면·큰 글자 배율 레이아웃 리뷰
-- `docs/review/20260831-171201-book-progress-source-pages-review.md` — 책 형태별 진행률·전자책 쪽수 저장의 PATCH 경합과 출처 전환 정합성 리뷰
-- `docs/review/20260901-112239-book-progress-source-pages-rereview.md` — 책 형태별 진행률 후속 수정의 쪽수 축소 요청 순서·오디오북 역변환·최신 상태 정합성 재리뷰
-- `docs/review/20260901-142758-book-progress-source-pages-third-review.md` — 출처·전자책 쪽수 조정 작업의 dirty push 경합·중간 실패·최신 진행 상태 3차 리뷰
-- `docs/review/20260901-154051-want-to-reread-and-filter-review.md` — 또 볼래요 필드의 기존 DB 마이그레이션·레거시 dirty push 데이터 정합성 리뷰
-- `docs/review/20260901-155043-want-to-reread-and-filter-rereview.md` — 또 볼래요 후속 UI와 미해결 DB 마이그레이션·레거시 dirty push 재리뷰
-- `docs/review/20260901-163827-profile-main-edit-review.md` — 프로필 메인·수정 화면의 무반응 이동 메뉴, 로컬 로그아웃 경고, 통계 갱신·이미지 선택 생명주기 리뷰
-- `docs/review/20260901-172506-reflection-viewer-color-review.md` — 독후감 뷰어의 미지원 색상 문자열 렌더링 예외와 입력 정규화 누락 리뷰
-- `docs/review/20260901-174322-profile-content-notices-review.md` — 프로필 하위 콘텐츠·공지사항 구현의 로컬 ID 연결, 로그아웃 경고, 이동·갱신·페이지네이션 리뷰
-- `docs/review/20260902-124339-reading-stats-review.md` — 독서 통계 화면의 연도 선택 취소, 시맨틱스, 요약 카드 오버플로, 공통 로딩 정책 리뷰
-- `docs/review/20260902-165631-book-record-bookshelf-ui-review.md` — 책 기록·검색 상세·완독 필터 UI 변경의 iOS 폰트, 좁은 화면 배치, 긴 한줄 평, 초기화·터치 영역 리뷰
-- `docs/review/20260904-011409-book-search-category-refresh-review.md` — 책 검색 공급자 전환·카테고리 주기 갱신·앱 버전 변경의 비동기 예외, 중복 요청, 버전 회귀 리뷰
-- `docs/review/20260904-013659-book-search-infinite-scroll-author-review.md` — 책 검색 무한 스크롤의 짧은 첫 페이지 추가 로드와 큰 글자 오류 행 레이아웃 리뷰
-- `docs/review/20260904-022040-tag-local-sync-review.md` — 태그 로컬 우선 동기화의 원격 책 삭제 정합성·책장 UI 갱신·전체 동기화 orphan 기준 시각 리뷰
-- `docs/review/20260904-132202-search-debounce-discussion-answer-pagination-review.md` — 책 검색 디바운스 요청 경합과 토론 댓글 삭제 후 페이지 범위·파일 인덱스 정합성 리뷰
-- `docs/review/20260904-144819-book-record-finish-dialog-ui-review.md` — 책 기록·완독 팝업 UI 변경의 오프라인 명작 유실, 키보드 종료 경합, 날짜 터치 영역·아이콘 시맨틱스 리뷰
-- `docs/review/20260910-110045-dark-theme-review.md` — 다크 테마 도입의 표지 플레이스홀더 대비, Quill 스타일 const 소실, readableText 비용, 루트 오버레이 스타일·팔레트 전환 누락 리뷰

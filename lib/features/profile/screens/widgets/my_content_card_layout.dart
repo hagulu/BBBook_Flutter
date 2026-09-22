@@ -50,9 +50,7 @@ class MyContentCardLayout extends StatelessWidget {
       children: [
         if (book != null) ...[
           _BookTitleRow(book: book, onTap: onBookTap),
-          const SizedBox(height: 8),
-          Divider(height: 1, color: AppColors.of(context).border),
-          const SizedBox(height: 10),
+          const SizedBox(height: 16),
         ],
         IntrinsicHeight(
           child: Row(
@@ -72,13 +70,13 @@ class MyContentCardLayout extends StatelessWidget {
                   children: [
                     Expanded(child: content),
                     if (dateLabel != null) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
                       Align(
-                        alignment: Alignment.centerRight,
+                        alignment: Alignment.centerLeft,
                         child: Text(
                           dateLabel!,
                           style: TextStyle(
-                            fontSize: 10,
+                            fontSize: 12,
                             color: AppColors.of(context).textMuted,
                           ),
                         ),

@@ -6,7 +6,6 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_pagination.dart';
@@ -158,7 +157,7 @@ class _DiscussionDetailScreenState
   void _openFreeAnswerSheet() {
     showDiscussionAnswerSheet(
       context,
-      hintText: '답변을 작성해보세요...',
+      hintText: '나의 생각을 들려주세요...',
       onSubmit: (content) => _submitAnswer(content: content, withOption: false),
     );
   }
@@ -369,33 +368,42 @@ class _DiscussionDetailScreenState
     final detailState = ref.watch(
       discussionDetailControllerProvider(widget.topicId),
     );
-    final bookTitle = switch (detailState) {
-      AsyncData(:final value) => value.book.title,
-      _ => null,
-    };
 
     return Scaffold(
-      appBar: AppBar(
-        title: bookTitle == null
-            ? const AppBarTitle('토론')
-            : AppBarTitle(bookTitle, subtitle: '주제 토론'),
-        backgroundColor: AppColors.of(context).pageBackground,
-        foregroundColor: AppColors.of(context).textStrong,
-        elevation: 0,
-      ),
-      body: SafeArea(
-        top: false,
-        child: switch (detailState) {
-          AsyncData(:final value) => _buildBody(value),
-          AsyncError(:final error) => CommunityContentErrorState(
-            message: error is ApiException ? error.message : '토론을 불러오지 못했습니다.',
-            onRetry: () => ref.invalidate(
-              discussionDetailControllerProvider(widget.topicId),
+      body: switch (detailState) {
+        AsyncData(:final value) => _buildBody(value),
+        AsyncError(:final error) => CustomScrollView(
+          slivers: [
+            _buildAppBar(),
+            SliverFillRemaining(
+              child: CommunityContentErrorState(
+                message: error is ApiException
+                    ? error.message
+                    : '토론을 불러오지 못했습니다.',
+                onRetry: () => ref.invalidate(
+                  discussionDetailControllerProvider(widget.topicId),
+                ),
+              ),
             ),
-          ),
-          _ => const CommunityContentLoadingState(),
-        },
-      ),
+          ],
+        ),
+        _ => CustomScrollView(
+          slivers: [
+            _buildAppBar(),
+            const SliverFillRemaining(child: CommunityContentLoadingState()),
+          ],
+        ),
+      },
+    );
+  }
+
+  SliverAppBar _buildAppBar() {
+    return SliverAppBar(
+      toolbarHeight: 48,
+      pinned: false,
+      backgroundColor: AppColors.of(context).pageBackground,
+      foregroundColor: AppColors.of(context).textStrong,
+      surfaceTintColor: Colors.transparent,
     );
   }
 
@@ -432,68 +440,74 @@ class _DiscussionDetailScreenState
           ]);
         } catch (_) {}
       },
-      child: SingleChildScrollView(
+      child: CustomScrollView(
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        child: CommunityContentWidth(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _TopicCard(
-                topic: topic,
-                onEdit: () => _editTopic(topic),
-                onEditDeadline: () => _editDeadline(topic),
-                onClose: _closeTopic,
-                onReopen: _reopenTopic,
-                onDelete: _deleteTopic,
-                onReport: _reportTopic,
-                onToggleLike: _isTogglingTopicLike ? null : _toggleTopicLike,
-                pollSection: topic.hasOptions
-                    ? _buildPollSection(
-                        topic,
-                        allowAccountActions: allowAccountActions,
-                      )
-                    : null,
-                allowAccountActions: allowAccountActions,
-              ),
-              if (!topic.hasOptions && allowAccountActions) ...[
-                const SizedBox(height: 12),
-                _FreeAnswerCard(
-                  isClosed: topic.isClosed,
-                  onOpen: _openFreeAnswerSheet,
-                ),
-              ],
-              SizedBox(key: _answerSectionKey, height: 16),
-              switch (answersState) {
-                AsyncData(:final value) => _AnswerList(
-                  state: value,
-                  options: topic.options,
-                  canEditAnswers: !topic.isClosed,
-                  pendingLikeIds: _pendingAnswerLikeIds,
-                  onSubmitEdit: _updateAnswer,
-                  onDelete: _deleteAnswer,
-                  onReport: _reportAnswer,
-                  onToggleLike: _toggleAnswerLike,
-                  onPageChanged: _goToAnswerPage,
-                  highlightAnswerId: widget.highlightAnswerId,
-                  highlightKey: _highlightedAnswerKey,
-                  allowAccountActions: allowAccountActions,
-                ),
-                AsyncError() => CommunityContentErrorState(
-                  message: '답변을 불러오지 못했습니다.',
-                  onRetry: () => ref.invalidate(
-                    discussionAnswersControllerProvider(widget.topicId),
+        slivers: [
+          _buildAppBar(),
+          SliverToBoxAdapter(
+            child: CommunityContentWidth(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _TopicCard(
+                    topic: topic,
+                    onEdit: () => _editTopic(topic),
+                    onEditDeadline: () => _editDeadline(topic),
+                    onClose: _closeTopic,
+                    onReopen: _reopenTopic,
+                    onDelete: _deleteTopic,
+                    onReport: _reportTopic,
+                    onToggleLike: _isTogglingTopicLike
+                        ? null
+                        : _toggleTopicLike,
+                    pollSection: topic.hasOptions
+                        ? _buildPollSection(
+                            topic,
+                            allowAccountActions: allowAccountActions,
+                          )
+                        : null,
+                    allowAccountActions: allowAccountActions,
                   ),
-                ),
-                _ => const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              },
-            ],
+                  if (!topic.hasOptions && allowAccountActions) ...[
+                    const SizedBox(height: 32),
+                    _FreeAnswerCard(
+                      isClosed: topic.isClosed,
+                      onOpen: _openFreeAnswerSheet,
+                    ),
+                  ],
+                  SizedBox(key: _answerSectionKey, height: 40),
+                  switch (answersState) {
+                    AsyncData(:final value) => _AnswerList(
+                      state: value,
+                      options: topic.options,
+                      canEditAnswers: !topic.isClosed,
+                      pendingLikeIds: _pendingAnswerLikeIds,
+                      onSubmitEdit: _updateAnswer,
+                      onDelete: _deleteAnswer,
+                      onReport: _reportAnswer,
+                      onToggleLike: _toggleAnswerLike,
+                      onPageChanged: _goToAnswerPage,
+                      highlightAnswerId: widget.highlightAnswerId,
+                      highlightKey: _highlightedAnswerKey,
+                      allowAccountActions: allowAccountActions,
+                    ),
+                    AsyncError() => CommunityContentErrorState(
+                      message: '답변을 불러오지 못했습니다.',
+                      onRetry: () => ref.invalidate(
+                        discussionAnswersControllerProvider(widget.topicId),
+                      ),
+                    ),
+                    _ => const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 24),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                  },
+                ],
+              ),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -510,8 +524,7 @@ class _DiscussionDetailScreenState
   }
 }
 
-/// 주제 본문 + (선택지 토론이면) 결과 바 + 공감 버튼을 담는 카드. 책 정보는
-/// 앱바(책 이름 + "토론" 서브타이틀)로 옮겼다.
+/// 책 이름·주제 본문·선택지 결과·공감 버튼을 담는 토론 지면.
 class _TopicCard extends StatelessWidget {
   const _TopicCard({
     required this.topic,
@@ -541,92 +554,104 @@ class _TopicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CommunityContentCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CommunityContentHeader(
-            title: topic.title ?? '',
-            nickname: topic.user.nickname,
-            profileImageUrl: topic.user.profileImageUrl,
-            dateLabel: formatRelativeDiscussionDateTime(topic.createdAt),
-            badges: [
-              if (topic.isClosed) const DiscussionBadge.closed(),
-              if (topic.isSpoiler) const DiscussionBadge.spoiler(),
-            ],
-            trailing: !allowAccountActions
-                ? null
-                : topic.isMine
-                ? _TopicMenu(
-                    topic: topic,
-                    onEdit: onEdit,
-                    onEditDeadline: onEditDeadline,
-                    onClose: onClose,
-                    onReopen: onReopen,
-                    onDelete: onDelete,
-                  )
-                : IconButton(
-                    padding: EdgeInsets.zero,
-                    tooltip: '토론 신고',
-                    icon: Icon(
-                      PhosphorIconsRegular.flag,
-                      size: 16,
-                      color: AppColors.of(context).textMuted,
-                    ),
-                    onPressed: onReport,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          topic.book.title,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 13,
+            height: 1.5,
+            fontWeight: FontWeight.w600,
+            color: AppColors.of(context).accentForeground,
+          ),
+        ),
+        const SizedBox(height: 12),
+        CommunityContentHeader(
+          title: topic.title ?? '',
+          nickname: topic.user.nickname,
+          profileImageUrl: topic.user.profileImageUrl,
+          dateLabel: formatRelativeDiscussionDateTime(topic.createdAt),
+          badges: [
+            if (topic.isClosed) const DiscussionBadge.closed(),
+            if (topic.isSpoiler) const DiscussionBadge.spoiler(),
+          ],
+          trailing: !allowAccountActions
+              ? null
+              : topic.isMine
+              ? _TopicMenu(
+                  topic: topic,
+                  onEdit: onEdit,
+                  onEditDeadline: onEditDeadline,
+                  onClose: onClose,
+                  onReopen: onReopen,
+                  onDelete: onDelete,
+                )
+              : IconButton(
+                  padding: EdgeInsets.zero,
+                  tooltip: '토론 신고',
+                  icon: Icon(
+                    PhosphorIconsRegular.flag,
+                    size: 16,
+                    color: AppColors.of(context).textMuted,
                   ),
-            metadata: topic.closesAt == null
-                ? null
-                : Row(
-                    children: [
-                      Icon(
-                        PhosphorIconsRegular.calendarBlank,
-                        size: 13,
-                        color: AppColors.of(context).controlInactive,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
+                  onPressed: onReport,
+                ),
+          metadata: topic.closesAt == null
+              ? null
+              : Row(
+                  children: [
+                    Icon(
+                      PhosphorIconsRegular.calendarBlank,
+                      size: 13,
+                      color: AppColors.of(context).controlInactive,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
                         '${formatDiscussionDate(topic.closesAt!)} 마감',
                         style: TextStyle(
                           fontSize: 11,
                           color: AppColors.of(context).textMuted,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 24),
+        Divider(height: 1, color: AppColors.of(context).border),
+        const SizedBox(height: 28),
+        SelectableText(
+          topic.content ?? '',
+          style: TextStyle(
+            fontSize: 16,
+            color: AppColors.of(context).textBody,
+            height: 1.8,
           ),
-          const SizedBox(height: 12),
+        ),
+        if (pollSection != null) ...[
+          const SizedBox(height: 32),
           Divider(height: 1, color: AppColors.of(context).border),
-          const SizedBox(height: 16),
-          Text(
-            topic.content ?? '',
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.of(context).textBody,
-              height: 1.65,
-            ),
-          ),
-          if (pollSection != null) ...[
-            const SizedBox(height: 18),
-            Divider(height: 1, color: AppColors.of(context).border),
-            const SizedBox(height: 12),
-            pollSection!,
-          ],
-          const SizedBox(height: 16),
-          Divider(height: 1, color: AppColors.of(context).border),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: allowAccountActions
-                ? CommunityLikeButton(
-                    isLiked: topic.likedByMe,
-                    likeCount: topic.likeCount,
-                    onTap: onToggleLike,
-                  )
-                : CommunityLikeCount(likeCount: topic.likeCount),
-          ),
+          const SizedBox(height: 24),
+          pollSection!,
         ],
-      ),
+        const SizedBox(height: 32),
+        Divider(height: 1, color: AppColors.of(context).border),
+        const SizedBox(height: 20),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: allowAccountActions
+              ? CommunityLikeButton(
+                  isLiked: topic.likedByMe,
+                  likeCount: topic.likeCount,
+                  onTap: onToggleLike,
+                )
+              : CommunityLikeCount(likeCount: topic.likeCount),
+        ),
+      ],
     );
   }
 }
@@ -727,44 +752,23 @@ class _FreeAnswerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CommunityContentCard(
-      child: isClosed
-          ? Text(
-              '닫힌 토론에는 답변을 작성할 수 없습니다',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.of(context).textMuted,
-              ),
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const DiscussionSectionLabel('내 답변 작성'),
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: onOpen,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.of(context).surfaceSubtle,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '답변을 작성해보세요...',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.of(context).textMuted,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+    if (isClosed) {
+      return Text(
+        '닫힌 토론에는 답변을 작성할 수 없습니다',
+        style: TextStyle(fontSize: 13, color: AppColors.of(context).textMuted),
+      );
+    }
+    return SizedBox(
+      width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: onOpen,
+        icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 18),
+        label: const Text('나의 생각 남기기'),
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          foregroundColor: AppColors.of(context).accentForeground,
+        ),
+      ),
     );
   }
 }
@@ -807,8 +811,15 @@ class _AnswerList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        DiscussionSectionLabel('답변 ${state.totalElements}개'),
-        const SizedBox(height: 12),
+        Text(
+          '함께 나눈 생각 ${state.totalElements}',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.of(context).textStrong,
+          ),
+        ),
+        const SizedBox(height: 8),
         if (state.items.isEmpty)
           Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
@@ -828,7 +839,7 @@ class _AnswerList extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final answer in state.items) ...[
+                  for (final (answerIndex, answer) in state.items.indexed) ...[
                     _MaybeHighlightedAnswer(
                       isHighlighted: answer.id == highlightAnswerId,
                       highlightKey: answer.id == highlightAnswerId
@@ -849,7 +860,8 @@ class _AnswerList extends StatelessWidget {
                         allowAccountActions: allowAccountActions,
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    if (answerIndex < state.items.length - 1)
+                      const CommunityContentDivider(),
                   ],
                 ],
               ),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'app_dialog_shell.dart';
-import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 공통 Confirm 팝업(제목/내용/확인·취소 버튼).
 ///
@@ -21,7 +20,6 @@ class AppConfirm {
     final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AppDialogShell(
-        icon: destructive ? PhosphorIconsRegular.warning : null,
         title: title,
         message: message,
         actions: [

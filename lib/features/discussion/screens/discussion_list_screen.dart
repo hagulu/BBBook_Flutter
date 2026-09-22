@@ -62,7 +62,10 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
   Future<void> _openForm() async {
     final createdId = await Navigator.of(context).push<int>(
       MaterialPageRoute(
-        builder: (_) => DiscussionFormScreen.create(isbn13: widget.isbn13),
+        builder: (_) => DiscussionFormScreen.create(
+          isbn13: widget.isbn13,
+          bookTitle: widget.bookTitle,
+        ),
       ),
     );
     if (!mounted) return;
@@ -122,6 +125,7 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
               shape: const CircleBorder(),
               backgroundColor: AppColors.of(context).accentFill,
               foregroundColor: AppColors.of(context).textStrong,
+              elevation: 2,
               child: const Icon(PhosphorIconsRegular.plus),
             )
           : null,
@@ -148,17 +152,18 @@ class _TopicList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filterRow = Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+    final filterRow = CommunityContentListHeader(
+      title: '함께 나누는 생각',
+      subtitle: '같은 책, 서로 다른 시선',
+      trailing: Wrap(
+        spacing: 8,
+        runSpacing: 8,
         children: [
           _FilterChip(
             label: '열린 토론',
             isSelected: !includeClosed,
             onTap: () => onFilterChanged(false),
           ),
-          const SizedBox(width: 6),
           _FilterChip(
             label: '전체',
             isSelected: includeClosed,
@@ -174,6 +179,7 @@ class _TopicList extends StatelessWidget {
         child: ListView(
           controller: scrollController,
           physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           children: [
             filterRow,
             const SizedBox(height: 68),
@@ -194,10 +200,11 @@ class _TopicList extends StatelessWidget {
       child: ListView.separated(
         controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(0, 0, 0, 96),
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 112),
         itemCount: 1 + state.items.length + (state.isLoadingMore ? 1 : 0),
-        separatorBuilder: (_, index) =>
-            index == 0 ? const SizedBox.shrink() : const SizedBox(height: 10),
+        separatorBuilder: (_, index) => index == 0
+            ? const SizedBox.shrink()
+            : const CommunityContentDivider(),
         itemBuilder: (context, index) {
           if (index == 0) return filterRow;
           final itemIndex = index - 1;
@@ -208,13 +215,10 @@ class _TopicList extends StatelessWidget {
             );
           }
           final topic = state.items[itemIndex];
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: DiscussionTopicCard(
-              key: ValueKey(topic.id),
-              topic: topic,
-              onTap: () => onOpen(topic.id),
-            ),
+          return DiscussionTopicCard(
+            key: ValueKey(topic.id),
+            topic: topic,
+            onTap: () => onOpen(topic.id),
           );
         },
       ),
@@ -235,27 +239,24 @@ class _FilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(999),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.of(context).accentFill
-              : AppColors.of(context).surfaceSubtle,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: isSelected
-                ? AppColors.of(context).textStrong
-                : AppColors.of(context).textMuted,
-          ),
-        ),
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => onTap(),
+      showCheckmark: false,
+      selectedColor: AppColors.of(context).accentFill,
+      backgroundColor: AppColors.of(context).pageBackground,
+      side: BorderSide(
+        color: isSelected ? Colors.transparent : AppColors.of(context).border,
+      ),
+      shape: const StadiumBorder(),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      labelStyle: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: isSelected
+            ? AppColors.of(context).textStrong
+            : AppColors.of(context).textMuted,
       ),
     );
   }

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../auth/providers/auth_access_providers.dart';
@@ -30,35 +29,35 @@ DefaultStyles _buildReaderQuillStyles(AppPalette colors) {
   final bodyTextStyle = TextStyle(
     color: colors.textBody,
     fontSize: 16,
-    height: 1.65,
+    height: 1.8,
   );
   return DefaultStyles(
     h1: DefaultTextBlockStyle(
       TextStyle(
         color: colors.textStrong,
-        fontSize: 27,
+        fontSize: 24,
         height: 1.3,
         fontWeight: FontWeight.bold,
       ),
       HorizontalSpacing.zero,
-      VerticalSpacing(12, 0),
+      VerticalSpacing(24, 12),
       VerticalSpacing.zero,
       null,
     ),
     h2: DefaultTextBlockStyle(
       TextStyle(
         color: colors.textStrong,
-        fontSize: 22,
+        fontSize: 20,
         height: 1.3,
         fontWeight: FontWeight.bold,
       ),
       HorizontalSpacing.zero,
-      VerticalSpacing(8, 0),
+      VerticalSpacing(20, 10),
       VerticalSpacing.zero,
       null,
     ),
     placeHolder: DefaultTextBlockStyle(
-      TextStyle(color: colors.textMuted, fontSize: 16, height: 1.65),
+      TextStyle(color: colors.textMuted, fontSize: 16, height: 1.8),
       HorizontalSpacing.zero,
       VerticalSpacing.zero,
       VerticalSpacing.zero,
@@ -67,7 +66,7 @@ DefaultStyles _buildReaderQuillStyles(AppPalette colors) {
     paragraph: DefaultTextBlockStyle(
       bodyTextStyle,
       HorizontalSpacing.zero,
-      VerticalSpacing(3, 5),
+      VerticalSpacing(0, 10),
       VerticalSpacing.zero,
       null,
     ),
@@ -84,7 +83,7 @@ DefaultStyles _buildReaderQuillStyles(AppPalette colors) {
         color: colors.reflectionQuoteText,
         fontSize: 16,
         fontStyle: FontStyle.italic,
-        height: 1.65,
+        height: 1.8,
       ),
       HorizontalSpacing(14, 8),
       VerticalSpacing(14, 14),
@@ -136,80 +135,100 @@ class _PublicReflectionReaderScreenState
     final state = ref.watch(publicReflectionDetailProvider(args));
 
     return Scaffold(
-      appBar: AppBar(
-        title: AppBarTitle(widget.bookTitle, subtitle: '공개 독후감'),
-        backgroundColor: AppColors.of(context).pageBackground,
-        foregroundColor: AppColors.of(context).textStrong,
-        elevation: 0,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            toolbarHeight: 48,
+            pinned: false,
+            backgroundColor: AppColors.of(context).pageBackground,
+            foregroundColor: AppColors.of(context).textStrong,
+            surfaceTintColor: Colors.transparent,
+          ),
+          switch (state) {
+            // 공개 독후감 조회는 인증이 필요 없지만 공감은 계정이 있어야 한다.
+            AsyncData(:final value) => SliverToBoxAdapter(
+              child: _ReaderBody(
+                bookTitle: widget.bookTitle,
+                detail: value,
+                onLike: _isLikeUpdating ? null : () => _toggleLike(args),
+                allowLike: ref.watch(canUseAccountFeaturesProvider),
+              ),
+            ),
+            AsyncError(:final error) => SliverFillRemaining(
+              child: CommunityContentErrorState(
+                message: error is ApiException
+                    ? error.message
+                    : '독후감을 불러오지 못했습니다.',
+                onRetry: () =>
+                    ref.invalidate(publicReflectionDetailProvider(args)),
+              ),
+            ),
+            _ => const SliverFillRemaining(
+              child: CommunityContentLoadingState(),
+            ),
+          },
+        ],
       ),
-      body: switch (state) {
-        // 공개 독후감 조회는 인증이 필요 없지만 공감은 계정이 있어야 한다.
-        AsyncData(:final value) => _ReaderBody(
-          detail: value,
-          onLike: _isLikeUpdating ? null : () => _toggleLike(args),
-          allowLike: ref.watch(canUseAccountFeaturesProvider),
-        ),
-        AsyncError(:final error) => CommunityContentErrorState(
-          message: error is ApiException ? error.message : '독후감을 불러오지 못했습니다.',
-          onRetry: () => ref.invalidate(publicReflectionDetailProvider(args)),
-        ),
-        _ => const CommunityContentLoadingState(),
-      },
     );
   }
 }
 
 class _ReaderBody extends StatelessWidget {
   const _ReaderBody({
+    required this.bookTitle,
     required this.detail,
     required this.onLike,
     required this.allowLike,
   });
 
+  final String bookTitle;
   final PublicReflectionDetail detail;
   final VoidCallback? onLike;
   final bool allowLike;
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        child: CommunityContentWidth(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          child: CommunityContentCard(
-            padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CommunityContentHeader(
-                  title: detail.title.trim().isEmpty ? '제목 없음' : detail.title,
-                  nickname: detail.user.nickname,
-                  profileImageUrl: detail.user.profileImageUrl,
-                  dateLabel: formatRelativeDiscussionDateTime(detail.createdAt),
-                ),
-                const ReflectionTitleBodyDivider(horizontalInset: 0),
-                _PublicReflectionRichContent(
-                  key: ValueKey('${detail.id}-${detail.updatedAt}'),
-                  contentJson: detail.contentJson,
-                ),
-                const SizedBox(height: 16),
-                Divider(height: 1, color: AppColors.of(context).border),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: allowLike
-                      ? CommunityLikeButton(
-                          isLiked: detail.likedByMe,
-                          likeCount: detail.likeCount,
-                          onTap: onLike,
-                        )
-                      : CommunityLikeCount(likeCount: detail.likeCount),
-                ),
-              ],
+    return CommunityContentWidth(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            bookTitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.of(context).accentForeground,
             ),
           ),
-        ),
+          const SizedBox(height: 12),
+          CommunityContentHeader(
+            title: detail.title.trim().isEmpty ? '제목 없음' : detail.title,
+            nickname: detail.user.nickname,
+            profileImageUrl: detail.user.profileImageUrl,
+            dateLabel: formatRelativeDiscussionDateTime(detail.createdAt),
+          ),
+          const ReflectionTitleBodyDivider(horizontalInset: 0),
+          _PublicReflectionRichContent(
+            key: ValueKey('${detail.id}-${detail.updatedAt}'),
+            contentJson: detail.contentJson,
+          ),
+          const SizedBox(height: 40),
+          Divider(height: 1, color: AppColors.of(context).border),
+          const SizedBox(height: 20),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: allowLike
+                ? CommunityLikeButton(
+                    isLiked: detail.likedByMe,
+                    likeCount: detail.likeCount,
+                    onTap: onLike,
+                  )
+                : CommunityLikeCount(likeCount: detail.likeCount),
+          ),
+        ],
       ),
     );
   }

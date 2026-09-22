@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../../shared/widgets/community_content.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
 import '../../auth/providers/auth_access_providers.dart';
 import '../models/book_reflection.dart';
@@ -42,25 +42,38 @@ class BookReflectionDetailScreen extends ConsumerWidget {
     final asyncReflection = ref.watch(bookReflectionDetailProvider(args));
 
     return Scaffold(
-      appBar: AppBar(
-        title: AppBarTitle(bookTitle, subtitle: '독후감'),
-        backgroundColor: AppColors.of(context).pageBackground,
-        foregroundColor: AppColors.of(context).textStrong,
-        elevation: 0,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            toolbarHeight: 48,
+            pinned: false,
+            backgroundColor: AppColors.of(context).pageBackground,
+            foregroundColor: AppColors.of(context).textStrong,
+            surfaceTintColor: Colors.transparent,
+          ),
+          switch (asyncReflection) {
+            AsyncData(:final value) =>
+              value == null
+                  ? const SliverFillRemaining(child: _ReflectionNotFound())
+                  : SliverToBoxAdapter(
+                      child: _ReflectionBody(
+                        bookTitle: bookTitle,
+                        reflection: value,
+                        onMore: () => _openActions(context, ref, value, args),
+                      ),
+                    ),
+            AsyncError() => SliverFillRemaining(
+              child: _ReflectionLoadError(
+                onRetry: () =>
+                    ref.invalidate(bookReflectionDetailProvider(args)),
+              ),
+            ),
+            _ => const SliverFillRemaining(
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          },
+        ],
       ),
-      body: switch (asyncReflection) {
-        AsyncData(:final value) =>
-          value == null
-              ? const _ReflectionNotFound()
-              : _ReflectionBody(
-                  reflection: value,
-                  onMore: () => _openActions(context, ref, value, args),
-                ),
-        AsyncError() => _ReflectionLoadError(
-          onRetry: () => ref.invalidate(bookReflectionDetailProvider(args)),
-        ),
-        _ => const Center(child: CircularProgressIndicator()),
-      },
     );
   }
 
@@ -249,8 +262,13 @@ class BookReflectionDetailScreen extends ConsumerWidget {
 enum _ReflectionAction { edit, delete }
 
 class _ReflectionBody extends StatelessWidget {
-  const _ReflectionBody({required this.reflection, required this.onMore});
+  const _ReflectionBody({
+    required this.bookTitle,
+    required this.reflection,
+    required this.onMore,
+  });
 
+  final String bookTitle;
   final BookReflection reflection;
   final VoidCallback onMore;
 
@@ -269,79 +287,77 @@ class _ReflectionBody extends StatelessWidget {
     }
 
     final title = reflection.title?.trim();
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(10, 16, 10, 40),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-        decoration: BoxDecoration(
-          color: AppColors.of(context).surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.of(context).border),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.of(context).shadowSoft,
-              blurRadius: 4,
-              offset: Offset(0, 1),
+    return CommunityContentWidth(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            bookTitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              height: 1.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.of(context).accentForeground,
             ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title == null || title.isEmpty ? '제목 없음' : title,
-                    style: TextStyle(
-                      color: AppColors.of(context).textStrong,
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                    ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title == null || title.isEmpty ? '제목 없음' : title,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: AppColors.of(context).textStrong,
+                    fontSize: 22,
+                    height: 1.35,
+                    letterSpacing: -0.3,
+                    fontWeight: FontWeight.bold,
                   ),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _formatDate(reflection.updatedAt),
-                    style: TextStyle(
-                      color: AppColors.of(context).textMuted,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: onMore,
-                  tooltip: '독후감 관리',
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(PhosphorIconsRegular.dotsThree, size: 22),
-                ),
-              ],
-            ),
-            const ReflectionTitleBodyDivider(horizontalInset: 0),
-            if (reflection.contentJson != null)
-              _ReflectionRichContent(
-                key: ValueKey(reflection.updatedAt),
-                reflectionId: reflection.id,
-                contentJson: reflection.contentJson!,
-              )
-            else
-              Text(
-                reflection.contentText?.trim().isNotEmpty == true
-                    ? reflection.contentText!.trim()
-                    : '내용이 없습니다.',
-                style: TextStyle(
-                  color: AppColors.of(context).textBody,
-                  fontSize: 15,
-                  height: 1.6,
                 ),
               ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${_formatDate(reflection.updatedAt)} · 나의 독후감',
+                  style: TextStyle(
+                    color: AppColors.of(context).textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: onMore,
+                tooltip: '독후감 관리',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(PhosphorIconsRegular.dotsThree, size: 22),
+              ),
+            ],
+          ),
+          const ReflectionTitleBodyDivider(horizontalInset: 0),
+          if (reflection.contentJson != null)
+            _ReflectionRichContent(
+              key: ValueKey(reflection.updatedAt),
+              reflectionId: reflection.id,
+              contentJson: reflection.contentJson!,
+            )
+          else
+            Text(
+              reflection.contentText?.trim().isNotEmpty == true
+                  ? reflection.contentText!.trim()
+                  : '내용이 없습니다.',
+              style: TextStyle(
+                color: AppColors.of(context).textBody,
+                fontSize: 16,
+                height: 1.8,
+              ),
+            ),
+        ],
       ),
     );
   }

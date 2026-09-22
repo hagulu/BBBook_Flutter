@@ -124,9 +124,9 @@ class _AnswerList extends StatelessWidget {
     return ListView.separated(
       controller: scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
       itemCount: items.length + (isLoadingMore ? 1 : 0),
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const CommunityContentDivider(),
       itemBuilder: (context, index) {
         if (index >= items.length) {
           return const CommunityContentPageLoader();

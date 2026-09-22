@@ -18,21 +18,15 @@ class AppDialogAction {
 
 /// [AppAlert]/[AppConfirm]가 공유하는 다이얼로그 카드 형태.
 ///
-/// alert.png 기준(아이콘+제목, 본문, 하단 버튼 영역)의 시각 스타일을 따른다.
+/// 아이콘 없이 제목, 본문, 하단 버튼 영역만 둔다.
 class AppDialogShell extends StatelessWidget {
   const AppDialogShell({
     super.key,
-    this.icon,
-    this.iconColor,
-    this.iconBackgroundColor,
     required this.title,
     required this.message,
     required this.actions,
   });
 
-  final IconData? icon;
-  final Color? iconColor;
-  final Color? iconBackgroundColor;
   final String title;
   final String message;
   final List<AppDialogAction> actions;
@@ -58,27 +52,7 @@ class AppDialogShell extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (icon != null)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            CircleAvatar(
-                              radius: 22,
-                              backgroundColor:
-                                  iconBackgroundColor ??
-                                  AppColors.of(context).highlightGoldSurface,
-                              child: Icon(
-                                icon,
-                                color: iconColor ?? AppColors.highlightGold,
-                                size: 22,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(child: _Title(title)),
-                          ],
-                        )
-                      else
-                        _Title(title),
+                      _Title(title),
                       const SizedBox(height: 16),
                       Text(
                         message,

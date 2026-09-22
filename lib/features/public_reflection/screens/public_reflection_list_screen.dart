@@ -72,35 +72,30 @@ class _PublicReflectionListScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: AppBarTitle(widget.bookTitle, subtitle: '공개 독후감'),
+        title: AppBarTitle(widget.bookTitle, subtitle: '독후감'),
         backgroundColor: AppColors.of(context).pageBackground,
         foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
       ),
-      body: SafeArea(
-        top: false,
-        child: switch (state) {
-          AsyncData(:final value) => _ReflectionList(
-            scrollController: _scrollController,
-            state: value,
-            onRefresh: () => ref
-                .read(
-                  publicReflectionListControllerProvider(
-                    widget.isbn13,
-                  ).notifier,
-                )
-                .refresh(),
-            onOpen: _openReader,
+      body: switch (state) {
+        AsyncData(:final value) => _ReflectionList(
+          scrollController: _scrollController,
+          state: value,
+          onRefresh: () => ref
+              .read(
+                publicReflectionListControllerProvider(widget.isbn13).notifier,
+              )
+              .refresh(),
+          onOpen: _openReader,
+        ),
+        AsyncError() => CommunityContentErrorState(
+          message: '독후감을 불러오지 못했습니다.',
+          onRetry: () => ref.invalidate(
+            publicReflectionListControllerProvider(widget.isbn13),
           ),
-          AsyncError() => CommunityContentErrorState(
-            message: '독후감을 불러오지 못했습니다.',
-            onRetry: () => ref.invalidate(
-              publicReflectionListControllerProvider(widget.isbn13),
-            ),
-          ),
-          _ => const CommunityContentLoadingState(),
-        },
-      ),
+        ),
+        _ => const CommunityContentLoadingState(),
+      },
     );
   }
 }
@@ -120,33 +115,45 @@ class _ReflectionList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (state.items.isEmpty) {
-      return CommunityContentEmptyList(
-        message: '아직 공개된 독후감이 없습니다.',
-        scrollController: scrollController,
-        onRefresh: onRefresh,
-      );
-    }
-
     return RefreshIndicator(
       onRefresh: onRefresh,
-      child: ListView.separated(
+      child: CustomScrollView(
         controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-        itemCount: state.items.length + (state.isLoadingMore ? 1 : 0),
-        separatorBuilder: (_, _) => const SizedBox(height: 10),
-        itemBuilder: (context, index) {
-          if (index >= state.items.length) {
-            return const CommunityContentPageLoader();
-          }
-          final reflection = state.items[index];
-          return PublicReflectionCard(
-            key: ValueKey(reflection.id),
-            reflection: reflection,
-            onTap: () => onOpen(reflection),
-          );
-        },
+        slivers: [
+          if (state.items.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 80),
+                  child: Text(
+                    '아직 공개된 독후감이 없습니다.',
+                    style: TextStyle(color: AppColors.of(context).textMuted),
+                  ),
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 48),
+              sliver: SliverList.separated(
+                itemCount: state.items.length + (state.isLoadingMore ? 1 : 0),
+                separatorBuilder: (_, _) => const CommunityContentDivider(),
+                itemBuilder: (context, index) {
+                  if (index >= state.items.length) {
+                    return const CommunityContentPageLoader();
+                  }
+                  final reflection = state.items[index];
+                  return PublicReflectionCard(
+                    key: ValueKey(reflection.id),
+                    reflection: reflection,
+                    onTap: () => onOpen(reflection),
+                  );
+                },
+              ),
+            ),
+        ],
       ),
     );
   }

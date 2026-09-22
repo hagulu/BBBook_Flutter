@@ -203,46 +203,51 @@ class _MainShellState extends ConsumerState<MainShell>
                   MainShellNavigationLayout.minimumHorizontalInset,
                   MainShellNavigationLayout.minimumBottomInset,
                 ),
-                child: BackdropGroup(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _FloatingNavPill(
-                        items: [
-                          _FloatingNavPillItem(
-                            icon: PhosphorIconsRegular.books,
-                            selectedIcon: PhosphorIconsFill.books,
-                            label: '책장',
-                            selected: selectedIndex == 0,
-                            onTap: () =>
-                                ref
-                                        .read(
-                                          mainShellTabIndexProvider.notifier,
-                                        )
-                                        .state =
-                                    0,
-                          ),
-                          _FloatingNavPillItem(
-                            icon: PhosphorIconsRegular.user,
-                            selectedIcon: PhosphorIconsFill.user,
-                            label: '마이',
-                            selected: selectedIndex == 1,
-                            onTap: () =>
-                                ref
-                                        .read(
-                                          mainShellTabIndexProvider.notifier,
-                                        )
-                                        .state =
-                                    1,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(
-                        width: MainShellNavigationLayout.controlGap,
-                      ),
-                      _AddBookButton(onTap: _openBookSearch),
-                    ],
+                child: Padding(
+                  padding: const EdgeInsets.only(
+                    bottom: MainShellNavigationLayout.bottomLift,
+                  ),
+                  child: BackdropGroup(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _FloatingNavPill(
+                          items: [
+                            _FloatingNavPillItem(
+                              icon: PhosphorIconsRegular.books,
+                              selectedIcon: PhosphorIconsFill.books,
+                              label: '책장',
+                              selected: selectedIndex == 0,
+                              onTap: () =>
+                                  ref
+                                          .read(
+                                            mainShellTabIndexProvider.notifier,
+                                          )
+                                          .state =
+                                      0,
+                            ),
+                            _FloatingNavPillItem(
+                              icon: PhosphorIconsRegular.user,
+                              selectedIcon: PhosphorIconsFill.user,
+                              label: '마이',
+                              selected: selectedIndex == 1,
+                              onTap: () =>
+                                  ref
+                                          .read(
+                                            mainShellTabIndexProvider.notifier,
+                                          )
+                                          .state =
+                                      1,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(
+                          width: MainShellNavigationLayout.controlGap,
+                        ),
+                        _AddBookButton(onTap: _openBookSearch),
+                      ],
+                    ),
                   ),
                 ),
               ),
