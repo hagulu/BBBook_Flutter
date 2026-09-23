@@ -4,17 +4,23 @@ class PublicReflectionAuthor {
     required this.id,
     this.nickname,
     this.profileImageUrl,
+    this.isFinishedBooksPublic = false,
   });
 
   final int id;
   final String? nickname;
   final String? profileImageUrl;
 
+  /// 완독 책장 공개 여부. 공개 설정 데이터가 없으면 서버가 false로 내려준다
+  /// (api-reflections-reflectionId-get.md).
+  final bool isFinishedBooksPublic;
+
   factory PublicReflectionAuthor.fromJson(Map<String, dynamic> json) {
     return PublicReflectionAuthor(
       id: json['id'] as int,
       nickname: json['nickname'] as String?,
       profileImageUrl: json['profileImageUrl'] as String?,
+      isFinishedBooksPublic: json['isFinishedBooksPublic'] as bool? ?? false,
     );
   }
 
@@ -32,6 +38,7 @@ class PublicReflectionAuthor {
       id: json['userId'] as int? ?? 0,
       nickname: json['nickname'] as String?,
       profileImageUrl: json['profileImageUrl'] as String?,
+      isFinishedBooksPublic: json['isFinishedBooksPublic'] as bool? ?? false,
     );
   }
 }

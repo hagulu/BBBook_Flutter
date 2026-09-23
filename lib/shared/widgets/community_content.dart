@@ -110,6 +110,7 @@ class CommunityAuthorRow extends StatelessWidget {
     this.avatarRadius = 12,
     this.layout = CommunityAuthorLayout.inline,
     this.trailing,
+    this.onTap,
   });
 
   final String? nickname;
@@ -118,6 +119,11 @@ class CommunityAuthorRow extends StatelessWidget {
   final double avatarRadius;
   final CommunityAuthorLayout layout;
   final Widget? trailing;
+
+  /// 아바타·닉네임(작성일 제외) 탭 시 호출. 다른 사용자의 공개 완독 책장
+  /// 진입점(`UserMenu` 대응)처럼 프로필 영역만 눌러야 할 때 쓴다 — null이면
+  /// 아무 반응 없는 평범한 텍스트로 남는다.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -137,9 +143,26 @@ class CommunityAuthorRow extends StatelessWidget {
       style: TextStyle(fontSize: 12, color: AppColors.of(context).textMuted),
     );
 
+    final onTap = this.onTap;
+    final nicknameWidget = onTap == null
+        ? nicknameText
+        : GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: nicknameText,
+          );
+    final avatar = _CommunityAvatar(imageUrl: profileImageUrl, radius: avatarRadius);
+    final avatarWidget = onTap == null
+        ? avatar
+        : GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: avatar,
+          );
+
     return Row(
       children: [
-        _CommunityAvatar(imageUrl: profileImageUrl, radius: avatarRadius),
+        avatarWidget,
         const SizedBox(width: 8),
         Expanded(
           child: layout == CommunityAuthorLayout.inline
@@ -148,7 +171,7 @@ class CommunityAuthorRow extends StatelessWidget {
                   runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    nicknameText,
+                    nicknameWidget,
                     Text(
                       '·',
                       style: TextStyle(
@@ -161,7 +184,11 @@ class CommunityAuthorRow extends StatelessWidget {
                 )
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [nicknameText, const SizedBox(height: 2), dateText],
+                  children: [
+                    nicknameWidget,
+                    const SizedBox(height: 2),
+                    dateText,
+                  ],
                 ),
         ),
         ?trailing,
@@ -183,6 +210,7 @@ class CommunityContentHeader extends StatelessWidget {
     this.badges = const [],
     this.trailing,
     this.metadata,
+    this.onAuthorTap,
   });
 
   final String title;
@@ -195,6 +223,9 @@ class CommunityContentHeader extends StatelessWidget {
   /// 행 오른쪽) 붙는 메뉴/신고 버튼 등.
   final Widget? trailing;
   final Widget? metadata;
+
+  /// [CommunityAuthorRow.onTap]으로 그대로 전달(프로필 영역 탭).
+  final VoidCallback? onAuthorTap;
 
   @override
   Widget build(BuildContext context) {
@@ -226,6 +257,7 @@ class CommunityContentHeader extends StatelessWidget {
           avatarRadius: 16,
           layout: CommunityAuthorLayout.stacked,
           trailing: metadata == null ? trailing : null,
+          onTap: onAuthorTap,
         ),
         if (metadata != null) ...[
           const SizedBox(height: 8),

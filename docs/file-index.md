@@ -202,6 +202,13 @@
 - `lib/features/notices/data/notices_api.dart` — 공지사항 목록·상세 API 호출(둘 다 인증 불필요)
 - `lib/features/notices/providers/notices_providers.dart` — 공지사항 목록 커서 무한 스크롤(다음 페이지 전용 에러 상태 포함)·상세 조회 Riverpod provider
 
+## features/public_bookshelf
+
+- `lib/features/public_bookshelf/screens/public_finished_bookshelf_screen.dart` — 다른 사용자의 공개 완독 책장 화면(그리드, 커서 무한 스크롤), 비공개(403)는 일반 오류와 구분해 안내
+- `lib/features/public_bookshelf/data/public_bookshelf_api.dart` — 공개 완독 책장 API 호출(`GET /api/users/{userId}/books/finished`, 인증 선택)
+- `lib/features/public_bookshelf/providers/public_bookshelf_providers.dart` — userId 기준 완독 책장 커서 무한 스크롤 Riverpod provider
+- `lib/features/public_bookshelf/widgets/author_profile_sheet.dart` — 독후감 상세/토론 상세/독자평 작성자 영역 탭 시 뜨는 시트(웹 `UserMenu` 대응), 완독 책장 공개(`isFinishedBooksPublic`) 사용자만 탭 가능, "완독 책장 보러가기" 선택 시 공개 완독 책장 화면으로 이동
+
 ## shared/widgets
 
 - `lib/shared/widgets/app_alert.dart` — 공통 Alert 팝업(제목/내용/확인 버튼)

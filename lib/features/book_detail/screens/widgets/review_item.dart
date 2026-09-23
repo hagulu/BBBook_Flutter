@@ -5,14 +5,14 @@ import '../../../../shared/widgets/community_content.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../../book_record/screens/widgets/star_rating.dart';
 import '../../../discussion/utils/discussion_date.dart';
+import '../../../public_bookshelf/widgets/author_profile_sheet.dart';
 import '../../models/book_review.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 커뮤니티 리뷰 카드 한 건(book-detail.md `CommunityReviews` 대응).
 ///
-/// 작성자 아바타/닉네임 클릭 시 다른 사용자 완독 책장으로 이동하는 `UserMenu`
-/// 팝오버는 해당 기능(public-finished-shelf)이 아직 이관되지 않아 이번
-/// 범위에서 제외한다(사용자 확인 사항).
+/// 작성자 아바타/닉네임을 탭하면 웹의 `UserMenu`와 동일하게 완독 책장이
+/// 공개된 사용자에 한해 시트를 띄워 완독 책장으로 이동한다.
 class ReviewItem extends StatefulWidget {
   const ReviewItem({
     super.key,
@@ -91,6 +91,12 @@ class _ReviewItemState extends State<ReviewItem> {
             nickname: review.user.nickname,
             profileImageUrl: review.user.profileImageUrl,
             dateLabel: formatRelativeDiscussionDate(review.createdAt),
+            onTap: authorProfileSheetHandler(
+              context,
+              userId: review.user.id,
+              nickname: review.user.nickname,
+              isFinishedBooksPublic: review.user.isFinishedBooksPublic,
+            ),
             trailing: review.isHidden
                 ? null
                 : Row(

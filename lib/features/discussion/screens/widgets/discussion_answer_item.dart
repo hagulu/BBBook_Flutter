@@ -4,6 +4,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/community_content.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
+import '../../../public_bookshelf/widgets/author_profile_sheet.dart';
 import '../../models/discussion_answer.dart';
 import '../../models/discussion_topic.dart';
 import '../../utils/discussion_date.dart';
@@ -109,6 +110,12 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
               avatarRadius: 13,
               layout: CommunityAuthorLayout.stacked,
               trailing: answer.isHidden ? null : _buildMenu(answer),
+              onTap: authorProfileSheetHandler(
+                context,
+                userId: answer.user.id,
+                nickname: answer.user.nickname,
+                isFinishedBooksPublic: answer.user.isFinishedBooksPublic,
+              ),
             ),
           if (answer.isHidden)
             Padding(

@@ -106,6 +106,9 @@ class ApiClient {
     ),
     RegExp(r'^/api/discussions/\d+(?:/answers)?$'),
     RegExp(r'^/api/reflections/\d+$'),
+    // 비로그인도 조회 가능하고, 공개 여부는 대상 사용자 설정만으로 결정된다
+    // (api-users-id-books-finished-get.md).
+    RegExp(r'^/api/users/\d+/books/finished$'),
   ];
 
   bool _isAnonymous(RequestOptions options) =>

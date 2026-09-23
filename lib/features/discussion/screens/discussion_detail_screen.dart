@@ -14,6 +14,7 @@ import '../../../shared/widgets/community_content.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
 import '../../auth/providers/auth_access_providers.dart';
 import '../../book_detail/screens/widgets/report_dialog.dart';
+import '../../public_bookshelf/widgets/author_profile_sheet.dart';
 import '../models/discussion_answer.dart';
 import '../models/discussion_topic.dart';
 import '../providers/discussion_providers.dart';
@@ -574,6 +575,12 @@ class _TopicCard extends StatelessWidget {
           nickname: topic.user.nickname,
           profileImageUrl: topic.user.profileImageUrl,
           dateLabel: formatRelativeDiscussionDateTime(topic.createdAt),
+          onAuthorTap: authorProfileSheetHandler(
+            context,
+            userId: topic.user.id,
+            nickname: topic.user.nickname,
+            isFinishedBooksPublic: topic.user.isFinishedBooksPublic,
+          ),
           badges: [
             if (topic.isClosed) const DiscussionBadge.closed(),
             if (topic.isSpoiler) const DiscussionBadge.spoiler(),

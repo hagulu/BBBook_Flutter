@@ -12,6 +12,7 @@ import '../../book_reflection/screens/widgets/reflection_image_embed_builder.dar
 import '../../book_reflection/screens/widgets/reflection_title_body_divider.dart';
 import '../../book_reflection/services/book_reflection_content_adapter.dart';
 import '../../discussion/utils/discussion_date.dart';
+import '../../public_bookshelf/widgets/author_profile_sheet.dart';
 import '../models/public_reflection.dart';
 import '../providers/public_reflection_providers.dart';
 
@@ -226,6 +227,12 @@ class _ReaderBody extends StatelessWidget {
             nickname: detail.user.nickname,
             profileImageUrl: detail.user.profileImageUrl,
             dateLabel: formatRelativeDiscussionDateTime(detail.createdAt),
+            onAuthorTap: authorProfileSheetHandler(
+              context,
+              userId: detail.user.id,
+              nickname: detail.user.nickname,
+              isFinishedBooksPublic: detail.user.isFinishedBooksPublic,
+            ),
           ),
           const ReflectionTitleBodyDivider(horizontalInset: 0),
           _PublicReflectionRichContent(
