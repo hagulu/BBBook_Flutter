@@ -17,14 +17,29 @@ class MyReflectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isHidden = reflection.isHidden;
+
     return CommunityContentCard(
       onTap: onTap,
       child: MyContentCardLayout(
         book: reflection.book,
-        dateLabel: reflection.isHidden
+        dateLabel: isHidden
             ? null
             : formatRelativeDiscussionDateTime(reflection.createdAt),
-        content: reflection.isHidden
+        title: isHidden
+            ? null
+            : Text(
+                reflection.title ?? '',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 16,
+                  height: 1.4,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.of(context).textStrong,
+                ),
+              ),
+        content: isHidden
             ? Text(
                 '숨김 처리된 독후감입니다.',
                 style: TextStyle(
@@ -32,33 +47,15 @@ class MyReflectionCard extends StatelessWidget {
                   color: AppColors.of(context).textMuted,
                 ),
               )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    reflection.title ?? '',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 18,
-                      height: 1.4,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.of(context).textStrong,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    reflection.previewText ?? '',
-                    maxLines: 5,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.of(context).textBody,
-                      height: 1.5,
-                    ),
-                  ),
-                ],
+            : Text(
+                reflection.previewText ?? '',
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.of(context).textBody,
+                  height: 1.5,
+                ),
               ),
       ),
     );

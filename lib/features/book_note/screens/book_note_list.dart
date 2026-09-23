@@ -4,6 +4,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../auth/providers/auth_access_providers.dart';
+import '../../discussion/utils/discussion_date.dart';
 import '../models/book_note.dart';
 import '../providers/book_note_providers.dart';
 import 'book_note_detail_screen.dart';
@@ -190,11 +191,11 @@ class _NoteCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 7),
                     Text(
-                      '${_formatDate(summary.note.updatedAt)} · '
+                      '${formatRelativeDiscussionDate(summary.note.updatedAt)} · '
                       '메모 ${summary.memoCount}개',
                       style: TextStyle(
                         color: AppColors.of(context).textMuted,
-                        fontSize: 12,
+                        fontSize: 11,
                       ),
                     ),
                   ],
@@ -211,11 +212,6 @@ class _NoteCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  static String _formatDate(DateTime value) {
-    final local = value.toLocal();
-    return '${local.year}.${local.month}.${local.day}';
   }
 }
 

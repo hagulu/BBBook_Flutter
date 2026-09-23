@@ -218,7 +218,7 @@ class CommunityContentHeader extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 12),
         CommunityAuthorRow(
           nickname: nickname,
           profileImageUrl: profileImageUrl,
@@ -228,7 +228,7 @@ class CommunityContentHeader extends StatelessWidget {
           trailing: metadata == null ? trailing : null,
         ),
         if (metadata != null) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(child: metadata!),
@@ -370,7 +370,7 @@ class CommunityContentWidth extends StatelessWidget {
   const CommunityContentWidth({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.fromLTRB(24, 24, 24, 48),
+    this.padding = const EdgeInsets.fromLTRB(24, 8, 24, 48),
   });
 
   final Widget child;
@@ -487,7 +487,7 @@ class CommunityLikeInline extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [

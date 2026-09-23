@@ -21,6 +21,7 @@ import '../../book_reflection/models/book_reflection.dart';
 import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../book_reflection/screens/book_reflection_detail_screen.dart';
 import '../../book_reflection/screens/book_reflection_editor_screen.dart';
+import '../../discussion/utils/discussion_date.dart';
 import '../../storage_mode/data/storage_mode_store.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../models/book_note.dart';
@@ -161,6 +162,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
                 bottom: 16 + MediaQuery.paddingOf(context).bottom,
                 child: FilterChip(
                   selected: _importantOnly,
+                  showCheckmark: false,
                   onSelected: (selected) =>
                       setState(() => _importantOnly = selected),
                   avatar: Icon(
@@ -788,7 +790,7 @@ class BookNoteMemoTimelineItem extends StatelessWidget {
                         Padding(
                           padding: const EdgeInsets.only(left: 8, right: 12),
                           child: Text(
-                            _formatDateTime(memo.createdAt),
+                            formatRelativeDiscussionDateTime(memo.createdAt),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -846,23 +848,6 @@ class BookNoteMemoTimelineItem extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  static String _formatDateTime(DateTime value) {
-    final local = value.toLocal();
-    final difference = DateTime.now().difference(local);
-    final elapsed = difference.isNegative ? Duration.zero : difference;
-    if (elapsed.inSeconds < 60) {
-      final seconds = elapsed.inSeconds < 1 ? 1 : elapsed.inSeconds;
-      return '$seconds초 전';
-    }
-    if (elapsed.inMinutes < 60) return '${elapsed.inMinutes}분 전';
-    if (elapsed.inHours < 24) return '${elapsed.inHours}시간 전';
-    if (elapsed.inDays < 30) return '${elapsed.inDays}일 전';
-
-    final hour = local.hour.toString().padLeft(2, '0');
-    final minute = local.minute.toString().padLeft(2, '0');
-    return '${local.month}-${local.day} $hour:$minute';
   }
 }
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/author_display.dart';
+import '../../../book_record/models/record_labels.dart';
 import '../../../book_record/screens/book_record_screen.dart';
 import '../../models/book_item.dart';
 import '../../models/book_status.dart';
@@ -14,7 +15,8 @@ import 'recommended_books_section.dart';
 
 /// 읽는 중 탭: READING 리스트 카드(진행률 바 + 경과일 배지).
 ///
-/// PAUSED 상태 책도 함께 조회해 흐리게(dimmed) 표시한다(`bookshelf.md`).
+/// PAUSED 상태 책도 함께 조회하되, READING 목록과 섞이지 않도록 구분선
+/// 아래에 별도 섹션으로 모아서 보여준다(흐리게(dimmed) 표시는 유지).
 class ReadingTabView extends ConsumerWidget {
   const ReadingTabView({super.key});
 
@@ -32,6 +34,19 @@ class ReadingTabView extends ConsumerWidget {
           emptyText: '읽는 중인 책이 없습니다.',
         ),
         builder: (context, items) {
+          final readingItems = [
+            for (final item in items)
+              if (item.status != BookStatus.paused) item,
+          ];
+          final pausedItems = [
+            for (final item in items)
+              if (item.status == BookStatus.paused) item,
+          ];
+          final hasPaused = pausedItems.isNotEmpty;
+          // 읽는 중 목록 + (있으면) 구분 헤더 1개 + 잠시 멈춤 목록.
+          final itemCount =
+              readingItems.length + (hasPaused ? 1 : 0) + pausedItems.length;
+
           return ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.fromLTRB(
@@ -40,12 +55,54 @@ class ReadingTabView extends ConsumerWidget {
               16,
               bookshelfBottomContentPadding(context),
             ),
-            itemCount: items.length,
+            itemCount: itemCount,
             separatorBuilder: (context, index) => const SizedBox(height: 12),
-            itemBuilder: (context, index) =>
-                _ReadingBookCard(book: items[index]),
+            itemBuilder: (context, index) {
+              if (index < readingItems.length) {
+                return _ReadingBookCard(book: readingItems[index]);
+              }
+              final pausedIndex = index - readingItems.length;
+              if (hasPaused && pausedIndex == 0) {
+                return _PausedSectionHeader(count: pausedItems.length);
+              }
+              final bookIndex = hasPaused ? pausedIndex - 1 : pausedIndex;
+              return _ReadingBookCard(book: pausedItems[bookIndex]);
+            },
           );
         },
+      ),
+    );
+  }
+}
+
+/// 잠시 멈춤 섹션 구분 헤더. 읽는 중 목록과 시각적으로 분리되도록 위에
+/// 살짝 더 넓은 간격을 두고, 아이콘 + 라벨 + 권수로 짧게 표시한다.
+class _PausedSectionHeader extends StatelessWidget {
+  const _PausedSectionHeader({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      child: Row(
+        children: [
+          Icon(
+            BookStatus.paused.icon,
+            size: 14,
+            color: AppColors.of(context).textMuted,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '${BookStatus.paused.label} $count',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.of(context).textMuted,
+            ),
+          ),
+        ],
       ),
     );
   }

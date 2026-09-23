@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/utils/author_display.dart';
 import '../../../bookshelf/screens/widgets/book_cover.dart';
 import '../../models/my_content_book.dart';
 
@@ -15,6 +14,7 @@ class MyContentCardLayout extends StatelessWidget {
     super.key,
     required this.book,
     required this.content,
+    this.title,
     this.coverOverlay,
     this.onBookTap,
     this.dateLabel,
@@ -25,7 +25,10 @@ class MyContentCardLayout extends StatelessWidget {
 
   final MyContentBookRef? book;
 
-  /// 표지 오른쪽에 배치되는 화면별 콘텐츠(제목·미리보기 등, 작성일 제외).
+  /// 표지 위, 책 제목 줄 아래에 전체 폭으로 배치되는 글 제목(있는 화면만).
+  final Widget? title;
+
+  /// 표지 오른쪽에 배치되는 화면별 콘텐츠(미리보기 등, 제목·작성일 제외).
   final Widget content;
 
   /// 표지 위에 겹치는 배지(예: 토론 마감 오버레이).
@@ -50,8 +53,9 @@ class MyContentCardLayout extends StatelessWidget {
       children: [
         if (book != null) ...[
           _BookTitleRow(book: book, onTap: onBookTap),
-          const SizedBox(height: 16),
+          SizedBox(height: title != null ? 4 : 16),
         ],
+        if (title != null) ...[title!, const SizedBox(height: 8)],
         IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -101,27 +105,15 @@ class _BookTitleRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final author = book.author.displayedAuthorOrNull;
-    final text = Text.rich(
-      TextSpan(
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: AppColors.of(context).textMuted,
-        ),
-        children: [
-          TextSpan(text: book.title),
-          if (author != null) ...[
-            const WidgetSpan(child: SizedBox(width: 3)),
-            TextSpan(
-              text: '($author)',
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w400),
-            ),
-          ],
-        ],
-      ),
+    final text = Text(
+      book.title,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: AppColors.of(context).textMuted,
+      ),
     );
 
     if (onTap == null) return text;

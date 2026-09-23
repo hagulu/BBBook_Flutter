@@ -40,10 +40,10 @@ const _kFinishedSearchBarHeight = 96.0;
 /// 완독 탭 월 그룹 헤더 고정 높이(시스템 글자 배율 1.0 기준). `_groupedSlivers`의
 /// 헤더 위젯과 `_FinishedTabViewState._offsetForGroupIndex`의 스크롤 오프셋
 /// 계산이 항상 같은 값을 쓰도록 [_scaledFinishedGroupHeaderHeight]로만 참조한다
-/// (값이 어긋나면 인덱스 점프가 밀림). 위 16dp + 아래 8dp 패딩을 뺀 20dp가
+/// (값이 어긋나면 인덱스 점프가 밀림). 위 8dp + 아래 8dp 패딩을 뺀 20dp가
 /// 라벨 몫인데, 배율 1.4 이상에서 라벨 줄 높이가 이를 넘어 잘리므로 배율만큼
 /// 함께 키운다.
-const _kFinishedGroupHeaderHeight = 44.0;
+const _kFinishedGroupHeaderHeight = 36.0;
 const _kFinishedGroupHeaderHeightGrowth = 20.0;
 
 double _scaledFinishedGroupHeaderHeight(double textScale) {
@@ -595,6 +595,8 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
               delegate: _MonthHeaderDelegate(
                 group.label,
                 height: _scaledFinishedGroupHeaderHeight(_textScale),
+                backgroundColor: AppColors.of(context).pageBackground,
+                textColor: AppColors.of(context).textStrong,
               ),
             ),
             SliverPadding(
@@ -686,7 +688,12 @@ class _MonthGroup {
 /// 않게 한다. `pinned: true`인 `SliverPersistentHeader`를 여러 개 이어
 /// 붙이면 다음 헤더가 상단에 닿는 순간 이전 헤더를 자연스럽게 밀어낸다.
 class _MonthHeaderDelegate extends SliverPersistentHeaderDelegate {
-  _MonthHeaderDelegate(this.label, {required this.height});
+  _MonthHeaderDelegate(
+    this.label, {
+    required this.height,
+    required this.backgroundColor,
+    required this.textColor,
+  });
 
   final String label;
 
@@ -694,6 +701,14 @@ class _MonthHeaderDelegate extends SliverPersistentHeaderDelegate {
   /// 높이. `_offsetForGroupIndex`의 스크롤 오프셋 계산과 항상 같은 값이어야
   /// 한다.
   final double height;
+
+  // 색은 호출부에서 미리 읽어 전달받아 build()의 context가 아닌 값 비교로
+  // 변경을 감지한다 — pinned SliverPersistentHeader는 shouldRebuild가
+  // false면 이미 화면에 그려진 헤더를 다시 build()하지 않으므로, 테마가
+  // 바뀌어도(label/height는 그대로라) 스크롤로 새로 나타나기 전까지 이전
+  // 색이 그대로 남는 문제가 있었다.
+  final Color backgroundColor;
+  final Color textColor;
 
   @override
   double get minExtent => height;
@@ -708,15 +723,15 @@ class _MonthHeaderDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       alignment: Alignment.centerLeft,
-      color: AppColors.of(context).pageBackground,
+      color: backgroundColor,
       child: Text(
         label,
         style: TextStyle(
           fontWeight: FontWeight.bold,
           fontSize: 14,
-          color: AppColors.of(context).textStrong,
+          color: textColor,
         ),
       ),
     );
@@ -724,7 +739,10 @@ class _MonthHeaderDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   bool shouldRebuild(covariant _MonthHeaderDelegate oldDelegate) =>
-      label != oldDelegate.label || height != oldDelegate.height;
+      label != oldDelegate.label ||
+      height != oldDelegate.height ||
+      backgroundColor != oldDelegate.backgroundColor ||
+      textColor != oldDelegate.textColor;
 }
 
 /// 완독 탭 상단 아이콘 바(검색 / 공개 토글 / 도움말). 고정되지 않은 일반

@@ -36,21 +36,34 @@ const _reflectionQuoteMarkInset = -6.0;
 /// 리더(`public_reflection_reader_screen.dart`)와 같은 값을 쓴다.
 /// `paragraph`를 비워 두면 패키지 기본값이 그대로 적용되므로 `lists`까지
 /// 함께 지정해야 목록 줄에서 크기가 되돌아가지 않는다.
-final _reflectionQuillStylesLight = _buildReflectionQuillStyles(
-  AppPalette.light,
-);
-final _reflectionQuillStylesDark = _buildReflectionQuillStyles(AppPalette.dark);
+///
+/// Quill이 만드는 `TextSpan`은 주변 `DefaultTextStyle`과 병합되지 않아
+/// `fontFamily`를 여기서 직접 지정하지 않으면 플랫폼 기본 폰트로 그려진다.
+/// iOS는 `Typography.material2021`이 본문/제목에 서로 다른 San Francisco
+/// 최적화 패밀리(Text/Display)를 쓰므로, `fontFamily`가 없으면 토론 화면의
+/// `Text`/`SelectableText`(주변 `DefaultTextStyle`을 상속해 `bodyMedium`
+/// 패밀리를 그대로 씀)와 실제 렌더링되는 줄 간격이 달라 보인다 — 숫자로 같은
+/// `height`를 줘도 폰트별 기본 줄높이(ascent/descent)가 다르기 때문이다.
+/// 그래서 `bodyMedium`의 `fontFamily`를 그대로 가져와 본문 계열 스타일에
+/// 명시적으로 맞춘다.
+DefaultStyles bookReflectionQuillStyles(BuildContext context) {
+  final brightness = Theme.of(context).brightness;
+  final colors = brightness == Brightness.dark
+      ? AppPalette.dark
+      : AppPalette.light;
+  final bodyFontFamily = Theme.of(context).textTheme.bodyMedium?.fontFamily;
+  return _buildReflectionQuillStyles(colors, bodyFontFamily);
+}
 
-DefaultStyles bookReflectionQuillStyles(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark
-    ? _reflectionQuillStylesDark
-    : _reflectionQuillStylesLight;
-
-DefaultStyles _buildReflectionQuillStyles(AppPalette colors) {
+DefaultStyles _buildReflectionQuillStyles(
+  AppPalette colors,
+  String? bodyFontFamily,
+) {
   final bodyTextStyle = TextStyle(
     color: colors.textBody,
-    fontSize: 16,
-    height: 1.8,
+    fontSize: 15,
+    height: 1.6,
+    fontFamily: bodyFontFamily,
   );
   return DefaultStyles(
     h1: DefaultTextBlockStyle(
@@ -78,7 +91,12 @@ DefaultStyles _buildReflectionQuillStyles(AppPalette colors) {
       null,
     ),
     placeHolder: DefaultTextBlockStyle(
-      TextStyle(color: colors.textMuted, fontSize: 16, height: 1.8),
+      TextStyle(
+        color: colors.textMuted,
+        fontSize: 15,
+        height: 1.6,
+        fontFamily: bodyFontFamily,
+      ),
       HorizontalSpacing.zero,
       VerticalSpacing.zero,
       VerticalSpacing.zero,
@@ -102,9 +120,10 @@ DefaultStyles _buildReflectionQuillStyles(AppPalette colors) {
     quote: DefaultTextBlockStyle(
       TextStyle(
         color: colors.reflectionQuoteText,
-        fontSize: 16,
+        fontSize: 15,
         fontStyle: FontStyle.italic,
-        height: 1.8,
+        height: 1.6,
+        fontFamily: bodyFontFamily,
       ),
       HorizontalSpacing(
         _reflectionQuoteLeftSpacing,
@@ -637,8 +656,7 @@ class _BookReflectionEditorScreenState
                       const SizedBox(width: 8),
                     ],
                   ),
-                  SliverFillRemaining(
-                    hasScrollBody: false,
+                  SliverToBoxAdapter(
                     child: CommunityContentWidth(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       // 앱바·제목·본문이 하나의 스크롤을 공유한다. Quill의

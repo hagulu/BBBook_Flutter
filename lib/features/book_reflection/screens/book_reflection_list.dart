@@ -5,6 +5,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../auth/providers/auth_access_providers.dart';
+import '../../discussion/utils/discussion_date.dart';
 import '../models/book_reflection.dart';
 import '../providers/book_reflection_providers.dart';
 import 'book_reflection_detail_screen.dart';
@@ -155,38 +156,19 @@ class _ReflectionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Flexible(
-                child: Text(
-                  reflection.isHidden
-                      ? '숨김 처리된 독후감'
-                      : (title == null || title.isEmpty ? '제목 없음' : title),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.of(context).textStrong,
-                    fontSize: 18,
-                    height: 1.4,
-                    letterSpacing: -0.2,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              if (showVisibility) ...[
-                const SizedBox(width: 8),
-                Semantics(
-                  label: reflection.isPublic ? '공개 독후감' : '비공개 독후감',
-                  child: Icon(
-                    reflection.isPublic
-                        ? PhosphorIconsRegular.globe
-                        : PhosphorIconsRegular.lock,
-                    size: 14,
-                    color: AppColors.of(context).textMuted,
-                  ),
-                ),
-              ],
-            ],
+          Text(
+            reflection.isHidden
+                ? '숨김 처리된 독후감'
+                : (title == null || title.isEmpty ? '제목 없음' : title),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: AppColors.of(context).textStrong,
+              fontSize: 18,
+              height: 1.4,
+              letterSpacing: -0.2,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           if (!reflection.isHidden &&
               preview != null &&
@@ -204,21 +186,31 @@ class _ReflectionCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 20),
-          Text(
-            _formatDate(reflection.createdAt),
-            style: TextStyle(
-              color: AppColors.of(context).textMuted,
-              fontSize: 12,
-            ),
+          Row(
+            children: [
+              Text(
+                formatRelativeDiscussionDate(reflection.createdAt),
+                style: TextStyle(
+                  color: AppColors.of(context).textMuted,
+                  fontSize: 11,
+                ),
+              ),
+              if (showVisibility && reflection.isPublic) ...[
+                const Spacer(),
+                Semantics(
+                  label: '공개 독후감',
+                  child: Icon(
+                    PhosphorIconsRegular.globe,
+                    size: 14,
+                    color: AppColors.of(context).textMuted,
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),
     );
-  }
-
-  static String _formatDate(DateTime value) {
-    final local = value.toLocal();
-    return '${local.year}.${local.month}.${local.day}';
   }
 }
 

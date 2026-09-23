@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/relative_time.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
@@ -319,12 +320,15 @@ class _ReflectionBody extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
                 child: Text(
-                  '${_formatDate(reflection.updatedAt)} · 나의 독후감',
+                  formatRelativeTime(
+                    reflection.updatedAt,
+                    fallback: _formatDate,
+                  ),
                   style: TextStyle(
                     color: AppColors.of(context).textMuted,
                     fontSize: 12,
@@ -353,8 +357,8 @@ class _ReflectionBody extends StatelessWidget {
                   : '내용이 없습니다.',
               style: TextStyle(
                 color: AppColors.of(context).textBody,
-                fontSize: 16,
-                height: 1.8,
+                fontSize: 15,
+                height: 1.6,
               ),
             ),
         ],

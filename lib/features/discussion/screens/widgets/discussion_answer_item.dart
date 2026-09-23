@@ -97,7 +97,7 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
     final answer = widget.answer;
 
     return CommunityContentCard(
-      padding: const EdgeInsets.symmetric(vertical: 24),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -141,9 +141,9 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
               Text(
                 answer.content ?? '',
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 14,
                   color: AppColors.of(context).textBody,
-                  height: 1.75,
+                  height: 1.45,
                 ),
               ),
               const SizedBox(height: 8),

@@ -22,45 +22,39 @@ class MyDiscussionAnswerCard extends StatelessWidget {
       child: MyContentCardLayout(
         book: answer.book,
         dateLabel: formatRelativeDiscussionDateTime(answer.createdAt),
-        content: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (answer.topicTitle != null) ...[
-              Text(
+        title: answer.topicTitle != null
+            ? Text(
                 answer.topicTitle!,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   height: 1.4,
                   fontWeight: FontWeight.w600,
                   color: AppColors.of(context).textStrong,
                 ),
-              ),
-              const SizedBox(height: 8),
-            ],
-            if (answer.isHidden)
-              Text(
+              )
+            : null,
+        content: answer.isHidden
+            ? Text(
                 '숨김 처리된 댓글입니다.',
                 style: TextStyle(
                   fontSize: 13,
                   color: AppColors.of(context).textMuted,
                 ),
               )
-            else if (answer.content != null)
-              Text(
+            : answer.content != null
+            ? Text(
                 answer.content!,
-                maxLines: 2,
+                maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13,
                   color: AppColors.of(context).textBody,
                   height: 1.5,
                 ),
-              ),
-          ],
-        ),
+              )
+            : const SizedBox.shrink(),
       ),
     );
   }

@@ -104,8 +104,8 @@ class _DiscussionAnswerSheetState extends State<_DiscussionAnswerSheet> {
             minLines: 3,
             maxLines: 8,
             style: TextStyle(
-              fontSize: 16,
-              height: 1.75,
+              fontSize: 14,
+              height: 1.45,
               color: AppColors.of(context).textBody,
             ),
             decoration: InputDecoration(

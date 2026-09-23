@@ -17,19 +17,30 @@ import '../providers/public_reflection_providers.dart';
 
 /// 긴 글을 위한 행간을 적용하되 Quill의 헤더·인용·목록·인라인 색상 속성은
 /// 기존 독후감 리더와 같은 렌더러로 유지한다.
-final _readerQuillStylesLight = _buildReaderQuillStyles(AppPalette.light);
-final _readerQuillStylesDark = _buildReaderQuillStyles(AppPalette.dark);
+///
+/// `fontFamily`는 `bookReflectionQuillStyles`(book_reflection_editor_screen.dart)
+/// 와 같은 이유로 `bodyMedium`에서 직접 가져와 명시한다 — Quill의 `TextSpan`은
+/// 주변 `DefaultTextStyle`과 병합되지 않아, 지정하지 않으면 플랫폼 기본 폰트로
+/// 그려져(iOS는 제목/본문 폰트가 다르다) 토론 등 일반 `Text` 위젯과 같은
+/// `height` 값을 줘도 실제 줄 간격이 달라 보인다.
+DefaultStyles _readerQuillStyles(BuildContext context) {
+  final brightness = Theme.of(context).brightness;
+  final colors = brightness == Brightness.dark
+      ? AppPalette.dark
+      : AppPalette.light;
+  final bodyFontFamily = Theme.of(context).textTheme.bodyMedium?.fontFamily;
+  return _buildReaderQuillStyles(colors, bodyFontFamily);
+}
 
-DefaultStyles _readerQuillStyles(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark
-    ? _readerQuillStylesDark
-    : _readerQuillStylesLight;
-
-DefaultStyles _buildReaderQuillStyles(AppPalette colors) {
+DefaultStyles _buildReaderQuillStyles(
+  AppPalette colors,
+  String? bodyFontFamily,
+) {
   final bodyTextStyle = TextStyle(
     color: colors.textBody,
-    fontSize: 16,
-    height: 1.8,
+    fontSize: 15,
+    height: 1.6,
+    fontFamily: bodyFontFamily,
   );
   return DefaultStyles(
     h1: DefaultTextBlockStyle(
@@ -57,7 +68,12 @@ DefaultStyles _buildReaderQuillStyles(AppPalette colors) {
       null,
     ),
     placeHolder: DefaultTextBlockStyle(
-      TextStyle(color: colors.textMuted, fontSize: 16, height: 1.8),
+      TextStyle(
+        color: colors.textMuted,
+        fontSize: 15,
+        height: 1.6,
+        fontFamily: bodyFontFamily,
+      ),
       HorizontalSpacing.zero,
       VerticalSpacing.zero,
       VerticalSpacing.zero,
@@ -81,9 +97,10 @@ DefaultStyles _buildReaderQuillStyles(AppPalette colors) {
     quote: DefaultTextBlockStyle(
       TextStyle(
         color: colors.reflectionQuoteText,
-        fontSize: 16,
+        fontSize: 15,
         fontStyle: FontStyle.italic,
-        height: 1.8,
+        height: 1.6,
+        fontFamily: bodyFontFamily,
       ),
       HorizontalSpacing(14, 8),
       VerticalSpacing(14, 14),

@@ -621,15 +621,15 @@ class _TopicCard extends StatelessWidget {
                   ],
                 ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 12),
         Divider(height: 1, color: AppColors.of(context).border),
-        const SizedBox(height: 28),
+        const SizedBox(height: 16),
         SelectableText(
           topic.content ?? '',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: 15,
             color: AppColors.of(context).textBody,
-            height: 1.8,
+            height: 1.6,
           ),
         ),
         if (pollSection != null) ...[
@@ -861,7 +861,10 @@ class _AnswerList extends StatelessWidget {
                       ),
                     ),
                     if (answerIndex < state.items.length - 1)
-                      const CommunityContentDivider(),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: CommunityContentDivider(),
+                      ),
                   ],
                 ],
               ),
@@ -887,7 +890,8 @@ class _AnswerList extends StatelessWidget {
   }
 }
 
-/// 강조 대상 답변에 스크롤 앵커([highlightKey])와 외곽선을 씌운다.
+/// 강조 대상 답변에 스크롤 앵커([highlightKey])와 옅은 배경을 씌운다.
+/// 펄스 없이 계속 유지되는 은은한 강조.
 class _MaybeHighlightedAnswer extends StatelessWidget {
   const _MaybeHighlightedAnswer({
     required this.isHighlighted,
@@ -903,16 +907,27 @@ class _MaybeHighlightedAnswer extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!isHighlighted) return child;
 
-    return Container(
+    final colors = AppColors.of(context);
+    return TweenAnimationBuilder<double>(
       key: highlightKey,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.of(context).accentForeground,
-          width: 1,
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOut,
+      builder: (context, value, _) => Opacity(
+        opacity: value,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          decoration: BoxDecoration(
+            color: colors.accentSurface.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: colors.accentForeground.withValues(alpha: 0.3),
+              width: 1,
+            ),
+          ),
+          child: child,
         ),
       ),
-      child: child,
     );
   }
 }

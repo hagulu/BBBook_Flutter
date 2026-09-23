@@ -297,8 +297,8 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                         minLines: 8,
                         maxLines: null,
                         style: TextStyle(
-                          fontSize: 16,
-                          height: 1.8,
+                          fontSize: 15,
+                          height: 1.6,
                           color: AppColors.of(context).textBody,
                         ),
                         decoration: const InputDecoration(

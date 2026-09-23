@@ -198,7 +198,7 @@ class _BookshelfScreenState extends ConsumerState<BookshelfScreen>
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: TabBar(
             controller: _tabController,
             isScrollable: true,

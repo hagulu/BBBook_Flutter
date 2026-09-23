@@ -10,7 +10,7 @@ class ReflectionTitleBodyDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 24, bottom: 28),
+      padding: const EdgeInsets.only(top: 12, bottom: 16),
       child: Divider(
         height: 1,
         thickness: 1,
