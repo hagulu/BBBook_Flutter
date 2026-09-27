@@ -127,9 +127,20 @@ class BookRecordRepository {
   }) async {
     final generation = BookshelfDatabase.sessionGeneration;
     final current = await _requireLocal(userBookId);
-    final adjusted = current.normalizedCurrentPageForSourceChange(
-      newSourceType: sourceType,
+    final newDisplayTotalPages = displayTotalPages.applyTo(
+      current.displayTotalPages,
     );
+    final newEffectiveTotalPages = sourceType == 'EBOOK'
+        ? (newDisplayTotalPages ?? current.statsTotalPages)
+        : current.statsTotalPages;
+    final adjusted = sourceType == current.sourceType
+        // 출처는 그대로고 전자책 쪽수만 바뀐 경우는 출처 전환이 아니므로
+        // 초기화 대신 새 전체 쪽수로 클램프한다(책 정보 수정과 같은 취급).
+        ? current.clampCurrentPageTo(newEffectiveTotalPages)
+        : current.normalizedCurrentPageForSourceChange(
+            newSourceType: sourceType,
+            newEffectiveTotalPages: newEffectiveTotalPages,
+          );
     final patch = RecordPatch(
       currentPage: adjusted == current.currentPage ? null : adjusted,
       sourceType: PatchField.value(sourceType),
@@ -274,7 +285,7 @@ class BookRecordRepository {
       nextCover = coverImageUrl ?? previousCover;
     }
 
-    final updated = current.copyWithBookInfo(
+    final withNewInfo = current.copyWithBookInfo(
       title: title,
       author: author,
       publisher: publisher,
@@ -291,6 +302,19 @@ class BookRecordRepository {
       bookId: current.bookId,
       updatedAt: DateTime.now().toUtc(),
     );
+    // 전체 쪽수를 줄여 현재 읽은 쪽수를 넘게 되면 에러로 막지 않고 새 전체
+    // 쪽수로 현재 읽은 쪽수를 자동으로 낮춘다(완독이든 읽는 중이든 전체
+    // 쪽수를 넘는 값은 존재할 수 없으므로 둘 다 새 전체 쪽수에 맞춘다).
+    final clampedCurrentPage = withNewInfo.clampCurrentPageTo(
+      withNewInfo.effectiveTotalPages,
+    );
+    final currentPageClamped = clampedCurrentPage != withNewInfo.currentPage;
+    final updated = currentPageClamped
+        ? withNewInfo.copyWithRecord(
+            RecordPatch(currentPage: clampedCurrentPage),
+            updatedAt: withNewInfo.updatedAt,
+          )
+        : withNewInfo;
     try {
       _validateBookInfo(updated);
       _checkGeneration(generation);
@@ -305,6 +329,7 @@ class BookRecordRepository {
       changedFields: {
         bookInfoDirtyField,
         if (nextCover != previousCover) bookCoverDirtyField,
+        if (currentPageClamped) RecordPatch.fieldCurrentPage,
       },
     );
     unawaited(_bookshelfRepository.pushDirtyRecord(current.userBookId));
@@ -328,10 +353,6 @@ class BookRecordRepository {
     }
     if ((item.statsTotalPages ?? 0) < 0 || (item.displayTotalPages ?? 0) < 0) {
       throw const ApiException('쪽수는 0 이상이어야 합니다.');
-    }
-    final total = item.effectiveTotalPages;
-    if (!item.isAudioBook && total != null && item.currentPage > total) {
-      throw const ApiException('총 쪽수는 현재 읽은 쪽수보다 작을 수 없습니다.');
     }
   }
 

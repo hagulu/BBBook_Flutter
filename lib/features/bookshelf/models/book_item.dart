@@ -114,16 +114,42 @@ class BookItem {
     return (currentPage / total).clamp(0.0, 1.0);
   }
 
-  /// 출처를 [newSourceType]으로 바꿀 때 [currentPage]를 정리한다. 쪽수와
-  /// 퍼센트는 단위가 달라 자동으로 환산하면(과거 시도) 오히려 사용자가
-  /// 의도하지 않은 값으로 조용히 바뀔 수 있으므로, 출처가 실제로 바뀌고
-  /// 진행 기록이 있으면(0보다 크면) 0으로 초기화해 새 출처 기준으로
-  /// 다시 시작하게 한다 — 호출부가 이 초기화를 사용자에게 미리 안내해야
-  /// 한다(`showSourcePlatformDialog`의 경고 확인). 출처가 그대로거나 애초에
-  /// 진행 기록이 없으면 값을 그대로 둔다.
-  int normalizedCurrentPageForSourceChange({required String? newSourceType}) {
-    if (newSourceType == sourceType || currentPage <= 0) return currentPage;
-    return 0;
+  /// 출처를 [newSourceType]으로 바꿀 때 [currentPage]를 정리한다. 오디오북은
+  /// 쪽수 대신 0~100 퍼센트를 쓰므로, 오디오북 ↔ 종이책/전자책 전환은
+  /// (출처를 아직 고르지 않았던 경우 포함) 단위 자체가 달라 이어갈 수 없어
+  /// 항상 0으로 초기화한다. 그 외(종이책 ↔ 전자책, 또는 출처 미설정 →
+  /// 종이책/전자책)는 모두 "쪽수" 단위를 공유하므로, 현재 읽은 쪽수가 바뀐
+  /// 형태의 전체 쪽수([newEffectiveTotalPages]) 범위 안이면 그대로
+  /// 이어가고, 범위를 넘을 때만(예전 판본 기준이라 새 전체 쪽수보다 큰
+  /// 경우) 0으로 초기화한다 — 호출부가 두 경우 모두 초기화를 사용자에게
+  /// 미리 안내해야 한다(`showSourcePlatformDialog`의 경고 확인). 출처가
+  /// 그대로거나 애초에 진행 기록이 없으면 값을 그대로 둔다.
+  int normalizedCurrentPageForSourceChange({
+    required String? newSourceType,
+    int? newEffectiveTotalPages,
+  }) {
+    if (newSourceType == sourceType || currentPage <= 0) {
+      return currentPage;
+    }
+    final wasAudioBook = sourceType == 'AUDIO_BOOK';
+    final becomesAudioBook = newSourceType == 'AUDIO_BOOK';
+    if (wasAudioBook || becomesAudioBook) return 0;
+    if (newEffectiveTotalPages != null &&
+        currentPage > newEffectiveTotalPages) {
+      return 0;
+    }
+    return currentPage;
+  }
+
+  /// 전체 쪽수가 [totalPages]로 줄어 현재 읽은 쪽수를 넘으면, 초기화하지
+  /// 않고 [totalPages]로 낮춘다 — 책 정보의 전체 쪽수를 고치는 것뿐인
+  /// 편집(출처 전환이 아님)에서 쓴다. 오디오북은 쪽수 개념이 없어 대상이
+  /// 아니다.
+  int clampCurrentPageTo(int? totalPages) {
+    if (isAudioBook || totalPages == null || currentPage <= totalPages) {
+      return currentPage;
+    }
+    return totalPages;
   }
 
   /// 책 정보(제목/저자/출판사/총쪽수/카테고리/표지)와 ISBN 연결만 바꾼

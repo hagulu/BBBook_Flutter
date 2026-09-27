@@ -100,6 +100,8 @@ void main() {
   }
 
   test('book-info PATCH가 실패해도 출처와 쪽수 모두 로컬에 남는다', () async {
+    // 종이책(120쪽 읽음, 총 300쪽) → 전자책(총 400쪽): 새 전체 쪽수 안에
+    // 들어오므로 초기화 없이 그대로 이어간다.
     await seedSyncedBook(userBookId: 501, currentPage: 120);
     final adapter = _RoutingAdapter(
       onRecordPatch: (data) => _jsonResponse(200, {
@@ -108,7 +110,7 @@ void main() {
         'statsTotalPages': 300,
         'displayTotalPages': null,
         'status': 'READING',
-        'currentPage': 0,
+        'currentPage': 120,
         'isMasterpiece': false,
         'sourceType': 'EBOOK',
         'rereadCount': 0,
@@ -128,7 +130,7 @@ void main() {
 
     expect(result.error, isNull);
     expect(result.item.sourceType, 'EBOOK');
-    expect(result.item.currentPage, 0);
+    expect(result.item.currentPage, 120);
     expect(result.item.displayTotalPages, 400);
     await syncRepository.pushDirtyRecord(501);
 
@@ -137,12 +139,52 @@ void main() {
     // 어긋난다.
     final persisted = await const BookshelfDao().getById(501);
     expect(persisted?.sourceType, 'EBOOK');
-    expect(persisted?.currentPage, 0);
+    expect(persisted?.currentPage, 120);
     expect(persisted?.displayTotalPages, 400);
     expect(
       (await const BookshelfDao().getDirtyRecord(501))?.changedFields,
       contains(bookInfoDirtyField),
     );
+  });
+
+  test('종이책 → 전자책 전환에서 새 전체 쪽수를 넘으면 0으로 초기화한다', () async {
+    await seedSyncedBook(userBookId: 505, currentPage: 250);
+    final adapter = _RoutingAdapter(
+      onRecordPatch: (data) => _jsonResponse(200, {
+        'userBookId': 505,
+        'title': '책',
+        'statsTotalPages': 300,
+        'displayTotalPages': null,
+        'status': 'READING',
+        'currentPage': 0,
+        'isMasterpiece': false,
+        'sourceType': 'EBOOK',
+        'rereadCount': 0,
+        'updatedAt': '2026-09-01T01:00:00Z',
+      }),
+      onBookInfoPatch: (data) => _jsonResponse(200, {
+        'userBookId': 505,
+        'title': '책',
+        'statsTotalPages': 300,
+        'displayTotalPages': 200,
+        'status': 'READING',
+        'currentPage': 0,
+        'isMasterpiece': false,
+        'sourceType': 'EBOOK',
+        'rereadCount': 0,
+        'updatedAt': '2026-09-01T01:01:00Z',
+      }),
+    );
+    final repository = buildRepository(adapter);
+
+    final result = await repository.updateSourceType(
+      505,
+      sourceType: 'EBOOK',
+      platformName: null,
+      displayTotalPages: PatchField.value(200),
+    );
+
+    expect(result.item.currentPage, 0);
   });
 
   test('이전 미전송 편집과 출처 변경을 함께 보내고 책 정보를 이어서 보낸다', () async {

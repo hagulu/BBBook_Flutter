@@ -88,7 +88,16 @@ void main() {
   });
 
   group('normalizedCurrentPageForSourceChange', () {
-    test('출처가 실제로 바뀌고 진행 기록이 있으면 0으로 초기화한다', () {
+    test('출처 미설정 → 종이책/전자책은 새 전체 쪽수 이내면 그대로 둔다', () {
+      final b = book(currentPage: 90, statsTotalPages: 360);
+      final normalized = b.normalizedCurrentPageForSourceChange(
+        newSourceType: 'EBOOK',
+        newEffectiveTotalPages: 360,
+      );
+      expect(normalized, 90);
+    });
+
+    test('출처 미설정 → 오디오북은 단위가 달라 항상 0으로 초기화한다', () {
       final b = book(currentPage: 90, statsTotalPages: 360);
       final normalized = b.normalizedCurrentPageForSourceChange(
         newSourceType: 'AUDIO_BOOK',
@@ -96,10 +105,48 @@ void main() {
       expect(normalized, 0);
     });
 
-    test('오디오북에서 페이지 기반으로 바꿔도 진행 기록이 있으면 0으로 초기화한다', () {
+    test('오디오북으로 바뀌면 진행 기록이 있을 때 항상 0으로 초기화한다', () {
+      final b = book(
+        currentPage: 90,
+        statsTotalPages: 360,
+        sourceType: 'PAPER_BOOK',
+      );
+      final normalized = b.normalizedCurrentPageForSourceChange(
+        newSourceType: 'AUDIO_BOOK',
+      );
+      expect(normalized, 0);
+    });
+
+    test('오디오북에서 페이지 기반으로 바꿔도 진행 기록이 있으면 항상 0으로 초기화한다', () {
       final b = book(currentPage: 80, sourceType: 'AUDIO_BOOK');
       final normalized = b.normalizedCurrentPageForSourceChange(
         newSourceType: 'EBOOK',
+      );
+      expect(normalized, 0);
+    });
+
+    test('종이책 ↔ 전자책 전환은 새 전체 쪽수 이내면 그대로 이어간다', () {
+      final b = book(
+        currentPage: 90,
+        statsTotalPages: 360,
+        sourceType: 'PAPER_BOOK',
+      );
+      final normalized = b.normalizedCurrentPageForSourceChange(
+        newSourceType: 'EBOOK',
+        newEffectiveTotalPages: 300,
+      );
+      expect(normalized, 90);
+    });
+
+    test('종이책 ↔ 전자책 전환에서 새 전체 쪽수를 넘으면 0으로 초기화한다', () {
+      final b = book(
+        currentPage: 90,
+        statsTotalPages: 360,
+        sourceType: 'PAPER_BOOK',
+      );
+      final normalized = b.normalizedCurrentPageForSourceChange(
+        newSourceType: 'EBOOK',
+        newEffectiveTotalPages: 80,
       );
       expect(normalized, 0);
     });
@@ -113,11 +160,33 @@ void main() {
     });
 
     test('출처가 바뀌어도 진행 기록이 없으면(0) 그대로 0이다', () {
-      final b = book(currentPage: 0, statsTotalPages: 360);
+      final b = book(currentPage: 0, statsTotalPages: 360, sourceType: 'PAPER_BOOK');
       final normalized = b.normalizedCurrentPageForSourceChange(
         newSourceType: 'AUDIO_BOOK',
       );
       expect(normalized, 0);
+    });
+  });
+
+  group('clampCurrentPageTo', () {
+    test('전체 쪽수를 넘으면 전체 쪽수로 낮춘다', () {
+      final b = book(currentPage: 120, statsTotalPages: 360);
+      expect(b.clampCurrentPageTo(100), 100);
+    });
+
+    test('전체 쪽수 이내면 그대로 둔다', () {
+      final b = book(currentPage: 90, statsTotalPages: 360);
+      expect(b.clampCurrentPageTo(100), 90);
+    });
+
+    test('전체 쪽수를 모르면(null) 그대로 둔다', () {
+      final b = book(currentPage: 90);
+      expect(b.clampCurrentPageTo(null), 90);
+    });
+
+    test('오디오북은 클램프 대상이 아니다', () {
+      final b = book(currentPage: 150, sourceType: 'AUDIO_BOOK');
+      expect(b.clampCurrentPageTo(100), 150);
     });
   });
 

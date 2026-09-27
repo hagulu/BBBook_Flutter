@@ -64,15 +64,17 @@ class SourcePlatformResult {
 /// 진행률을 계산하고(`displayTotalPages ?? statsTotalPages`), 비워두면 종이책
 /// 기준 쪽수로 fallback한다. 종이책 기준 쪽수 자체는 이 팝업에서 바꾸지 않는다.
 ///
-/// [initialCurrentPage]는 전자책 쪽수 입력값 검증에 쓴다 — 새로 입력한
-/// 값이 현재 읽은 쪽수보다 작으면 `PATCH .../book-info`가 400으로 거부되므로
-/// (api-doc), 저장 전에 이 팝업 안에서 미리 막는다.
+/// [initialCurrentPage]는 출처 전환 시 진행 기록 초기화 여부를 판단하는
+/// 기준값이다([_SourcePlatformDialogState._save] 참고). [initialStatsTotalPages]는
+/// 종이책 기준 전체 쪽수로, 전자책 쪽수를 입력하지 않았을 때의 fallback
+/// 총쪽수이자 전자책 → 종이책 전환 시의 새 전체 쪽수로도 쓰인다.
 Future<SourcePlatformResult?> showSourcePlatformDialog(
   BuildContext context, {
   required BookSourceType? initialSource,
   required String? initialPlatform,
   required Map<String, List<String>> platformOptions,
   int? initialDisplayTotalPages,
+  int? initialStatsTotalPages,
   required int initialCurrentPage,
 }) {
   return showModalBottomSheet<SourcePlatformResult>(
@@ -84,6 +86,7 @@ Future<SourcePlatformResult?> showSourcePlatformDialog(
       initialPlatform: initialPlatform,
       platformOptions: platformOptions,
       initialDisplayTotalPages: initialDisplayTotalPages,
+      initialStatsTotalPages: initialStatsTotalPages,
       initialCurrentPage: initialCurrentPage,
     ),
   );
@@ -98,6 +101,7 @@ class _SourcePlatformDialog extends StatefulWidget {
     required this.initialPlatform,
     required this.platformOptions,
     this.initialDisplayTotalPages,
+    this.initialStatsTotalPages,
     required this.initialCurrentPage,
   });
 
@@ -105,6 +109,7 @@ class _SourcePlatformDialog extends StatefulWidget {
   final String? initialPlatform;
   final Map<String, List<String>> platformOptions;
   final int? initialDisplayTotalPages;
+  final int? initialStatsTotalPages;
   final int initialCurrentPage;
 
   @override
@@ -126,7 +131,6 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
   late final _ebookPagesController = TextEditingController(
     text: widget.initialDisplayTotalPages?.toString() ?? '',
   );
-  String? _ebookPagesError;
 
   bool _isKnownPlatform() {
     final key = widget.initialSource?.platformOptionsKey;
@@ -163,10 +167,9 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
 
   bool get _isEbookSelected => _source == BookSourceType.ebook;
 
-  void _save() {
+  Future<void> _save() async {
     final source = _source;
     if (source == null) return;
-    if (_ebookPagesError != null) setState(() => _ebookPagesError = null);
 
     PatchField<String>? platformName;
     if (source.platformOptionsKey != null) {
@@ -197,37 +200,72 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
     }
 
     PatchField<int>? displayTotalPages;
+    // 전자책을 유지하며 입력한 새 전체 쪽수(비워두면 종이책 기준 쪽수로
+    // fallback) — 아래 초기화 여부 판단에도 같이 쓴다.
+    int? newEbookTotalPages;
     if (_isEbookSelected) {
       final text = _ebookPagesController.text.trim();
       final parsed = text.isEmpty ? null : int.tryParse(text);
+      newEbookTotalPages = parsed ?? widget.initialStatsTotalPages;
       if (text.isEmpty) {
         // 비워둔 채 저장 — 기존에 설정된 값이 있었을 때만 명시적으로 지운다.
         if (widget.initialDisplayTotalPages != null) {
           displayTotalPages = const PatchField.clear();
         }
-      } else if (parsed != null &&
-          _source == widget.initialSource &&
-          parsed < widget.initialCurrentPage) {
-        // 현재 읽은 쪽수보다 작은 값은 저장 요청 자체가 400으로 거부된다
-        // (api-me-books-userBookId-book-info-patch.md) — 요청을 보내기 전에
-        // 여기서 미리 막는다. 출처 자체를 바꾸는 경우(전자책을 유지하는
-        // 게 아니라 다른 출처에서 전자책으로 전환)는 저장 시
-        // `BookItem.normalizedCurrentPageForSourceChange`가 진행 기록을
-        // 0으로 초기화하므로(사용자에게는 출처 선택 시점에 미리 경고) 이
-        // 비교 자체가 필요 없다 — 어떤 총쪽수를 입력해도 항상 유효하다.
-        setState(() {
-          _ebookPagesError =
-              '현재 읽은 쪽수(${widget.initialCurrentPage}쪽)보다 작을 수 없어요.';
-        });
-        return;
       } else if (parsed != null && parsed != widget.initialDisplayTotalPages) {
         displayTotalPages = PatchField.value(parsed);
       }
+      // 새 전체 쪽수가 현재 읽은 쪽수보다 작아도 저장을 막지 않는다 —
+      // 출처가 바뀌는 경우든 전자책을 유지한 채 쪽수만 줄인 경우든, 저장은
+      // `BookRecordRepository`가 상황에 맞게 처리한다(출처 전환은 아래
+      // 경고 후 0으로 초기화, 전자책 유지는 새 전체 쪽수로 자동 클램프).
     } else if (widget.initialDisplayTotalPages != null) {
       // 전자책이 아닌 형태로 바꾸면 남아있는 전자책 쪽수 override를 함께
       // 지운다 — 그러지 않으면 화면에서만 사라진 것처럼 보이고 진행률·완독
       // 상한 계산에는 계속 쓰인다.
       displayTotalPages = const PatchField.clear();
+    }
+
+    // 출처가 실제로 바뀌고 진행 기록이 있으면, 저장 시 진행 기록이
+    // 초기화될 수 있다는 걸 미리 경고한다 —
+    // `BookItem.normalizedCurrentPageForSourceChange`와 같은 기준: 오디오북이
+    // 관련된 전환은(출처를 아직 고르지 않았던 경우 포함) 단위(쪽수 ↔
+    // 퍼센트)가 달라 항상 초기화되고, 그 외 전환은 새 전체 쪽수를 넘을
+    // 때만 초기화된다(넘지 않으면 쪽수를 그대로 이어간다).
+    final sourceChanged = source != widget.initialSource;
+    if (sourceChanged && widget.initialCurrentPage > 0) {
+      final involvesAudioBook =
+          source == BookSourceType.audioBook ||
+          widget.initialSource == BookSourceType.audioBook;
+      final newTotalPages = source == BookSourceType.ebook
+          ? newEbookTotalPages
+          : widget.initialStatsTotalPages;
+      final willReset =
+          involvesAudioBook ||
+          (newTotalPages != null &&
+              widget.initialCurrentPage > newTotalPages);
+      if (willReset) {
+        final confirmed = await AppConfirm.show(
+          context,
+          title: '책 유형 변경',
+          message: '책 유형을 바꾸면 현재 읽은 기록이 0으로 초기화됩니다. 계속할까요?',
+          confirmText: '변경',
+          destructive: true,
+        );
+        if (!mounted) return;
+        if (!confirmed) {
+          // 취소하면 시트에 남아있는 선택 표시도 원래 출처/플랫폼으로
+          // 되돌린다 — 그러지 않으면 저장되지 않았는데도 새 출처가 선택된
+          // 것처럼 보인다.
+          setState(() {
+            _source = widget.initialSource;
+            _selectedPlatform = _isKnownPlatform()
+                ? widget.initialPlatform
+                : (_hasCustomInitialPlatform ? _kCustomPlatformLabel : null);
+          });
+          return;
+        }
+      }
     }
 
     Navigator.of(context).pop(
@@ -239,24 +277,11 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
     );
   }
 
-  /// 출처 선택. 이미 진행 기록이 있는 책의 출처를 실제로 바꾸면(초기 출처와
-  /// 다르고 [widget.initialCurrentPage]가 0보다 크면) 저장 시 진행 기록이
-  /// 0으로 초기화된다(쪽수 ↔ 퍼센트는 단위가 달라 자동 환산하지 않는다 —
-  /// `BookItem.normalizedCurrentPageForSourceChange`) — 선택하는 이 시점에
-  /// 한 번만 경고 확인을 받고, 취소하면 선택을 되돌린다. 플랫폼이 필요
-  /// 없는 출처(종이책)는 확인(또는 애초에 경고가 필요 없으면 곧바로) 후
-  /// 바로 저장하고 닫는다.
-  Future<void> _selectSource(BookSourceType source) async {
-    if (source != widget.initialSource && widget.initialCurrentPage > 0) {
-      final confirmed = await AppConfirm.show(
-        context,
-        title: '책 유형 변경',
-        message: '책 유형을 바꾸면 현재 읽은 기록이 0으로 초기화됩니다. 계속할까요?',
-        confirmText: '변경',
-        destructive: true,
-      );
-      if (!confirmed || !mounted) return;
-    }
+  /// 출처 선택. 실제 초기화 여부 판단과 경고는 [_save]에서 한 번에
+  /// 처리한다(전자책 전체 쪽수처럼 선택 이후에 입력되는 값까지 반영해야
+  /// "새 전체 쪽수를 넘는지"를 정확히 판단할 수 있으므로 저장 시점으로
+  /// 미뤘다). 플랫폼이 필요 없는 출처(종이책)는 선택 즉시 저장한다.
+  void _selectSource(BookSourceType source) {
     setState(() {
       _source = source;
       _selectedPlatform = null;
@@ -348,36 +373,20 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
               controller: _ebookPagesController,
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              onChanged: (_) {
-                if (_ebookPagesError != null) {
-                  setState(() => _ebookPagesError = null);
-                }
-              },
               decoration: const InputDecoration(
                 isDense: true,
                 hintText: '입력하지 않으면 종이책 페이지 사용',
                 counterText: '',
               ),
             ),
-            if (_ebookPagesError != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                _ebookPagesError!,
-                style: TextStyle(
-                  color: AppColors.of(context).error,
-                  fontSize: 12,
-                ),
+            const SizedBox(height: 6),
+            Text(
+              '보는 기기에 맞는 쪽수를 입력하세요',
+              style: TextStyle(
+                color: AppColors.of(context).textMuted,
+                fontSize: 12,
               ),
-            ] else ...[
-              const SizedBox(height: 6),
-              Text(
-                '보는 기기에 맞는 쪽수를 입력하세요',
-                style: TextStyle(
-                  color: AppColors.of(context).textMuted,
-                  fontSize: 12,
-                ),
-              ),
-            ],
+            ),
           ],
         ],
       ),

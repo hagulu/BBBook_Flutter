@@ -666,6 +666,7 @@ class _BookRecordBody extends ConsumerWidget {
       initialPlatform: book.platformName,
       platformOptions: options,
       initialDisplayTotalPages: book.displayTotalPages,
+      initialStatsTotalPages: book.statsTotalPages,
       initialCurrentPage: book.currentPage,
     );
     if (result == null || !context.mounted) return;
