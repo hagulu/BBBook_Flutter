@@ -48,6 +48,21 @@ class ReadingStatsMonthly {
   final int count;
 }
 
+/// 독서 통계(리포트) 화면의 태그별 완독 통계. [tagId]는 [BookTag.id]와 같은
+/// 로컬 태그 ID다. 완독 책 범위(`yearFiltered`) 안에서 태그가 붙은 권수를
+/// 센 값이며, 개수 내림차순으로 정렬돼 있다(`reading_stats_calculator.dart`).
+class ReadingStatsTag {
+  const ReadingStatsTag({
+    required this.tagId,
+    required this.tagName,
+    required this.count,
+  });
+
+  final int tagId;
+  final String tagName;
+  final int count;
+}
+
 /// 독서 통계(리포트) 화면 요약 데이터(`stats-screen.md` §1-3~§1-6). 서버
 /// API(`api-me-reading-stats-summary-get.md`) 대신 로컬 서재·노트 데이터로
 /// 계산한다(`reading_stats_calculator.dart`, `reading_stats_providers.dart`
@@ -60,6 +75,7 @@ class ReadingStatsSummary {
     required this.categoryStats,
     this.monthlyYear,
     required this.monthlyStats,
+    required this.tagStats,
     required this.rereadCount,
     required this.masterpieceCount,
     required this.averageRating,
@@ -75,6 +91,11 @@ class ReadingStatsSummary {
   /// 것이다(연도를 지정하면 그 해로 좁힌다).
   final int? monthlyYear;
   final List<ReadingStatsMonthly> monthlyStats;
+
+  /// 태그별 완독 통계. 개수 내림차순 정렬(`reading_stats_calculator.dart`).
+  /// 화면은 태그가 5개 이상일 때만 이 통계 섹션을 보여준다
+  /// (`reading_stats_screen.dart`).
+  final List<ReadingStatsTag> tagStats;
   final int rereadCount;
   final int masterpieceCount;
   final double? averageRating;

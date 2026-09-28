@@ -75,6 +75,26 @@ ReadingStatsSummary computeReadingStatsSummary({
       ),
   ];
 
+  // [BookItem.tags]의 [BookTag.id](로컬 태그 ID)로 묶는다 — 태그는 이름
+  // 변경이 자유로워(카테고리와 달리 마스터 캐시가 따로 없다) 최신 이름은
+  // 매번 책에 실려 온 값을 그대로 쓰면 된다.
+  final tagIdCounts = <int, int>{};
+  final tagNameById = <int, String>{};
+  for (final item in yearFiltered) {
+    for (final tag in item.tags) {
+      tagIdCounts[tag.id] = (tagIdCounts[tag.id] ?? 0) + 1;
+      tagNameById[tag.id] = tag.name;
+    }
+  }
+  final tagStats = [
+    for (final entry in tagIdCounts.entries)
+      ReadingStatsTag(
+        tagId: entry.key,
+        tagName: tagNameById[entry.key]!,
+        count: entry.value,
+      ),
+  ]..sort((a, b) => b.count.compareTo(a.count));
+
   final monthlyCounts = List<int>.filled(12, 0);
   for (final item in monthlyFiltered) {
     final month = item.finishedAt?.month;
@@ -134,6 +154,7 @@ ReadingStatsSummary computeReadingStatsSummary({
     categoryStats: categoryStats,
     monthlyYear: monthlyYear,
     monthlyStats: monthlyStats,
+    tagStats: tagStats,
     rereadCount: rereadCount,
     masterpieceCount: masterpieceCount,
     averageRating: averageRating,

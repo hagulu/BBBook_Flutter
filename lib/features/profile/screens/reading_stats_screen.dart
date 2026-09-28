@@ -9,6 +9,7 @@ import '../models/reading_stats_summary.dart';
 import '../providers/reading_stats_providers.dart';
 import 'widgets/reading_stats_category_chart.dart';
 import 'widgets/reading_stats_monthly_chart.dart';
+import 'widgets/reading_stats_tag_chart.dart';
 import 'widgets/reading_stats_year_picker.dart';
 
 /// 독서 리포트 화면(`docs/porting-reference/stats-screen.md`). 화면 제목과 연도
@@ -147,6 +148,12 @@ class _StatsContent extends StatelessWidget {
           const _SectionLabel('장르별 비율'),
           const SizedBox(height: 10),
           ReadingStatsCategoryChart(categories: stats.categoryStats),
+        ],
+        if (stats.tagStats.length >= 5) ...[
+          const SizedBox(height: 20),
+          const _SectionLabel('태그별 통계'),
+          const SizedBox(height: 10),
+          _Card(child: ReadingStatsTagChart(tags: stats.tagStats)),
         ],
         const SizedBox(height: 20),
         _SectionLabel(
