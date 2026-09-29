@@ -710,7 +710,7 @@ class _BookReflectionEditorScreenState
                                     fontWeight: FontWeight.bold,
                                   ),
                               decoration: InputDecoration(
-                                hintText: '제목을 적어주세요',
+                                hintText: '제목을 입력하세요',
                                 hintStyle: Theme.of(context)
                                     .textTheme
                                     .headlineMedium
@@ -742,7 +742,7 @@ class _BookReflectionEditorScreenState
                               config: QuillEditorConfig(
                                 scrollable: false,
                                 padding: const EdgeInsets.fromLTRB(0, 0, 0, 48),
-                                placeholder: '책을 읽고 느낀 점을 기록해 보세요.',
+                                placeholder: '내용을 입력하세요',
                                 customStyles: bookReflectionQuillStyles(
                                   context,
                                 ),

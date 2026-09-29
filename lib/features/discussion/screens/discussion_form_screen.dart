@@ -279,7 +279,7 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
-                          hintText: '어떤 이야기를 나눌까요?',
+                          hintText: '제목을 입력하세요',
                           hintStyle: Theme.of(context).textTheme.headlineMedium
                               ?.copyWith(
                                 fontSize: 22,
@@ -308,7 +308,7 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
-                          hintText: '질문이 떠오른 장면과 나의 생각을 들려주세요.',
+                          hintText: '내용을 입력하세요',
                         ),
                       ),
                     ],

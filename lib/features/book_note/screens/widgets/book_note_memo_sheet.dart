@@ -8,9 +8,9 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../../../core/policy/attachment_limit_policy.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/image/screens/shared_image_editor_screen.dart';
+import '../../../../shared/image/widgets/shared_image_viewer.dart';
 import '../../../../shared/widgets/app_alert.dart';
 import '../../../../shared/widgets/app_bar_title.dart';
-import '../../../../shared/widgets/app_confirm.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../models/book_note.dart';
@@ -26,8 +26,12 @@ Future<BookNoteMemoDraft?> showBookNoteMemoEditor(
   BookNoteMemoDraft? initialDraft,
   required AttachmentLimitPolicy attachmentLimitPolicy,
   required int currentImageMemoCount,
+  bool autofocusContent = true,
+  bool autoStartOcr = false,
+  bool autoStartPhotoPick = false,
 }) {
   assert(initialMemo == null || initialDraft == null);
+  assert(!autoStartOcr || !autoStartPhotoPick);
   return Navigator.of(context).push<BookNoteMemoDraft>(
     MaterialPageRoute(
       fullscreenDialog: true,
@@ -36,6 +40,9 @@ Future<BookNoteMemoDraft?> showBookNoteMemoEditor(
         initialDraft: initialDraft,
         attachmentLimitPolicy: attachmentLimitPolicy,
         currentImageMemoCount: currentImageMemoCount,
+        autofocusContent: autofocusContent,
+        autoStartOcr: autoStartOcr,
+        autoStartPhotoPick: autoStartPhotoPick,
       ),
     ),
   );
@@ -83,13 +90,6 @@ class _BookNoteMemoQuickComposer extends StatefulWidget {
 
 class _BookNoteMemoQuickComposerState
     extends State<_BookNoteMemoQuickComposer> {
-  static const _quickTypes = [
-    BookNoteMemoType.summary,
-    BookNoteMemoType.thought,
-    BookNoteMemoType.quote,
-    BookNoteMemoType.photo,
-  ];
-
   final _contentController = TextEditingController();
   BookNoteMemoType _type = BookNoteMemoType.summary;
 
@@ -118,7 +118,7 @@ class _BookNoteMemoQuickComposerState
                   spacing: 4,
                   runSpacing: 4,
                   children: [
-                    for (final type in _quickTypes)
+                    for (final type in BookNoteMemoType.values)
                       Builder(
                         builder: (context) {
                           final style = _NoteMemoTypeChoiceStyle.of(
@@ -206,16 +206,38 @@ class _BookNoteMemoQuickComposerState
                     fontSize: 15,
                     height: 1.35,
                   ),
-                  decoration: const InputDecoration(
-                    hintText: '메모를 빠르게 남겨보세요.',
+                  decoration: InputDecoration(
+                    hintText: '메모를 입력하세요',
                     filled: false,
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
                     focusedBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
+                    contentPadding: const EdgeInsets.symmetric(
                       horizontal: 4,
                       vertical: 10,
                     ),
+                    prefixIconConstraints: const BoxConstraints(
+                      minWidth: 0,
+                      minHeight: 0,
+                    ),
+                    prefixIcon:
+                        _type == BookNoteMemoType.quote &&
+                            _contentController.text.isEmpty
+                        ? IconButton(
+                            onPressed: _startQuoteOcr,
+                            tooltip: '카메라로 발췌 인식',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 44,
+                              height: 44,
+                            ),
+                            icon: Icon(
+                              PhosphorIconsRegular.camera,
+                              size: 20,
+                              color: AppColors.of(context).memoQuoteForeground,
+                            ),
+                          )
+                        : null,
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
@@ -259,24 +281,74 @@ class _BookNoteMemoQuickComposerState
 
   void _onTypeSelected(BookNoteMemoType type) {
     if (type == BookNoteMemoType.photo) {
-      unawaited(_expand(initialType: type));
+      unawaited(_startPhotoPick());
       return;
     }
     setState(() => _type = type);
   }
 
-  Future<void> _expand({BookNoteMemoType? initialType}) async {
-    final initialDraft = initialType == null
-        ? _draft
-        : BookNoteMemoDraft(
-            type: initialType,
-            content: _contentController.text.trim().isEmpty
-                ? null
-                : _contentController.text.trim(),
-          );
+  /// 카메라·크롭·OCR 화면이 시트 위가 아니라 상세 작성 화면 위에서
+  /// 진행되도록, 카메라를 열기 전에 먼저 상세 화면부터 띄우고 그 화면이
+  /// 스스로 카메라·사진 선택을 이어서 실행한다([_BookNoteMemoEditorScreen]의
+  /// `autoStartOcr`/`autoStartPhotoPick`). 그래야 촬영 중 뒤로 보이는 화면이
+  /// 이 시트가 아니라 상세 화면이 되고, 중간에 취소해도 상세 화면이 스스로
+  /// 닫히며 이 시트까지 함께 닫힌다.
+  Future<void> _startPhotoPick() async {
+    if (!widget.attachmentLimitPolicy.canAttachNoteImage(
+      currentImageMemoCount: widget.currentImageMemoCount,
+      memoAlreadyHasImage: false,
+    )) {
+      AppSnackBar.error(
+        context,
+        widget.attachmentLimitPolicy.noteImageLimitMessage,
+      );
+      return;
+    }
+    // 상세 화면으로 넘어가는 동안 키보드가 다시 뜨지 않도록 미리 내려둔다
+    // (시트의 텍스트 필드는 전용 FocusNode가 없어, 포커스가 남아있으면
+    // 화면이 바뀌는 순간 키보드가 잠깐 다시 올라온다).
+    FocusScope.of(context).unfocus();
     final draft = await showBookNoteMemoEditor(
       context,
-      initialDraft: initialDraft,
+      initialDraft: BookNoteMemoDraft(
+        type: BookNoteMemoType.photo,
+        content: _contentController.text.trim().isEmpty
+            ? null
+            : _contentController.text.trim(),
+      ),
+      attachmentLimitPolicy: widget.attachmentLimitPolicy,
+      currentImageMemoCount: widget.currentImageMemoCount,
+      autofocusContent: false,
+      autoStartPhotoPick: true,
+    );
+    if (!mounted) return;
+    Navigator.of(context).pop<BookNoteMemoDraft>(draft);
+  }
+
+  Future<void> _startQuoteOcr() async {
+    // 위와 같은 이유로 먼저 포커스를 내린다.
+    FocusScope.of(context).unfocus();
+    final draft = await showBookNoteMemoEditor(
+      context,
+      initialDraft: BookNoteMemoDraft(
+        type: BookNoteMemoType.quote,
+        content: _contentController.text.trim().isEmpty
+            ? null
+            : _contentController.text.trim(),
+      ),
+      attachmentLimitPolicy: widget.attachmentLimitPolicy,
+      currentImageMemoCount: widget.currentImageMemoCount,
+      autofocusContent: false,
+      autoStartOcr: true,
+    );
+    if (!mounted) return;
+    Navigator.of(context).pop<BookNoteMemoDraft>(draft);
+  }
+
+  Future<void> _expand() async {
+    final draft = await showBookNoteMemoEditor(
+      context,
+      initialDraft: _draft,
       attachmentLimitPolicy: widget.attachmentLimitPolicy,
       currentImageMemoCount: widget.currentImageMemoCount,
     );
@@ -308,6 +380,9 @@ class _BookNoteMemoEditorScreen extends StatefulWidget {
     required this.initialDraft,
     required this.attachmentLimitPolicy,
     required this.currentImageMemoCount,
+    required this.autofocusContent,
+    this.autoStartOcr = false,
+    this.autoStartPhotoPick = false,
   });
 
   final BookNoteMemo? initialMemo;
@@ -318,6 +393,18 @@ class _BookNoteMemoEditorScreen extends StatefulWidget {
   /// 편집 중인 메모 자체가 이미 이미지가 있었다면([_memoAlreadyHasImage])
   /// 이 개수에 포함돼 있으므로, 교체는 한도와 무관하게 항상 허용한다.
   final int currentImageMemoCount;
+
+  /// 카메라·OCR을 거쳐 이미 내용이 채워진 채로 들어올 때는 화면 전환 직후
+  /// 다시 키보드가 올라오면 정신없으므로 false로 넘긴다.
+  final bool autofocusContent;
+
+  /// 빠른 추가에서 발췌 카메라 아이콘을 눌렀을 때, 이 화면이 뜨자마자 스스로
+  /// OCR 촬영을 이어서 시작한다. 중간에 취소하면 이 화면도 함께 닫힌다.
+  final bool autoStartOcr;
+
+  /// 빠른 추가에서 사진 아이콘을 눌렀을 때, 이 화면이 뜨자마자 스스로 사진
+  /// 선택을 이어서 시작한다. 중간에 취소하면 이 화면도 함께 닫힌다.
+  final bool autoStartPhotoPick;
 
   @override
   State<_BookNoteMemoEditorScreen> createState() =>
@@ -380,6 +467,13 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
         : false;
     _pickedImagePath = draft?.pickedImagePath;
     if (_type == BookNoteMemoType.photo) _contentController.clearHighlights();
+    if (widget.autoStartOcr) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _autoStartOcr());
+    } else if (widget.autoStartPhotoPick) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _autoStartPhotoPick(),
+      );
+    }
   }
 
   @override
@@ -463,6 +557,7 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
                     _PhotoPicker(
                       memo: _imageRemoved ? null : widget.initialMemo,
                       pickedImagePath: _pickedImagePath,
+                      allowDelete: widget.initialMemo == null,
                       onPick: _pickPhoto,
                       onRemove: () => setState(() {
                         _pickedImagePath = null;
@@ -474,17 +569,17 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
                       key: const Key('book_note_memo_content_field'),
                       controller: _contentController,
                       focusNode: _contentFocusNode,
-                      minLines: 5,
+                      minLines: 3,
                       maxLines: null,
                       keyboardType: TextInputType.multiline,
-                      scrollPadding: const EdgeInsets.only(bottom: 120),
+                      scrollPadding: const EdgeInsets.only(bottom: 24),
                       style: TextStyle(
                         color: AppColors.of(context).textBody,
                         fontSize: 16,
                         height: 1.6,
                       ),
                       decoration: const InputDecoration(
-                        hintText: '사진에 대한 설명이나 기억을 남겨보세요.',
+                        hintText: '사진 설명을 입력하세요',
                         filled: false,
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
@@ -510,7 +605,7 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
                 key: const Key('book_note_memo_content_field'),
                 controller: _contentController,
                 focusNode: _contentFocusNode,
-                autofocus: true,
+                autofocus: widget.autofocusContent,
                 expands: true,
                 minLines: null,
                 maxLines: null,
@@ -522,7 +617,7 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
                   height: 1.6,
                 ),
                 decoration: const InputDecoration(
-                  hintText: '기록할 내용을 입력하세요.',
+                  hintText: '메모를 입력하세요',
                   filled: false,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
@@ -613,6 +708,55 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
     _insertTextAtSelection(_contentController, text);
     setState(() => _errorText = null);
     _contentFocusNode.requestFocus();
+  }
+
+  /// 빠른 추가의 발췌 카메라 아이콘으로 이 화면이 뜨자마자 실행된다. 이미
+  /// 이 화면이 뒤 배경이라 카메라·크롭 화면이 그 위에서 진행되고, 인식된
+  /// 문장이 없으면(취소 포함) 이 화면 자체를 닫아 빠른 추가 시트까지 함께
+  /// 닫히게 한다([_startQuoteOcr]). 여기서는 키보드를 다시 띄우지 않는다.
+  Future<void> _autoStartOcr() async {
+    final text = await captureMemoQuoteWithOcr(context);
+    if (!mounted) return;
+    if (text == null || text.trim().isEmpty) {
+      Navigator.of(context).pop();
+      return;
+    }
+    _insertTextAtSelection(_contentController, text);
+    setState(() => _errorText = null);
+  }
+
+  /// 빠른 추가의 사진 아이콘으로 이 화면이 뜨자마자 실행된다. [_autoStartOcr]와
+  /// 같은 이유로, 사진 선택을 끝까지 취소하면 이 화면을 닫아 시트까지 함께
+  /// 닫히게 한다.
+  Future<void> _autoStartPhotoPick() async {
+    if (!_canAttachImage) {
+      AppSnackBar.error(
+        context,
+        widget.attachmentLimitPolicy.noteImageLimitMessage,
+      );
+      Navigator.of(context).pop();
+      return;
+    }
+    final capturedPath = await captureMemoPhoto(context);
+    if (!mounted) return;
+    if (capturedPath == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    final editedPath = await openSharedImageEditor(
+      context,
+      imagePath: capturedPath,
+      profile: SharedImageEditorProfile.general,
+    );
+    if (!mounted) return;
+    if (editedPath == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() {
+      _pickedImagePath = editedPath;
+      _imageRemoved = false;
+    });
   }
 
   bool get _hasPhoto {
@@ -1097,10 +1241,11 @@ class _NoteMemoTypeChoiceStyle {
   };
 }
 
-class _PhotoPicker extends StatefulWidget {
+class _PhotoPicker extends StatelessWidget {
   const _PhotoPicker({
     required this.memo,
     required this.pickedImagePath,
+    required this.allowDelete,
     required this.onPick,
     required this.onRemove,
   });
@@ -1109,36 +1254,51 @@ class _PhotoPicker extends StatefulWidget {
   /// 메모면 null이다.
   final BookNoteMemo? memo;
   final String? pickedImagePath;
+
+  /// 기존 메모 수정 중에는 사진이 없는 PHOTO 메모를 저장할 수 없어 삭제가
+  /// 의미가 없으므로([_BookNoteMemoEditorScreenState._submit] 검증), 신규
+  /// 작성일 때만 삭제를 허용한다.
+  final bool allowDelete;
   final VoidCallback onPick;
   final VoidCallback onRemove;
 
-  @override
-  State<_PhotoPicker> createState() => _PhotoPickerState();
-}
-
-class _PhotoPickerState extends State<_PhotoPicker> {
-  bool _showActions = false;
+  bool get _hasImage => pickedImagePath != null || (memo?.hasImage ?? false);
 
   @override
   Widget build(BuildContext context) {
-    final hasImage =
-        widget.pickedImagePath != null || (widget.memo?.hasImage ?? false);
-    if (!hasImage) {
-      return SizedBox(
-        width: double.infinity,
-        height: 76,
-        child: OutlinedButton.icon(
-          onPressed: widget.onPick,
-          style: OutlinedButton.styleFrom(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
+    if (!_hasImage) {
+      return AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Material(
+          color: AppColors.of(context).surfaceSubtle,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: AppColors.of(context).border),
           ),
-          icon: const Icon(PhosphorIconsRegular.camera, size: 22),
-          label: const Text(
-            '사진 추가',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+          child: InkWell(
+            onTap: onPick,
+            borderRadius: BorderRadius.circular(16),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    PhosphorIconsRegular.camera,
+                    size: 32,
+                    color: AppColors.of(context).textMuted,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '사진 추가',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.of(context).textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       );
@@ -1147,128 +1307,58 @@ class _PhotoPickerState extends State<_PhotoPicker> {
     return Semantics(
       container: true,
       label: '선택한 사진',
-      hint: '두 번 탭하면 사진 변경과 삭제 버튼이 표시됩니다.',
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _showActions = !_showActions),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            height: 240,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                const ColoredBox(color: AppColors.mediaBackdrop),
-                _MemoImage(
-                  memo: widget.memo,
-                  pickedImagePath: widget.pickedImagePath,
-                ),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 160),
-                  child: _showActions
-                      ? ColoredBox(
-                          key: const ValueKey('photo-actions'),
-                          color: AppColors.mediaBackdrop.withValues(
-                            alpha: 0.52,
-                          ),
-                          child: Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _PhotoOverlayAction(
-                                  icon: PhosphorIconsRegular.camera,
-                                  label: '변경',
-                                  foregroundColor: AppColors.of(
-                                    context,
-                                  ).textStrong,
-                                  onPressed: () {
-                                    setState(() => _showActions = false);
-                                    widget.onPick();
-                                  },
-                                ),
-                                const SizedBox(width: 28),
-                                _PhotoOverlayAction(
-                                  icon: PhosphorIconsRegular.trash,
-                                  label: '삭제',
-                                  foregroundColor: AppColors.of(context).error,
-                                  onPressed: () async {
-                                    final confirmed = await AppConfirm.show(
-                                      context,
-                                      title: '사진을 삭제할까요?',
-                                      message: '선택한 사진이 메모에서 제거됩니다.',
-                                      confirmText: '삭제',
-                                      destructive: true,
-                                    );
-                                    if (!mounted || !confirmed) return;
-                                    setState(() => _showActions = false);
-                                    widget.onRemove();
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : const SizedBox.shrink(
-                          key: ValueKey('photo-actions-hidden'),
-                        ),
-                ),
-              ],
+      hint: allowDelete ? '탭하면 사진을 크게 보고 변경·삭제할 수 있습니다.' : '탭하면 사진을 크게 보고 변경할 수 있습니다.',
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _openPreview(context),
+            child: _MemoImage(
+              memo: memo,
+              pickedImagePath: pickedImagePath,
+              fit: BoxFit.cover,
             ),
           ),
         ),
       ),
     );
   }
-}
 
-class _PhotoOverlayAction extends StatelessWidget {
-  const _PhotoOverlayAction({
-    required this.icon,
-    required this.label,
-    required this.foregroundColor,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color foregroundColor;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton.filled(
-          onPressed: onPressed,
-          tooltip: '사진 $label',
-          constraints: const BoxConstraints.tightFor(width: 64, height: 64),
-          style: IconButton.styleFrom(
-            backgroundColor: AppColors.of(context).surface,
-            foregroundColor: foregroundColor,
-          ),
-          icon: Icon(icon, size: 28),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.surface,
-            fontSize: 14,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
+  Future<void> _openPreview(BuildContext context) async {
+    final action = await showSharedImageViewer(
+      context,
+      image: _MemoImage(
+        memo: memo,
+        pickedImagePath: pickedImagePath,
+        fit: BoxFit.contain,
+      ),
+      showActions: true,
+      showDeleteAction: allowDelete,
+      editLabel: '변경',
     );
+    if (action == null) return;
+    switch (action) {
+      case SharedImageViewerAction.edit:
+        onPick();
+      case SharedImageViewerAction.delete:
+        onRemove();
+    }
   }
 }
 
 /// 표시 우선순위: 방금 고른 사진 → 로컬 사본 → 서버 URL.
 class _MemoImage extends StatelessWidget {
-  const _MemoImage({required this.memo, required this.pickedImagePath});
+  const _MemoImage({
+    required this.memo,
+    required this.pickedImagePath,
+    required this.fit,
+  });
 
   final BookNoteMemo? memo;
   final String? pickedImagePath;
+  final BoxFit fit;
 
   @override
   Widget build(BuildContext context) {
@@ -1276,7 +1366,7 @@ class _MemoImage extends StatelessWidget {
     if (picked != null) {
       return Image.file(
         File(picked),
-        fit: BoxFit.contain,
+        fit: fit,
         errorBuilder: (_, _, _) => const _ImageError(),
       );
     }
@@ -1284,7 +1374,7 @@ class _MemoImage extends StatelessWidget {
     if (localFile != null) {
       return Image.file(
         localFile,
-        fit: BoxFit.contain,
+        fit: fit,
         errorBuilder: (_, _, _) => _remote(),
       );
     }
@@ -1299,7 +1389,7 @@ class _MemoImage extends StatelessWidget {
     }
     return Image.network(
       imageUrl,
-      fit: BoxFit.contain,
+      fit: fit,
       errorBuilder: (_, _, _) => const _ImageError(),
     );
   }

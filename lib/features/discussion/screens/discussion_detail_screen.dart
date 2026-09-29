@@ -148,7 +148,7 @@ class _DiscussionDetailScreenState
     final color = discussionOptionColorOf(topic.options, optionId);
     showDiscussionAnswerSheet(
       context,
-      hintText: '이 선택을 한 이유나 생각을 들려주세요...',
+      hintText: '내용을 입력하세요',
       selectedOptionLabel: label,
       accentColor: color,
       onSubmit: (content) =>
@@ -159,7 +159,7 @@ class _DiscussionDetailScreenState
   void _openFreeAnswerSheet() {
     showDiscussionAnswerSheet(
       context,
-      hintText: '나의 생각을 들려주세요...',
+      hintText: '내용을 입력하세요',
       onSubmit: (content) => _submitAnswer(content: content, withOption: false),
     );
   }

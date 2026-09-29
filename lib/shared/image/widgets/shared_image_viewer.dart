@@ -16,6 +16,7 @@ Future<SharedImageViewerAction?> showSharedImageViewer(
   BuildContext context, {
   required Widget image,
   bool showActions = false,
+  bool showDeleteAction = true,
   String editLabel = '수정',
   String deleteLabel = '삭제',
 }) {
@@ -26,6 +27,7 @@ Future<SharedImageViewerAction?> showSharedImageViewer(
     builder: (_) => _SharedImageViewerDialog(
       image: image,
       showActions: showActions,
+      showDeleteAction: showDeleteAction,
       editLabel: editLabel,
       deleteLabel: deleteLabel,
     ),
@@ -36,12 +38,14 @@ class _SharedImageViewerDialog extends StatelessWidget {
   const _SharedImageViewerDialog({
     required this.image,
     required this.showActions,
+    required this.showDeleteAction,
     required this.editLabel,
     required this.deleteLabel,
   });
 
   final Widget image;
   final bool showActions;
+  final bool showDeleteAction;
   final String editLabel;
   final String deleteLabel;
 
@@ -108,21 +112,23 @@ class _SharedImageViewerDialog extends StatelessWidget {
                             ),
                             label: Text(editLabel),
                           ),
-                          const SizedBox(width: 20),
-                          TextButton.icon(
-                            onPressed: () => Navigator.of(
-                              context,
-                            ).pop(SharedImageViewerAction.delete),
-                            style: TextButton.styleFrom(
-                              foregroundColor: AppColors.error,
-                              minimumSize: const Size(96, 48),
+                          if (showDeleteAction) ...[
+                            const SizedBox(width: 20),
+                            TextButton.icon(
+                              onPressed: () => Navigator.of(
+                                context,
+                              ).pop(SharedImageViewerAction.delete),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.error,
+                                minimumSize: const Size(96, 48),
+                              ),
+                              icon: const Icon(
+                                PhosphorIconsRegular.trash,
+                                size: 19,
+                              ),
+                              label: Text(deleteLabel),
                             ),
-                            icon: const Icon(
-                              PhosphorIconsRegular.trash,
-                              size: 19,
-                            ),
-                            label: Text(deleteLabel),
-                          ),
+                          ],
                         ],
                       ),
                     ),

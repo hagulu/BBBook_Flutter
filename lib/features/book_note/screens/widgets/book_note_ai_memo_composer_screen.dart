@@ -8,7 +8,7 @@ import '../../../../shared/widgets/app_bar_title.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 
 const _aiMemoMinLength = 20;
-const _aiMemoMaxLength = 20000;
+const _aiMemoMaxLength = 3000;
 
 /// AI 메모 생성 전용 긴 텍스트 입력 화면.
 ///
@@ -38,7 +38,7 @@ class _BookNoteAiMemoComposerScreenState
   }
 
   bool get _canGenerate {
-    final length = _textController.text.trim().length;
+    final length = _textController.text.trim().characters.length;
     return !_isGenerating &&
         length >= _aiMemoMinLength &&
         length <= _aiMemoMaxLength;
@@ -46,7 +46,7 @@ class _BookNoteAiMemoComposerScreenState
 
   Future<void> _generate() async {
     final text = _textController.text.trim();
-    if (text.length < _aiMemoMinLength) {
+    if (text.characters.length < _aiMemoMinLength) {
       AppSnackBar.error(context, '내용을 $_aiMemoMinLength자 이상 입력해 주세요.');
       return;
     }
@@ -111,43 +111,74 @@ class _BookNoteAiMemoComposerScreenState
           top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-            child: TextField(
-              controller: _textController,
-              autofocus: true,
-              enabled: !_isGenerating,
-              expands: true,
-              minLines: null,
-              maxLines: null,
-              maxLength: _aiMemoMaxLength,
-              textAlignVertical: TextAlignVertical.top,
-              keyboardType: TextInputType.multiline,
-              style: TextStyle(
-                color: AppColors.of(context).textBody,
-                fontSize: 15,
-                height: 1.5,
-              ),
-              decoration: InputDecoration(
-                hintText:
-                    '읽은 내용을 붙여넣으면 AI가 메모로 정리해 드려요. '
-                    '(최소 $_aiMemoMinLength자)',
-                hintStyle: TextStyle(
-                  color: AppColors.of(context).textMuted,
-                  fontSize: 15,
-                  height: 1.5,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _textController,
+                    autofocus: true,
+                    enabled: !_isGenerating,
+                    expands: true,
+                    minLines: null,
+                    maxLines: null,
+                    maxLength: _aiMemoMaxLength,
+                    textAlignVertical: TextAlignVertical.top,
+                    keyboardType: TextInputType.multiline,
+                    style: TextStyle(
+                      color: AppColors.of(context).textBody,
+                      fontSize: 15,
+                      height: 1.5,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '정리할 내용을 자유롭게 적으면 AI가 요약·발췌·생각 메모로 만들어드려요',
+                      hintStyle: TextStyle(
+                        color: AppColors.of(context).textMuted,
+                        fontSize: 15,
+                        height: 1.5,
+                      ),
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      counterText: '',
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
                 ),
-                filled: false,
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                counterText: '',
-              ),
-              onChanged: (_) => setState(() {}),
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '${_formatCount(_textController.text.characters.length)} / '
+                    '${_formatCount(_aiMemoMaxLength)}',
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                      color: AppColors.of(context).textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
       ),
     );
   }
+}
+
+/// 천 단위 구분 쉼표를 넣는다(예: 3000 → "3,000"). 이 화면은 최대 길이가
+/// 고정값이라 별도 패키지 없이 자리수만 세어 넣는 것으로 충분하다.
+String _formatCount(int value) {
+  final digits = value.toString();
+  final buffer = StringBuffer();
+  for (var i = 0; i < digits.length; i++) {
+    final remaining = digits.length - i;
+    if (i > 0 && remaining % 3 == 0) buffer.write(',');
+    buffer.write(digits[i]);
+  }
+  return buffer.toString();
 }
 
 /// IME 조합 중인 구간에 시스템이 그리는 밑줄을 없앤다. 긴 글을 오래

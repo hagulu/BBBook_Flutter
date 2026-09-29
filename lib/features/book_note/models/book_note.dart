@@ -1,7 +1,7 @@
 enum BookNoteMemoType {
   summary('SUMMARY', '요약'),
-  quote('QUOTE', '발췌'),
   thought('THOUGHT', '생각'),
+  quote('QUOTE', '발췌'),
   photo('PHOTO', '사진');
 
   const BookNoteMemoType(this.dbValue, this.label);
