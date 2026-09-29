@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/ads/ad_slot_planner.dart';
+import '../../../shared/ads/ads_enabled_provider.dart';
 import '../../../shared/widgets/app_bar_title.dart';
+import '../../../shared/widgets/app_inline_banner_ad.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../auth/providers/auth_access_providers.dart';
 import '../models/discussion_topic.dart';
@@ -88,6 +91,7 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(discussionListControllerProvider(_args));
+    final adsEnabled = ref.watch(adsEnabledProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -108,6 +112,7 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
                 .read(discussionListControllerProvider(_args).notifier)
                 .refresh(),
             onOpen: _openDetail,
+            adsEnabled: adsEnabled,
           ),
           AsyncError() => CommunityContentErrorState(
             message: '토론을 불러오지 못했습니다.',
@@ -141,6 +146,7 @@ class _TopicList extends StatelessWidget {
     required this.onFilterChanged,
     required this.onRefresh,
     required this.onOpen,
+    required this.adsEnabled,
   });
 
   final ScrollController scrollController;
@@ -149,6 +155,7 @@ class _TopicList extends StatelessWidget {
   final ValueChanged<bool> onFilterChanged;
   final Future<void> Function() onRefresh;
   final void Function(int topicId) onOpen;
+  final bool adsEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -195,31 +202,43 @@ class _TopicList extends StatelessWidget {
       );
     }
 
+    // 토론 목록에 8행마다 배너 광고를 끼워 넣는다(맨 위 필터 행은 제외).
+    // adsEnabled가 꺼져 있으면(추후 광고 제거 구매 등) 광고 항목 자체를
+    // 끼워 넣지 않는다.
+    final entries = adsEnabled
+        ? interleaveAdSlots(state.items, rowsPerAd: 8)
+        : [for (final item in state.items) ItemAdSlotEntry(item)];
+
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: ListView.separated(
         controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(24, 0, 24, 112),
-        itemCount: 1 + state.items.length + (state.isLoadingMore ? 1 : 0),
+        itemCount: 1 + entries.length + (state.isLoadingMore ? 1 : 0),
         separatorBuilder: (_, index) => index == 0
             ? const SizedBox.shrink()
             : const CommunityContentDivider(),
         itemBuilder: (context, index) {
           if (index == 0) return filterRow;
           final itemIndex = index - 1;
-          if (itemIndex >= state.items.length) {
+          if (itemIndex >= entries.length) {
             return const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
               child: CommunityContentPageLoader(),
             );
           }
-          final topic = state.items[itemIndex];
-          return DiscussionTopicCard(
-            key: ValueKey(topic.id),
-            topic: topic,
-            onTap: () => onOpen(topic.id),
-          );
+          final entry = entries[itemIndex];
+          return switch (entry) {
+            ItemAdSlotEntry(:final item) => DiscussionTopicCard(
+              key: ValueKey(item.id),
+              topic: item,
+              onTap: () => onOpen(item.id),
+            ),
+            AdAdSlotEntry(:final afterCount) => AppInlineBannerAd(
+              key: ValueKey('discussion-ad-$afterCount'),
+            ),
+          };
         },
       ),
     );

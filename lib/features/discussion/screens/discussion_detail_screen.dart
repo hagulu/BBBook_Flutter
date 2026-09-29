@@ -6,6 +6,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_banner_ad.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_pagination.dart';
@@ -470,6 +471,7 @@ class _DiscussionDetailScreenState
                         : null,
                     allowAccountActions: allowAccountActions,
                   ),
+                  const AppBannerAd(topSpacing: 20),
                   if (!topic.hasOptions && allowAccountActions) ...[
                     const SizedBox(height: 32),
                     _FreeAnswerCard(

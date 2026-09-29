@@ -7,7 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/providers/auth_access_providers.dart';
 import '../../../../core/utils/author_display.dart';
+import '../../../../shared/ads/ad_slot_planner.dart';
+import '../../../../shared/ads/ads_enabled_provider.dart';
 import '../../../../shared/widgets/app_alert.dart';
+import '../../../../shared/widgets/app_inline_banner_ad.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../../book_record/screens/book_record_screen.dart';
@@ -165,6 +168,16 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
   // 같을 때만([_lastSettledFilter] == 현재 필터) 재사용한다.
   FinishedFilter? _lastSettledFilter;
   List<BookItem>? _lastSettledItems;
+
+  // 그리드에 끼워 넣은 광고 슬롯의 실제 로드 결과 높이(키: "그룹키:슬롯인덱스",
+  // 로드 전/실패면 0). `_groupContentHeight`가 이 값을 함께 더해야 월 인덱스
+  // 스크러버의 오프셋 계산이 실제 렌더링과 어긋나지 않는다.
+  final Map<String, double> _adSlotHeights = {};
+
+  void _setAdSlotHeight(String slotKey, double height) {
+    if (_adSlotHeights[slotKey] == height) return;
+    setState(() => _adSlotHeights[slotKey] = height);
+  }
 
   // PageView(TabBarView 내부)는 기본적으로 화면 밖으로 벗어난 탭의 State를
   // 그대로 폐기한다. 이 탭은 검색어/필터/스크롤 위치 등 내부 상태가 많고
@@ -335,9 +348,11 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     double contentWidth,
   ) {
     final headerHeight = _scaledFinishedGroupHeaderHeight(_textScale);
+    final plans = _adPlansForLengths([for (final g in groups) g.items.length]);
     double offset = 0;
     for (var i = 0; i < index; i++) {
-      offset += headerHeight + _groupContentHeight(groups[i], contentWidth);
+      offset +=
+          headerHeight + _groupContentHeight(groups[i], plans[i], contentWidth);
     }
     return offset;
   }
@@ -346,12 +361,53 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
   /// 렌더링과 어긋나지 않도록 이 값 하나로 통일해서 쓴다.
   double get _textScale => MediaQuery.textScalerOf(context).scale(1.0);
 
+  /// 완독 목록 전체(월 그룹 경계와 무관하게)를 기준으로 그리드는 8행, 리스트는
+  /// 10행마다 배너 광고 하나를 이어서 센다 — 첫 화면에 바로 광고가 보이지
+  /// 않고 콘텐츠를 충분히 본 뒤에야 만나도록 하기 위한 간격이다. 한 달에
+  /// 그만큼을 못 채워도 광고가 아예 노출되지 않는 일이 없도록
+  /// [_adPlansForLengths]가 그룹 경계에서도 사이클을 끊지 않는다.
+  ///
+  /// [adsEnabledProvider]가 꺼져 있으면(추후 광고 제거 구매 등) 광고 슬롯
+  /// 자체를 만들지 않는다 — 위젯만 숨기면(`AppInlineBannerAd`가 스스로
+  /// 빈 크기를 반환) 슬롯 사이에 넣어 둔 기본 행 간격만 빈 공간으로 남기
+  /// 때문에, 슬롯을 만드는 단계에서부터 광고 없는 원래 레이아웃과 동일하게
+  /// 계산한다.
+  List<GridAdPlan> _adPlansForLengths(List<int> segmentLengths) {
+    if (!ref.read(adsEnabledProvider)) {
+      return [
+        for (final length in segmentLengths)
+          GridAdPlan(
+            length > 0 ? [length] : const [],
+            length > 0 ? [false] : const [],
+          ),
+      ];
+    }
+    final isList = _viewMode == _FinishedViewMode.list;
+    return planRowBasedAdSlots(
+      segmentLengths: segmentLengths,
+      crossAxisCount: isList ? 1 : 3,
+      rowsPerAd: isList ? 10 : 8,
+    );
+  }
+
   /// 그리드는 열 수·비율에 따라, 리스트는 고정 행 높이(`_scaledFinishedListRowHeight`)에
   /// 따라 그룹 한 덩어리의 높이를 계산한다. `SliverGrid`/`SliverFixedExtentList`가
   /// 실제로 그리는 방식과 이 계산이 어긋나면 인덱스 점프 위치가 밀린다.
-  double _groupContentHeight(_MonthGroup group, double contentWidth) {
+  double _groupContentHeight(
+    _MonthGroup group,
+    GridAdPlan plan,
+    double contentWidth,
+  ) {
     if (_viewMode == _FinishedViewMode.list) {
-      return group.items.length * _scaledFinishedListRowHeight(_textScale);
+      final rowHeight = _scaledFinishedListRowHeight(_textScale);
+      var height = 0.0;
+      for (var i = 0; i < plan.chunks.length; i++) {
+        height += plan.chunks[i] * rowHeight;
+        if (plan.adAfterChunk[i]) {
+          height += _adSlotHeights['list:${group.key}:$i'] ?? 0.0;
+        }
+      }
+      return height;
     }
     const crossAxisCount = 3;
     const crossAxisSpacing = 12.0;
@@ -362,13 +418,31 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     final tileWidth =
         (gridWidth - crossAxisSpacing * (crossAxisCount - 1)) / crossAxisCount;
     final tileHeight = tileWidth / _kFinishedGridAspectRatio;
-    final rows = (group.items.length / crossAxisCount).ceil();
-    return rows <= 0 ? 0.0 : rows * tileHeight + (rows - 1) * mainAxisSpacing;
+
+    var height = 0.0;
+    for (var i = 0; i < plan.chunks.length; i++) {
+      final rows = (plan.chunks[i] / crossAxisCount).ceil();
+      if (rows > 0) {
+        height += rows * tileHeight + (rows - 1) * mainAxisSpacing;
+      }
+      if (plan.adAfterChunk[i]) {
+        // `_gridSliverWithAds`가 광고 로드 여부와 무관하게 항상 먼저 넣는
+        // 기본 행 간격(원래 하나의 그리드였을 때의 mainAxisSpacing)과, 그
+        // 위에 광고가 로드됐을 때만 추가되는 실측 높이를 더한다.
+        height += mainAxisSpacing;
+        height += _adSlotHeights['grid:${group.key}:$i'] ?? 0.0;
+      }
+    }
+    return height;
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context); // AutomaticKeepAliveClientMixin 요구사항
+    // 값 자체는 _adPlansForLengths가 ref.read로 다시 읽지만, 여기서
+    // watch해 둬야 이 값이 바뀔 때(예: 광고 제거 구매) 화면이 다시
+    // 그려져 광고 슬롯이 즉시 사라지거나 나타난다.
+    ref.watch(adsEnabledProvider);
     final filter = ref.watch(finishedFilterProvider);
     final books = ref.watch(finishedBooksProvider);
     final isDefaultMode = filter.isDefaultMode;
@@ -539,6 +613,7 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
       ];
     }
     if (!filter.isDefaultMode) {
+      final plan = _adPlansForLengths([items.length]).first;
       return [
         SliverPadding(
           padding: EdgeInsets.fromLTRB(
@@ -547,53 +622,151 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
             16,
             bookshelfBottomContentPadding(context),
           ),
-          sliver: _bookSliver(items),
+          sliver: _bookSliver(items, groupKey: 'flat', plan: plan),
         ),
       ];
     }
-    return _groupedSlivers(groups);
-  }
-
-  Widget _bookSliver(List<BookItem> items) {
-    if (_viewMode == _FinishedViewMode.list) {
-      return SliverFixedExtentList(
-        itemExtent: _scaledFinishedListRowHeight(_textScale),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) => _FinishedBookListRow(
-            book: items[index],
-            categoryColor: _categoryColors[items[index].category],
-            showDivider: index != items.length - 1,
-          ),
-          childCount: items.length,
-        ),
-      );
-    }
-    return SliverGrid(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 16,
-        childAspectRatio: _kFinishedGridAspectRatio,
-      ),
-      delegate: SliverChildBuilderDelegate(
-        (context, index) => _FinishedBookCard(book: items[index]),
-        childCount: items.length,
-      ),
+    return _groupedSlivers(
+      groups,
+      _adPlansForLengths([for (final g in groups) g.items.length]),
     );
   }
 
-  List<Widget> _groupedSlivers(List<_MonthGroup> groups) {
+  /// [groupKey]는 광고 슬롯 높이를 [_adSlotHeights]에서 구분해 저장하는
+  /// 키다(월별 그룹 모드에서는 `group.key`, 검색/필터로 그룹이 없는
+  /// 평면 모드에서는 고정값 `'flat'`). [plan]은 이 구간을 어떻게 나눠
+  /// 그릴지와 그 사이 어디에 광고를 넣을지를 담고 있다(전체 목록을
+  /// 이어서 계산한 결과라 월 경계에서 사이클이 끊기지 않는다).
+  Widget _bookSliver(
+    List<BookItem> items, {
+    required String groupKey,
+    required GridAdPlan plan,
+  }) {
+    if (_viewMode == _FinishedViewMode.list) {
+      return _listSliverWithAds(items, groupKey: groupKey, plan: plan);
+    }
+    return _gridSliverWithAds(items, groupKey: groupKey, plan: plan);
+  }
+
+  /// 책 개수가 아니라 그리드 열 개수(3열) 기준 8행마다 배너 광고를 한 행
+  /// 전체 너비로 끼워 넣는다.
+  ///
+  /// 묶음 경계에는 원래 하나의 `SliverGrid`였을 때와 똑같은 `mainAxisSpacing`
+  /// 간격을 광고 로드 여부와 무관하게 항상 먼저 넣는다 — 광고가 아직
+  /// 로드되지 않았거나 실패했을 때도 앞뒤 행 사이 간격이 그대로 유지되도록
+  /// (광고 위젯 자체는 그 위에 얹히는 추가 여백/콘텐츠만 담당한다).
+  Widget _gridSliverWithAds(
+    List<BookItem> items, {
+    required String groupKey,
+    required GridAdPlan plan,
+  }) {
+    const crossAxisCount = 3;
+    const mainAxisSpacing = 16.0;
+    var start = 0;
+    final slivers = <Widget>[];
+    for (var i = 0; i < plan.chunks.length; i++) {
+      final take = plan.chunks[i];
+      final chunkItems = items.sublist(start, start + take);
+      start += take;
+      slivers.add(
+        SliverGrid(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: mainAxisSpacing,
+            childAspectRatio: _kFinishedGridAspectRatio,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => _FinishedBookCard(book: chunkItems[index]),
+            childCount: chunkItems.length,
+          ),
+        ),
+      );
+      if (plan.adAfterChunk[i]) {
+        final slotKey = 'grid:$groupKey:$i';
+        slivers.add(
+          const SliverToBoxAdapter(
+            child: SizedBox(height: mainAxisSpacing),
+          ),
+        );
+        slivers.add(
+          SliverToBoxAdapter(
+            child: AppInlineBannerAd(
+              key: ValueKey('finished-ad-$slotKey'),
+              bottomSpacing: mainAxisSpacing,
+              onResolvedHeight: (height) => _setAdSlotHeight(slotKey, height),
+            ),
+          ),
+        );
+      }
+    }
+    return SliverMainAxisGroup(slivers: slivers);
+  }
+
+  /// 리스트 보기는 열이 없으니(1열) 책 개수 10행마다 배너 광고를 끼워 넣는다.
+  ///
+  /// 구분선은 묶음(청크) 경계가 아니라 이 [items](그룹 전체 목록) 안에서의
+  /// 진짜 마지막 행에서만 생략한다 — 광고가 로드되지 않았을 때도 청크
+  /// 경계에서 구분선이 사라지지 않게 하기 위함이다(원래 하나의 리스트였을
+  /// 때와 같은 모습).
+  Widget _listSliverWithAds(
+    List<BookItem> items, {
+    required String groupKey,
+    required GridAdPlan plan,
+  }) {
+    final rowHeight = _scaledFinishedListRowHeight(_textScale);
+    var start = 0;
+    final slivers = <Widget>[];
+    for (var i = 0; i < plan.chunks.length; i++) {
+      final take = plan.chunks[i];
+      final chunkItems = items.sublist(start, start + take);
+      final chunkStart = start;
+      start += take;
+      slivers.add(
+        SliverFixedExtentList(
+          itemExtent: rowHeight,
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => _FinishedBookListRow(
+              book: chunkItems[index],
+              categoryColor: _categoryColors[chunkItems[index].category],
+              showDivider: chunkStart + index != items.length - 1,
+            ),
+            childCount: chunkItems.length,
+          ),
+        ),
+      );
+      if (plan.adAfterChunk[i]) {
+        final slotKey = 'list:$groupKey:$i';
+        slivers.add(
+          SliverToBoxAdapter(
+            child: AppInlineBannerAd(
+              key: ValueKey('finished-ad-$slotKey'),
+              topSpacing: 12,
+              bottomSpacing: 12,
+              onResolvedHeight: (height) => _setAdSlotHeight(slotKey, height),
+            ),
+          ),
+        );
+      }
+    }
+    return SliverMainAxisGroup(slivers: slivers);
+  }
+
+  List<Widget> _groupedSlivers(
+    List<_MonthGroup> groups,
+    List<GridAdPlan> plans,
+  ) {
     return [
       // 헤더+콘텐츠를 SliverMainAxisGroup으로 묶어야 pinned 헤더가 "이
       // 그룹 범위 안에서만" 고정된다 — 묶지 않으면 이전 달 헤더들이 화면에
       // 계속 쌓여 남는다(각자 독립적으로 고정되어 버리기 때문).
-      for (final group in groups)
+      for (var g = 0; g < groups.length; g++)
         SliverMainAxisGroup(
           slivers: [
             SliverPersistentHeader(
               pinned: true,
               delegate: _MonthHeaderDelegate(
-                group.label,
+                groups[g].label,
                 height: _scaledFinishedGroupHeaderHeight(_textScale),
                 backgroundColor: AppColors.of(context).pageBackground,
                 textColor: AppColors.of(context).textStrong,
@@ -601,7 +774,11 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
             ),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: _bookSliver(group.items),
+              sliver: _bookSliver(
+                groups[g].items,
+                groupKey: groups[g].key,
+                plan: plans[g],
+              ),
             ),
           ],
         ),

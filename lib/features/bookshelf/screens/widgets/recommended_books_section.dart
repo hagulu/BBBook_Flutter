@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/author_display.dart';
+import '../../../../shared/widgets/app_banner_ad.dart';
 import '../../../book_detail/screens/book_detail_screen.dart';
 import '../../../book_record/screens/book_record_screen.dart';
 import '../../models/book_recommendation.dart';
@@ -56,6 +57,7 @@ class RecommendedBooksSection extends ConsumerWidget {
                           if (i > 0) const SizedBox(height: 20),
                           _RecommendationGroup(group: groups[i]),
                         ],
+                        const AppBannerAd(topSpacing: 20),
                       ],
                     )
                   : Center(

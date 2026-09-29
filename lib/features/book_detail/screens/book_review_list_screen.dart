@@ -4,8 +4,11 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/ads/ad_slot_planner.dart';
+import '../../../shared/ads/ads_enabled_provider.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
+import '../../../shared/widgets/app_inline_banner_ad.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../auth/providers/auth_access_providers.dart';
@@ -157,6 +160,7 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
     // 독자평 조회는 인증이 필요 없지만 작성·공감·신고는 계정이 있어야 한다.
     // 계정이 없으면 비활성화가 아니라 버튼 자체를 만들지 않는다.
     final allowAccountActions = ref.watch(canUseAccountFeaturesProvider);
+    final adsEnabled = ref.watch(adsEnabledProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -180,6 +184,7 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
             onDelete: _handleDelete,
             onReport: _handleReport,
             allowAccountActions: allowAccountActions,
+            adsEnabled: adsEnabled,
           ),
           AsyncError() => CommunityContentErrorState(
             message: '독자평을 불러오지 못했습니다.',
@@ -214,6 +219,7 @@ class _ReviewList extends StatelessWidget {
     required this.onDelete,
     required this.onReport,
     required this.allowAccountActions,
+    required this.adsEnabled,
   });
 
   final ScrollController scrollController;
@@ -225,6 +231,7 @@ class _ReviewList extends StatelessWidget {
   final void Function(BookReview review) onDelete;
   final void Function(BookReview review) onReport;
   final bool allowAccountActions;
+  final bool adsEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -236,31 +243,42 @@ class _ReviewList extends StatelessWidget {
       );
     }
 
+    // 독자평 목록에 10행마다 배너 광고를 끼워 넣는다. adsEnabled가 꺼져
+    // 있으면(추후 광고 제거 구매 등) 광고 항목 자체를 끼워 넣지 않는다.
+    final entries = adsEnabled
+        ? interleaveAdSlots(state.items, rowsPerAd: 10)
+        : [for (final item in state.items) ItemAdSlotEntry(item)];
+
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: ListView.separated(
         controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-        itemCount: state.items.length + (state.isLoadingMore ? 1 : 0),
+        itemCount: entries.length + (state.isLoadingMore ? 1 : 0),
         separatorBuilder: (_, _) =>
             Divider(height: 1, color: AppColors.of(context).border),
         itemBuilder: (context, index) {
-          if (index >= state.items.length) {
+          if (index >= entries.length) {
             return const CommunityContentPageLoader();
           }
-          final review = state.items[index];
-          return ReviewItem(
-            key: ValueKey(review.id),
-            review: review,
-            onToggleLike: pendingLikeIds.contains(review.id)
-                ? null
-                : () => onToggleLike(review),
-            onEdit: () => onEdit(review),
-            onDelete: () => onDelete(review),
-            onReport: () => onReport(review),
-            allowAccountActions: allowAccountActions,
-          );
+          final entry = entries[index];
+          return switch (entry) {
+            ItemAdSlotEntry(:final item) => ReviewItem(
+              key: ValueKey(item.id),
+              review: item,
+              onToggleLike: pendingLikeIds.contains(item.id)
+                  ? null
+                  : () => onToggleLike(item),
+              onEdit: () => onEdit(item),
+              onDelete: () => onDelete(item),
+              onReport: () => onReport(item),
+              allowAccountActions: allowAccountActions,
+            ),
+            AdAdSlotEntry(:final afterCount) => AppInlineBannerAd(
+              key: ValueKey('review-ad-$afterCount'),
+            ),
+          };
         },
       ),
     );

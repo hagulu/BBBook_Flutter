@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/author_display.dart';
+import '../../../shared/widgets/app_banner_ad.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
@@ -380,6 +381,7 @@ class _HeroSection extends StatelessWidget {
           if (detail.description != null && detail.description!.isNotEmpty) ...[
             const SizedBox(height: 20),
             _DescriptionCard(description: detail.description!),
+            const AppBannerAd(topSpacing: 20),
           ],
         ],
       ),

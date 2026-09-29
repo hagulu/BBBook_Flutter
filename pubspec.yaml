@@ -66,6 +66,7 @@ dependencies:
   csv: ^8.0.0
   naver_login_flutter: ^4.0.0
   flutter_svg: ^2.3.0
+  google_mobile_ads: ^9.1.0
 dev_dependencies:
   flutter_launcher_icons: ^0.14.4
   flutter_test:

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_banner_ad.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../auth/providers/auth_access_providers.dart';
@@ -239,6 +240,7 @@ class _ReaderBody extends StatelessWidget {
             key: ValueKey('${detail.id}-${detail.updatedAt}'),
             contentJson: detail.contentJson,
           ),
+          const AppBannerAd(topSpacing: 24),
           const SizedBox(height: 40),
           Divider(height: 1, color: AppColors.of(context).border),
           const SizedBox(height: 20),

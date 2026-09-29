@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 
 import 'app/app.dart';
+import 'core/config/ad_config.dart';
 import 'core/config/api_config.dart';
 import 'core/config/kakao_config.dart';
 import 'core/theme/theme_mode_provider.dart';
@@ -18,6 +22,9 @@ void main() async {
   // 촬영 방향만 맞추므로, 화면 회전을 막아도 가로 촬영 자체는 가능하다.
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   ApiConfig.assertConfiguredForRelease();
+  AdConfig.assertConfiguredForRelease();
+  // 배너 로드는 첫 화면 진입 전에 끝나지 않아도 되므로 완료를 기다리지 않는다.
+  unawaited(MobileAds.instance.initialize());
   final kakaoNativeAppKey = await KakaoConfig.loadNativeAppKey();
   KakaoConfig.assertConfiguredForRelease();
   if (KakaoConfig.isConfigured) {

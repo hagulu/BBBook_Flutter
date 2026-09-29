@@ -21,6 +21,7 @@
 - `lib/core/storage/client_id_storage.dart` — X-Client-Id 헤더용 설치 단위 클라이언트 식별자(UUID) 저장/재사용
 - `lib/core/storage/local_image_store.dart` — 기능별 이미지 로컬 파일 저장소(선택 이미지 저장·서버 이미지 내려받기·orphan 정리, DB에는 폴더 기준 상대 경로만 보관)
 - `lib/core/policy/attachment_limit_policy.dart` — 노트/독후감 이미지 첨부 한도 정책(현재 고정값: 노트 3·독후감 0, 추후 서버 등급별 값으로 교체 가능한 단일 지점) 및 서버 제한 에러코드 상수
+- `lib/core/config/ad_config.dart` — AdMob 배너 광고 단위 ID 단일 관리 지점(현재는 Google 공식 테스트 ID, 실제 배포 시 이 값만 교체), release 빌드가 테스트 ID를 그대로 쓰면 막는 `assertConfiguredForRelease()`
 
 ## features/auth
 
@@ -219,6 +220,13 @@
 - `lib/shared/widgets/app_snackbar.dart` — 공통 SnackBar(pill 형태, 성공/정보는 아이덴티티 컬러·에러는 에러 컬러 반투명 배경 + 상태 아이콘)
 - `lib/shared/widgets/app_pagination.dart` — 공통 숫자 페이지네이션(항상 첫/마지막 페이지 노출, 현재 페이지 주변만 펼치고 나머지는 `···` 생략, `buildPaginationRange` 순수 함수 + `AppPagination` 위젯)
 - `lib/shared/widgets/record_dialog_shell.dart` — 여러 기능의 선택·수정 폼이 공유하는 바텀시트 셸(드래그 핸들·제목·콘텐츠·공통 버튼)
+- `lib/shared/widgets/app_banner_ad.dart` — 화면 상단/하단용 공통 AdMob 배너 광고 위젯(로드 전/실패 시 빈 영역 없음, 좁은 화면에서는 비율 유지 축소, 광고 단위 ID는 `AdConfig` 참조)
+- `lib/shared/widgets/app_inline_banner_ad.dart` — 목록/그리드 중간 삽입용 배너 광고 위젯(로드 전부터 자리·높이를 미리 확보해 로드 시 목록이 밀리지 않음, 실패 시에만 자리 제거, 뷰포트 근처에서만 실제 로드 시작)
+
+## shared/ads
+
+- `lib/shared/ads/ad_slot_planner.dart` — 목록/그리드에 몇 행마다 광고를 끼워 넣을지 계산하는 순수 함수(`planRowBasedAdSlots`)와 1열 목록용 헬퍼(`interleaveAdSlots`), 완독 책장·책 검색·독후감·토론·독자평 목록이 공유
+- `lib/shared/ads/ads_enabled_provider.dart` — 광고 전체 노출 여부를 결정하는 단일 지점(`adsEnabledProvider`, 지금은 항상 true), 추후 광고 제거 구매 등으로 교체할 지점
 
 ## shared/image
 

@@ -5,6 +5,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/relative_time.dart';
+import '../../../shared/widgets/app_banner_ad.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
@@ -361,6 +362,7 @@ class _ReflectionBody extends StatelessWidget {
                 height: 1.6,
               ),
             ),
+          const AppBannerAd(topSpacing: 24),
         ],
       ),
     );

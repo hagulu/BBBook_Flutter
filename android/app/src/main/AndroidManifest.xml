@@ -83,6 +83,12 @@
         <meta-data android:name="com.naver.sdk.clientName" android:value="북꾸러미"/>
         <meta-data android:name="com.naver.sdk.logEnabled" android:value="false"/>
         <meta-data android:name="com.hagulu.nook.bbbook.kakaoNativeAppKey" android:value="${kakaoNativeAppKey}"/>
+        <!-- AdMob 초기화에 필요. 지금은 Google 공식 테스트 App ID만 사용하고
+             실제 서비스 배포 시 발급받은 Android App ID로 교체한다
+             (`lib/core/config/ad_config.dart`의 배너 광고 단위 ID와는 별개 값). -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-3940256099942544~3347511713"/>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

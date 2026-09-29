@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/ads/ad_slot_planner.dart';
+import '../../../shared/ads/ads_enabled_provider.dart';
+import '../../../shared/widgets/app_banner_ad.dart';
 import '../../../shared/widgets/app_bar_title.dart';
+import '../../../shared/widgets/app_inline_banner_ad.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../book_detail/screens/book_detail_screen.dart';
 import '../../book_record/screens/book_record_screen.dart';
@@ -111,6 +115,7 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(bookSearchControllerProvider);
+    final adsEnabled = ref.watch(adsEnabledProvider);
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _fillViewportIfNeeded(),
     );
@@ -174,9 +179,10 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
                 onRetryLoadMore: () => ref
                     .read(bookSearchControllerProvider.notifier)
                     .retryLoadMore(),
+                adsEnabled: adsEnabled,
               ),
             )
-          else
+          else ...[
             // 검색어가 없을 때만 노출되는 진입점이라 Expanded로 감싸 남는
             // 화면 아래쪽 전체를 차지하지 않고, 버튼 자체 높이만 차지하게 한다.
             Padding(
@@ -186,6 +192,18 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
                 onTapScan: _scanBarcode,
               ),
             ),
+            // 검색 전 하단 빈 공간을 광고로 채운다. 로드 전/실패 시에는
+            // AppBannerAd 자체가 빈 크기로 접혀 빈 영역만 남지 않는다.
+            const Expanded(
+              child: Align(
+                alignment: Alignment.bottomCenter,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: AppBannerAd(),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -287,6 +305,7 @@ class _SearchResultsBody extends StatelessWidget {
     required this.onOpenDetail,
     required this.onRetry,
     required this.onRetryLoadMore,
+    required this.adsEnabled,
   });
 
   final BookSearchState state;
@@ -294,6 +313,7 @@ class _SearchResultsBody extends StatelessWidget {
   final ValueChanged<String> onOpenDetail;
   final VoidCallback onRetry;
   final VoidCallback onRetryLoadMore;
+  final bool adsEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -334,24 +354,38 @@ class _SearchResultsBody extends StatelessWidget {
     }
 
     final showLoadMoreRow = state.isLoadingMore || state.loadMoreError;
+    // 검색 결과 목록에 10행마다 배너 광고를 끼워 넣는다. 더 불러오기로
+    // 결과가 뒤에 계속 늘어나도([BookSearchState.items]가 페이지마다
+    // append) 광고 위치는 항상 같은 지점(10번째, 20번째, ... 항목 뒤)을
+    // 가리키므로 새로고침 없이도 안정적이다. adsEnabled가 꺼져 있으면
+    // (추후 광고 제거 구매 등) 광고 항목 자체를 끼워 넣지 않는다.
+    final entries = adsEnabled
+        ? interleaveAdSlots(state.items, rowsPerAd: 10)
+        : [for (final item in state.items) ItemAdSlotEntry(item)];
     final list = ListView.builder(
       controller: scrollController,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-      itemCount: state.items.length + (showLoadMoreRow ? 1 : 0),
+      itemCount: entries.length + (showLoadMoreRow ? 1 : 0),
       itemBuilder: (context, index) {
-        if (index >= state.items.length) {
+        if (index >= entries.length) {
           return state.loadMoreError
               ? _LoadMoreError(onRetry: onRetryLoadMore)
               : const CommunityContentPageLoader();
         }
-        final item = state.items[index];
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: SearchResultCard(
-            item: item,
-            onTap: () => onOpenDetail(item.isbn),
+        final entry = entries[index];
+        return switch (entry) {
+          ItemAdSlotEntry(:final item) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: SearchResultCard(
+              item: item,
+              onTap: () => onOpenDetail(item.isbn),
+            ),
           ),
-        );
+          AdAdSlotEntry(:final afterCount) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: AppInlineBannerAd(key: ValueKey('search-ad-$afterCount')),
+          ),
+        };
       },
     );
 

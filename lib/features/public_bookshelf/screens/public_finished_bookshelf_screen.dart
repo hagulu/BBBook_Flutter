@@ -4,7 +4,10 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/ads/ad_slot_planner.dart';
+import '../../../shared/ads/ads_enabled_provider.dart';
 import '../../../shared/widgets/app_bar_title.dart';
+import '../../../shared/widgets/app_inline_banner_ad.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../book_detail/screens/book_detail_screen.dart';
 import '../../bookshelf/screens/widgets/book_cover.dart';
@@ -75,6 +78,7 @@ class _PublicFinishedBookshelfScreenState
     final state = ref.watch(
       publicFinishedBooksControllerProvider(widget.userId),
     );
+    final adsEnabled = ref.watch(adsEnabledProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -93,6 +97,7 @@ class _PublicFinishedBookshelfScreenState
             items: value.items,
             isLoadingMore: value.isLoadingMore,
             onTapBook: _openBook,
+            adsEnabled: adsEnabled,
           ),
           AsyncError(:final error) => _ErrorState(
             error: error,
@@ -164,12 +169,14 @@ class _FinishedGrid extends StatelessWidget {
     required this.items,
     required this.isLoadingMore,
     required this.onTapBook,
+    required this.adsEnabled,
   });
 
   final ScrollController scrollController;
   final List<PublicFinishedBook> items;
   final bool isLoadingMore;
   final void Function(PublicFinishedBook book) onTapBook;
+  final bool adsEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -195,21 +202,7 @@ class _FinishedGrid extends StatelessWidget {
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          sliver: SliverGrid(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 16,
-              childAspectRatio: 0.46,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => _FinishedBookCard(
-                book: items[index],
-                onTap: () => onTapBook(items[index]),
-              ),
-              childCount: items.length,
-            ),
-          ),
+          sliver: _gridSliverWithAds(items, onTapBook: onTapBook),
         ),
         if (isLoadingMore)
           const SliverToBoxAdapter(child: CommunityContentPageLoader()),
@@ -218,6 +211,74 @@ class _FinishedGrid extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  /// 책 개수가 아니라 그리드 열 개수(3열) 기준 8행마다 배너 광고를 한 행
+  /// 전체 너비로 끼워 넣는다. 마지막 묶음 뒤에는 넣지 않는다. 더 불러오기로
+  /// 항목이 뒤에 계속 늘어나는 화면이라 매번 전체 목록을 기준으로 다시
+  /// 계산한다(월별 그룹처럼 별도 스크롤 인덱스가 없어 슬롯 높이를 따로
+  /// 추적할 필요는 없다).
+  Widget _gridSliverWithAds(
+    List<PublicFinishedBook> items, {
+    required void Function(PublicFinishedBook book) onTapBook,
+  }) {
+    const crossAxisCount = 3;
+    const mainAxisSpacing = 16.0;
+    // adsEnabled가 꺼져 있으면(추후 광고 제거 구매 등) 슬롯 자체를 만들지
+    // 않는다 — 위젯만 숨기면 슬롯 사이 기본 행 간격만 빈 공간으로 남는다.
+    final plan = adsEnabled
+        ? planRowBasedAdSlots(
+            segmentLengths: [items.length],
+            crossAxisCount: crossAxisCount,
+            rowsPerAd: 8,
+          ).first
+        : GridAdPlan(
+            items.isEmpty ? const [] : [items.length],
+            items.isEmpty ? const [] : [false],
+          );
+
+    var start = 0;
+    final slivers = <Widget>[];
+    for (var i = 0; i < plan.chunks.length; i++) {
+      final take = plan.chunks[i];
+      final chunkItems = items.sublist(start, start + take);
+      final chunkStart = start;
+      start += take;
+      slivers.add(
+        SliverGrid(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: mainAxisSpacing,
+            childAspectRatio: 0.46,
+          ),
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => _FinishedBookCard(
+              book: chunkItems[index],
+              onTap: () => onTapBook(chunkItems[index]),
+            ),
+            childCount: chunkItems.length,
+          ),
+        ),
+      );
+      if (plan.adAfterChunk[i]) {
+        // 광고 로드 여부와 무관하게 원래 하나의 그리드였을 때의 행 간격을
+        // 먼저 넣는다 — 로드 전/실패 시에도 앞뒤 행 사이 간격이 사라지지
+        // 않도록(광고 위젯 자체는 그 위에 얹히는 추가 여백/콘텐츠만 담당).
+        slivers.add(
+          const SliverToBoxAdapter(child: SizedBox(height: mainAxisSpacing)),
+        );
+        slivers.add(
+          SliverToBoxAdapter(
+            child: AppInlineBannerAd(
+              key: ValueKey('public-finished-ad-$chunkStart'),
+              bottomSpacing: mainAxisSpacing,
+            ),
+          ),
+        );
+      }
+    }
+    return SliverMainAxisGroup(slivers: slivers);
   }
 }
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_banner_ad.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../models/reading_stats_summary.dart';
@@ -155,6 +156,7 @@ class _StatsContent extends StatelessWidget {
           const SizedBox(height: 10),
           _Card(child: ReadingStatsTagChart(tags: stats.tagStats)),
         ],
+        const AppBannerAd(topSpacing: 20),
         const SizedBox(height: 20),
         _SectionLabel(
           stats.monthlyYear == null ? '월별 완독' : '월별 완독 · ${stats.monthlyYear}년',
