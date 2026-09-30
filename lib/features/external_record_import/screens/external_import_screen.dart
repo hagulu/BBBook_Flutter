@@ -181,7 +181,6 @@ class _ImportPreview extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final result = state.result!;
-    final supportedInformation = _supportedInformation(result.source);
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(
@@ -201,11 +200,6 @@ class _ImportPreview extends StatelessWidget {
                     ],
                   ),
                   style: TextStyle(color: colors.textStrong, fontSize: 20),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  supportedInformation,
-                  style: TextStyle(color: colors.textMuted, fontSize: 12),
                 ),
                 if (result.source == ExternalImportSource.bookJuk) ...[
                   const SizedBox(height: 5),
@@ -276,7 +270,7 @@ class _ImportPreview extends StatelessWidget {
           child: SafeArea(
             top: false,
             minimum: const EdgeInsets.fromLTRB(16, 6, 16, 12),
-            child: FilledButton(
+            child: ElevatedButton(
               onPressed: importing || state.selectedBookCount == 0
                   ? null
                   : onImport,
@@ -286,13 +280,6 @@ class _ImportPreview extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  String _supportedInformation(ExternalImportSource source) {
-    return switch (source) {
-      ExternalImportSource.bookJuk => '책 정보 · 독서 상태·날짜 · 메모',
-      ExternalImportSource.bookmory => '책 정보 · 독서 상태·날짜 · 페이지·재독 · 별점·한줄평 · 메모',
-    };
   }
 }
 
@@ -475,7 +462,7 @@ class _CenteredMessage extends StatelessWidget {
             ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 24),
-              FilledButton(onPressed: onAction, child: Text(actionLabel!)),
+              ElevatedButton(onPressed: onAction, child: Text(actionLabel!)),
             ],
           ],
         ),

@@ -10,6 +10,7 @@ import '../../../shared/widgets/app_inline_banner_ad.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../book_detail/screens/book_detail_screen.dart';
 import '../../book_record/screens/book_record_screen.dart';
+import '../../external_record_import/screens/external_import_guide_screen.dart';
 import '../providers/book_search_providers.dart';
 import 'barcode_scan_screen.dart';
 import 'widgets/custom_book_dialog.dart';
@@ -112,6 +113,12 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
     if (isbn != null && mounted) _openDetail(isbn);
   }
 
+  void _openExternalImport() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const ExternalImportGuideScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(bookSearchControllerProvider);
@@ -190,6 +197,7 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
               child: _EmptyQueryActions(
                 onTapCustomBook: _openCustomBookDialog,
                 onTapScan: _scanBarcode,
+                onTapExternalImport: _openExternalImport,
               ),
             ),
             // 검색 전 하단 빈 공간을 광고로 채운다. 로드 전/실패 시에는
@@ -214,80 +222,114 @@ class _EmptyQueryActions extends StatelessWidget {
   const _EmptyQueryActions({
     required this.onTapCustomBook,
     required this.onTapScan,
+    required this.onTapExternalImport,
   });
 
   final VoidCallback onTapCustomBook;
   final VoidCallback onTapScan;
 
+  /// null이면(계정 없음) 외부 기록 가져오기 버튼을 감춘다.
+  final VoidCallback? onTapExternalImport;
+
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final onTapExternalImport = this.onTapExternalImport;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(
-          child: _CompactActionButton(
-            icon: PhosphorIconsRegular.notePencil,
-            label: '직접 등록',
-            onTap: onTapCustomBook,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _CompactActionButton(
+                icon: PhosphorIconsRegular.notePencil,
+                label: '직접 등록',
+                onTap: onTapCustomBook,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _CompactActionButton(
+                icon: PhosphorIconsRegular.barcode,
+                label: '바코드로 등록',
+                onTap: onTapScan,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _CompactActionButton(
-            icon: PhosphorIconsRegular.barcode,
-            label: '바코드로 등록',
-            onTap: onTapScan,
+        if (onTapExternalImport != null) ...[
+          const SizedBox(height: 12),
+          _CompactActionButton(
+            icon: PhosphorIconsRegular.arrowSquareIn,
+            label: '다른 서비스 기록 가져오기',
+            caption: '북적북적 · 북모리',
+            onTap: onTapExternalImport,
           ),
-        ),
+        ],
       ],
     );
   }
 }
 
+/// 아이콘과 라벨을 한 줄에 놓는 보조 등록 버튼(직접 등록·바코드).
+/// 아이콘과 라벨을 한 줄에 놓는 보조 등록 버튼(직접 등록·바코드·외부 가져오기).
 class _CompactActionButton extends StatelessWidget {
   const _CompactActionButton({
     required this.icon,
     required this.label,
     required this.onTap,
+    this.caption,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
 
+  /// 라벨 뒤에 옅게 덧붙이는 보조 문구(예: 지원 서비스 이름).
+  final String? caption;
+
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     return Material(
-      color: AppColors.of(context).surface,
-      borderRadius: BorderRadius.circular(16),
+      color: colors.surface,
+      borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 8),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.of(context).border),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: colors.border),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: AppColors.of(context).accentSurface,
-                child: Icon(
-                  icon,
-                  color: AppColors.of(context).accentForeground,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                  color: AppColors.of(context).textStrong,
+              Icon(icon, color: colors.accentForeground, size: 18),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text.rich(
+                  TextSpan(
+                    text: label,
+                    children: [
+                      if (caption != null)
+                        TextSpan(
+                          text: '  $caption',
+                          style: TextStyle(
+                            fontWeight: FontWeight.normal,
+                            fontSize: 12,
+                            color: colors.textMuted,
+                          ),
+                        ),
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: colors.textStrong,
+                  ),
                 ),
               ),
             ],

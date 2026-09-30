@@ -1,5 +1,3 @@
-import 'dart:developer' as developer;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -16,10 +14,8 @@ import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../auth/providers/auth_access_providers.dart';
 import '../../notices/screens/notices_list_screen.dart';
-import '../../external_record_import/models/external_import_models.dart';
-import '../../external_record_import/screens/external_import_screen.dart';
-import '../../external_record_import/services/external_import_file_picker.dart';
 import '../../record_archive/providers/record_archive_provider.dart';
+import '../../record_archive/screens/record_archive_import_screen.dart';
 import '../../server_storage_migration/providers/server_storage_migration_providers.dart';
 import '../../server_storage_migration/services/server_storage_migration_service.dart';
 import '../../storage_mode/data/storage_mode_store.dart';
@@ -34,10 +30,9 @@ class ProfileSettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 계정이 없으면 기록은 항상 이 기기에만 있다 — 서버 동기화 설정과 서버
-    // Import 세션이 필요한 "다른 서비스 기록 가져오기"는 아예 감춘다(별도의
-    // 로컬 모드 설정도 두지 않는다). ZIP 내보내기/가져오기는 서버를 쓰지
-    // 않으므로 그대로 남긴다.
+    // 계정이 없으면 기록은 항상 이 기기에만 있다 — 서버 동기화 설정은 아예
+    // 감춘다(별도의 로컬 모드 설정도 두지 않는다). ZIP 내보내기/가져오기는
+    // 서버를 쓰지 않으므로 그대로 남긴다.
     final hasAccount = ref.watch(canUseAccountFeaturesProvider);
     final mode =
         ref.watch(storageModeProvider).valueOrNull ?? StorageMode.server;
@@ -73,31 +68,35 @@ class ProfileSettingsScreen extends ConsumerWidget {
                     ),
                     if (hasAccount) ...[
                       const Divider(),
-                      Padding(
-                        padding: EdgeInsets.zero,
-                        child: _StorageModeCard(
-                          isLocal: isLocal,
-                          serverCleanupPending:
-                              isLocal &&
-                              (ref
-                                      .watch(serverDeletePendingProvider)
-                                      .valueOrNull ??
-                                  false),
-                          onSwitchToLocal: () => _startMigration(context, ref),
-                          onSwitchToServer: () =>
-                              _startReverseMigration(context, ref),
-                          onRetryServerCleanup: () =>
-                              _retryServerCleanup(context, ref),
-                        ),
+                      _StorageModeCard(
+                        isLocal: isLocal,
+                        serverCleanupPending:
+                            isLocal &&
+                            (ref
+                                    .watch(serverDeletePendingProvider)
+                                    .valueOrNull ??
+                                false),
+                        onSwitchToLocal: () => _startMigration(context, ref),
+                        onSwitchToServer: () =>
+                            _startReverseMigration(context, ref),
+                        onRetryServerCleanup: () =>
+                            _retryServerCleanup(context, ref),
                       ),
                     ],
-                    const Divider(),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              _SettingsGroup(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                     _SettingsMenuTile(
                       icon: PhosphorIconsRegular.export,
                       label: '내 기록 내보내기',
                       onTap: isSwitching
                           ? null
-                          : () => _archive(context, ref, importing: false),
+                          : () => _export(context, ref),
                     ),
                     const Divider(),
                     _SettingsMenuTile(
@@ -105,26 +104,38 @@ class ProfileSettingsScreen extends ConsumerWidget {
                       label: '내 기록 가져오기',
                       onTap: isSwitching
                           ? null
-                          : () => _archive(context, ref, importing: true),
+                          : () => Navigator.of(context).push<void>(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    const RecordArchiveImportScreen(),
+                              ),
+                            ),
                     ),
-                    if (hasAccount) ...[
-                      const Divider(),
-                      _SettingsMenuTile(
-                        icon: PhosphorIconsRegular.files,
-                        label: '다른 서비스 기록 가져오기',
-                        onTap: isSwitching
-                            ? null
-                            : () => _openExternalImport(context),
-                      ),
-                    ],
-                    const Divider(),
-                    const _OpenSourceLicenseMenu(),
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
-              const _PolicyLinks(),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
+              const _SettingsGroup(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _OpenSourceLicenseMenu(),
+                    Divider(),
+                    _PolicyMenu(
+                      icon: PhosphorIconsRegular.fileText,
+                      label: '이용약관',
+                      path: '/terms',
+                    ),
+                    Divider(),
+                    _PolicyMenu(
+                      icon: PhosphorIconsRegular.shieldCheck,
+                      label: '개인정보 처리방침',
+                      path: '/privacy',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
               const _AppVersion(),
             ],
           ),
@@ -133,62 +144,18 @@ class ProfileSettingsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _openExternalImport(BuildContext context) async {
-    try {
-      final file = await ExternalImportFilePicker.pick();
-      if (file == null || !context.mounted) return;
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute(builder: (_) => ExternalImportScreen(file: file)),
-      );
-    } on ExternalImportException catch (error) {
-      developer.log('[외부 파일 선택] result=FAIL reason=${error.reason}');
-      if (!context.mounted) return;
-      await AppAlert.show(
-        context,
-        title: '파일을 열 수 없어요',
-        message: error.userMessage,
-      );
-    } catch (_) {
-      developer.log('[외부 파일 선택] result=FAIL reason=platform_error');
-      if (!context.mounted) return;
-      await AppAlert.show(
-        context,
-        title: '파일을 열 수 없어요',
-        message: '파일 선택을 완료하지 못했어요. 다시 시도해 주세요.',
-      );
-    }
-  }
-
-  Future<void> _archive(
-    BuildContext context,
-    WidgetRef ref, {
-    required bool importing,
-  }) async {
-    if (importing) {
-      final confirmed = await AppConfirm.show(
-        context,
-        title: '내 기록 가져오기',
-        message:
-            '내보낸 ZIP 파일의 기록을 이 기기에 가져옵니다. 같은 ISBN의 책은 기존 책에 연결하며, 이미 가져온 기록은 중복으로 만들지 않습니다. 동기화가 켜져 있으면 이후 서버에도 반영됩니다.',
-        confirmText: '파일 선택',
-      );
-      if (!confirmed || !context.mounted) return;
-    }
+  Future<void> _export(BuildContext context, WidgetRef ref) async {
     AppLoading.show(context);
     String? message;
     try {
       message = await ref
           .read(recordArchiveProvider.notifier)
-          .run(importing: importing);
+          .run(importing: false);
     } finally {
       AppLoading.hide();
     }
     if (message != null && context.mounted) {
-      await AppAlert.show(
-        context,
-        title: importing ? '내 기록 가져오기' : '내 기록 내보내기',
-        message: message,
-      );
+      await AppAlert.show(context, title: '내 기록 내보내기', message: message);
     }
   }
 
@@ -281,49 +248,25 @@ class _OpenSourceLicenseMenu extends StatelessWidget {
   }
 }
 
-class _PolicyLinks extends StatelessWidget {
-  const _PolicyLinks();
+class _PolicyMenu extends StatelessWidget {
+  const _PolicyMenu({
+    required this.icon,
+    required this.label,
+    required this.path,
+  });
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _PolicyLink(label: '이용약관', path: '/terms'),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: SizedBox(
-              height: 12,
-              child: VerticalDivider(
-                width: 1,
-                color: AppColors.of(context).border,
-              ),
-            ),
-          ),
-          _PolicyLink(label: '개인정보처리방침', path: '/privacy'),
-        ],
-      ),
-    );
-  }
-}
-
-class _PolicyLink extends StatelessWidget {
-  const _PolicyLink({required this.label, required this.path});
-
+  final IconData icon;
   final String label;
   final String path;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return _SettingsMenuTile(
+      icon: icon,
+      label: label,
       onTap: () => launchUrl(
         Uri.parse('${ApiConfig.baseUrl}$path'),
         mode: LaunchMode.externalApplication,
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 12, color: AppColors.of(context).textMuted),
       ),
     );
   }
@@ -493,7 +436,7 @@ class _StorageModeCard extends ConsumerWidget {
       children: [
         _SettingsMenuTile(
           icon: PhosphorIconsRegular.arrowsClockwise,
-          label: '동기화',
+          label: '기록 동기화',
           status: isLocal ? '꺼짐' : '켜짐',
           statusIsActive: !isLocal,
           showCaret: false,

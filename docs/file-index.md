@@ -40,7 +40,7 @@
 
 - `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 리포트 카드/내 글 모아보기 2×2 바로가기/로그아웃, 계정이 없으면 상단을 로그인 유도 카드로 대체하고 계정 전용 메뉴는 숨김), `docs/porting-reference/profile-main-screen.md` 대응
 - `lib/features/profile/screens/profile_edit_screen.dart` — 프로필 수정 화면(닉네임·프로필 이미지 변경/삭제, 저장, 회원 탈퇴), `docs/porting-reference/profile-edit-screen.md` 대응
-- `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(상단 공지사항, 밝은·다크·시스템 테마 선택, 오픈소스 라이선스 목록·전문, 하단 이용약관·개인정보처리방침·앱 버전, 저장 방식(서버/로컬) 전환 및 내 기록 ZIP/외부 서비스 기록 가져오기 진입점), 프로필 탭 AppBar 설정 아이콘으로 진입
+- `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(제목 없는 3개 그룹: 공지사항·화면 테마·기록 동기화(서버/로컬 전환) / 내 기록 ZIP 내보내기·가져오기 / 오픈소스 라이선스·이용약관·개인정보 처리방침, 하단 앱 버전), 프로필 탭 AppBar 설정 아이콘으로 진입
 - `lib/features/profile/screens/my_reflections_screen.dart` — 내가 작성한 독후감 목록(커서 무한 스크롤), 정상 항목은 서버 reflectionId로 로컬 행을 찾아 기존 `BookReflectionDetailScreen`(수정·삭제 포함)으로 이동
 - `lib/features/profile/screens/my_reviews_screen.dart` — 내가 작성한 독자평 목록(커서 무한 스크롤), 탭해도 이동하는 상세 화면 없음
 - `lib/features/profile/screens/my_discussions_screen.dart` — 내가 작성한 토론 목록(커서 무한 스크롤), 정상 항목은 `DiscussionDetailScreen`으로 이동
@@ -137,17 +137,20 @@
 
 ## features/external_record_import
 
-- `lib/features/external_record_import/screens/external_import_screen.dart` — 북적북적 CSV·북모리 BOOKMORY 파일 분석 결과와 책/메모/제외 건수를 확인한 뒤 기존 Import 세션으로 가져오는 화면
-- `lib/features/external_record_import/providers/external_import_providers.dart` — 외부 파일 분석·기존 기록 사전 동기화·Import 실행·완료 후 증분 동기화 상태 관리
+- `lib/features/external_record_import/screens/external_import_guide_screen.dart` — 다른 서비스 기록 가져오기 안내 화면(서비스별 파일 확장자·가져오는 기록, 앱 업데이트 영향 안내, 파일 선택 후 분석 화면 진입), 책 추가 화면에서 진입
+- `lib/features/external_record_import/screens/external_import_screen.dart` — 북적북적 CSV·북모리 BOOKMORY 파일 분석 결과와 책/메모/제외 건수를 확인하고 가져올 책을 골라 가져오는 화면
+- `lib/features/external_record_import/providers/external_import_providers.dart` — 외부 파일 분석·같은 ISBN 충돌 확인·가져오기 실행 상태 관리. 동기화가 켜져 있으면 기존 기록 사전 동기화 → 서버 Import → 증분 동기화, 동기화 꺼짐·계정 없음이면 로컬 저장
 - `lib/features/external_record_import/services/external_import_file_analyzer.dart` — 확장자 우선 분기와 CSV 헤더/BOOKMORY ZIP·SQLite 내부 검증을 거쳐 서비스별 파서로 연결
-- `lib/features/external_record_import/services/external_record_import_service.dart` — 공통 외부 모델을 기존 records Import 청크로 변환해 start/items/complete를 실행하고, API 실패는 서버 자동 롤백에 맡기며 클라이언트 후처리 실패만 cancel
-- `lib/features/external_record_import/widgets/external_import_share_coordinator.dart` — Android 공유/파일 열기 cold·warm start 이벤트를 인증 완료 뒤 분석 화면으로 즉시 연결하고 캐시 파일 정리
+- `lib/features/external_record_import/services/external_record_import_service.dart` — (동기화 켜짐) 공통 외부 모델을 기존 records Import 청크로 변환해 start/items/complete를 실행하고, API 실패는 서버 자동 롤백에 맡기며 클라이언트 후처리 실패만 cancel
+- `lib/features/external_record_import/services/external_record_local_import_service.dart` — (동기화 꺼짐·계정 없음) 공통 외부 모델을 사전 검증한 뒤 로컬 복원 규격으로 변환해 `RecordArchiveDao.restore`로 한 트랜잭션 저장
+- `lib/features/external_record_import/widgets/external_import_share_coordinator.dart` — Android 공유/파일 열기 cold·warm start 이벤트를 앱 사용 가능 상태가 된 뒤 분석 화면으로 즉시 연결하고 캐시 파일 정리
 
 ## features/record_archive
 
 - `lib/features/record_archive/services/record_archive_service.dart` — 로컬 기록 ZIP 내보내기·가져오기, 이미지 확보·공유 참조·검증·실패 파일 정리
-- `lib/features/record_archive/data/record_archive_dao.dart` — DB 스냅샷을 export DTO로 변환하고 기존 중복 정책·dirty 상태를 적용해 한 트랜잭션으로 복원
+- `lib/features/record_archive/data/record_archive_dao.dart` — DB 스냅샷을 export DTO로 변환하고 기존 중복 정책·dirty 상태를 적용해 한 트랜잭션으로 복원(외부 서비스 가져오기도 원격 표지와 함께 재사용)
 - `lib/features/record_archive/models/record_archive.dart` — PK와 독립적인 version 1 아카이브 DTO·필드 규격·버전 파서·관계 검증
+- `lib/features/record_archive/screens/record_archive_import_screen.dart` — 내 기록 가져오기 안내 화면(ZIP 형식·연결/중복/동기화 안내, 파일 선택 후 기존 가져오기 실행), 설정에서 진입
 - `lib/features/record_archive/providers/record_archive_provider.dart` — 설정 화면 내보내기·가져오기 진행 상태, OS ZIP 선택·공유, 완료 후 로컬 목록 갱신
 - `docs/policies/record-archive.md` — ZIP/JSON version 1 규격, 중복 대응·동기화·이미지·파일 검증 정책과 지원 한도
 
@@ -161,7 +164,7 @@
 
 ## features/book_search
 
-- `lib/features/book_search/screens/book_search_screen.dart` — 책 추가 전체 화면(하단 탭 셸 "+" 버튼으로 아래에서 올라오는 전환), 검색창/결과 목록/페이지네이션/직접 등록·바코드 등록 진입점 조립
+- `lib/features/book_search/screens/book_search_screen.dart` — 책 추가 전체 화면(하단 탭 셸 "+" 버튼으로 아래에서 올라오는 전환), 검색창/결과 목록/페이지네이션/직접 등록·바코드 등록·다른 서비스 기록 가져오기(북적북적·북모리 보조 문구, 안내 화면으로 이동) 한 줄 버튼 진입점 조립
 - `lib/features/book_search/screens/barcode_scan_screen.dart` — 카메라로 책 바코드(ISBN-13) 스캔 화면. 기본은 ISBN을 반환해 상세로 이동, "빠른 등록" 체크 시 선택한 상태로 즉시 서재에 담고 연속 스캔
 - `lib/features/book_search/data/book_search_api.dart` — 책 검색 API 호출(키워드 검색, 직접 등록 POST(표지/카테고리 포함 multipart 지원))
 - `lib/features/book_search/providers/book_search_providers.dart` — 검색 화면 상태(검색어/페이지/결과) 관리 Riverpod provider

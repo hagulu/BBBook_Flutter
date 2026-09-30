@@ -4,13 +4,14 @@ import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../auth/providers/auth_notifier.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../../book_note/models/book_note.dart';
 import '../../book_note/providers/book_note_providers.dart';
 import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
+import '../../record_archive/data/record_archive_dao.dart';
 import '../../server_storage_migration/providers/server_storage_migration_providers.dart';
 import '../../storage_mode/data/storage_mode_store.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
@@ -18,6 +19,7 @@ import '../../tag/providers/tag_providers.dart';
 import '../models/external_import_models.dart';
 import '../services/external_import_file_analyzer.dart';
 import '../services/external_record_import_service.dart';
+import '../services/external_record_local_import_service.dart';
 
 final externalImportFileAnalyzerProvider = Provider<ExternalImportFileAnalyzer>(
   (_) => const ExternalImportFileAnalyzer(),
@@ -28,6 +30,11 @@ final externalRecordImportServiceProvider =
       (ref) => ExternalRecordImportService(
         api: RecordImportApiGateway(ref.watch(recordImportApiProvider)),
       ),
+    );
+
+final externalRecordLocalImportServiceProvider =
+    Provider<ExternalRecordLocalImportService>(
+      (_) => ExternalRecordLocalImportService(dao: RecordArchiveDao()),
     );
 
 class ExternalImportExecutionLock extends Notifier<int?> {
@@ -140,9 +147,14 @@ class ExternalImportController
           .analyze(arg);
       final existingBooksByIsbn = await _loadExistingBooks(result);
       final conflicts = _conflictingIndexes(result, existingBooksByIsbn);
+      // 파일 안에 같은 ISBN 항목이 여럿이면 첫 항목만 기본 선택한다.
+      final seenIsbns = <String>{};
       final selected = {
         for (var index = 0; index < result.books.length; index++)
-          if (!conflicts.contains(index)) index,
+          if (!conflicts.contains(index) &&
+              (result.books[index].isbn13 == null ||
+                  seenIsbns.add(result.books[index].isbn13!)))
+            index,
       };
       if (_disposed) return;
       state = ExternalImportState(
@@ -207,11 +219,22 @@ class ExternalImportController
     if (state.selectedBookIndexes.isEmpty) {
       return const ExternalImportFeedback.info('가져올 책을 한 권 이상 선택해 주세요.');
     }
+    // 같은 ISBN 두 항목은 서버 Import에서는 세션 전체 실패(400), 로컬
+    // 저장에서는 한 권으로 합쳐져 앞 항목이 사라진다. 저장 전에 막는다.
+    final selectedIsbns = <String>{};
+    for (final index in state.selectedBookIndexes) {
+      final isbn13 = input.books[index].isbn13;
+      if (isbn13 != null && !selectedIsbns.add(isbn13)) {
+        return const ExternalImportFeedback.info(
+          '같은 책(ISBN)이 두 번 이상 선택됐어요. 한 항목만 선택해 주세요.',
+        );
+      }
+    }
     if (ref.read(localStorageMigrationControllerProvider).isRunning ||
         ref.read(serverStorageMigrationControllerProvider).isRunning) {
       return const ExternalImportFeedback.info('저장 방식 변경이 끝난 뒤 다시 시도해 주세요.');
     }
-    final ownerUserId = ref.read(authNotifierProvider).user?.id;
+    final ownerUserId = ref.read(recordOwnerIdProvider);
     if (ownerUserId == null) {
       return const ExternalImportFeedback.error('로그인 상태를 확인해 주세요.');
     }
@@ -229,16 +252,14 @@ class ExternalImportController
     var importCommitted = false;
 
     try {
+      // 동기화가 켜져 있으면 서버 Import를 먼저 거친다(같은 ISBN 재사용·삭제
+      // 행 복구·전체 롤백·원래 날짜 보존). 서버를 쓰지 않는 경우에만 로컬
+      // DB에 바로 저장한다.
       final mode = await ref.read(storageModeStoreProvider).current();
-      if (mode == StorageMode.local) {
-        developer.log(
-          '[외부 기록 가져오기 시작] userId=$ownerUserId '
-          'source=${input.source.code} result=FAIL '
-          'reason=local_storage_mode',
-        );
-        return const ExternalImportFeedback.info(
-          '현재 동기화가 꺼져 있어요. 설정에서 동기화를 켠 뒤 가져와 주세요.',
-        );
+      if (!ref.read(canUseAccountFeaturesProvider) ||
+          mode == StorageMode.local) {
+        stage = 'local_import';
+        return await _importLocally(input, ownerUserId, generation);
       }
       state = state.copyWith(
         phase: ExternalImportPhase.importing,
@@ -297,45 +318,11 @@ class ExternalImportController
       final existingBooksByIsbn = await _loadExistingBooks(input);
       _checkSession(ownerUserId, generation);
 
-      final currentConflicts = _conflictingIndexes(input, existingBooksByIsbn);
-      final selectedIndexes = state.selectedBookIndexes.toSet();
-      final overwriteIndexes = state.overwriteBookIndexes.toSet();
-      final newlyProtected = selectedIndexes.where(
-        (index) =>
-            currentConflicts.contains(index) &&
-            !overwriteIndexes.contains(index),
-      );
-      if (newlyProtected.isNotEmpty) {
-        selectedIndexes.removeAll(newlyProtected);
-        if (!_disposed) {
-          state = state.copyWith(
-            phase: ExternalImportPhase.ready,
-            selectedBookIndexes: Set.unmodifiable(selectedIndexes),
-            conflictingBookIndexes: Set.unmodifiable(currentConflicts),
-            overwriteBookIndexes: Set.unmodifiable(
-              overwriteIndexes.intersection(currentConflicts),
-            ),
-          );
-        }
-        return const ExternalImportFeedback.info(
-          '기존 책이 새로 확인되어 선택에서 제외했어요. 목록을 확인해 주세요.',
-        );
-      }
-
-      final selectedBooks = selectedIndexes
-          .map((index) => input.books[index])
-          .toList(growable: false);
-      final selectedInput = ExternalImportParseResult(
-        source: input.source,
-        books: selectedBooks,
-        discoveredBookCount: input.discoveredBookCount,
-        skippedItemCount: input.skippedItemCount,
-        warningCount: input.warningCount,
-      );
-      final overwriteExistingIsbns = overwriteIndexes
-          .map((index) => input.books[index].isbn13)
-          .whereType<String>()
-          .toSet();
+      final selection = _confirmSelection(input, existingBooksByIsbn);
+      if (selection == null) return _newConflictFeedback;
+      final selectedBooks = selection.input.books;
+      final overwriteExistingIsbns = selection.overwriteExistingIsbns;
+      final selectedInput = selection.input;
 
       stage = 'record_import';
       final importResult = await ref
@@ -463,6 +450,103 @@ class ExternalImportController
       executionLock.release(this);
       keepAliveLink.close();
     }
+  }
+
+  static const _newConflictFeedback = ExternalImportFeedback.info(
+    '기존 책이 새로 확인되어 선택에서 제외했어요. 목록을 확인해 주세요.',
+  );
+
+  /// 서버를 쓰지 않는 경우(동기화 꺼짐·계정 없음)의 가져오기. 로컬 DB에
+  /// 한 트랜잭션으로 저장하므로 사전 동기화나 복구 메모 정리가 필요 없다.
+  /// 예외는 [startImport]의 공통 처리로 넘긴다.
+  Future<ExternalImportFeedback?> _importLocally(
+    ExternalImportParseResult input,
+    int ownerUserId,
+    int generation,
+  ) async {
+    state = state.copyWith(
+      phase: ExternalImportPhase.importing,
+      clearMessage: true,
+      needsRefresh: false,
+    );
+    developer.log(
+      '[외부 기록 가져오기 시작] userId=$ownerUserId '
+      'source=${input.source.code} selectedBookCount=${state.selectedBookCount} '
+      'overwriteCount=${state.overwriteBookIndexes.length} '
+      'mode=LOCAL result=SUCCESS',
+    );
+    final existingBooksByIsbn = await _loadExistingBooks(input);
+    _checkSession(ownerUserId, generation);
+    final selection = _confirmSelection(input, existingBooksByIsbn);
+    if (selection == null) return _newConflictFeedback;
+
+    await ref
+        .read(externalRecordLocalImportServiceProvider)
+        .run(
+          selection.input,
+          ownerUserId: ownerUserId,
+          sessionValid: () =>
+              generation == BookshelfDatabase.sessionGeneration &&
+              ref.read(recordOwnerIdProvider) == ownerUserId,
+          existingBooksByIsbn: existingBooksByIsbn,
+          overwriteExistingIsbns: selection.overwriteExistingIsbns,
+        );
+    _completeImport(
+      selectedBookCount: selection.input.books.length,
+      needsRefresh: false,
+    );
+    developer.log(
+      '[외부 기록 가져오기 흐름] userId=$ownerUserId '
+      'source=${input.source.code} stage=completed mode=LOCAL '
+      'selectedBookCount=${selection.input.books.length} result=SUCCESS',
+    );
+    return null;
+  }
+
+  /// 저장 직전 기존 책을 다시 확인한다. 목록에서 명시적으로 덮어쓰기를
+  /// 고르지 않은 충돌이 새로 생겼으면 선택에서 빼고 null을 반환해, 분석
+  /// 이후 생긴 변경을 조용히 덮지 않는다.
+  ({ExternalImportParseResult input, Set<String> overwriteExistingIsbns})?
+  _confirmSelection(
+    ExternalImportParseResult input,
+    Map<String, BookItem> existingBooksByIsbn,
+  ) {
+    final currentConflicts = _conflictingIndexes(input, existingBooksByIsbn);
+    final selectedIndexes = state.selectedBookIndexes.toSet();
+    final overwriteIndexes = state.overwriteBookIndexes.toSet();
+    final newlyProtected = selectedIndexes.where(
+      (index) =>
+          currentConflicts.contains(index) && !overwriteIndexes.contains(index),
+    );
+    if (newlyProtected.isNotEmpty) {
+      selectedIndexes.removeAll(newlyProtected);
+      if (!_disposed) {
+        state = state.copyWith(
+          phase: ExternalImportPhase.ready,
+          selectedBookIndexes: Set.unmodifiable(selectedIndexes),
+          conflictingBookIndexes: Set.unmodifiable(currentConflicts),
+          overwriteBookIndexes: Set.unmodifiable(
+            overwriteIndexes.intersection(currentConflicts),
+          ),
+        );
+      }
+      return null;
+    }
+    return (
+      input: ExternalImportParseResult(
+        source: input.source,
+        books: selectedIndexes
+            .map((index) => input.books[index])
+            .toList(growable: false),
+        discoveredBookCount: input.discoveredBookCount,
+        skippedItemCount: input.skippedItemCount,
+        warningCount: input.warningCount,
+      ),
+      overwriteExistingIsbns: overwriteIndexes
+          .map((index) => input.books[index].isbn13)
+          .whereType<String>()
+          .toSet(),
+    );
   }
 
   void _completeImport({
@@ -598,7 +682,7 @@ class ExternalImportController
 
   void _checkSession(int ownerUserId, int generation) {
     if (generation != BookshelfDatabase.sessionGeneration ||
-        ref.read(authNotifierProvider).user?.id != ownerUserId) {
+        ref.read(recordOwnerIdProvider) != ownerUserId) {
       throw const _ExternalImportSessionChanged();
     }
   }

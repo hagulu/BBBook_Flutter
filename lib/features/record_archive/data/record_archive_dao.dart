@@ -272,10 +272,21 @@ class RecordArchiveDao {
   }
 
   /// 파일 준비 완료 후 호출. 전체 DB 반영은 한 트랜잭션이며 기존 dirty push가 후속 전송한다.
+  ///
+  /// [remoteCoverUrls]는 책 id별 원격 표지 URL(외부 서비스 가져오기)이다. 새로
+  /// 만드는 책에만 쓰며, 표지 변경으로 표시해 동기화 때 서버에도 올린다.
+  /// 책 레코드에 `categoryCode` 키가 없으면 기존 책의 카테고리를 유지한다
+  /// (ZIP 파서는 항상 키를 채우므로 ZIP 가져오기 동작은 그대로다).
+  ///
+  /// [allowedIsbnMatches]가 주어지면 그 ISBN만 기존 책에 합친다. 그 밖의
+  /// ISBN이 기존 책(같은 트랜잭션에서 먼저 넣은 책 포함)과 겹치면 조용히
+  /// 덮어쓰지 않고 전체를 중단한다. null이면 ZIP처럼 같은 ISBN 책에 연결한다.
   Future<Set<String>> restore(
     RecordArchive archive,
     int ownerUserId,
     Map<String, String> images, {
+    Map<String, String> remoteCoverUrls = const {},
+    Set<String>? allowedIsbnMatches,
     required bool Function() sessionValid,
   }) async {
     final db = await _database();
@@ -311,6 +322,14 @@ class RecordArchiveDao {
                 whereArgs: [book['isbn13']],
                 limit: 1,
               );
+        if (sameIdentity.isEmpty &&
+            sameIsbn.isNotEmpty &&
+            allowedIsbnMatches != null &&
+            !allowedIsbnMatches.contains(book['isbn13'])) {
+          throw const ArchiveException(
+            '같은 책이 이미 서재에 있어 가져오기를 중단했어요. 목록을 다시 확인해 주세요.',
+          );
+        }
         final existing = sameIdentity.isNotEmpty ? sameIdentity : sameIsbn;
         final id = existing.isEmpty
             ? await _nextId(txn, 'user_book', 'user_book_id')
@@ -325,14 +344,17 @@ class RecordArchiveDao {
                 whereArgs: [book['categoryCode']],
                 limit: 1,
               );
+        final remoteCover = existing.isEmpty ? remoteCoverUrls[book.id] : null;
         final values = <String, Object?>{
           ...rowValues(book, _bookColumns),
-          'display_category_id': category.firstOrNull?['id'],
+          if (book.values.containsKey('categoryCode'))
+            'display_category_id': category.firstOrNull?['id'],
           'is_dirty': 1,
           'updated_at': now,
           'dirty_fields': {
             ..._recordDirtyFields,
-            if (existing.isEmpty && images[book['coverImage']] != null)
+            if (existing.isEmpty &&
+                (images[book['coverImage']] != null || remoteCover != null))
               bookCoverDirtyField,
             if (existing.isNotEmpty && existing.single['dirty_fields'] != null)
               ...(existing.single['dirty_fields'] as String).split(','),
@@ -345,7 +367,7 @@ class RecordArchiveDao {
             ...values,
             'user_book_id': id,
             'client_request_id': book.id,
-            'cover_image_url': cover,
+            'cover_image_url': cover ?? remoteCover,
           });
         } else {
           // 기존 Import와 같이 ISBN 대응 책의 표지는 보존한다.
