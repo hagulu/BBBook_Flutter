@@ -17,7 +17,29 @@ class AppConfirm {
     String cancelText = '취소',
     bool destructive = false,
   }) async {
-    final result = await showDialog<bool>(
+    final result = await choose(
+      context,
+      title: title,
+      message: message,
+      confirmText: confirmText,
+      cancelText: cancelText,
+      destructive: destructive,
+    );
+    return result ?? false;
+  }
+
+  /// [show]와 같은 팝업이지만 취소 버튼(false)과 바깥 영역 탭·뒤로 가기로
+  /// 닫힘(null)을 구분해 반환한다. 취소 버튼에도 별도 동작(다시 시도 등)을
+  /// 붙이고, 닫으면 아무것도 하지 않아야 할 때 사용한다.
+  static Future<bool?> choose(
+    BuildContext context, {
+    required String title,
+    required String message,
+    String confirmText = '확인',
+    String cancelText = '취소',
+    bool destructive = false,
+  }) {
+    return showDialog<bool>(
       context: context,
       builder: (dialogContext) => AppDialogShell(
         title: title,
@@ -38,6 +60,5 @@ class AppConfirm {
         ],
       ),
     );
-    return result ?? false;
   }
 }

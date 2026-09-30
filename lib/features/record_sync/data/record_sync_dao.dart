@@ -205,6 +205,33 @@ class RecordSyncDao {
     if (total == 0) onProgress(0, 0);
   }
 
+  /// 서버에 아직 반영되지 못한 기록(is_dirty = 1)이 하나라도 남아 있는지.
+  ///
+  /// 백그라운드 동기화의 재전송 판단과 달리 재시도 대기(`sync_retry_after`)나
+  /// 부모 책 생성 보류 여부를 따지지 않는다 — 서버 저장 모드 로그아웃은 로컬
+  /// 기록을 통째로 지우므로, 지금 보낼 수 없는 기록도 유실 대상이다.
+  /// 책 삭제 대기(`pending_delete`)도 `is_dirty = 1`로 함께 잡힌다.
+  Future<bool> hasUnsyncedChanges() async {
+    final db = await BookshelfDatabase.instance();
+    for (final table in const [
+      'user_book',
+      'book_note',
+      'book_note_memo',
+      'book_reflection',
+      'user_book_tag_map',
+    ]) {
+      if ((await db.query(
+        table,
+        columns: ['1'],
+        where: 'is_dirty = 1',
+        limit: 1,
+      )).isNotEmpty) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   String _date(DateTime value) => value.toUtc().toIso8601String();
 }
 

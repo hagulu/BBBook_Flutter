@@ -38,7 +38,7 @@
 
 ## features/profile
 
-- `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 리포트 카드/내 글 모아보기 2×2 바로가기/로그아웃, 계정이 없으면 상단을 로그인 유도 카드로 대체하고 계정 전용 메뉴는 숨김), `docs/porting-reference/profile-main-screen.md` 대응
+- `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 리포트 카드/내 글 모아보기 2×2 바로가기/로그아웃(서버 동기화 모드는 최종 동기화 후 미동기화 기록이 남으면 다시 시도·그래도 로그아웃 선택), 계정이 없으면 상단을 로그인 유도 카드로 대체하고 계정 전용 메뉴는 숨김), `docs/porting-reference/profile-main-screen.md` 대응
 - `lib/features/profile/screens/profile_edit_screen.dart` — 프로필 수정 화면(닉네임·프로필 이미지 변경/삭제, 저장, 회원 탈퇴), `docs/porting-reference/profile-edit-screen.md` 대응
 - `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(제목 없는 3개 그룹: 공지사항·화면 테마·기록 동기화(서버/로컬 전환) / 내 기록 ZIP 내보내기·가져오기 / 오픈소스 라이선스·이용약관·개인정보 처리방침, 하단 앱 버전), 프로필 탭 AppBar 설정 아이콘으로 진입
 - `lib/features/profile/screens/my_reflections_screen.dart` — 내가 작성한 독후감 목록(커서 무한 스크롤), 정상 항목은 서버 reflectionId로 로컬 행을 찾아 기존 `BookReflectionDetailScreen`(수정·삭제 포함)으로 이동
@@ -158,6 +158,7 @@
 
 - `lib/features/record_sync/screens/initial_record_sync_screen.dart` — 사용 가능한 로컬 기록이 없을 때만 최초 기록 다운로드·저장 진행 상태와 재시도를 표시하는 게이트 화면
 - `lib/features/record_sync/providers/background_record_sync_provider.dart` — 앱 사용 중 인증→책→노트→독후감→태그 복구 조율, 앱 복귀·통신 성공·주기 확인으로 dirty 재전송, 저장 방식 전환 중 중단
+- `lib/features/record_sync/providers/logout_record_sync_provider.dart` — 서버 동기화 모드 로그아웃 직전 책→노트→독후감→태그 최종 동기화(사용자 재시도)와 남은 미동기화 기록 확인
 - `lib/features/record_sync/providers/record_sync_providers.dart` — 사용자별 최초 기록 동기화 단계·진행률·재시도 상태 관리
 - `lib/features/record_sync/data/record_sync_api.dart` — 전체 책장·기록 조회(`/api/me/records`)와 로컬 전환 시 서버 기록 일괄 소프트 삭제(DELETE) API 호출
 - `lib/features/record_sync/data/record_sync_repository.dart` — 전체 책장·기록 조회와 원자적 로컬 저장을 조율하는 초기 동기화 source of truth
@@ -217,7 +218,7 @@
 
 - `lib/shared/widgets/app_alert.dart` — 공통 Alert 팝업(제목/내용/확인 버튼)
 - `lib/shared/widgets/app_bar_title.dart` — 공통 앱바 타이틀(전역 축소 글씨 크기, `subtitle` 지정 시 제목 아래 작게 배치)
-- `lib/shared/widgets/app_confirm.dart` — 공통 Confirm 팝업(확인/취소, Future<bool> 반환)
+- `lib/shared/widgets/app_confirm.dart` — 공통 Confirm 팝업(확인/취소, Future<bool> 반환 — `choose()`는 취소 버튼과 닫힘을 구분해 Future<bool?> 반환)
 - `lib/shared/widgets/app_loading.dart` — 공통 Loading(전체 화면 `AppLoading`, 영역 단위 `AppLoadingOverlay`)
 - `lib/shared/widgets/ai_generating_view.dart` — AI 생성 전용 대기 표시(반짝이는 아이콘 애니메이션 + 직관적 상태 문구 + 순차 점 3개, `AiGeneratingView`), 전체 화면 오버레이 버전 `AppAiLoading` — AI 메모/독후감 생성 두 진입점만 공유
 - `lib/shared/widgets/app_snackbar.dart` — 공통 SnackBar(pill 형태, 성공/정보는 아이덴티티 컬러·에러는 에러 컬러 반투명 배경 + 상태 아이콘)

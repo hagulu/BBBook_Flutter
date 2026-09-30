@@ -6,10 +6,12 @@ import '../../../app/main_shell_layout.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_confirm.dart';
+import '../../../shared/widgets/app_loading.dart';
 import '../../auth/providers/auth_access_providers.dart';
 import '../../auth/providers/auth_notifier.dart';
 import '../../auth/screens/onboarding_screen.dart';
 import '../../auth/widgets/social_login_section.dart';
+import '../../record_sync/providers/logout_record_sync_provider.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../models/profile_me.dart';
 import '../models/profile_stats_summary.dart';
@@ -655,6 +657,12 @@ class _LogoutButton extends ConsumerWidget {
     // 화면 진입 전에 아무도 이 provider를 구독하지 않았을 경우 최초 상태가
     // AsyncLoading이라 실제로 로컬 모드여도 서버 모드용 문구가 뜬다.
     // StorageModeStore.isLocal()을 직접 await해 확정된 값으로 판단한다.
+    //
+    // 확인 팝업·최종 동기화를 기다리는 사이 이 화면이 제거되면 [ref]를 더
+    // 읽을 수 없다. 사용자가 이미 로그아웃을 골랐으므로 흐름이 끊기지 않게
+    // 쓸 대상을 먼저 잡아 둔다.
+    final auth = ref.read(authNotifierProvider.notifier);
+    final logoutSync = ref.read(logoutRecordSyncProvider);
     final isLocal = await ref.read(storageModeStoreProvider).isLocal();
     if (!context.mounted) return;
     final confirmed = await AppConfirm.show(
@@ -664,14 +672,49 @@ class _LogoutButton extends ConsumerWidget {
           ? '동기화가 꺼져 있어 기록은 이 기기에만 있습니다. 로그아웃해도 기록과 '
                 '사진은 지우지 않고 계정 연결만 해제하며, "로그인 없이 사용하기"로 '
                 '다시 들어오면 그대로 이어서 볼 수 있습니다. 로그아웃할까요?'
-          : '아직 서버에 동기화되지 않은 메모와 사진은 이 기기에서 '
-                '삭제되어 복구할 수 없습니다. 로그아웃할까요?',
+          : '로그아웃할까요?',
       confirmText: '로그아웃',
       cancelText: '취소',
       destructive: !isLocal,
     );
     if (!confirmed) return;
-    await ref.read(authNotifierProvider.notifier).logout();
+    if (!isLocal) {
+      if (!context.mounted) return;
+      if (!await _syncBeforeLogout(context, logoutSync)) return;
+    }
+    await auth.logout();
+  }
+
+  /// 서버 동기화 모드는 로그아웃하며 이 기기의 기록을 지우므로, 그 전에
+  /// 마지막 동기화를 시도한다. 그래도 서버에 올리지 못한 기록이 남으면
+  /// 로그아웃을 멈추고 다시 시도할지, 기록을 포기하고 로그아웃할지 묻는다.
+  /// 팝업을 그냥 닫으면 로그아웃하지 않는다. 계속 진행해도 되면 true.
+  Future<bool> _syncBeforeLogout(
+    BuildContext context,
+    LogoutRecordSync logoutSync,
+  ) async {
+    while (true) {
+      AppLoading.show(context);
+      final bool hasUnsynced;
+      try {
+        hasUnsynced = await logoutSync.syncAndCheckUnsynced();
+      } finally {
+        AppLoading.hide();
+      }
+      if (!hasUnsynced) return true;
+      if (!context.mounted) return false;
+      final forceLogout = await AppConfirm.choose(
+        context,
+        title: '로그아웃',
+        message: '동기화되지 않은 기록이 있습니다. 지금 로그아웃하면 해당 기록이 삭제될 수 있습니다.',
+        confirmText: '그래도 로그아웃',
+        cancelText: '다시 시도',
+        destructive: true,
+      );
+      if (forceLogout == null) return false;
+      if (forceLogout) return true;
+      if (!context.mounted) return false;
+    }
   }
 }
 
