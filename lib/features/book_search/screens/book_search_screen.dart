@@ -11,6 +11,7 @@ import '../../../shared/widgets/community_content.dart';
 import '../../book_detail/screens/book_detail_screen.dart';
 import '../../book_record/screens/book_record_screen.dart';
 import '../../external_record_import/screens/external_import_guide_screen.dart';
+import '../../external_record_import/screens/finished_csv_import_screen.dart';
 import '../providers/book_search_providers.dart';
 import 'barcode_scan_screen.dart';
 import 'widgets/custom_book_dialog.dart';
@@ -119,6 +120,12 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
     );
   }
 
+  void _openFinishedCsvImport() {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const FinishedCsvImportScreen()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(bookSearchControllerProvider);
@@ -198,6 +205,7 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
                 onTapCustomBook: _openCustomBookDialog,
                 onTapScan: _scanBarcode,
                 onTapExternalImport: _openExternalImport,
+                onTapFinishedCsvImport: _openFinishedCsvImport,
               ),
             ),
             // 검색 전 하단 빈 공간을 광고로 채운다. 로드 전/실패 시에는
@@ -223,10 +231,12 @@ class _EmptyQueryActions extends StatelessWidget {
     required this.onTapCustomBook,
     required this.onTapScan,
     required this.onTapExternalImport,
+    required this.onTapFinishedCsvImport,
   });
 
   final VoidCallback onTapCustomBook;
   final VoidCallback onTapScan;
+  final VoidCallback onTapFinishedCsvImport;
 
   /// null이면(계정 없음) 외부 기록 가져오기 버튼을 감춘다.
   final VoidCallback? onTapExternalImport;
@@ -265,12 +275,18 @@ class _EmptyQueryActions extends StatelessWidget {
             onTap: onTapExternalImport,
           ),
         ],
+        const SizedBox(height: 12),
+        _CompactActionButton(
+          icon: PhosphorIconsRegular.fileCsv,
+          label: '완독 기록 가져오기',
+          description: '기존 독서 기록을 CSV로 한 번에 추가해요',
+          onTap: onTapFinishedCsvImport,
+        ),
       ],
     );
   }
 }
 
-/// 아이콘과 라벨을 한 줄에 놓는 보조 등록 버튼(직접 등록·바코드).
 /// 아이콘과 라벨을 한 줄에 놓는 보조 등록 버튼(직접 등록·바코드·외부 가져오기).
 class _CompactActionButton extends StatelessWidget {
   const _CompactActionButton({
@@ -278,6 +294,7 @@ class _CompactActionButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.caption,
+    this.description,
   });
 
   final IconData icon;
@@ -286,6 +303,9 @@ class _CompactActionButton extends StatelessWidget {
 
   /// 라벨 뒤에 옅게 덧붙이는 보조 문구(예: 지원 서비스 이름).
   final String? caption;
+
+  /// 라벨 아래 줄에 옅게 놓는 설명(한 줄에 담기 긴 안내용).
+  final String? description;
 
   @override
   Widget build(BuildContext context) {
@@ -302,36 +322,50 @@ class _CompactActionButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: colors.border),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          child: Column(
             children: [
-              Icon(icon, color: colors.accentForeground, size: 18),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text.rich(
-                  TextSpan(
-                    text: label,
-                    children: [
-                      if (caption != null)
-                        TextSpan(
-                          text: '  $caption',
-                          style: TextStyle(
-                            fontWeight: FontWeight.normal,
-                            fontSize: 12,
-                            color: colors.textMuted,
-                          ),
-                        ),
-                    ],
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: colors.accentForeground, size: 18),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text.rich(
+                      TextSpan(
+                        text: label,
+                        children: [
+                          if (caption != null)
+                            TextSpan(
+                              text: '  $caption',
+                              style: TextStyle(
+                                fontWeight: FontWeight.normal,
+                                fontSize: 12,
+                                color: colors.textMuted,
+                              ),
+                            ),
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: colors.textStrong,
+                      ),
+                    ),
                   ),
+                ],
+              ),
+              if (description != null) ...[
+                const SizedBox(height: 3),
+                Text(
+                  description!,
+                  textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                    color: colors.textStrong,
-                  ),
+                  style: TextStyle(fontSize: 12, color: colors.textMuted),
                 ),
-              ),
+              ],
             ],
           ),
         ),

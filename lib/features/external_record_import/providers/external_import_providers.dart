@@ -319,7 +319,7 @@ class ExternalImportController
       _checkSession(ownerUserId, generation);
 
       final selection = _confirmSelection(input, existingBooksByIsbn);
-      if (selection == null) return _newConflictFeedback;
+      if (selection == null) return newConflictFeedback;
       final selectedBooks = selection.input.books;
       final overwriteExistingIsbns = selection.overwriteExistingIsbns;
       final selectedInput = selection.input;
@@ -452,7 +452,9 @@ class ExternalImportController
     }
   }
 
-  static const _newConflictFeedback = ExternalImportFeedback.info(
+  /// 저장 직전 같은 ISBN의 기존 책이 새로 확인돼 선택에서 뺐을 때의 결과.
+  /// 목록 없이 가져오는 화면은 이 값을 받으면 바로 다시 가져오기를 요청한다.
+  static const newConflictFeedback = ExternalImportFeedback.info(
     '기존 책이 새로 확인되어 선택에서 제외했어요. 목록을 확인해 주세요.',
   );
 
@@ -478,7 +480,7 @@ class ExternalImportController
     final existingBooksByIsbn = await _loadExistingBooks(input);
     _checkSession(ownerUserId, generation);
     final selection = _confirmSelection(input, existingBooksByIsbn);
-    if (selection == null) return _newConflictFeedback;
+    if (selection == null) return newConflictFeedback;
 
     await ref
         .read(externalRecordLocalImportServiceProvider)

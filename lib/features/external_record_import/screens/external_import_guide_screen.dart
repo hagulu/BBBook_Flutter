@@ -112,7 +112,7 @@ class ExternalImportGuideScreen extends ConsumerWidget {
             label: const Text('파일 선택'),
           ),
           const SizedBox(height: 20),
-          for (final source in ExternalImportSource.values) ...[
+          for (final source in _guideSources) ...[
             _SourceCard(source: source),
             const SizedBox(height: 12),
           ],
@@ -143,6 +143,12 @@ class ExternalImportGuideScreen extends ConsumerWidget {
   }
 }
 
+/// 완독 CSV는 책 추가 화면의 별도 메뉴로 가져오므로 여기서는 제외한다.
+const _guideSources = [
+  ExternalImportSource.bookJuk,
+  ExternalImportSource.bookmory,
+];
+
 class _SourceCard extends StatelessWidget {
   const _SourceCard({required this.source});
 
@@ -151,6 +157,7 @@ class _SourceCard extends StatelessWidget {
   String get _fileExtension => switch (source) {
     ExternalImportSource.bookJuk => '.csv',
     ExternalImportSource.bookmory => '.bookmory',
+    ExternalImportSource.finishedCsv => '.csv',
   };
 
   /// 각 파서(`BookJukImporter`/`BookmoryImporter`)가 실제로 읽는 필드 기준.
@@ -166,11 +173,17 @@ class _SourceCard extends StatelessWidget {
       (label: '평가', detail: '마지막 완독의 별점, 한줄평'),
       (label: '메모', detail: '요약·발췌·생각 메모와 쪽수'),
     ],
+    ExternalImportSource.finishedCsv => const [
+      (label: '책 정보', detail: '제목, 저자, 출판사, ISBN, 쪽수'),
+      (label: '독서 기록', detail: '완독일, 독서 매체, 플랫폼'),
+      (label: '평가', detail: '별점, 한줄 감상'),
+    ],
   };
 
   String get _excludedFields => switch (source) {
     ExternalImportSource.bookJuk => 'ISBN, 표지, 쪽수, 별점, 태그',
     ExternalImportSource.bookmory => '태그',
+    ExternalImportSource.finishedCsv => '메모, 태그',
   };
 
   @override

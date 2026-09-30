@@ -33,8 +33,14 @@ class ExternalImportSnapshotBuilder {
       final bookLocalId = -(bookIndex + 1);
       final identity = _bookIdentity(external);
       final createdAt = external.createdAt ?? now;
-      final isEbook = external.sourceType == ExternalBookSourceType.ebook;
-      final isAudio = external.sourceType == ExternalBookSourceType.audioBook;
+      // 완독 CSV의 total_pages는 매체와 무관하게 종이책 기준 쪽수다
+      // (서버 CSV Import도 stats_total_pages로만 저장한다).
+      final pagesAreStats = external.source == ExternalImportSource.finishedCsv;
+      final isEbook =
+          !pagesAreStats && external.sourceType == ExternalBookSourceType.ebook;
+      final isAudio =
+          !pagesAreStats &&
+          external.sourceType == ExternalBookSourceType.audioBook;
       final isbn13 = external.isbn13;
       final existing = isbn13 == null ? null : existingBooksByIsbn[isbn13];
       final overwriteExisting =
@@ -73,7 +79,7 @@ class ExternalImportSnapshotBuilder {
               finishedAt: external.finishedAt,
               libraryId: existing?.libraryId,
               libraryDueAt: existing?.libraryDueAt,
-              platformName: existing?.platformName,
+              platformName: external.platformName ?? existing?.platformName,
               discoverySource: existing?.discoverySource,
               tags: existing?.tags ?? const [],
               createdAt: createdAt,

@@ -2,7 +2,11 @@ import '../../bookshelf/models/book_status.dart';
 
 enum ExternalImportSource {
   bookJuk('BOOK_JUK', '북적북적'),
-  bookmory('BOOKMORY', '북모리');
+  bookmory('BOOKMORY', '북모리'),
+
+  /// 책 추가 화면의 "완독 기록 가져오기"(`my-import.md`) 전용 CSV. 다른
+  /// 서비스 기록 가져오기 안내 화면에는 노출하지 않는다.
+  finishedCsv('FINISHED_CSV', '완독 기록');
 
   const ExternalImportSource(this.code, this.label);
 
@@ -59,6 +63,7 @@ class ExternalBookImportItem {
     this.startedAt,
     this.finishedAt,
     this.sourceType,
+    this.platformName,
     this.coverImageUrl,
     this.createdAt,
   });
@@ -78,10 +83,26 @@ class ExternalBookImportItem {
   final DateTime? finishedAt;
   final int rereadCount;
   final ExternalBookSourceType? sourceType;
+  final String? platformName;
   final String? coverImageUrl;
   final DateTime? createdAt;
   final List<ExternalNoteImportItem> notes;
   final List<String> tags;
+}
+
+/// 파일 안에서 형식 조건을 어겨 가져오지 않는 행. 완독 CSV처럼 행 단위로
+/// 실패를 알려줘야 하는 파서만 채운다.
+class ExternalImportRowFailure {
+  const ExternalImportRowFailure({
+    required this.row,
+    required this.title,
+    required this.reason,
+  });
+
+  /// CSV 파일 행 번호(1은 헤더, 데이터는 2부터).
+  final int row;
+  final String? title;
+  final String reason;
 }
 
 class ExternalImportParseResult {
@@ -91,6 +112,7 @@ class ExternalImportParseResult {
     required this.discoveredBookCount,
     required this.skippedItemCount,
     required this.warningCount,
+    this.rowFailures = const [],
   });
 
   final ExternalImportSource source;
@@ -98,6 +120,7 @@ class ExternalImportParseResult {
   final int discoveredBookCount;
   final int skippedItemCount;
   final int warningCount;
+  final List<ExternalImportRowFailure> rowFailures;
 
   int get noteCount => books.fold(0, (sum, book) => sum + book.notes.length);
   int get importableRecordCount => books.length;
@@ -119,12 +142,16 @@ class ExternalImportFileReference {
     required this.displayName,
     this.deleteWhenDone = false,
     this.platformErrorMessage,
+    this.expectedSource,
   });
 
   final String path;
   final String displayName;
   final bool deleteWhenDone;
   final String? platformErrorMessage;
+
+  /// 지정하면 확장자·헤더로 서비스를 추측하지 않고 이 형식으로만 분석한다.
+  final ExternalImportSource? expectedSource;
 
   factory ExternalImportFileReference.fromPlatformMap(
     Map<Object?, Object?> value,
@@ -151,10 +178,16 @@ class ExternalImportFileReference {
         other.path == path &&
         other.displayName == displayName &&
         other.deleteWhenDone == deleteWhenDone &&
-        other.platformErrorMessage == platformErrorMessage;
+        other.platformErrorMessage == platformErrorMessage &&
+        other.expectedSource == expectedSource;
   }
 
   @override
-  int get hashCode =>
-      Object.hash(path, displayName, deleteWhenDone, platformErrorMessage);
+  int get hashCode => Object.hash(
+    path,
+    displayName,
+    deleteWhenDone,
+    platformErrorMessage,
+    expectedSource,
+  );
 }

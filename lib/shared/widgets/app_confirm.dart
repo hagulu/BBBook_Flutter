@@ -16,6 +16,7 @@ class AppConfirm {
     String confirmText = '확인',
     String cancelText = '취소',
     bool destructive = false,
+    Widget? content,
   }) async {
     final result = await choose(
       context,
@@ -24,6 +25,7 @@ class AppConfirm {
       confirmText: confirmText,
       cancelText: cancelText,
       destructive: destructive,
+      content: content,
     );
     return result ?? false;
   }
@@ -38,12 +40,14 @@ class AppConfirm {
     String confirmText = '확인',
     String cancelText = '취소',
     bool destructive = false,
+    Widget? content,
   }) {
     return showDialog<bool>(
       context: context,
       builder: (dialogContext) => AppDialogShell(
         title: title,
         message: message,
+        content: content,
         actions: [
           AppDialogAction(
             label: cancelText,

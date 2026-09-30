@@ -25,11 +25,16 @@ class AppDialogShell extends StatelessWidget {
     required this.title,
     required this.message,
     required this.actions,
+    this.content,
   });
 
   final String title;
   final String message;
   final List<AppDialogAction> actions;
+
+  /// 본문 아래에 덧붙이는 보조 정보(선택한 파일, 처리 결과 등). 본문과 함께
+  /// 스크롤된다.
+  final Widget? content;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +67,10 @@ class AppDialogShell extends StatelessWidget {
                           height: 1.4,
                         ),
                       ),
+                      if (content != null) ...[
+                        const SizedBox(height: 16),
+                        content!,
+                      ],
                     ],
                   ),
                 ),
