@@ -25,16 +25,25 @@ class FinishedCsvImporter {
     'publisher',
     'isbn13',
     'total_pages',
+    'started_at',
     'finished_at',
     'my_rating',
     'short_review',
     'source_type',
     'platform_name',
+    'difficulty',
+    'discovery_source',
+    'is_masterpiece',
+    'reread_count',
+    'tags',
   ];
 
   static const _maxTextLength = 255;
   static const _maxShortReviewLength = 150;
   static const _maxPlatformNameLength = 50;
+  static const _maxDiscoverySourceLength = 50;
+  static const _maxTagLength = 15;
+  static const _maxTagsPerBook = 10;
 
   static final _isbnSeparatorPattern = RegExp(r'[-\s]');
   static final _isbnPattern = RegExp(r'^\d{13}$');
@@ -77,7 +86,9 @@ class FinishedCsvImporter {
           .trim();
       if (header.isNotEmpty) columns.putIfAbsent(header, () => index);
     }
-    if (!headers.every(columns.containsKey)) {
+    // title 외 컬럼은 모두 선택이다. 헤더에 없는 컬럼은 빈 값으로 본다
+    // (기존 10개 컬럼 CSV도 그대로 가져온다).
+    if (!columns.containsKey('title')) {
       throw const ExternalImportException(
         'CSV 형식이 올바르지 않아요. 첫 줄의 헤더를 확인해 주세요.',
         reason: 'csv_headers_not_supported',
@@ -90,8 +101,8 @@ class FinishedCsvImporter {
     for (var rowIndex = 1; rowIndex < rows.length; rowIndex++) {
       final row = rows[rowIndex];
       String value(String header) {
-        final index = columns[header]!;
-        if (index >= row.length) return '';
+        final index = columns[header];
+        if (index == null || index >= row.length) return '';
         return row[index]?.toString().trim() ?? '';
       }
 
@@ -162,13 +173,29 @@ class FinishedCsvImporter {
       }
     }
 
+    final rawStartedAt = value('started_at');
+    DateTime? startedAt;
+    if (rawStartedAt.isNotEmpty) {
+      startedAt = _parseDate(rawStartedAt);
+      if (startedAt == null) {
+        return const _RowFailure('시작일은 yyyy-MM-dd 형식으로 입력해 주세요.');
+      }
+    }
+
     final rawFinishedAt = value('finished_at');
-    DateTime? finishedAt;
+    final DateTime finishedAt;
     if (rawFinishedAt.isNotEmpty) {
-      finishedAt = _parseDate(rawFinishedAt);
-      if (finishedAt == null) {
+      final parsed = _parseDate(rawFinishedAt);
+      if (parsed == null) {
         return const _RowFailure('완독일은 yyyy-MM-dd 형식으로 입력해 주세요.');
       }
+      finishedAt = parsed;
+    } else {
+      finishedAt = _todayInKst();
+    }
+    // 완독일을 비워 오늘로 채운 경우도 같은 기준으로 비교한다.
+    if (startedAt != null && startedAt.isAfter(finishedAt)) {
+      return const _RowFailure('시작일이 완독일보다 늦어요.');
     }
 
     final rawRating = value('my_rating');
@@ -203,6 +230,53 @@ class FinishedCsvImporter {
       return const _RowFailure('플랫폼명은 50자까지 입력할 수 있어요.');
     }
 
+    final rawDifficulty = value('difficulty');
+    final difficulty = _parseDifficulty(rawDifficulty);
+    // 앱·웹은 세 저장값만 난이도로 표시하므로, 그 밖의 값은 저장해도 보이지
+    // 않는다. 독서 매체처럼 허용 값이 아니면 그 행을 실패로 알린다.
+    if (rawDifficulty.isNotEmpty && difficulty == null) {
+      return const _RowFailure('난이도는 EASY, MODERATE, HARD 중 하나로 입력해 주세요.');
+    }
+
+    final discoverySource = value('discovery_source');
+    if (discoverySource.length > _maxDiscoverySourceLength) {
+      return const _RowFailure('알게 된 경로는 50자까지 입력할 수 있어요.');
+    }
+
+    final rawMasterpiece = value('is_masterpiece').toLowerCase();
+    final bool isMasterpiece;
+    switch (rawMasterpiece) {
+      case '' || 'false':
+        isMasterpiece = false;
+      case 'true':
+        isMasterpiece = true;
+      default:
+        return const _RowFailure('명작 여부는 true 또는 false로 입력해 주세요.');
+    }
+
+    final rawRereadCount = value('reread_count');
+    var rereadCount = 1;
+    if (rawRereadCount.isNotEmpty) {
+      final parsed = _pagesPattern.hasMatch(rawRereadCount)
+          ? int.tryParse(rawRereadCount)
+          : null;
+      if (parsed == null || parsed <= 0) {
+        return const _RowFailure('회독 수는 1 이상의 숫자로 입력해 주세요.');
+      }
+      rereadCount = parsed;
+    }
+
+    final tags = <String>{
+      for (final tag in value('tags').split('|'))
+        if (tag.trim().isNotEmpty) tag.trim(),
+    }.toList(growable: false);
+    if (tags.any((tag) => tag.length > _maxTagLength)) {
+      return const _RowFailure('태그는 하나에 15자까지 입력할 수 있어요.');
+    }
+    if (tags.length > _maxTagsPerBook) {
+      return const _RowFailure('태그는 책 한 권에 10개까지 입력할 수 있어요.');
+    }
+
     final isAudioBook = sourceType == ExternalBookSourceType.audioBook;
     return _RowBook(
       ExternalBookImportItem(
@@ -221,12 +295,21 @@ class FinishedCsvImporter {
         totalPages: totalPages,
         rating: rating,
         shortReview: shortReview.isEmpty ? null : shortReview,
-        finishedAt: finishedAt ?? _todayInKst(),
-        rereadCount: 1,
+        startedAt: startedAt,
+        finishedAt: finishedAt,
+        rereadCount: rereadCount,
         sourceType: sourceType,
-        platformName: platformName.isEmpty ? null : platformName,
+        // 종이책은 플랫폼을 쓰지 않으므로 값이 있어도 무시한다.
+        platformName:
+            platformName.isEmpty ||
+                sourceType == ExternalBookSourceType.paperBook
+            ? null
+            : platformName,
+        difficulty: difficulty,
+        discoverySource: discoverySource.isEmpty ? null : discoverySource,
+        isMasterpiece: isMasterpiece,
         notes: const [],
-        tags: const [],
+        tags: tags,
       ),
     );
   }
@@ -238,6 +321,18 @@ class FinishedCsvImporter {
       'PAPER_BOOK' => ExternalBookSourceType.paperBook,
       'EBOOK' => ExternalBookSourceType.ebook,
       'AUDIO_BOOK' || 'AUDIOBOOK' => ExternalBookSourceType.audioBook,
+      _ => null,
+    };
+  }
+
+  /// 앱과 웹은 난이도를 `EASY`/`MODERATE`/`HARD`로 저장하고 표시할 때만
+  /// 한글로 바꾼다(`DifficultyLevel`). 대소문자나 한글 표기로 적은 값도 이
+  /// 저장값으로 맞춘다.
+  String? _parseDifficulty(String value) {
+    return switch (value.toUpperCase()) {
+      'EASY' || '쉬움' => 'EASY',
+      'MODERATE' || '보통' => 'MODERATE',
+      'HARD' || '어려움' => 'HARD',
       _ => null,
     };
   }

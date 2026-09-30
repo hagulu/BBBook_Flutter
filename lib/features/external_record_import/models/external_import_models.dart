@@ -64,6 +64,9 @@ class ExternalBookImportItem {
     this.finishedAt,
     this.sourceType,
     this.platformName,
+    this.difficulty,
+    this.discoverySource,
+    this.isMasterpiece,
     this.coverImageUrl,
     this.createdAt,
   });
@@ -84,6 +87,11 @@ class ExternalBookImportItem {
   final int rereadCount;
   final ExternalBookSourceType? sourceType;
   final String? platformName;
+  final String? difficulty;
+  final String? discoverySource;
+
+  /// null이면 기존 책의 값을 유지한다(새 책은 false).
+  final bool? isMasterpiece;
   final String? coverImageUrl;
   final DateTime? createdAt;
   final List<ExternalNoteImportItem> notes;

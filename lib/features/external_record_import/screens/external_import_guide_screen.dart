@@ -175,15 +175,16 @@ class _SourceCard extends StatelessWidget {
     ],
     ExternalImportSource.finishedCsv => const [
       (label: '책 정보', detail: '제목, 저자, 출판사, ISBN, 쪽수'),
-      (label: '독서 기록', detail: '완독일, 독서 매체, 플랫폼'),
-      (label: '평가', detail: '별점, 한줄 감상'),
+      (label: '독서 기록', detail: '시작일, 완독일, 회독 수, 독서 매체, 플랫폼, 알게 된 경로'),
+      (label: '평가', detail: '별점, 한줄 감상, 난이도, 명작'),
+      (label: '태그', detail: '책당 10개까지'),
     ],
   };
 
   String get _excludedFields => switch (source) {
     ExternalImportSource.bookJuk => 'ISBN, 표지, 쪽수, 별점, 태그',
     ExternalImportSource.bookmory => '태그',
-    ExternalImportSource.finishedCsv => '메모, 태그',
+    ExternalImportSource.finishedCsv => '메모',
   };
 
   @override

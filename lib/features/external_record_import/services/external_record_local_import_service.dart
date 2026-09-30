@@ -98,6 +98,13 @@ class ExternalRecordLocalImportService {
     final bookIds = <int, String>{};
     final noteIds = <int, String>{};
     final remoteCovers = <String, String>{};
+    final tagNamesById = {for (final tag in snapshot.tags) tag.id: tag.name};
+    final tagNamesByBook = <int, List<String>>{};
+    for (final map in snapshot.tagMaps) {
+      tagNamesByBook
+          .putIfAbsent(map.userBookId, () => [])
+          .add(tagNamesById[map.tagId]!);
+    }
     final books = <ArchiveRecord>[];
     for (final book in snapshot.books) {
       final id = book.clientRequestId!;
@@ -132,8 +139,9 @@ class ExternalRecordLocalImportService {
             'createdAt': book.createdAt.toIso8601String(),
             'updatedAt': book.updatedAt.toIso8601String(),
             'coverImage': null,
-            // 외부 서비스 태그는 가져오지 않는다. 기존 책 태그는 그대로 둔다.
-            'tags': const <String>[],
+            // 가져오는 파일에 태그가 있는 경우(완독 CSV)만 추가한다. 기존 책
+            // 태그는 그대로 두고 같은 이름 태그는 재사용한다.
+            'tags': tagNamesByBook[book.userBookId] ?? const <String>[],
           },
         ),
       );
@@ -180,7 +188,7 @@ class ExternalRecordLocalImportService {
         notes: notes,
         memos: memos,
         reflections: const [],
-        tags: const [],
+        tags: tagNamesById.values.toList(growable: false),
       ),
       remoteCoverUrls: remoteCovers,
     );

@@ -145,7 +145,7 @@
 - `lib/features/external_record_import/services/external_record_import_service.dart` — (동기화 켜짐) 공통 외부 모델을 기존 records Import 청크로 변환해 start/items/complete를 실행하고, API 실패는 서버 자동 롤백에 맡기며 클라이언트 후처리 실패만 cancel
 - `lib/features/external_record_import/services/external_record_local_import_service.dart` — (동기화 꺼짐·계정 없음) 공통 외부 모델을 사전 검증한 뒤 로컬 복원 규격으로 변환해 `RecordArchiveDao.restore`로 한 트랜잭션 저장
 - `lib/features/external_record_import/screens/finished_csv_import_screen.dart` — 완독 기록 CSV 가져오기 화면(`my-import.md` 기능 대응, 파일 선택 즉시 분석→확인→가져오기→결과 팝업, CSV 만들기 단계별 안내와 AI 변환 프롬프트·CSV 형식 바텀시트), 책 추가 화면에서 진입. 앱에서 CSV를 해석해 외부 가져오기와 같은 흐름(동기화 켜짐: 서버 Import, 꺼짐·계정 없음: 로컬 저장)으로 저장하고 같은 ISBN의 기존 책은 건너뜀
-- `lib/features/external_record_import/data/finished_csv_importer.dart` — 완독 CSV(`title,author,...,platform_name`) 파서, 서버 CSV Import와 같은 행 단위 검증으로 실패 행(행 번호·제목·사유)을 분리
+- `lib/features/external_record_import/data/finished_csv_importer.dart` — 완독 CSV(`title`~`tags` 16개 컬럼, title 외 선택) 파서, 서버 CSV Import와 같은 행 단위 검증으로 실패 행(행 번호·제목·사유)을 분리
 - `lib/features/external_record_import/widgets/external_import_share_coordinator.dart` — Android 공유/파일 열기 cold·warm start 이벤트를 앱 사용 가능 상태가 된 뒤 분석 화면으로 즉시 연결하고 캐시 파일 정리
 
 ## features/record_archive

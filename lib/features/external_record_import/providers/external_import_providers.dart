@@ -577,15 +577,14 @@ class ExternalImportController
         .whereType<String>()
         .toSet();
     final repository = ref.read(bookshelfRepositoryProvider);
-    final entries = await Future.wait(
-      isbns.map(
-        (isbn) async => MapEntry(isbn, await repository.getByIsbn13(isbn)),
-      ),
-    );
-    return {
-      for (final entry in entries)
-        if (entry.value != null) entry.key: entry.value!,
-    };
+    // ISBN이 많은 파일에서 조회 Future를 한꺼번에 만들지 않도록 하나씩
+    // 조회한다(로컬 DB 조회는 어차피 순서대로 처리된다).
+    final existing = <String, BookItem>{};
+    for (final isbn in isbns) {
+      final book = await repository.getByIsbn13(isbn);
+      if (book != null) existing[isbn] = book;
+    }
+    return existing;
   }
 
   Set<int> _conflictingIndexes(

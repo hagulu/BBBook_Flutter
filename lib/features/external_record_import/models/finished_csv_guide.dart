@@ -31,6 +31,11 @@ abstract final class FinishedCsvGuide {
     ),
     FinishedCsvField(name: 'total_pages', label: '총 페이지 수', rule: '양수만'),
     FinishedCsvField(
+      name: 'started_at',
+      label: '시작일',
+      rule: 'yyyy-MM-dd, 완독일보다 늦으면 안 됨',
+    ),
+    FinishedCsvField(
       name: 'finished_at',
       label: '완독일',
       rule: 'yyyy-MM-dd, 비우면 오늘 날짜',
@@ -42,29 +47,63 @@ abstract final class FinishedCsvGuide {
       label: '독서 매체',
       rule: 'PAPER_BOOK, EBOOK, AUDIO_BOOK',
     ),
-    FinishedCsvField(name: 'platform_name', label: '플랫폼명'),
+    FinishedCsvField(
+      name: 'platform_name',
+      label: '플랫폼명',
+      rule: '최대 50자, 종이책이면 무시',
+    ),
+    FinishedCsvField(
+      name: 'difficulty',
+      label: '난이도',
+      rule: 'EASY, MODERATE, HARD',
+    ),
+    FinishedCsvField(
+      name: 'discovery_source',
+      label: '알게 된 경로',
+      rule: '최대 50자',
+    ),
+    FinishedCsvField(
+      name: 'is_masterpiece',
+      label: '명작 여부',
+      rule: 'true / false, 기본값 false',
+    ),
+    FinishedCsvField(name: 'reread_count', label: '회독 수', rule: '1 이상, 기본값 1'),
+    FinishedCsvField(name: 'tags', label: '태그', rule: '| 로 구분, 태그당 15자·최대 10개'),
   ];
 
   static final prompt =
       '''
-아래 독서 기록을 완독 기록 CSV 파일로 변환해 주세요.
+제공된 자료의 독서 기록을 아래 형식의 CSV 파일로 변환해줘.
 
-[출력 형식]
-- 첫 줄에는 아래 헤더를 그대로 넣어 주세요.
-  $header
-- 한 줄에 책 한 권씩 작성해 주세요.
-- 값에 쉼표(,)나 줄바꿈이 있으면 큰따옴표(")로 감싸 주세요.
-- 결과는 UTF-8 인코딩의 .csv 파일로 만들어 주세요. 파일을 만들 수 없다면 CSV 내용만 출력하고 다른 설명은 붙이지 마세요.
+첫 줄은 반드시 아래 헤더를 그대로 사용해.
 
-[작성 규칙]
-- title(책 제목)은 반드시 입력해 주세요.
-- 모르는 값은 추측하지 말고 비워 주세요.
-- isbn13: 확실히 아는 경우에만 하이픈 없이 13자리 숫자로 입력해 주세요.
-- total_pages: 확인할 수 있는 경우에만 숫자로 입력해 주세요.
-- finished_at: 완독일을 yyyy-MM-dd 형식으로 입력하고, 모르면 비워 주세요.
-- my_rating: 0.5 ~ 5.0 사이 숫자로, 소수점 첫째 자리까지 입력해 주세요.
-- short_review: 한줄 감상을 150자 이내로 요약해 주세요.
-- source_type: 종이책은 PAPER_BOOK, 전자책은 EBOOK, 오디오북은 AUDIO_BOOK 중 하나로 입력해 주세요.
-- platform_name: 밀리의서재, 리디북스, 교보eBook처럼 이용한 플랫폼을 아는 경우에만 입력해 주세요.'''
+$header
+
+## 규칙
+
+- 자료에서 확인되는 정보만 사용하고, 불확실하면 비워둬.
+- `title`은 필수야. 제목을 확인할 수 없으면 해당 항목은 제외해.
+- CSV는 반드시 UTF-8로 저장해.
+- 쉼표, 큰따옴표, 줄바꿈이 포함된 값은 올바른 CSV 형식으로 처리해.
+- `isbn13`: 확실한 ISBN-13만 하이픈 없이 13자리 숫자로 입력
+- `total_pages`: 종이책 기준 쪽수, 양의 정수
+- `started_at`, `finished_at`: `yyyy-MM-dd`
+  - 시작일은 완독일보다 늦을 수 없어.
+  - 완독일을 모르면 비워둬.
+- `my_rating`: `0.5 ~ 5.0`, 소수점 첫째 자리까지
+- `short_review`: 최대 150자
+- `source_type`: `PAPER_BOOK`, `EBOOK`, `AUDIO_BOOK` 중 하나
+- `platform_name`: 확인되는 경우만 입력, 최대 50자
+- `difficulty`: `EASY`, `MODERATE`, `HARD` 중 하나
+- `discovery_source`: 책을 알게 된 경로, 최대 50자
+- `is_masterpiece`: 인생책이면 `true`, 아니면 `false` 또는 빈 값
+- `reread_count`: 읽은 횟수, 양의 정수
+- `tags`: 여러 개면 `|`로 구분
+  - 태그 하나는 최대 15자, 책 한 권당 최대 10개
+  - 제한을 넘으면 의미를 유지하면서 간결하게 다듬고, 중요한 태그를 최대 10개까지 추려줘.
+
+각 행의 컬럼 수와 순서는 반드시 헤더와 일치시켜.
+
+**결과는 UTF-8 `.csv` 파일로 만들어서 다운로드할 수 있게 제공해줘. CSV 내용은 채팅에 출력하지 마.**'''
           .trim();
 }
