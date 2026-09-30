@@ -707,7 +707,7 @@ class _LogoutButton extends ConsumerWidget {
         context,
         title: '로그아웃',
         message: '동기화되지 않은 기록이 있습니다. 지금 로그아웃하면 해당 기록이 삭제될 수 있습니다.',
-        confirmText: '그래도 로그아웃',
+        confirmText: '로그아웃',
         cancelText: '다시 시도',
         destructive: true,
       );
