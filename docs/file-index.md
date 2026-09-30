@@ -22,6 +22,7 @@
 - `lib/core/storage/local_image_store.dart` — 기능별 이미지 로컬 파일 저장소(선택 이미지 저장·서버 이미지 내려받기·orphan 정리, DB에는 폴더 기준 상대 경로만 보관)
 - `lib/core/policy/attachment_limit_policy.dart` — 노트/독후감 이미지 첨부 한도 정책(현재 고정값: 노트 3·독후감 0, 추후 서버 등급별 값으로 교체 가능한 단일 지점) 및 서버 제한 에러코드 상수
 - `lib/core/config/ad_config.dart` — AdMob 배너 광고 단위 ID 단일 관리 지점(현재는 Google 공식 테스트 ID, 실제 배포 시 이 값만 교체), release 빌드가 테스트 ID를 그대로 쓰면 막는 `assertConfiguredForRelease()`
+- `lib/core/utils/preview_text.dart` — 목록 본문 미리보기의 줄바꿈·연속 공백을 공백 하나로 합쳐 한 문단처럼 만드는 헬퍼(`flattenPreviewText`)
 
 ## features/auth
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/preview_text.dart';
 import '../../../../shared/widgets/community_content.dart';
 import '../../models/discussion_topic.dart';
 import '../../utils/discussion_date.dart';
@@ -24,6 +25,7 @@ class DiscussionTopicCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return CommunityContentCard(
       onTap: onTap,
+      padding: const EdgeInsets.only(top: 24, bottom: 16),
       child: topic.isHidden
           ? Text(
               '숨김 처리된 토론입니다.',
@@ -51,7 +53,7 @@ class DiscussionTopicCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     height: 1.4,
                     letterSpacing: -0.2,
                     fontWeight: FontWeight.bold,
@@ -60,8 +62,8 @@ class DiscussionTopicCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  topic.isSpoiler ? '스포일러가 포함된 토론입니다' : (topic.content ?? ''),
-                  maxLines: 5,
+                  topic.isSpoiler ? '스포일러가 포함된 토론입니다' : (flattenPreviewText(topic.content) ?? ''),
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 13,
@@ -69,7 +71,7 @@ class DiscussionTopicCard extends StatelessWidget {
                     height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 CommunityAuthorRow(
                   nickname: topic.user.nickname,
                   profileImageUrl: topic.user.profileImageUrl,

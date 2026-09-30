@@ -242,7 +242,7 @@ class CommunityContentHeader extends StatelessWidget {
             title,
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
               color: AppColors.of(context).textStrong,
-              fontSize: 22,
+              fontSize: 21,
               height: 1.35,
               letterSpacing: -0.3,
               fontWeight: FontWeight.bold,

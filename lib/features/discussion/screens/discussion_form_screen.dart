@@ -167,11 +167,20 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
     }
   }
 
+  /// 1줄 책 제목 + 2줄 화면명. 수정 진입 시 서버가 책 제목을 비워 내려줄 수
+  /// 있어 그때는 화면명만 표시한다.
+  Widget _buildAppBarTitle() {
+    final screenName = _isEdit ? '토론 수정' : '토론 작성';
+    final bookTitle = widget.bookTitle.trim();
+    if (bookTitle.isEmpty) return AppBarTitle(screenName);
+    return AppBarTitle(bookTitle, subtitle: screenName);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: AppBarTitle(_isEdit ? '토론 수정' : '토론 작성'),
+        title: _buildAppBarTitle(),
         backgroundColor: AppColors.of(context).pageBackground,
         foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
@@ -208,22 +217,6 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        // 수정 진입 시 서버가 책 제목을 비워 내려줄 수 있어
-                        // 그때는 안내 문구로 되돌린다(머리글이 비지 않게).
-                        widget.bookTitle.trim().isEmpty
-                            ? '함께 생각해 볼 질문'
-                            : widget.bookTitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.of(context).accentForeground,
-                          fontSize: 13,
-                          height: 1.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
                       if (_isLocked) ...[
                         Container(
                           width: double.infinity,

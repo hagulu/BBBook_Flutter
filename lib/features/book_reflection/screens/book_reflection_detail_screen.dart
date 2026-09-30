@@ -312,7 +312,7 @@ class _ReflectionBody extends StatelessWidget {
                   title == null || title.isEmpty ? '제목 없음' : title,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     color: AppColors.of(context).textStrong,
-                    fontSize: 22,
+                    fontSize: 21,
                     height: 1.35,
                     letterSpacing: -0.3,
                     fontWeight: FontWeight.bold,

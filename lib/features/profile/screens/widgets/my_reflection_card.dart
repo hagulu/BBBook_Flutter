@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/preview_text.dart';
 import '../../../../shared/widgets/community_content.dart';
 import '../../../discussion/utils/discussion_date.dart';
 import '../../models/my_reflection_summary.dart';
@@ -48,7 +49,7 @@ class MyReflectionCard extends StatelessWidget {
                 ),
               )
             : Text(
-                reflection.previewText ?? '',
+                flattenPreviewText(reflection.previewText) ?? '',
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(

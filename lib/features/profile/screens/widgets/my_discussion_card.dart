@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/preview_text.dart';
 import '../../../../shared/widgets/community_content.dart';
 import '../../../discussion/utils/discussion_date.dart';
 import '../../models/my_discussion_summary.dart';
@@ -76,7 +77,7 @@ class MyDiscussionCard extends StatelessWidget {
                 child: Text(
                   discussion.isSpoiler
                       ? '스포일러가 포함된 토론입니다'
-                      : (discussion.previewText ?? ''),
+                      : (flattenPreviewText(discussion.previewText) ?? ''),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

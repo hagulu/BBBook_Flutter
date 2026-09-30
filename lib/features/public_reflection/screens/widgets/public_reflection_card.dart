@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/preview_text.dart';
 import '../../../../shared/widgets/community_content.dart';
 import '../../../discussion/utils/discussion_date.dart';
 import '../../models/public_reflection.dart';
@@ -19,10 +20,11 @@ class PublicReflectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final title = reflection.title?.trim();
-    final preview = reflection.contentText?.trim();
+    final preview = flattenPreviewText(reflection.contentText);
 
     return CommunityContentCard(
       onTap: onTap,
+      padding: const EdgeInsets.only(top: 24, bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -31,7 +33,7 @@ class PublicReflectionCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               height: 1.4,
               letterSpacing: -0.2,
               fontWeight: FontWeight.bold,
@@ -41,7 +43,7 @@ class PublicReflectionCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             preview == null || preview.isEmpty ? '내용이 없습니다.' : preview,
-            maxLines: 5,
+            maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontSize: 13,
@@ -49,7 +51,7 @@ class PublicReflectionCard extends StatelessWidget {
               height: 1.5,
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
           CommunityAuthorRow(
             nickname: reflection.user.nickname,
             profileImageUrl: reflection.user.profileImageUrl,

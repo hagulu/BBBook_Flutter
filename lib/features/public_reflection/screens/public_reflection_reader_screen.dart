@@ -48,7 +48,7 @@ DefaultStyles _buildReaderQuillStyles(
     h1: DefaultTextBlockStyle(
       TextStyle(
         color: colors.textStrong,
-        fontSize: 24,
+        fontSize: 21,
         height: 1.3,
         fontWeight: FontWeight.bold,
       ),
@@ -60,7 +60,7 @@ DefaultStyles _buildReaderQuillStyles(
     h2: DefaultTextBlockStyle(
       TextStyle(
         color: colors.textStrong,
-        fontSize: 20,
+        fontSize: 18,
         height: 1.3,
         fontWeight: FontWeight.bold,
       ),

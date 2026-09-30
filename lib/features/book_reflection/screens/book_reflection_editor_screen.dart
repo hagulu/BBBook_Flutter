@@ -69,7 +69,7 @@ DefaultStyles _buildReflectionQuillStyles(
     h1: DefaultTextBlockStyle(
       TextStyle(
         color: colors.textStrong,
-        fontSize: 24,
+        fontSize: 21,
         height: 1.3,
         fontWeight: FontWeight.bold,
       ),
@@ -81,7 +81,7 @@ DefaultStyles _buildReflectionQuillStyles(
     h2: DefaultTextBlockStyle(
       TextStyle(
         color: colors.textStrong,
-        fontSize: 20,
+        fontSize: 18,
         height: 1.3,
         fontWeight: FontWeight.bold,
       ),
@@ -613,6 +613,14 @@ class _BookReflectionEditorScreenState
     await _popWithoutGuard();
   }
 
+  /// 1줄 책 제목 + 2줄 화면명. 책 제목이 비어 있으면 화면명만 표시한다.
+  Widget _buildAppBarTitle() {
+    final screenName = widget.reflection == null ? '독후감 작성' : '독후감 수정';
+    final bookTitle = widget.bookTitle.trim();
+    if (bookTitle.isEmpty) return AppBarTitle(screenName);
+    return AppBarTitle(bookTitle, subtitle: screenName);
+  }
+
   @override
   Widget build(BuildContext context) {
     final reflectionId = widget.reflection?.id;
@@ -634,7 +642,7 @@ class _BookReflectionEditorScreenState
                 controller: _editorScrollController,
                 slivers: [
                   SliverAppBar(
-                    title: const AppBarTitle('독후감'),
+                    title: _buildAppBarTitle(),
                     pinned: false,
                     backgroundColor: AppColors.of(context).pageBackground,
                     foregroundColor: AppColors.of(context).textStrong,
@@ -672,23 +680,7 @@ class _BookReflectionEditorScreenState
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                top: 24,
-                                bottom: 16,
-                              ),
-                              child: Text(
-                                widget.bookTitle,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  height: 1.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.of(context).accentForeground,
-                                ),
-                              ),
-                            ),
+                            const SizedBox(height: 24),
                             TextField(
                               controller: _titleController,
                               minLines: 1,
