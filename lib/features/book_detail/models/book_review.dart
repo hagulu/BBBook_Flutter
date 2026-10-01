@@ -97,7 +97,8 @@ class BookReview {
   }
 }
 
-/// `GET /api/books/{isbn13}/reviews` 커서 기반 목록 페이지.
+/// `GET /api/books/{isbn13}/reviews` 커서 기반 목록 페이지. 숨김 처리된
+/// 리뷰는 목록에 노출하지 않으므로 [items]에서 제외한다.
 class ReviewsPage {
   const ReviewsPage({
     required this.items,
@@ -113,6 +114,7 @@ class ReviewsPage {
     return ReviewsPage(
       items: (json['items'] as List<dynamic>)
           .map((e) => BookReview.fromJson(e as Map<String, dynamic>))
+          .where((review) => !review.isHidden)
           .toList(),
       nextCursor: json['nextCursor'] as int?,
       hasNext: json['hasNext'] as bool,

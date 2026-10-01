@@ -128,7 +128,7 @@ class _DiscussionList extends StatelessWidget {
         return MyDiscussionCard(
           key: ValueKey(discussion.id),
           discussion: discussion,
-          onTap: discussion.isHidden ? null : () => onOpen(discussion),
+          onTap: () => onOpen(discussion),
         );
       },
     );

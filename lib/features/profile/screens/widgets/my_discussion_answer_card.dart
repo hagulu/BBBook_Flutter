@@ -7,8 +7,6 @@ import '../../models/my_discussion_answer_summary.dart';
 import 'my_content_card_layout.dart';
 
 /// "내가 작성한 토론 댓글" 목록 카드(`my-content-screens.md` §5-1).
-///
-/// 다른 3개 화면과 달리 `isHidden`이어도 카드 전체가 항상 탭 가능하다(§5-2).
 class MyDiscussionAnswerCard extends StatelessWidget {
   const MyDiscussionAnswerCard({super.key, required this.answer, this.onTap});
 
@@ -35,15 +33,7 @@ class MyDiscussionAnswerCard extends StatelessWidget {
                 ),
               )
             : null,
-        content: answer.isHidden
-            ? Text(
-                '숨김 처리된 댓글입니다.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.of(context).textMuted,
-                ),
-              )
-            : answer.content != null
+        content: answer.content != null
             ? Text(
                 answer.content!,
                 maxLines: 3,

@@ -245,6 +245,15 @@ class _FakePublicReflectionSource implements PublicReflectionSource {
   }
 
   @override
+  Future<void> postReport({
+    required int reflectionId,
+    required String reason,
+    String? content,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<PublicReflectionDetail> fetchDetail(int reflectionId) async {
     if (detailError case final error?) throw error;
     return detail!;

@@ -245,7 +245,8 @@ class DiscussionTopicDetail {
 
 const _unset = Object();
 
-/// `GET /api/books/{isbn13}/discussions` 커서 기반 목록 페이지.
+/// `GET /api/books/{isbn13}/discussions` 커서 기반 목록 페이지. 숨김 처리된
+/// 주제는 목록에 노출하지 않으므로 [items]에서 제외한다.
 class DiscussionTopicsPage {
   const DiscussionTopicsPage({
     required this.items,
@@ -261,6 +262,7 @@ class DiscussionTopicsPage {
     return DiscussionTopicsPage(
       items: (json['items'] as List<dynamic>? ?? const [])
           .map((e) => DiscussionTopic.fromJson(e as Map<String, dynamic>))
+          .where((topic) => !topic.isHidden)
           .toList(),
       nextCursor: json['nextCursor'] as int?,
       hasNext: json['hasNext'] as bool? ?? false,

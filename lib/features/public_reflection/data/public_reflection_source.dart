@@ -13,4 +13,10 @@ abstract interface class PublicReflectionSource {
   Future<int> postLike(int reflectionId);
 
   Future<int> deleteLike(int reflectionId);
+
+  Future<void> postReport({
+    required int reflectionId,
+    required String reason,
+    String? content,
+  });
 }

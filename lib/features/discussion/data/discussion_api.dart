@@ -26,11 +26,46 @@ class DiscussionApi {
 
   /// GET /api/books/{isbn13}/discussions — 커서 기반 토론 주제 목록.
   /// [includeClosed]가 true면 닫힌 토론도 뒤에 이어서 내려온다.
+  ///
+  /// 숨김 주제는 [DiscussionTopicsPage]에서 제외되므로, 걸러진 뒤 [size]보다
+  /// 적게 남으면 다음 페이지를 이어 조회해 채운다 — 스크롤 기반 추가
+  /// 로딩이라 목록이 짧게 끝나면 다음 페이지 요청이 일어나지 않기 때문이다.
   Future<DiscussionTopicsPage> getTopics({
     required String isbn13,
     int? cursor,
     bool includeClosed = false,
     int size = 20,
+  }) async {
+    var page = await _fetchTopicsPage(
+      isbn13: isbn13,
+      cursor: cursor,
+      includeClosed: includeClosed,
+      size: size,
+    );
+    final items = [...page.items];
+    while (page.hasNext && items.length < size) {
+      final nextCursor = page.nextCursor;
+      if (nextCursor == null) break;
+      page = await _fetchTopicsPage(
+        isbn13: isbn13,
+        cursor: nextCursor,
+        includeClosed: includeClosed,
+        size: size,
+      );
+      items.addAll(page.items);
+    }
+    return DiscussionTopicsPage(
+      items: items,
+      nextCursor: page.nextCursor,
+      hasNext: page.hasNext,
+    );
+  }
+
+  Future<DiscussionTopicsPage> _fetchTopicsPage({
+    required String isbn13,
+    int? cursor,
+    required bool includeClosed,
+    required int size,
   }) async {
     try {
       final response = await _apiClient.dio.get<Map<String, dynamic>>(

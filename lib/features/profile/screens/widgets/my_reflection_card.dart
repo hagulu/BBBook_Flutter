@@ -9,55 +9,43 @@ import 'my_content_card_layout.dart';
 
 /// "내가 작성한 독후감" 목록 카드(`my-content-screens.md` §2-1).
 class MyReflectionCard extends StatelessWidget {
-  const MyReflectionCard({super.key, required this.reflection, this.onTap});
+  const MyReflectionCard({
+    super.key,
+    required this.reflection,
+    required this.onTap,
+  });
 
   final MyReflectionSummary reflection;
-
-  /// 숨김 처리된 항목은 null(탭 불가).
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final isHidden = reflection.isHidden;
-
     return CommunityContentCard(
       onTap: onTap,
       child: MyContentCardLayout(
         book: reflection.book,
-        dateLabel: isHidden
-            ? null
-            : formatRelativeDiscussionDateTime(reflection.createdAt),
-        title: isHidden
-            ? null
-            : Text(
-                reflection.title ?? '',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 16,
-                  height: 1.4,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.of(context).textStrong,
-                ),
-              ),
-        content: isHidden
-            ? Text(
-                '숨김 처리된 독후감입니다.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.of(context).textMuted,
-                ),
-              )
-            : Text(
-                flattenPreviewText(reflection.previewText) ?? '',
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.of(context).textBody,
-                  height: 1.5,
-                ),
-              ),
+        dateLabel: formatRelativeDiscussionDateTime(reflection.createdAt),
+        title: Text(
+          reflection.title ?? '',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 16,
+            height: 1.4,
+            fontWeight: FontWeight.bold,
+            color: AppColors.of(context).textStrong,
+          ),
+        ),
+        content: Text(
+          flattenPreviewText(reflection.previewText) ?? '',
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 13,
+            color: AppColors.of(context).textBody,
+            height: 1.5,
+          ),
+        ),
       ),
     );
   }

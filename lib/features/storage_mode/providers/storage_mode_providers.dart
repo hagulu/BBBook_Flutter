@@ -71,14 +71,24 @@ class LocalStorageMigrationController
   }
 
   /// 겹쳐 눌러도 진행 중인 이전을 공유한다(같은 이전을 두 번 돌리지 않는다).
-  Future<void> start() {
-    return _inFlight ??= _run().whenComplete(() => _inFlight = null);
+  ///
+  /// 최신 기록이나 이미지를 다 받지 못하면 [confirmProceed]로 그래도
+  /// 전환할지 묻는다(없으면 전환하지 않는다).
+  Future<void> start({Future<bool> Function(String message)? confirmProceed}) {
+    return _inFlight ??= _run(
+      confirmProceed,
+    ).whenComplete(() => _inFlight = null);
   }
 
   /// 전환은 끝났는데 서버 기록 정리만 남은 상태를 마저 처리한다(멱등한
   /// DELETE라 여러 번 호출해도 안전하다).
+  ///
+  /// 전환 도중 앱이 종료됐다면 표지 사본 승격이 끝나지 않았을 수 있다. 서버
+  /// 기록을 지우면 표지 원본 URL이 사라지므로, 삭제 전에 승격을 먼저 마친다
+  /// (이미 승격된 행은 조건에 걸리지 않아 다시 실행해도 안전하다).
   Future<bool> retryServerCleanup() async {
     try {
+      await ref.read(bookshelfRepositoryProvider).promoteLocalCoverCopies();
       await ref.read(recordSyncApiProvider).deleteAllRecords();
       await ref.read(storageModeStoreProvider).markServerRecordsDeleted();
       ref.invalidate(serverDeletePendingProvider);
@@ -89,7 +99,9 @@ class LocalStorageMigrationController
     }
   }
 
-  Future<void> _run() async {
+  Future<void> _run(
+    Future<bool> Function(String message)? confirmProceed,
+  ) async {
     final ownerUserId = ref.read(
       authNotifierProvider.select((auth) => auth.user?.id),
     );
@@ -109,6 +121,7 @@ class LocalStorageMigrationController
         if (_disposed) return;
         state = progress;
       },
+      confirmProceed: confirmProceed,
     );
     if (_disposed) return;
     state = result;

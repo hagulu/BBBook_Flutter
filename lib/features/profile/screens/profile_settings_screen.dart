@@ -94,9 +94,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
                     _SettingsMenuTile(
                       icon: PhosphorIconsRegular.export,
                       label: '내 기록 내보내기',
-                      onTap: isSwitching
-                          ? null
-                          : () => _export(context, ref),
+                      onTap: isSwitching ? null : () => _export(context, ref),
                     ),
                     const Divider(),
                     _SettingsMenuTile(
@@ -164,16 +162,26 @@ class ProfileSettingsScreen extends ConsumerWidget {
       context,
       title: '동기화 끄기',
       message:
-          '현재 이 기기에 있는 기록만 남기고 서버 기록은 정리합니다.\n\n'
-          '기기에 저장되지 않은 사진·이미지는 보존되지 않습니다.\n\n'
-          '끄기 전에 다른 기기의 변경사항이 모두 동기화됐는지 확인해 주세요. '
+          '서버의 최신 기록과 이미지를 받아 이 기기에 남기고 서버 기록은 정리합니다.\n\n'
           '동기화를 끄면 다른 기기에서 기록을 볼 수 없고, 로그아웃하면 이 기기의 기록이 삭제됩니다.\n\n'
           '계속할까요?',
       confirmText: '동기화 끄기',
     );
     if (!confirmed || !context.mounted) return;
     ref.read(serverStorageMigrationControllerProvider.notifier).dismissResult();
-    ref.read(localStorageMigrationControllerProvider.notifier).start();
+    ref
+        .read(localStorageMigrationControllerProvider.notifier)
+        .start(
+          confirmProceed: (message) async {
+            if (!context.mounted) return false;
+            return AppConfirm.show(
+              context,
+              title: '동기화를 마치지 못했어요',
+              message: message,
+              confirmText: '동기화 끄기',
+            );
+          },
+        );
   }
 
   Future<void> _startReverseMigration(
@@ -184,9 +192,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
       context,
       title: '동기화 켜기',
       message:
-          '이 기기에만 있는 기록과 이미지를 계정에 올립니다.\n\n'
-          '완료되면 다른 기기에서도 기록을 볼 수 있습니다. 직접 등록한 책 표지는 '
-          '동기화되지 않을 수 있습니다.\n\n'
+          '이 기기의 기록을 계정에 올려 다른 기기에서도 볼 수 있게 합니다.\n\n'
           '계속할까요?',
       confirmText: '동기화 켜기',
     );
@@ -410,10 +416,11 @@ class _StorageModeCard extends ConsumerWidget {
         localState.isRunning ||
         serverState.isRunning ||
         ref.watch(recordArchiveProvider);
+    // 완료되면 진행 카드를 감추고 상태 pill(켜짐/꺼짐)만으로 결과를 보여준다.
     final Widget? migrationProgress;
     if (serverState.stage != ServerStorageMigrationStage.idle) {
       final state = serverState;
-      migrationProgress = state.stage == ServerStorageMigrationStage.idle
+      migrationProgress = state.stage == ServerStorageMigrationStage.completed
           ? null
           : _ServerMigrationProgress(
               state: state,
@@ -423,13 +430,22 @@ class _StorageModeCard extends ConsumerWidget {
             );
     } else {
       final state = localState;
-      migrationProgress = state.stage == LocalStorageMigrationStage.idle
+      migrationProgress =
+          state.stage == LocalStorageMigrationStage.idle ||
+              state.stage == LocalStorageMigrationStage.completed
           ? null
           : _LocalMigrationProgress(
               state: state,
               onRetry: isLocal ? onRetryServerCleanup : onSwitchToLocal,
             );
     }
+
+    // 서버 기록 정리 뒤에는 받지 못한 이미지를 다시 받을 수 없으므로, 완료
+    // 후에도 사용자가 확인할 때까지 누락 건수를 남긴다.
+    final unavailableImages =
+        localState.stage == LocalStorageMigrationStage.completed
+        ? localState.unavailableImages
+        : 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -463,6 +479,18 @@ class _StorageModeCard extends ConsumerWidget {
                 child: const Text('확인'),
               ),
             ),
+        ],
+        if (unavailableImages > 0 && !isSwitching) ...[
+          const SizedBox(height: 8),
+          _MigrationNotice(
+            message:
+                '이미지 $unavailableImages장은 서버에서 받을 수 없어 이 기기에 '
+                '저장하지 못했습니다.',
+            actionLabel: '확인',
+            onAction: () => ref
+                .read(localStorageMigrationControllerProvider.notifier)
+                .dismissResult(),
+          ),
         ],
         if (serverCleanupPending) ...[
           const SizedBox(height: 8),
@@ -616,7 +644,7 @@ class _LocalMigrationProgress extends StatelessWidget {
           '이미지 내려받는 중 (${state.imagesDone}/${state.imagesTotal})',
         LocalStorageMigrationStage.verifying => '저장 상태를 확인하는 중',
         LocalStorageMigrationStage.switchingMode => '저장 방식을 전환하는 중',
-        LocalStorageMigrationStage.completed => '동기화를 껐어요',
+        LocalStorageMigrationStage.completed => '',
         LocalStorageMigrationStage.failed =>
           state.failureMessage ?? '전환하지 못했어요',
         LocalStorageMigrationStage.idle => '',
@@ -648,7 +676,7 @@ class _ServerMigrationProgress extends StatelessWidget {
         ServerStorageMigrationStage.uploadingImages =>
           '이미지 업로드 중 (${state.imagesDone}/${state.imagesTotal})',
         ServerStorageMigrationStage.completing => '저장 방식을 전환하는 중',
-        ServerStorageMigrationStage.completed => '동기화를 켰어요',
+        ServerStorageMigrationStage.completed => '',
         ServerStorageMigrationStage.failed =>
           state.failureMessage ?? '전환하지 못했어요',
         ServerStorageMigrationStage.idle => '',

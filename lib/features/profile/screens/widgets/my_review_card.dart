@@ -46,13 +46,6 @@ class _ReviewBodyState extends State<_ReviewBody> {
   Widget build(BuildContext context) {
     final review = widget.review;
 
-    if (review.isHidden) {
-      return Text(
-        '숨김 처리된 리뷰입니다.',
-        style: TextStyle(fontSize: 13, color: AppColors.of(context).textMuted),
-      );
-    }
-
     final content = review.content;
 
     return Column(

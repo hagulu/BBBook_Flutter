@@ -81,6 +81,8 @@ class DiscussionAnswer {
 }
 
 /// `GET /api/discussions/{topicId}/answers` 페이지 기반 목록 페이지(최신순).
+/// 숨김 처리된 답변은 목록에 노출하지 않으므로 [items]에서 제외한다
+/// ([totalElements]·[totalPages]는 서버 집계값 그대로다).
 class DiscussionAnswersPage {
   const DiscussionAnswersPage({
     required this.items,
@@ -100,6 +102,7 @@ class DiscussionAnswersPage {
     return DiscussionAnswersPage(
       items: (json['items'] as List<dynamic>? ?? const [])
           .map((e) => DiscussionAnswer.fromJson(e as Map<String, dynamic>))
+          .where((answer) => !answer.isHidden)
           .toList(),
       page: json['page'] as int? ?? 0,
       totalElements: json['totalElements'] as int? ?? 0,

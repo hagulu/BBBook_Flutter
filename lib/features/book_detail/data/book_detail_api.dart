@@ -107,10 +107,42 @@ class BookDetailApi {
   }
 
   /// GET /api/books/{isbn13}/reviews — 커서 기반 리뷰 목록(최신순).
+  ///
+  /// 숨김 리뷰는 [ReviewsPage]에서 제외되므로, 걸러진 뒤 [size]보다 적게
+  /// 남으면 다음 페이지를 이어 조회해 채운다 — 스크롤 기반 추가 로딩이라
+  /// 목록이 짧게 끝나면 다음 페이지 요청이 일어나지 않기 때문이다.
   Future<ReviewsPage> getReviews({
     required String isbn13,
     int? cursor,
     int size = 20,
+  }) async {
+    var page = await _fetchReviewsPage(
+      isbn13: isbn13,
+      cursor: cursor,
+      size: size,
+    );
+    final items = [...page.items];
+    while (page.hasNext && items.length < size) {
+      final nextCursor = page.nextCursor;
+      if (nextCursor == null) break;
+      page = await _fetchReviewsPage(
+        isbn13: isbn13,
+        cursor: nextCursor,
+        size: size,
+      );
+      items.addAll(page.items);
+    }
+    return ReviewsPage(
+      items: items,
+      nextCursor: page.nextCursor,
+      hasNext: page.hasNext,
+    );
+  }
+
+  Future<ReviewsPage> _fetchReviewsPage({
+    required String isbn13,
+    int? cursor,
+    required int size,
   }) async {
     try {
       final response = await _apiClient.dio.get<Map<String, dynamic>>(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
@@ -8,6 +9,7 @@ import '../../../shared/widgets/app_banner_ad.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../auth/providers/auth_access_providers.dart';
+import '../../book_detail/screens/widgets/report_dialog.dart';
 import '../../book_reflection/screens/book_reflection_editor_screen.dart';
 import '../../book_reflection/screens/widgets/reflection_image_embed_builder.dart';
 import '../../book_reflection/screens/widgets/reflection_title_body_divider.dart';
@@ -148,10 +150,27 @@ class _PublicReflectionReaderScreenState
     }
   }
 
+  Future<void> _report(PublicReflectionDetailArgs args) async {
+    final submission = await showReportDialog(context);
+    if (submission == null) return;
+    try {
+      await ref
+          .read(publicReflectionDetailProvider(args).notifier)
+          .report(
+            reason: submission.reason.apiValue,
+            content: submission.content,
+          );
+      if (mounted) AppSnackBar.success(context, '신고가 접수되었습니다.');
+    } on ApiException catch (error) {
+      if (mounted) AppSnackBar.error(context, error.message);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final args = (isbn13: widget.isbn13, reflectionId: widget.reflectionId);
     final state = ref.watch(publicReflectionDetailProvider(args));
+    final canUseAccountFeatures = ref.watch(canUseAccountFeaturesProvider);
 
     return Scaffold(
       body: CustomScrollView(
@@ -164,13 +183,17 @@ class _PublicReflectionReaderScreenState
             surfaceTintColor: Colors.transparent,
           ),
           switch (state) {
-            // 공개 독후감 조회는 인증이 필요 없지만 공감은 계정이 있어야 한다.
+            // 공개 독후감 조회는 인증이 필요 없지만 공감·신고는 계정이 있어야
+            // 한다. 본인 글은 신고할 수 없다.
             AsyncData(:final value) => SliverToBoxAdapter(
               child: _ReaderBody(
                 bookTitle: widget.bookTitle,
                 detail: value,
                 onLike: _isLikeUpdating ? null : () => _toggleLike(args),
-                allowLike: ref.watch(canUseAccountFeaturesProvider),
+                allowLike: canUseAccountFeatures,
+                onReport: canUseAccountFeatures && !value.isMine
+                    ? () => _report(args)
+                    : null,
               ),
             ),
             AsyncError(:final error) => SliverFillRemaining(
@@ -198,12 +221,16 @@ class _ReaderBody extends StatelessWidget {
     required this.detail,
     required this.onLike,
     required this.allowLike,
+    required this.onReport,
   });
 
   final String bookTitle;
   final PublicReflectionDetail detail;
   final VoidCallback? onLike;
   final bool allowLike;
+
+  /// null이면 신고 버튼을 노출하지 않는다(비로그인·본인 글).
+  final VoidCallback? onReport;
 
   @override
   Widget build(BuildContext context) {
@@ -234,6 +261,18 @@ class _ReaderBody extends StatelessWidget {
               nickname: detail.user.nickname,
               isFinishedBooksPublic: detail.user.isFinishedBooksPublic,
             ),
+            trailing: onReport == null
+                ? null
+                : IconButton(
+                    padding: EdgeInsets.zero,
+                    tooltip: '독후감 신고',
+                    icon: Icon(
+                      PhosphorIconsRegular.flag,
+                      size: 16,
+                      color: AppColors.of(context).textMuted,
+                    ),
+                    onPressed: onReport,
+                  ),
           ),
           const ReflectionTitleBodyDivider(horizontalInset: 0),
           _PublicReflectionRichContent(

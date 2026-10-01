@@ -834,7 +834,11 @@ class _AnswerList extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: 24),
             child: Center(
               child: Text(
-                '아직 답변이 없습니다.',
+                // 숨김 답변만 있는 페이지는 목록에서 빠져 비어 보인다. 다른
+                // 페이지에 공개 답변이 있을 수 있어 "없다"고 단정하지 않는다.
+                state.totalElements > 0
+                    ? '이 페이지에 표시할 답변이 없습니다.'
+                    : '아직 답변이 없습니다.',
                 style: TextStyle(color: AppColors.of(context).textMuted),
               ),
             ),

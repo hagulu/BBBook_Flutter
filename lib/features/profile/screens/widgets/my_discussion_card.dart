@@ -9,41 +9,38 @@ import 'my_content_card_layout.dart';
 
 /// "내가 작성한 토론" 목록 카드(`my-content-screens.md` §4-1).
 class MyDiscussionCard extends StatelessWidget {
-  const MyDiscussionCard({super.key, required this.discussion, this.onTap});
+  const MyDiscussionCard({
+    super.key,
+    required this.discussion,
+    required this.onTap,
+  });
 
   final MyDiscussionSummary discussion;
-
-  /// 숨김 처리된 항목은 null(탭 불가).
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final isHidden = discussion.isHidden;
     final opacity = discussion.isClosed ? 0.5 : 1.0;
 
     return CommunityContentCard(
       onTap: onTap,
       child: MyContentCardLayout(
         book: discussion.book,
-        dateLabel: isHidden
-            ? null
-            : formatRelativeDiscussionDateTime(discussion.createdAt),
-        title: isHidden
-            ? null
-            : Opacity(
-                opacity: opacity,
-                child: Text(
-                  discussion.title ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 16,
-                    height: 1.4,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.of(context).textStrong,
-                  ),
-                ),
-              ),
+        dateLabel: formatRelativeDiscussionDateTime(discussion.createdAt),
+        title: Opacity(
+          opacity: opacity,
+          child: Text(
+            discussion.title ?? '',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 16,
+              height: 1.4,
+              fontWeight: FontWeight.bold,
+              color: AppColors.of(context).textStrong,
+            ),
+          ),
+        ),
         coverOverlay: discussion.isClosed
             ? ClipRRect(
                 borderRadius: BorderRadius.circular(10),
@@ -62,31 +59,23 @@ class MyDiscussionCard extends StatelessWidget {
                 ),
               )
             : null,
-        content: isHidden
-            ? Text(
-                '숨김 처리된 토론입니다.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.of(context).textMuted,
-                ),
-              )
-            // 마감 표시는 썸네일 오버레이만으로 하고, 텍스트 영역은 딤
-            // 처리로만 마감 상태를 함께 드러낸다(별도 배지는 두지 않는다).
-            : Opacity(
-                opacity: opacity,
-                child: Text(
-                  discussion.isSpoiler
-                      ? '스포일러가 포함된 토론입니다'
-                      : (flattenPreviewText(discussion.previewText) ?? ''),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.of(context).textBody,
-                    height: 1.5,
-                  ),
-                ),
-              ),
+        // 마감 표시는 썸네일 오버레이만으로 하고, 텍스트 영역은 딤
+        // 처리로만 마감 상태를 함께 드러낸다(별도 배지는 두지 않는다).
+        content: Opacity(
+          opacity: opacity,
+          child: Text(
+            discussion.isSpoiler
+                ? '스포일러가 포함된 토론입니다'
+                : (flattenPreviewText(discussion.previewText) ?? ''),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.of(context).textBody,
+              height: 1.5,
+            ),
+          ),
+        ),
       ),
     );
   }

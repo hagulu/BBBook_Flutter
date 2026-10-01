@@ -88,6 +88,15 @@ class _DeferredLikeSource implements PublicReflectionSource {
   }
 
   @override
+  Future<void> postReport({
+    required int reflectionId,
+    required String reason,
+    String? content,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
   Future<PublicReflectionDetail> fetchDetail(int reflectionId) async => detail;
 
   @override

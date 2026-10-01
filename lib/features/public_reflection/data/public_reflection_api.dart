@@ -8,7 +8,7 @@ import 'public_reflection_source.dart';
 /// 공개 독후감 목록과 상세 조회 API.
 ///
 /// 문서: ../../../../../api-doc/api-books-isbn13-reflections-get.md,
-/// api-reflections-reflectionId-get.md
+/// api-reflections-reflectionId-get.md, api-reports-post.md
 ///
 /// 로그인 상태에서는 공감 여부 등 사용자 기준 응답을 받을 수 있으므로, 401 시
 /// refresh 1회 재시도를 보장하는 [ApiClient]를 사용한다.
@@ -87,6 +87,40 @@ class PublicReflectionApi implements PublicReflectionSource {
       return _unwrapMap(response)['likeCount'] as int;
     } on DioException catch (error) {
       throw _mapError(error, overrides: const {404: '취소할 공감을 찾을 수 없습니다.'});
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException('서버 응답 형식이 올바르지 않습니다.', cause: error);
+    }
+  }
+
+  /// POST /api/reports — 공개 독후감 신고(targetType=REFLECTION).
+  @override
+  Future<void> postReport({
+    required int reflectionId,
+    required String reason,
+    String? content,
+  }) async {
+    try {
+      await apiClient.dio.post<Map<String, dynamic>>(
+        '/api/reports',
+        data: {
+          'targetType': 'REFLECTION',
+          'targetId': reflectionId,
+          'reason': reason,
+          'content': ?content,
+        },
+      );
+    } on DioException catch (error) {
+      throw _mapError(
+        error,
+        overrides: const {
+          400: '입력값을 확인해주세요.',
+          404: '신고 대상을 찾을 수 없습니다.',
+          409: '이미 신고한 독후감입니다.',
+          500: '신고를 접수하지 못했습니다.',
+        },
+      );
     } on ApiException {
       rethrow;
     } catch (error) {

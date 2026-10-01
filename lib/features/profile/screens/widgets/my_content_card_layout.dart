@@ -41,7 +41,7 @@ class MyContentCardLayout extends StatelessWidget {
 
   /// 카드 오른쪽 아래에 고정 배치되는 작성일. [content]의 줄 수와 무관하게
   /// 항상 같은 높이(표지 하단)에 위치하도록 [content]와 분리해서 받는다.
-  /// null이면(숨김 항목 등) 표시하지 않는다.
+  /// null이면 표시하지 않는다.
   final String? dateLabel;
 
   @override

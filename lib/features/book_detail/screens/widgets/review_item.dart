@@ -97,106 +97,94 @@ class _ReviewItemState extends State<ReviewItem> {
               nickname: review.user.nickname,
               isFinishedBooksPublic: review.user.isFinishedBooksPublic,
             ),
-            trailing: review.isHidden
-                ? null
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (review.rating != null) ...[
-                        StarRatingDisplay(
-                          rating: review.rating!,
-                          size: 14,
-                          filledColor: AppColors.of(context).accentGraphic,
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      if (widget.allowAccountActions)
-                        if (review.isMine)
-                          CommunityMoreButton(
-                            tooltip: '리뷰 메뉴',
-                            iconSize: 18,
-                            onTap: () => _openMenuSheet(context),
-                          )
-                        else
-                          IconButton(
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(
-                              minWidth: 32,
-                              minHeight: 32,
-                            ),
-                            icon: Icon(
-                              PhosphorIconsRegular.flag,
-                              size: 16,
-                              color: AppColors.of(context).textMuted,
-                            ),
-                            onPressed: widget.onReport,
-                          ),
-                    ],
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (review.rating != null) ...[
+                  StarRatingDisplay(
+                    rating: review.rating!,
+                    size: 14,
+                    filledColor: AppColors.of(context).accentGraphic,
                   ),
-          ),
-          const SizedBox(height: 8),
-          if (review.isHidden)
-            Text(
-              '숨김 처리된 리뷰입니다.',
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.of(context).textMuted,
-              ),
-            )
-          else ...[
-            if (review.isSpoiler && !_spoilerRevealed)
-              InkWell(
-                onTap: () => setState(() => _spoilerRevealed = true),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.of(context).surfaceSubtle,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        PhosphorIconsRegular.eyeSlash,
-                        size: 14,
+                  const SizedBox(width: 8),
+                ],
+                if (widget.allowAccountActions)
+                  if (review.isMine)
+                    CommunityMoreButton(
+                      tooltip: '리뷰 메뉴',
+                      iconSize: 18,
+                      onTap: () => _openMenuSheet(context),
+                    )
+                  else
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                      icon: Icon(
+                        PhosphorIconsRegular.flag,
+                        size: 16,
                         color: AppColors.of(context).textMuted,
                       ),
-                      SizedBox(width: 6),
-                      Text(
-                        '스포일러가 포함되어 있어요. 눌러서 보기',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.of(context).textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
+                      onPressed: widget.onReport,
+                    ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (review.isSpoiler && !_spoilerRevealed)
+            InkWell(
+              onTap: () => setState(() => _spoilerRevealed = true),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
                 ),
-              )
-            else
-              Text(
-                review.content ?? '',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.of(context).textBody,
-                  height: 1.4,
+                decoration: BoxDecoration(
+                  color: AppColors.of(context).surfaceSubtle,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      PhosphorIconsRegular.eyeSlash,
+                      size: 14,
+                      color: AppColors.of(context).textMuted,
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      '스포일러가 포함되어 있어요. 눌러서 보기',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.of(context).textMuted,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: widget.allowAccountActions
-                  ? CommunityLikeInline(
-                      isLiked: review.isLiked,
-                      likeCount: review.likeCount,
-                      onTap: widget.onToggleLike,
-                    )
-                  : CommunityLikeCount(likeCount: review.likeCount),
+            )
+          else
+            Text(
+              review.content ?? '',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.of(context).textBody,
+                height: 1.4,
+              ),
             ),
-          ],
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: widget.allowAccountActions
+                ? CommunityLikeInline(
+                    isLiked: review.isLiked,
+                    likeCount: review.likeCount,
+                    onTap: widget.onToggleLike,
+                  )
+                : CommunityLikeCount(likeCount: review.likeCount),
+          ),
         ],
       ),
     );

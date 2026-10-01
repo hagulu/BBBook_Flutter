@@ -144,6 +144,7 @@ class PublicReflectionDetail {
     required this.updatedAt,
     this.likeCount = 0,
     this.likedByMe = false,
+    this.isMine = false,
   });
 
   final int id;
@@ -159,6 +160,10 @@ class PublicReflectionDetail {
   final DateTime updatedAt;
   final int likeCount;
   final bool likedByMe;
+
+  /// 현재 사용자의 작성 여부(비로그인은 false). 본인 글에는 신고 버튼을
+  /// 노출하지 않는다.
+  final bool isMine;
 
   bool get isPublished => status == 'PUBLISHED';
 
@@ -177,6 +182,7 @@ class PublicReflectionDetail {
       updatedAt: updatedAt,
       likeCount: likeCount ?? this.likeCount,
       likedByMe: likedByMe ?? this.likedByMe,
+      isMine: isMine,
     );
   }
 
@@ -199,6 +205,7 @@ class PublicReflectionDetail {
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       likeCount: json['likeCount'] as int? ?? 0,
       likedByMe: json['likedByMe'] as bool? ?? false,
+      isMine: json['isMine'] as bool? ?? false,
     );
   }
 }

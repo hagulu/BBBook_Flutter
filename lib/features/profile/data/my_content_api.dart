@@ -32,6 +32,7 @@ class MyContentApi {
       cursor: cursor,
       size: size,
       itemFromJson: MyReviewSummary.fromJson,
+      isHidden: (item) => item.isHidden,
     );
   }
 
@@ -45,6 +46,7 @@ class MyContentApi {
       cursor: cursor,
       size: size,
       itemFromJson: MyDiscussionSummary.fromJson,
+      isHidden: (item) => item.isHidden,
     );
   }
 
@@ -58,10 +60,47 @@ class MyContentApi {
       cursor: cursor,
       size: size,
       itemFromJson: MyDiscussionAnswerSummary.fromJson,
+      isHidden: (item) => item.isHidden,
     );
   }
 
+  /// 숨김 처리된 항목은 목록에서 제외한다. 걸러진 뒤 [size]보다 적게 남으면
+  /// 다음 페이지를 이어 조회해 채운다 — 스크롤 기반 추가 로딩이라 목록이
+  /// 짧게 끝나면 다음 페이지 요청이 일어나지 않기 때문이다.
   Future<MyContentPage<T>> _fetchPage<T>(
+    String path, {
+    int? cursor,
+    required int size,
+    required T Function(Map<String, dynamic> json) itemFromJson,
+    required bool Function(T item) isHidden,
+  }) async {
+    final items = <T>[];
+    var page = await _fetchRawPage(
+      path,
+      cursor: cursor,
+      size: size,
+      itemFromJson: itemFromJson,
+    );
+    items.addAll(page.items.where((item) => !isHidden(item)));
+    while (page.hasNext && items.length < size) {
+      final nextCursor = page.nextCursor;
+      if (nextCursor == null) break;
+      page = await _fetchRawPage(
+        path,
+        cursor: nextCursor,
+        size: size,
+        itemFromJson: itemFromJson,
+      );
+      items.addAll(page.items.where((item) => !isHidden(item)));
+    }
+    return MyContentPage<T>(
+      items: List.unmodifiable(items),
+      nextCursor: page.nextCursor,
+      hasNext: page.hasNext,
+    );
+  }
+
+  Future<MyContentPage<T>> _fetchRawPage<T>(
     String path, {
     int? cursor,
     required int size,

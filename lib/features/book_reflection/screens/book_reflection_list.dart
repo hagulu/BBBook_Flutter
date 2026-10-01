@@ -159,9 +159,7 @@ class _ReflectionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            reflection.isHidden
-                ? '숨김 처리된 독후감'
-                : (title == null || title.isEmpty ? '제목 없음' : title),
+            title == null || title.isEmpty ? '제목 없음' : title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -172,9 +170,7 @@ class _ReflectionCard extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
-          if (!reflection.isHidden &&
-              preview != null &&
-              preview.isNotEmpty) ...[
+          if (preview != null && preview.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
               preview,

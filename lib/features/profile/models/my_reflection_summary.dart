@@ -15,7 +15,6 @@ class MyReflectionSummary {
     required this.title,
     required this.previewText,
     required this.isPublic,
-    required this.isHidden,
     required this.createdAt,
   });
 
@@ -24,13 +23,9 @@ class MyReflectionSummary {
   final int userBookId;
   final MyContentBookRef? book;
 
-  /// isHidden이면 표시하지 않는다(관리자 숨김 처리).
   final String? title;
-
-  /// isHidden이면 표시하지 않는다.
   final String? previewText;
   final bool isPublic;
-  final bool isHidden;
   final DateTime createdAt;
 
   factory MyReflectionSummary.fromLocal({
@@ -47,12 +42,9 @@ class MyReflectionSummary {
               author: book.author,
               coverImageUrl: book.coverImageUrl,
             ),
-      title: reflection.isHidden ? null : reflection.title,
-      previewText: reflection.isHidden
-          ? null
-          : reflection.contentText?.trim(),
+      title: reflection.title,
+      previewText: reflection.contentText?.trim(),
       isPublic: reflection.isPublic,
-      isHidden: reflection.isHidden,
       createdAt: reflection.createdAt,
     );
   }

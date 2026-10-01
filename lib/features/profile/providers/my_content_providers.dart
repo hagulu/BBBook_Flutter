@@ -66,7 +66,8 @@ class MyReflectionListController
       ownerUserId: ownerUserId,
     );
     final items = <MyReflectionSummary>[];
-    for (final reflection in reflections) {
+    // 관리자 숨김 처리된 독후감은 목록에 노출하지 않는다.
+    for (final reflection in reflections.where((r) => !r.isHidden)) {
       final book = await bookshelfRepository.getById(reflection.userBookId);
       items.add(MyReflectionSummary.fromLocal(reflection: reflection, book: book));
     }

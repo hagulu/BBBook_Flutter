@@ -99,7 +99,7 @@ class _ReflectionList extends StatelessWidget {
         return MyReflectionCard(
           key: ValueKey(reflection.id),
           reflection: reflection,
-          onTap: reflection.isHidden ? null : () => onOpen(reflection),
+          onTap: () => onOpen(reflection),
         );
       },
     );

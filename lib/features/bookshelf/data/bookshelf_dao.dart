@@ -1,6 +1,8 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/storage/local_image_store.dart';
+
 import '../models/book_item.dart';
 import '../models/book_status.dart';
 import '../models/book_tag.dart';
@@ -91,6 +93,64 @@ class BookshelfDao {
       for (final row in rows)
         row['user_book_id'] as int: row['cover_image_url'] as String,
     };
+  }
+
+  /// 서버 표지 URL과 짝지은 로컬 사본 경로(`local_cover_path`). 표지가
+  /// 바뀌어 짝이 어긋난 사본은 빠진다.
+  Future<List<({int userBookId, String coverImageUrl, String? localCoverPath})>>
+  getRemoteCoversWithLocalCopy() async {
+    final db = await BookshelfDatabase.instance();
+    final rows = await db.query(
+      'user_book',
+      columns: [
+        'user_book_id',
+        'cover_image_url',
+        'local_cover_path',
+        'local_cover_url',
+      ],
+      where: 'cover_image_url IS NOT NULL AND pending_delete = 0',
+    );
+    return [
+      for (final row in rows)
+        if (LocalImageStore.isRemote(row['cover_image_url'] as String))
+          (
+            userBookId: row['user_book_id'] as int,
+            coverImageUrl: row['cover_image_url'] as String,
+            localCoverPath: row['local_cover_url'] == row['cover_image_url']
+                ? row['local_cover_path'] as String?
+                : null,
+          ),
+    ];
+  }
+
+  /// 내려받은 서버 표지 사본을 연결한다. 그 사이 표지가 바뀌었으면
+  /// 연결하지 않는다(서버 동기화 상태와 dirty 여부는 건드리지 않는다).
+  Future<void> setLocalCoverCopy({
+    required int userBookId,
+    required String coverImageUrl,
+    required String localCoverPath,
+  }) async {
+    final db = await BookshelfDatabase.instance();
+    await db.update(
+      'user_book',
+      {'local_cover_path': localCoverPath, 'local_cover_url': coverImageUrl},
+      where: 'user_book_id = ? AND cover_image_url = ?',
+      whereArgs: [userBookId, coverImageUrl],
+    );
+  }
+
+  /// 로컬 저장 모드 전환 직후, 서버 표지 대신 짝지어 둔 로컬 사본을 표지
+  /// 원본으로 삼는다. 로컬 모드에서 `cover_image_url`은 로컬 상대 경로가
+  /// 원칙이고, 그래야 서버 기록이 정리된 뒤에도 표지가 남고 서버 저장으로
+  /// 되돌릴 때 Import가 이 파일을 다시 올린다.
+  Future<void> promoteLocalCoverCopies() async {
+    final db = await BookshelfDatabase.instance();
+    await db.rawUpdate(
+      'UPDATE user_book SET cover_image_url = local_cover_path, '
+      'local_cover_path = NULL, local_cover_url = NULL '
+      'WHERE local_cover_path IS NOT NULL '
+      'AND local_cover_url = cover_image_url',
+    );
   }
 
   Future<List<BookItem>> searchFinished(FinishedFilter filter) async {

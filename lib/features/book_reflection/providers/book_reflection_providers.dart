@@ -95,9 +95,11 @@ final bookReflectionListProvider = FutureProvider.autoDispose
       final ownerUserId = ref.watch(recordOwnerIdProvider);
       if (ownerUserId == null) return const [];
       ref.watch(bookReflectionSyncVersionProvider);
-      return ref
+      final reflections = await ref
           .watch(bookReflectionRepositoryProvider)
           .findByUserBook(ownerUserId: ownerUserId, userBookId: userBookId);
+      // 관리자 숨김 처리된 독후감은 목록에 노출하지 않는다.
+      return reflections.where((reflection) => !reflection.isHidden).toList();
     });
 
 class BookReflectionDetailArgs {

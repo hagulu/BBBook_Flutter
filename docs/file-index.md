@@ -245,3 +245,4 @@
 ## docs
 
 - `docs/policies/offline-records.md` — 오프라인 진입·인증 복구·재전송·계정 변경 삭제 정책과 검증 항목
+- `docs/review/20261001-155439-current-changes-review.md` — 현재 변경분의 저장 방식 전환·토론 답변 표시 코드 리뷰 결과

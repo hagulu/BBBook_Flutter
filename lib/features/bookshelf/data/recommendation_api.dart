@@ -37,9 +37,11 @@ class RecommendationApi {
         queryParameters: {'size': size},
         options: ApiClient.recordDependentOptions(),
       );
-      return _unwrapList(
-        response,
-      ).map((e) => BookRecommendationGroup.fromJson(e as Map<String, dynamic>)).toList();
+      return _unwrapList(response)
+          .map(
+            (e) => BookRecommendationGroup.fromJson(e as Map<String, dynamic>),
+          )
+          .toList();
     } on DioException catch (e) {
       throw _mapError(e, overrides: const {400: '요청 값을 확인해주세요.'});
     } on ApiException {

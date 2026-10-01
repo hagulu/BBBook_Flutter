@@ -1,5 +1,6 @@
 import 'dart:developer' as developer;
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/storage/local_image_store.dart';
 
 /// 서버 → 로컬 저장 모드 이전의 단계별 실행기.
@@ -108,9 +109,12 @@ class LocalStorageMigrationState {
 /// 로컬 원본까지 지운다. 반대로 1 다음에 죽으면 "로컬 모드 + 서버에 남은
 /// 데이터"가 되는데, 이건 다시 실행해 지우면 되는 회복 가능한 상태다.
 ///
-/// 전환 시 서버 동기화나 이미지 다운로드를 하지 않는다. 현재 기기에 있는
-/// 기록만 원본으로 남기므로, 사용자는 전환 전에 다른 기기 변경사항이
-/// 동기화됐는지 확인해야 한다.
+/// 전환 전에 서버의 최신 기록을 한 번 받아 와(다른 기기 변경사항 반영)
+/// 이 기기를 최신으로 맞추고, 아직 기기에 없는 메모 사진·독후감 이미지를
+/// 모두 내려받는다(서버 정리 뒤에는 다시 받을 수 없다). 둘 중 하나라도
+/// 끝내지 못하면 [confirmProceed]로 그래도 전환할지 묻고, 거절하면 아무것도
+/// 바꾸지 않고 [LocalStorageMigrationStage.idle]로 돌아간다. 서버가 더 이상
+/// 주지 않는 이미지(404 등)는 재시도해도 같으므로 묻지 않는다.
 class LocalStorageMigrationService {
   LocalStorageMigrationService(this._steps);
 
@@ -118,16 +122,66 @@ class LocalStorageMigrationService {
 
   Future<LocalStorageMigrationState> run({
     void Function(LocalStorageMigrationState state)? onProgress,
+    Future<bool> Function(String message)? confirmProceed,
   }) async {
     var state = const LocalStorageMigrationState(
-      stage: LocalStorageMigrationStage.switchingMode,
+      stage: LocalStorageMigrationStage.syncingRecords,
     );
     void emit(LocalStorageMigrationState next) {
       state = next;
       onProgress?.call(next);
     }
 
+    Future<bool> askProceed(String message) async =>
+        await confirmProceed?.call(message) ?? false;
+
     emit(state);
+    try {
+      await _steps.syncAllRecords();
+    } catch (error) {
+      developer.log(
+        '[로컬 저장 이전] result=FAIL reason=sync (${error.runtimeType})',
+      );
+      final reason = error is ApiException
+          ? error.message
+          : '서버에서 최신 기록을 가져오지 못했습니다.';
+      if (!await askProceed('$reason\n\n최신 기록 없이 그래도 동기화를 끌까요?')) {
+        emit(const LocalStorageMigrationState());
+        return state;
+      }
+    }
+
+    var missingImages = 0;
+    try {
+      emit(state.copyWith(stage: LocalStorageMigrationStage.downloadingImages));
+      final report = await _steps.downloadAllImages((done, total) {
+        emit(state.copyWith(imagesDone: done, imagesTotal: total));
+      });
+      emit(state.copyWith(unavailableImages: report.unavailable));
+      emit(state.copyWith(stage: LocalStorageMigrationStage.verifying));
+      missingImages = await _steps.countMissingLocalImages();
+    } catch (error) {
+      developer.log(
+        '[로컬 저장 이전] result=FAIL reason=image_download '
+        '(${error.runtimeType})',
+      );
+      missingImages = -1;
+    }
+    if (missingImages != 0) {
+      developer.log(
+        '[로컬 저장 이전] result=FAIL reason=image_download_incomplete '
+        'missing=$missingImages',
+      );
+      final count = missingImages > 0 ? '$missingImages장' : '일부';
+      if (!await askProceed(
+        '이미지 $count을 내려받지 못했습니다.\n\n'
+        '지금 끄면 받지 못한 이미지는 다시 받을 수 없습니다. 그래도 동기화를 끌까요?',
+      )) {
+        emit(const LocalStorageMigrationState());
+        return state;
+      }
+    }
+
     try {
       // 여기서부터는 로컬이 원본이다. 서버 삭제보다 먼저 기록해 동기화를
       // 멈춰야, 삭제 직후 중단되더라도 로컬 데이터가 안전하다.

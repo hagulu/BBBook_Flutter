@@ -109,7 +109,7 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
               dateLabel: formatRelativeDiscussionDateTime(answer.createdAt),
               avatarRadius: 13,
               layout: CommunityAuthorLayout.stacked,
-              trailing: answer.isHidden ? null : _buildMenu(answer),
+              trailing: _buildMenu(answer),
               onTap: authorProfileSheetHandler(
                 context,
                 userId: answer.user.id,
@@ -117,54 +117,41 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
                 isFinishedBooksPublic: answer.user.isFinishedBooksPublic,
               ),
             ),
-          if (answer.isHidden)
-            Padding(
-              padding: EdgeInsets.only(top: 10),
-              child: Text(
-                '숨김 처리된 답변입니다.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.of(context).textMuted,
-                ),
-              ),
+          if (answer.hasVote) ...[
+            const SizedBox(height: 10),
+            DiscussionVoteBanner(
+              label: discussionOptionLabelOf(widget.options, answer.optionId),
+              color: discussionOptionColorOf(widget.options, answer.optionId),
+            ),
+          ],
+          const SizedBox(height: 16),
+          if (_isEditing)
+            _EditForm(
+              controller: _editController!,
+              isSaving: _isSaving,
+              onCancel: _cancelEdit,
+              onSubmit: _submitEdit,
             )
           else ...[
-            if (answer.hasVote) ...[
-              const SizedBox(height: 10),
-              DiscussionVoteBanner(
-                label: discussionOptionLabelOf(widget.options, answer.optionId),
-                color: discussionOptionColorOf(widget.options, answer.optionId),
+            Text(
+              answer.content ?? '',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.of(context).textBody,
+                height: 1.45,
               ),
-            ],
-            const SizedBox(height: 16),
-            if (_isEditing)
-              _EditForm(
-                controller: _editController!,
-                isSaving: _isSaving,
-                onCancel: _cancelEdit,
-                onSubmit: _submitEdit,
-              )
-            else ...[
-              Text(
-                answer.content ?? '',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: AppColors.of(context).textBody,
-                  height: 1.45,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: widget.allowAccountActions
-                    ? CommunityLikeInline(
-                        isLiked: answer.likedByMe,
-                        likeCount: answer.likeCount,
-                        onTap: widget.onToggleLike,
-                      )
-                    : CommunityLikeCount(likeCount: answer.likeCount),
-              ),
-            ],
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: widget.allowAccountActions
+                  ? CommunityLikeInline(
+                      isLiked: answer.likedByMe,
+                      likeCount: answer.likeCount,
+                      onTap: widget.onToggleLike,
+                    )
+                  : CommunityLikeCount(likeCount: answer.likeCount),
+            ),
           ],
         ],
       ),

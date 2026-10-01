@@ -10,15 +10,16 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 /// `maxNrOfCacheObjects`(200)를 넘기기 쉬우므로 별도 인스턴스로 여유를 둔다.
 class FinishedCoverCacheManager extends CacheManager {
   FinishedCoverCacheManager._()
-      : super(
-          Config(
-            key,
-            stalePeriod: const Duration(days: 30),
-            maxNrOfCacheObjects: 500,
-          ),
-        );
+    : super(
+        Config(
+          key,
+          stalePeriod: const Duration(days: 30),
+          maxNrOfCacheObjects: 500,
+        ),
+      );
 
   static const key = 'finishedCoverCache';
 
-  static final FinishedCoverCacheManager instance = FinishedCoverCacheManager._();
+  static final FinishedCoverCacheManager instance =
+      FinishedCoverCacheManager._();
 }

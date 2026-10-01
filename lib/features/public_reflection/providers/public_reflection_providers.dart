@@ -176,6 +176,14 @@ class PublicReflectionDetailController
       _isTogglingLike = false;
     }
   }
+
+  Future<void> report({required String reason, String? content}) {
+    return _source.postReport(
+      reflectionId: arg.reflectionId,
+      reason: reason,
+      content: content,
+    );
+  }
 }
 
 final publicReflectionDetailProvider = AsyncNotifierProvider.autoDispose

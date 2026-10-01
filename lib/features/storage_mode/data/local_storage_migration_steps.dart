@@ -54,13 +54,26 @@ class LocalStorageMigrationRepositorySteps
   Future<LocalImageSyncReport> downloadAllImages(
     void Function(int done, int total) onProgress,
   ) async {
-    // 메모 사진과 독후감 이미지의 진행률을 하나로 합쳐 보여준다.
+    // 다운로드 대상과 누락 수는 DB 연결 유무로 판정한다. 동기화가 기다리지
+    // 않고 넘긴 정리(파일이 사라진 연결 끊기)가 끝나기 전에 세면, 파일 없는
+    // 이미지를 이미 확보한 것으로 보고 서버 정리까지 진행할 수 있다.
+    await Future.wait([
+      noteRepository.sweepLocalImages(),
+      reflectionRepository.sweepLocalImages(),
+    ]);
+
+    // 메모 사진·독후감 이미지·직접 올린 책 표지의 진행률을 하나로 합쳐
+    // 보여준다.
     var memoDone = 0;
     var memoTotal = 0;
     var reflectionDone = 0;
     var reflectionTotal = 0;
-    void emit() =>
-        onProgress(memoDone + reflectionDone, memoTotal + reflectionTotal);
+    var coverDone = 0;
+    var coverTotal = 0;
+    void emit() => onProgress(
+      memoDone + reflectionDone + coverDone,
+      memoTotal + reflectionTotal + coverTotal,
+    );
 
     final memoReport = await noteRepository.downloadAllImages(
       onProgress: (done, total) {
@@ -76,13 +89,21 @@ class LocalStorageMigrationRepositorySteps
         emit();
       },
     );
-    return memoReport + reflectionReport;
+    final coverReport = await bookshelfRepository.downloadUploadedCovers(
+      onProgress: (done, total) {
+        coverDone = done;
+        coverTotal = total;
+        emit();
+      },
+    );
+    return memoReport + reflectionReport + coverReport;
   }
 
   @override
   Future<int> countMissingLocalImages() async {
     return await noteRepository.countImagesPendingDownload() +
-        await reflectionRepository.countImagesPendingDownload();
+        await reflectionRepository.countImagesPendingDownload() +
+        await bookshelfRepository.countUploadedCoversPendingDownload();
   }
 
   @override
@@ -96,6 +117,8 @@ class LocalStorageMigrationRepositorySteps
       reflectionRepository.waitForCurrentSync(),
       tagRepository.waitForCurrentSync(),
     ]);
+    // 동기화가 멈춘 뒤에 바꿔야 서버 응답이 표지를 서버 URL로 되돌리지 않는다.
+    await bookshelfRepository.promoteLocalCoverCopies();
   }
 
   @override

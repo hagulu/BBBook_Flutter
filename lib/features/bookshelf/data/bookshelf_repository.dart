@@ -62,6 +62,108 @@ class BookshelfRepository {
     if (pending != null) await pending;
   }
 
+  /// 서버에서 받을 수 없다고 확인된(404 등) 업로드 표지 URL. 재시도해도
+  /// 같으므로 누락 수에서 뺀다.
+  final Set<String> _unavailableCoverUrls = {};
+
+  /// 사용자가 직접 올린 표지인지. 업로드 표지는 서버 저장 경로
+  /// `{prefix}/user-books/{userBookId}/thumbnail/…`에 있다(attachments API
+  /// 문서) — 알라딘 등 공용 표지는 서버 기록 정리와 무관하므로 받지 않는다.
+  static bool _isUploadedCover(String url) {
+    final path = Uri.tryParse(url)?.path ?? '';
+    return path.contains('/user-books/') && path.contains('/thumbnail/');
+  }
+
+  /// 아직 이 기기에 사본이 없는 업로드 표지(파일이 사라진 사본 포함).
+  ///
+  /// [includeUnavailable]이 false면 이전 시도에서 서버가 주지 않는다고
+  /// 확인된 표지는 뺀다(다시 받아도 같으므로).
+  Future<List<({int userBookId, String coverImageUrl})>>
+  _uploadedCoversPendingDownload({bool includeUnavailable = false}) async {
+    final pending = <({int userBookId, String coverImageUrl})>[];
+    for (final cover in await _dao.getRemoteCoversWithLocalCopy()) {
+      if (!_isUploadedCover(cover.coverImageUrl)) continue;
+      if (!includeUnavailable &&
+          _unavailableCoverUrls.contains(cover.coverImageUrl)) {
+        continue;
+      }
+      // resolve()는 경로만 만든다 — 파일이 지워졌거나 비어 있으면 다시 받는다.
+      final copy = await bookCoverImageStore.resolve(cover.localCoverPath);
+      if (copy != null && await copy.exists() && await copy.length() > 0) {
+        continue;
+      }
+      pending.add((
+        userBookId: cover.userBookId,
+        coverImageUrl: cover.coverImageUrl,
+      ));
+    }
+    return pending;
+  }
+
+  /// 사용자가 올린 서버 표지 중 이 기기에 사본이 없는 것을 모두 내려받아
+  /// 연결한다. 로컬 저장 모드 전환([LocalStorageMigrationService]) 전용이다
+  /// — 서버 기록 정리 뒤에는 표지 파일도 서버에서 지워진다.
+  Future<LocalImageSyncReport> downloadUploadedCovers({
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final expectedGeneration = BookshelfDatabase.sessionGeneration;
+    final pending = await _uploadedCoversPendingDownload();
+    // 이전 시도에서 이미 받을 수 없다고 확인돼 이번에는 요청하지 않는 표지도
+    // 확보하지 못한 이미지이므로 결과 건수에 포함한다.
+    final previouslyUnavailable =
+        (await _uploadedCoversPendingDownload(
+          includeUnavailable: true,
+        )).length -
+        pending.length;
+    var stored = 0;
+    var unavailable = previouslyUnavailable;
+    var failed = 0;
+    var done = 0;
+    onProgress?.call(0, pending.length);
+    for (final cover in pending) {
+      if (BookshelfDatabase.sessionGeneration != expectedGeneration) break;
+      final result = await bookCoverImageStore.ensureDownloaded(
+        cover.coverImageUrl,
+      );
+      switch (result.status) {
+        case LocalImageDownloadStatus.failed:
+          failed++;
+        case LocalImageDownloadStatus.unavailable:
+          unavailable++;
+          _unavailableCoverUrls.add(cover.coverImageUrl);
+        case LocalImageDownloadStatus.stored:
+          if (BookshelfDatabase.sessionGeneration != expectedGeneration) break;
+          await _dao.setLocalCoverCopy(
+            userBookId: cover.userBookId,
+            coverImageUrl: cover.coverImageUrl,
+            localCoverPath: result.localImagePath!,
+          );
+          stored++;
+      }
+      onProgress?.call(++done, pending.length);
+    }
+    if (stored > 0 || failed > 0 || unavailable > 0) {
+      developer.log(
+        '[책 표지 로컬 저장] stored=$stored unavailable=$unavailable '
+        'failed=$failed',
+      );
+    }
+    return LocalImageSyncReport(
+      stored: stored,
+      unavailable: unavailable,
+      failed: failed,
+    );
+  }
+
+  /// 아직 사본을 확보하지 못한 업로드 표지 수(다시 시도하면 받을 수 있는
+  /// 것만).
+  Future<int> countUploadedCoversPendingDownload() async =>
+      (await _uploadedCoversPendingDownload()).length;
+
+  /// 로컬 저장 모드 전환 직후 짝지어 둔 표지 사본을 표지 원본으로 삼는다
+  /// ([BookshelfDao.promoteLocalCoverCopies]).
+  Future<void> promoteLocalCoverCopies() => _dao.promoteLocalCoverCopies();
+
   /// 서버 동기화. dirty 로컬 행(책 기록 화면에서 로컬 우선 반영한 뒤 아직
   /// 서버에 반영되지 못한 수정)이 있으면 먼저 일괄 push한 뒤, 로컬에 동기화
   /// 기준값(마지막 since)이 없으면(최초 로그인 또는 로그아웃 후 최초 구성)
