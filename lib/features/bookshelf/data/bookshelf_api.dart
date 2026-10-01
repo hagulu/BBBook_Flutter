@@ -132,6 +132,8 @@ class BookshelfApi {
   }
 
   ApiException _mapError(DioException e) {
+    final sanctioned = ApiException.sanctionedFromDio(e);
+    if (sanctioned != null) return sanctioned;
     final statusCode = e.response?.statusCode;
     final message = switch (statusCode) {
       401 => '인증에 실패했습니다.',

@@ -20,3 +20,9 @@ final recordOwnerIdProvider = Provider<int?>((ref) {
 final canUseAccountFeaturesProvider = Provider<bool>((ref) {
   return !ref.watch(authNotifierProvider.select((auth) => auth.isStandalone));
 });
+
+/// 서버에서 징계 중 제한하는 공개 글 작성·수정 및 공개 전환 진입점.
+final canPublishCommunityContentProvider = Provider<bool>((ref) {
+  final auth = ref.watch(authNotifierProvider);
+  return !auth.isStandalone && auth.user?.isSanctioned != true;
+});

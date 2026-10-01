@@ -247,10 +247,7 @@ class DiscussionApi {
         '/api/discussions/$topicId',
       );
     } on DioException catch (e) {
-      throw _mapError(
-        e,
-        overrides: const {404: '토론이 존재하지 않거나 본인 작성이 아닙니다.'},
-      );
+      throw _mapError(e, overrides: const {404: '토론이 존재하지 않거나 본인 작성이 아닙니다.'});
     } on ApiException {
       rethrow;
     } catch (e) {
@@ -292,10 +289,7 @@ class DiscussionApi {
     try {
       await _apiClient.dio.post<Map<String, dynamic>>(
         '/api/discussions/$topicId/answers',
-        data: {
-          'content': content,
-          if (withOption) 'optionId': optionId,
-        },
+        data: {'content': content, if (withOption) 'optionId': optionId},
       );
     } on DioException catch (e) {
       throw _mapError(
@@ -351,10 +345,7 @@ class DiscussionApi {
         '/api/discussions/$topicId/answers/$answerId',
       );
     } on DioException catch (e) {
-      throw _mapError(
-        e,
-        overrides: const {404: '답변이 존재하지 않거나 본인 작성이 아닙니다.'},
-      );
+      throw _mapError(e, overrides: const {404: '답변이 존재하지 않거나 본인 작성이 아닙니다.'});
     } on ApiException {
       rethrow;
     } catch (e) {
@@ -438,6 +429,8 @@ class DiscussionApi {
   }
 
   ApiException _mapError(DioException e, {Map<int, String>? overrides}) {
+    final sanctioned = ApiException.sanctionedFromDio(e);
+    if (sanctioned != null) return sanctioned;
     final statusCode = e.response?.statusCode;
     final message =
         overrides?[statusCode] ??

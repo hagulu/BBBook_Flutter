@@ -9,6 +9,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../core/theme/app_theme.dart';
+import '../features/auth/providers/auth_notifier.dart';
 import '../features/book_search/screens/book_search_screen.dart';
 import '../features/bookshelf/providers/bookshelf_providers.dart';
 import '../features/bookshelf/screens/bookshelf_screen.dart';
@@ -113,6 +114,10 @@ class _MainShellState extends ConsumerState<MainShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshCategoriesIfStale());
+      // 징계 해제는 서버 상태를 다시 읽어야 반영된다. 앱 복귀 때만 확인한다.
+      if (ref.read(authNotifierProvider).user?.isSanctioned == true) {
+        unawaited(ref.read(authNotifierProvider.notifier).refreshCurrentUser());
+      }
     }
   }
 

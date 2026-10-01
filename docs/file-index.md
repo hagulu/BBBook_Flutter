@@ -39,7 +39,7 @@
 
 ## features/profile
 
-- `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드/독서 리포트 카드/내 글 모아보기 2×2 바로가기/로그아웃(서버 동기화 모드는 최종 동기화 후 미동기화 기록이 남으면 다시 시도·로그아웃 선택), 계정이 없으면 상단을 로그인 유도 카드로 대체하고 계정 전용 메뉴는 숨김), `docs/porting-reference/profile-main-screen.md` 대응
+- `lib/features/profile/screens/profile_screen.dart` — 프로필(개인 페이지) 메인 화면(프로필 카드와 징계 안내 팝업/독서 리포트 카드/내 글 모아보기 2×2 바로가기/로그아웃(서버 동기화 모드는 최종 동기화 후 미동기화 기록이 남으면 다시 시도·로그아웃 선택), 계정이 없으면 상단을 로그인 유도 카드로 대체하고 계정 전용 메뉴는 숨김), `docs/porting-reference/profile-main-screen.md` 대응
 - `lib/features/profile/screens/profile_edit_screen.dart` — 프로필 수정 화면(닉네임·프로필 이미지 변경/삭제, 저장, 회원 탈퇴), `docs/porting-reference/profile-edit-screen.md` 대응
 - `lib/features/profile/screens/profile_settings_screen.dart` — 설정 화면(제목 없는 3개 그룹: 공지사항·화면 테마·기록 동기화(서버/로컬 전환) / 내 기록 ZIP 내보내기·가져오기 / 오픈소스 라이선스·이용약관·개인정보 처리방침, 하단 앱 버전), 프로필 탭 AppBar 설정 아이콘으로 진입
 - `lib/features/profile/screens/my_reflections_screen.dart` — 내가 작성한 독후감 목록(커서 무한 스크롤), 정상 항목은 서버 reflectionId로 로컬 행을 찾아 기존 `BookReflectionDetailScreen`(수정·삭제 포함)으로 이동
@@ -249,3 +249,5 @@
 - `docs/policies/offline-records.md` — 오프라인 진입·인증 복구·재전송·계정 변경 삭제 정책과 검증 항목
 - `docs/review/20261001-155439-current-changes-review.md` — 현재 변경분의 저장 방식 전환·토론 답변 표시 코드 리뷰 결과
 - `docs/review/20261001-165029-current-user-report-review.md` — 현재 변경분의 사용자 신고 진입 경로 코드 리뷰 결과
+- `docs/review/20261001-182423-current-sanction-review.md` — 현재 변경분의 징계 상태 갱신·공개 기능 제한·징계 상세 화면 코드 리뷰 결과
+- `docs/review/20261001-183002-sanction-followup-review.md` — 징계 상태 갱신·마감일 제한·마이 팝업 후속 코드 리뷰 결과

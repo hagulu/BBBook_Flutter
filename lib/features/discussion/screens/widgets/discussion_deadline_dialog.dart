@@ -10,11 +10,12 @@ import '../../utils/discussion_date.dart';
 /// 날짜만 고르고 시각은 그날 `23:59:59`로 고정한다(웹과 동일). 저장에
 /// 실패하면 팝업을 닫지 않고 내부에 인라인 에러를 표시한다.
 ///
-/// [onSave]는 저장 성공 시 true를 반환해야 하며, null 인자는 "마감일 제거"다.
+/// [onSave]는 저장 성공 시 null, 실패 시 안내 문구를 반환한다.
+/// null 인자는 "마감일 제거"다.
 Future<void> showDiscussionDeadlineDialog(
   BuildContext context, {
   required DateTime? initialClosesAt,
-  required Future<bool> Function(DateTime? closesAt) onSave,
+  required Future<String?> Function(DateTime? closesAt) onSave,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -29,7 +30,7 @@ class _DeadlineDialog extends StatefulWidget {
   const _DeadlineDialog({required this.initialClosesAt, required this.onSave});
 
   final DateTime? initialClosesAt;
-  final Future<bool> Function(DateTime? closesAt) onSave;
+  final Future<String?> Function(DateTime? closesAt) onSave;
 
   @override
   State<_DeadlineDialog> createState() => _DeadlineDialogState();
@@ -66,15 +67,15 @@ class _DeadlineDialogState extends State<_DeadlineDialog> {
         ? null
         : DateTime(picked.year, picked.month, picked.day, 23, 59, 59);
 
-    final succeeded = await widget.onSave(closesAt);
+    final errorMessage = await widget.onSave(closesAt);
     if (!mounted) return;
-    if (succeeded) {
+    if (errorMessage == null) {
       Navigator.of(context).pop();
       return;
     }
     setState(() {
       _isSaving = false;
-      _errorMessage = '저장에 실패했습니다';
+      _errorMessage = errorMessage;
     });
   }
 

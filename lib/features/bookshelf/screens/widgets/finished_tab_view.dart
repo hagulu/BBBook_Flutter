@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/providers/auth_access_providers.dart';
 import '../../../../core/utils/author_display.dart';
@@ -944,6 +945,7 @@ class _FinishedIconBar extends ConsumerWidget {
     // 완독 책장 공개는 서버 계정 설정(`/api/me/privacy-setting`)이다 —
     // 계정이 없으면 공개할 책장 자체가 없어 토글과 안내를 함께 숨긴다.
     final canPublishShelf = ref.watch(canUseAccountFeaturesProvider);
+    final canPublish = ref.watch(canPublishCommunityContentProvider);
     final privacyState = canPublishShelf
         ? ref.watch(privacySettingControllerProvider)
         : const AsyncValue<bool>.data(false);
@@ -997,7 +999,9 @@ class _FinishedIconBar extends ConsumerWidget {
                     padding: EdgeInsets.zero,
                     tooltip: isPublic
                         ? '완독 책장 공개 중 (탭하면 비공개로 전환)'
-                        : '완독 책장 비공개 중 (탭하면 공개로 전환)',
+                        : canPublish
+                        ? '완독 책장 비공개 중 (탭하면 공개로 전환)'
+                        : '징계 기간에는 완독 책장을 공개할 수 없습니다',
                     icon: Icon(
                       isPublic
                           ? PhosphorIconsRegular.globe
@@ -1005,7 +1009,8 @@ class _FinishedIconBar extends ConsumerWidget {
                       color: AppColors.of(context).accentForeground,
                       size: 20,
                     ),
-                    onPressed: privacyState.isLoading
+                    onPressed:
+                        privacyState.isLoading || (!isPublic && !canPublish)
                         ? null
                         : () async {
                             try {
@@ -1014,9 +1019,14 @@ class _FinishedIconBar extends ConsumerWidget {
                                     privacySettingControllerProvider.notifier,
                                   )
                                   .toggle(!isPublic);
-                            } catch (_) {
+                            } catch (error) {
                               if (context.mounted) {
-                                AppSnackBar.error(context, '공개 설정 변경에 실패했습니다.');
+                                AppSnackBar.error(
+                                  context,
+                                  error is ApiException
+                                      ? error.message
+                                      : '공개 설정 변경에 실패했습니다.',
+                                );
                               }
                             }
                           },

@@ -80,6 +80,15 @@ class LocalAuthStore {
         'nickname': user.nickname,
         'profileImageUrl': user.profileImageUrl,
         'isFinishedBooksPublic': user.isFinishedBooksPublic,
+        'isSanctioned': user.isSanctioned,
+        'sanction': user.sanction == null
+            ? null
+            : {
+                'reason': user.sanction!.reason,
+                'reasonLabel': user.sanction!.reasonLabel,
+                'isPermanent': user.sanction!.isPermanent,
+                'endsAt': user.sanction!.endsAt?.toIso8601String(),
+              },
       }),
     }, conflictAlgorithm: ConflictAlgorithm.replace);
   }

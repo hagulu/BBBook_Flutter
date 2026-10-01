@@ -22,6 +22,7 @@ class ReviewItem extends StatefulWidget {
     required this.onDelete,
     required this.onReport,
     this.allowAccountActions = true,
+    this.canEdit = true,
   });
 
   final BookReview review;
@@ -29,6 +30,7 @@ class ReviewItem extends StatefulWidget {
   /// 서버 계정이 필요한 액션(공감·신고·본인 글 관리)을 노출할지. 계정 없이
   /// 쓰는 사용자에게는 버튼 자체를 만들지 않는다.
   final bool allowAccountActions;
+  final bool canEdit;
 
   /// 공감 요청이 진행 중이면 null을 넘겨 중복 탭(POST/DELETE 경합)을 막는다.
   final VoidCallback? onToggleLike;
@@ -53,11 +55,13 @@ class _ReviewItemState extends State<ReviewItem> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CommunityMenuTile(
-              icon: PhosphorIconsRegular.pencilSimple,
-              label: '수정',
-              onTap: () => Navigator.pop(sheetContext, _ReviewMenuAction.edit),
-            ),
+            if (widget.canEdit)
+              CommunityMenuTile(
+                icon: PhosphorIconsRegular.pencilSimple,
+                label: '수정',
+                onTap: () =>
+                    Navigator.pop(sheetContext, _ReviewMenuAction.edit),
+              ),
             CommunityMenuTile(
               icon: PhosphorIconsRegular.trash,
               label: '삭제',

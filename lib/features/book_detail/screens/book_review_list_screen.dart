@@ -160,6 +160,7 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
     // 독자평 조회는 인증이 필요 없지만 작성·공감·신고는 계정이 있어야 한다.
     // 계정이 없으면 비활성화가 아니라 버튼 자체를 만들지 않는다.
     final allowAccountActions = ref.watch(canUseAccountFeaturesProvider);
+    final canPublish = ref.watch(canPublishCommunityContentProvider);
     final adsEnabled = ref.watch(adsEnabledProvider);
 
     return Scaffold(
@@ -184,6 +185,7 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
             onDelete: _handleDelete,
             onReport: _handleReport,
             allowAccountActions: allowAccountActions,
+            canEdit: canPublish,
             adsEnabled: adsEnabled,
           ),
           AsyncError() => CommunityContentErrorState(
@@ -194,7 +196,7 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
           _ => const CommunityContentLoadingState(),
         },
       ),
-      floatingActionButton: allowAccountActions
+      floatingActionButton: canPublish
           ? FloatingActionButton(
               onPressed: _handleCreate,
               tooltip: '독자평 쓰기',
@@ -219,6 +221,7 @@ class _ReviewList extends StatelessWidget {
     required this.onDelete,
     required this.onReport,
     required this.allowAccountActions,
+    required this.canEdit,
     required this.adsEnabled,
   });
 
@@ -231,6 +234,7 @@ class _ReviewList extends StatelessWidget {
   final void Function(BookReview review) onDelete;
   final void Function(BookReview review) onReport;
   final bool allowAccountActions;
+  final bool canEdit;
   final bool adsEnabled;
 
   @override
@@ -274,6 +278,7 @@ class _ReviewList extends StatelessWidget {
               onDelete: () => onDelete(item),
               onReport: () => onReport(item),
               allowAccountActions: allowAccountActions,
+              canEdit: canEdit,
             ),
             AdAdSlotEntry(:final afterCount) => AppInlineBannerAd(
               key: ValueKey('review-ad-$afterCount'),

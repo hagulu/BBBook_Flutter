@@ -222,6 +222,8 @@ class BookReflectionApi {
   }
 
   ApiException _mapError(DioException e) {
+    final sanctioned = ApiException.sanctionedFromDio(e);
+    if (sanctioned != null) return sanctioned;
     final statusCode = e.response?.statusCode;
     final errorCode = _responseErrorCode(e);
     if (errorCode == AttachmentLimitErrorCodes.reflectionImageNotAllowed) {

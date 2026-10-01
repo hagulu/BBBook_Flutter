@@ -9,6 +9,7 @@ import 'api_exception.dart';
 typedef AccessTokenReader = String? Function();
 typedef AccessTokenRefresher = Future<String?> Function();
 typedef UnauthorizedHandler = Future<void> Function();
+typedef SanctionedHandler = Future<void> Function();
 
 /// 인증이 필요한 API 요청 전용 공통 클라이언트.
 ///
@@ -39,6 +40,7 @@ class ApiClient {
   AccessTokenReader? _readAccessToken;
   AccessTokenRefresher? _refreshAccessToken;
   UnauthorizedHandler? _onUnauthorized;
+  SanctionedHandler? _onSanctioned;
   Future<void> Function()? _prepareSession;
   void Function()? _onUserRetry;
   void Function()? onNetworkAvailable;
@@ -54,12 +56,14 @@ class ApiClient {
     required AccessTokenReader readAccessToken,
     required AccessTokenRefresher refreshAccessToken,
     required UnauthorizedHandler onUnauthorized,
+    SanctionedHandler? onSanctioned,
     Future<void> Function()? prepareSession,
     void Function()? onUserRetry,
   }) {
     _readAccessToken = readAccessToken;
     _refreshAccessToken = refreshAccessToken;
     _onUnauthorized = onUnauthorized;
+    _onSanctioned = onSanctioned;
     _prepareSession = prepareSession;
     _onUserRetry = onUserRetry;
   }
@@ -212,6 +216,14 @@ class ApiClient {
     if (error.requestOptions.extra['authGeneration'] != _sessionGeneration) {
       handler.next(_sessionChanged(error.requestOptions));
       return;
+    }
+    final body = error.response?.data;
+    if (error.response?.statusCode == 403 &&
+        body is Map &&
+        body['errorCode'] == 'USER_SANCTIONED' &&
+        error.requestOptions.path != '/api/users/me') {
+      final refresh = _onSanctioned;
+      if (refresh != null) unawaited(refresh());
     }
     if (error.type == DioExceptionType.connectionError ||
         error.type == DioExceptionType.connectionTimeout ||

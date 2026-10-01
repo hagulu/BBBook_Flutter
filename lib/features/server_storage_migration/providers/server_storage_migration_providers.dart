@@ -72,6 +72,11 @@ class ServerStorageMigrationController
       ref.read(bookshelfSyncVersionProvider.notifier).state++;
       ref.read(bookNoteSyncVersionProvider.notifier).state++;
       ref.read(bookReflectionSyncVersionProvider.notifier).state++;
+      // /items는 징계 중 가져온 공개 독후감을 서버에서 비공개로 저장한다.
+      // 확정 후 서버 값을 다시 읽어 로컬 공개 표시도 같은 상태로 맞춘다.
+      if (ref.read(authNotifierProvider).user?.isSanctioned == true) {
+        await ref.read(bookReflectionSyncControllerProvider.notifier).syncNow();
+      }
       // Import API는 태그(tags/tagMaps)를 새로 만들거나 재사용할 뿐 삭제를
       // 표현하지 못한다 — 로컬 저장 모드 동안 사용자가 지운 태그 매핑은
       // Import에 실려 가지 않고 로컬에 `is_dirty=1`로만 남는다. 평소

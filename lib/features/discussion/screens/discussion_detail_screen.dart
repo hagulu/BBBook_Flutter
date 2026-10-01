@@ -299,15 +299,22 @@ class _DiscussionDetailScreenState
   }
 
   Future<void> _editDeadline(DiscussionTopicDetail topic) {
+    if (!ref.read(canPublishCommunityContentProvider)) {
+      AppSnackBar.error(context, '징계 기간에는 마감일을 수정할 수 없습니다.');
+      return Future<void>.value();
+    }
     return showDiscussionDeadlineDialog(
       context,
       initialClosesAt: topic.closesAt,
       onSave: (closesAt) async {
+        if (!ref.read(canPublishCommunityContentProvider)) {
+          return '징계 기간에는 마감일을 수정할 수 없습니다.';
+        }
         try {
           await _detailController.updateClosesAt(closesAt);
-          return true;
-        } on ApiException {
-          return false;
+          return null;
+        } on ApiException catch (error) {
+          return error.message;
         }
       },
     );
@@ -416,6 +423,7 @@ class _DiscussionDetailScreenState
     // 토론 조회는 인증이 필요 없지만 답변 작성·공감·신고·선택지 투표는
     // 계정이 있어야 한다. 계정이 없으면 그 진입점을 아예 만들지 않는다.
     final allowAccountActions = ref.watch(canUseAccountFeaturesProvider);
+    final canPublish = ref.watch(canPublishCommunityContentProvider);
 
     if (widget.highlightAnswerId != null && answersState.valueOrNull != null) {
       // build 도중 바로 실행하면 `_ensureHighlightVisible`이 첫 await 전에
@@ -454,6 +462,7 @@ class _DiscussionDetailScreenState
                 children: [
                   _TopicCard(
                     topic: topic,
+                    canEdit: canPublish,
                     onEdit: () => _editTopic(topic),
                     onEditDeadline: () => _editDeadline(topic),
                     onClose: _closeTopic,
@@ -466,13 +475,13 @@ class _DiscussionDetailScreenState
                     pollSection: topic.hasOptions
                         ? _buildPollSection(
                             topic,
-                            allowAccountActions: allowAccountActions,
+                            allowAccountActions: canPublish,
                           )
                         : null,
                     allowAccountActions: allowAccountActions,
                   ),
                   const AppBannerAd(topSpacing: 20),
-                  if (!topic.hasOptions && allowAccountActions) ...[
+                  if (!topic.hasOptions && canPublish) ...[
                     const SizedBox(height: 32),
                     _FreeAnswerCard(
                       isClosed: topic.isClosed,
@@ -484,7 +493,7 @@ class _DiscussionDetailScreenState
                     AsyncData(:final value) => _AnswerList(
                       state: value,
                       options: topic.options,
-                      canEditAnswers: !topic.isClosed,
+                      canEditAnswers: !topic.isClosed && canPublish,
                       pendingLikeIds: _pendingAnswerLikeIds,
                       onSubmitEdit: _updateAnswer,
                       onDelete: _deleteAnswer,
@@ -531,6 +540,7 @@ class _DiscussionDetailScreenState
 class _TopicCard extends StatelessWidget {
   const _TopicCard({
     required this.topic,
+    required this.canEdit,
     required this.onEdit,
     required this.onEditDeadline,
     required this.onClose,
@@ -543,6 +553,7 @@ class _TopicCard extends StatelessWidget {
   });
 
   final DiscussionTopicDetail topic;
+  final bool canEdit;
   final VoidCallback onEdit;
   final VoidCallback onEditDeadline;
   final VoidCallback onClose;
@@ -592,6 +603,7 @@ class _TopicCard extends StatelessWidget {
               : topic.isMine
               ? _TopicMenu(
                   topic: topic,
+                  canEdit: canEdit,
                   onEdit: onEdit,
                   onEditDeadline: onEditDeadline,
                   onClose: onClose,
@@ -668,6 +680,7 @@ class _TopicCard extends StatelessWidget {
 class _TopicMenu extends StatelessWidget {
   const _TopicMenu({
     required this.topic,
+    required this.canEdit,
     required this.onEdit,
     required this.onEditDeadline,
     required this.onClose,
@@ -676,6 +689,7 @@ class _TopicMenu extends StatelessWidget {
   });
 
   final DiscussionTopicDetail topic;
+  final bool canEdit;
   final VoidCallback onEdit;
   final VoidCallback onEditDeadline;
   final VoidCallback onClose;
@@ -692,18 +706,19 @@ class _TopicMenu extends StatelessWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (!topic.isClosed)
+            if (!topic.isClosed && canEdit)
               CommunityMenuTile(
                 icon: PhosphorIconsRegular.pencilSimple,
                 label: '수정',
                 onTap: () => Navigator.pop(sheetContext, _TopicMenuAction.edit),
               ),
-            CommunityMenuTile(
-              icon: PhosphorIconsRegular.calendarBlank,
-              label: '마감일 설정/수정',
-              onTap: () =>
-                  Navigator.pop(sheetContext, _TopicMenuAction.deadline),
-            ),
+            if (canEdit)
+              CommunityMenuTile(
+                icon: PhosphorIconsRegular.calendarBlank,
+                label: '마감일 설정/수정',
+                onTap: () =>
+                    Navigator.pop(sheetContext, _TopicMenuAction.deadline),
+              ),
             if (!topic.isClosed)
               CommunityMenuTile(
                 icon: PhosphorIconsRegular.lock,

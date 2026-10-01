@@ -33,6 +33,7 @@ class AuthNotifier extends Notifier<AuthState> {
   Future<void>? _restoring;
   Future<String?>? _refreshing;
   Future<void>? _unauthorizing;
+  Future<void>? _refreshingSanction;
   DateTime? _retryAfter;
   bool _changingSession = false;
   int _generation = 0;
@@ -46,6 +47,7 @@ class AuthNotifier extends Notifier<AuthState> {
       readAccessToken: () => state.accessToken,
       refreshAccessToken: _refreshAccessToken,
       onUnauthorized: _handleUnauthorized,
+      onSanctioned: refreshCurrentUser,
       prepareSession: ensureSession,
       onUserRetry: () => _retryAfter = null,
     );
@@ -256,7 +258,16 @@ class AuthNotifier extends Notifier<AuthState> {
         await _refreshing;
       } catch (_) {}
       await _unauthorizing;
-      final session = await _repository.loginWithProvider(provider);
+      final loginSession = await _repository.loginWithProvider(provider);
+      final currentUser = await _repository.fetchCurrentUser(
+        accessToken: loginSession.accessToken,
+      );
+      final session = AuthSession(
+        user: currentUser,
+        accessToken: loginSession.accessToken,
+        refreshToken: loginSession.refreshToken,
+        expiresIn: loginSession.expiresIn,
+      );
       final continued = await _adoptLocalRecordsForLogin(
         session.user,
         confirmAccountChange: confirmAccountChange,
@@ -531,6 +542,40 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> _handleUnauthorized() => _unauthorizing ??= _revokeSession()
       .whenComplete(() => _unauthorizing = null);
+
+  /// 서버 정책 변경을 알리는 USER_SANCTIONED 응답을 받으면 한 번만 재조회한다.
+  Future<void> refreshCurrentUser() => _refreshingSanction ??=
+      _fetchCurrentUser().whenComplete(() => _refreshingSanction = null);
+
+  Future<void> _fetchCurrentUser() async {
+    final generation = _generation;
+    try {
+      if (!state.isLoggedIn && state.user != null && !state.requiresLogin) {
+        // 오프라인 로컬 상태에서 앱으로 돌아온 경우 세션 복원이 이미
+        // /api/users/me를 조회하므로 그 결과를 그대로 사용한다.
+        await ensureSession();
+        return;
+      }
+      if (!state.isLoggedIn || state.accessToken == null) return;
+      final user = await _repository.fetchCurrentUser();
+      if (generation != _generation || !state.isLoggedIn) return;
+      state = AuthState(
+        status: state.status,
+        user: user,
+        accessToken: state.accessToken,
+      );
+      await ref.read(localAuthStoreProvider).saveUser(user);
+      ref.invalidate(privacySettingControllerProvider);
+      developer.log(
+        '[징계 상태 조회] api=/api/users/me userId=${user.id} result=SUCCESS',
+      );
+    } catch (e) {
+      developer.log(
+        '[징계 상태 조회] api=/api/users/me userId=${state.user?.id} '
+        'result=FAIL reason=${e.runtimeType}',
+      );
+    }
+  }
 
   Future<void> _revokeSession() async {
     // 계정이 없는 사용자에게는 해제할 세션이 없다. 공개 조회 요청이 어쩌다

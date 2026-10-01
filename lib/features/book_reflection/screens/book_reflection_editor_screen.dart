@@ -18,7 +18,9 @@ import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
+import '../../auth/providers/auth_access_providers.dart';
 import '../../book_note/models/book_note.dart';
+import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../models/book_reflection.dart';
 import '../providers/book_reflection_providers.dart';
 import '../services/book_reflection_content_adapter.dart';
@@ -451,6 +453,17 @@ class _BookReflectionEditorScreenState
 
   Future<void> _save() async {
     if (_isSaving) return;
+    if (!ref.read(canPublishCommunityContentProvider) &&
+        (widget.visibilityOverride ?? widget.reflection?.isPublic ?? false) &&
+        !await ref.read(storageModeStoreProvider).isLocal()) {
+      if (!mounted) return;
+      AppSnackBar.error(
+        context,
+        '징계 기간에는 공개 독후감을 수정할 수 없습니다. 먼저 비공개로 변경해 주세요.',
+      );
+      return;
+    }
+    if (!mounted) return;
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       AppSnackBar.error(context, '제목을 입력해 주세요.');

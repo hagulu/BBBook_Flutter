@@ -5,6 +5,7 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 import '../../../app/main_shell_layout.dart';
 import '../../auth/providers/auth_providers.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/app_alert.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../auth/providers/auth_access_providers.dart';
@@ -216,18 +217,54 @@ class _ProfileContent extends ConsumerWidget {
   }
 }
 
-class _ProfileCard extends StatelessWidget {
+class _ProfileCard extends ConsumerWidget {
   const _ProfileCard({required this.profile});
 
   final ProfileMe profile;
 
+  Future<void> _showSanction(BuildContext context, WidgetRef ref) async {
+    AppLoading.show(context);
+    try {
+      await ref.read(authNotifierProvider.notifier).refreshCurrentUser();
+    } finally {
+      AppLoading.hide();
+    }
+    if (!context.mounted) return;
+    final user = ref.read(authNotifierProvider).user;
+    final sanction = user?.sanction;
+    if (user?.isSanctioned != true) {
+      await AppAlert.show(context, title: '징계 안내', message: '현재 징계 중이 아닙니다.');
+      return;
+    }
+
+    final endsAt = sanction?.endsAt?.toLocal();
+    final period = sanction?.isPermanent == true
+        ? '영구 징계'
+        : endsAt == null
+        ? '해제 예정 정보 없음'
+        : '${MaterialLocalizations.of(context).formatMediumDate(endsAt)} '
+              '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(endsAt))}까지';
+    await AppAlert.show(
+      context,
+      title: '징계 안내',
+      message:
+          '사유: ${sanction?.reasonLabel?.isNotEmpty == true ? sanction!.reasonLabel! : '사유 정보 없음'}\n'
+          '기간: $period\n\n'
+          '공개 독후감·독자평·토론·답변 작성과 수정, 완독 책장 공개가 제한됩니다.',
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final nickname = profile.nickname ?? '사용자';
+    final sanctionColor = AppColors.of(context).error;
+    final isSanctioned = ref.watch(
+      authNotifierProvider.select((auth) => auth.user?.isSanctioned == true),
+    );
     return Semantics(
       button: true,
       label: '프로필 수정',
-      excludeSemantics: true,
+      explicitChildNodes: true,
       child: Material(
         color: AppColors.of(context).pageBackground,
         child: InkWell(
@@ -239,10 +276,34 @@ class _ProfileCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(vertical: 12),
             child: Column(
               children: [
-                _Avatar(
-                  imageUrl: profile.profileImageUrl,
-                  nickname: nickname,
-                  size: 76,
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    _Avatar(
+                      imageUrl: profile.profileImageUrl,
+                      nickname: nickname,
+                      size: 76,
+                    ),
+                    if (isSanctioned)
+                      Positioned(
+                        right: -10,
+                        bottom: -8,
+                        child: IconButton.filledTonal(
+                          tooltip: '징계 상세 보기',
+                          iconSize: 22,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 36,
+                          ),
+                          style: IconButton.styleFrom(
+                            foregroundColor: sanctionColor,
+                            backgroundColor: Colors.white,
+                          ),
+                          icon: const Icon(PhosphorIconsFill.warningCircle),
+                          onPressed: () => _showSanction(context, ref),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 10),
                 Text(

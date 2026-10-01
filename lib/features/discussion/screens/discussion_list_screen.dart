@@ -123,7 +123,7 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
         },
       ),
       // 토론 목록 조회는 인증이 필요 없지만 작성은 계정이 있어야 한다.
-      floatingActionButton: ref.watch(canUseAccountFeaturesProvider)
+      floatingActionButton: ref.watch(canPublishCommunityContentProvider)
           ? FloatingActionButton(
               onPressed: _openForm,
               tooltip: '토론 작성',

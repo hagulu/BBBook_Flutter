@@ -310,6 +310,8 @@ class BookDetailApi {
   }
 
   ApiException _mapError(DioException e, {Map<int, String>? overrides}) {
+    final sanctioned = ApiException.sanctionedFromDio(e);
+    if (sanctioned != null) return sanctioned;
     final statusCode = e.response?.statusCode;
     final message =
         overrides?[statusCode] ??
