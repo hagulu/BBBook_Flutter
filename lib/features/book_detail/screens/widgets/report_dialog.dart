@@ -3,23 +3,29 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
 
-/// 신고 사유 4종(common-interactions.md `ReportModal` 대응).
+/// 신고 사유 6종(`api-reports-post.md`). 사용자 신고(USER)는 [spoiler]를 쓸 수 없다.
 enum ReportReason {
   spam,
   offensive,
+  advertisement,
+  sexual,
   spoiler,
   etc;
 
   String get apiValue => switch (this) {
     ReportReason.spam => 'SPAM',
     ReportReason.offensive => 'OFFENSIVE',
+    ReportReason.advertisement => 'ADVERTISEMENT',
+    ReportReason.sexual => 'SEXUAL',
     ReportReason.spoiler => 'SPOILER',
     ReportReason.etc => 'ETC',
   };
 
   String get label => switch (this) {
-    ReportReason.spam => '스팸/광고',
-    ReportReason.offensive => '욕설/혐오',
+    ReportReason.spam => '스팸/도배',
+    ReportReason.offensive => '욕설/비방',
+    ReportReason.advertisement => '홍보/광고',
+    ReportReason.sexual => '선정성',
     ReportReason.spoiler => '스포일러',
     ReportReason.etc => '기타',
   };
@@ -32,18 +38,24 @@ class ReportSubmission {
   final String? content;
 }
 
-/// 리뷰 신고 모달. 사유 라디오 4종, ETC 선택 시에만 상세 내용 입력창 노출.
-Future<ReportSubmission?> showReportDialog(BuildContext context) {
+/// 신고 모달. 사유 라디오, ETC 선택 시에만 상세 내용 입력창 노출.
+/// 사용자 신고는 스포일러 사유가 없으므로 [allowSpoiler]를 false로 넘긴다.
+Future<ReportSubmission?> showReportDialog(
+  BuildContext context, {
+  bool allowSpoiler = true,
+}) {
   return showModalBottomSheet<ReportSubmission>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (context) => const _ReportDialog(),
+    builder: (context) => _ReportDialog(allowSpoiler: allowSpoiler),
   );
 }
 
 class _ReportDialog extends StatefulWidget {
-  const _ReportDialog();
+  const _ReportDialog({required this.allowSpoiler});
+
+  final bool allowSpoiler;
 
   @override
   State<_ReportDialog> createState() => _ReportDialogState();
@@ -52,6 +64,11 @@ class _ReportDialog extends StatefulWidget {
 class _ReportDialogState extends State<_ReportDialog> {
   ReportReason _reason = ReportReason.spam;
   final _contentController = TextEditingController();
+
+  List<ReportReason> get _reasons => [
+    for (final reason in ReportReason.values)
+      if (widget.allowSpoiler || reason != ReportReason.spoiler) reason,
+  ];
 
   @override
   void dispose() {
@@ -71,7 +88,7 @@ class _ReportDialogState extends State<_ReportDialog> {
             onChanged: (v) => setState(() => _reason = v!),
             child: Column(
               children: [
-                for (final reason in ReportReason.values)
+                for (final reason in _reasons)
                   RadioListTile<ReportReason>(
                     value: reason,
                     activeColor: AppColors.of(context).accentForeground,

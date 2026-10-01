@@ -270,7 +270,7 @@ class BookDetailApi {
     }
   }
 
-  /// POST /api/reports — 콘텐츠 신고(REVIEW 등).
+  /// POST /api/reports — 콘텐츠·사용자 신고(REVIEW, USER 등).
   Future<void> postReport({
     required String targetType,
     required int targetId,
@@ -290,7 +290,9 @@ class BookDetailApi {
     } on DioException catch (e) {
       throw _mapError(
         e,
-        overrides: const {404: '신고 대상을 찾을 수 없습니다.', 409: '이미 신고한 콘텐츠입니다.'},
+        overrides: targetType == 'USER'
+            ? const {404: '신고할 사용자를 찾을 수 없습니다.', 409: '이미 신고한 사용자입니다.'}
+            : const {404: '신고 대상을 찾을 수 없습니다.', 409: '이미 신고한 콘텐츠입니다.'},
       );
     } on ApiException {
       rethrow;

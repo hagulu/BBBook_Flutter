@@ -215,7 +215,9 @@
 - `lib/features/public_bookshelf/screens/public_finished_bookshelf_screen.dart` — 다른 사용자의 공개 완독 책장 화면(그리드, 커서 무한 스크롤), 비공개(403)는 일반 오류와 구분해 안내
 - `lib/features/public_bookshelf/data/public_bookshelf_api.dart` — 공개 완독 책장 API 호출(`GET /api/users/{userId}/books/finished`, 인증 선택)
 - `lib/features/public_bookshelf/providers/public_bookshelf_providers.dart` — userId 기준 완독 책장 커서 무한 스크롤 Riverpod provider
-- `lib/features/public_bookshelf/widgets/author_profile_sheet.dart` — 독후감 상세/토론 상세/독자평 작성자 영역 탭 시 뜨는 시트(웹 `UserMenu` 대응), 완독 책장 공개(`isFinishedBooksPublic`) 사용자만 탭 가능, "완독 책장 보러가기" 선택 시 공개 완독 책장 화면으로 이동
+- `lib/features/public_bookshelf/widgets/author_profile_sheet.dart` — 독후감 상세/토론 상세/독자평 작성자 영역 탭 시 뜨는 시트(웹 `UserMenu` 대응), 완독 책장 공개 사용자는 "완독 책장 보러가기", 본인이 아닌 로그인 사용자는 "신고" 항목 제공(둘 다 불가하면 탭 불가)
+- `lib/features/public_bookshelf/widgets/user_report_flow.dart` — 사용자(USER) 신고 흐름(기존 신고 모달 재사용, 스포일러 사유 제외, `POST /api/reports`), 작성자 시트·공개 완독 책장 앱바에서 사용
+- `lib/features/public_bookshelf/services/user_report_policy.dart` — 사용자 신고 가능 조건(로그인 + 본인 아님)
 
 ## shared/widgets
 
@@ -246,3 +248,4 @@
 
 - `docs/policies/offline-records.md` — 오프라인 진입·인증 복구·재전송·계정 변경 삭제 정책과 검증 항목
 - `docs/review/20261001-155439-current-changes-review.md` — 현재 변경분의 저장 방식 전환·토론 답변 표시 코드 리뷰 결과
+- `docs/review/20261001-165029-current-user-report-review.md` — 현재 변경분의 사용자 신고 진입 경로 코드 리뷰 결과

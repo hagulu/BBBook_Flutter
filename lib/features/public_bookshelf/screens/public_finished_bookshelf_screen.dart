@@ -13,6 +13,7 @@ import '../../book_detail/screens/book_detail_screen.dart';
 import '../../bookshelf/screens/widgets/book_cover.dart';
 import '../models/public_finished_book.dart';
 import '../providers/public_bookshelf_providers.dart';
+import '../widgets/user_report_flow.dart';
 
 /// 다른 사용자의 공개 완독 책장 화면(`api-users-id-books-finished-get.md`).
 ///
@@ -88,6 +89,17 @@ class _PublicFinishedBookshelfScreenState
         backgroundColor: AppColors.of(context).pageBackground,
         foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
+        actions: [
+          if (canReportUserNow(
+            ProviderScope.containerOf(context, listen: false),
+            widget.userId,
+          ))
+            IconButton(
+              tooltip: '사용자 신고',
+              icon: const Icon(PhosphorIconsRegular.siren),
+              onPressed: () => reportUser(context, widget.userId),
+            ),
+        ],
       ),
       body: SafeArea(
         top: false,
