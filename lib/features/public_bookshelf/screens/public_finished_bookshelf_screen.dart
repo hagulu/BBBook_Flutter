@@ -96,7 +96,7 @@ class _PublicFinishedBookshelfScreenState
           ))
             IconButton(
               tooltip: '사용자 신고',
-              icon: const Icon(PhosphorIconsRegular.siren),
+              icon: const Icon(PhosphorIconsRegular.flag),
               onPressed: () => reportUser(context, widget.userId),
             ),
         ],

@@ -58,7 +58,7 @@ Future<void> _openAuthorProfileSheet(
             ),
           if (reportable)
             CommunityMenuTile(
-              icon: PhosphorIconsRegular.siren,
+              icon: PhosphorIconsRegular.flag,
               label: '신고',
               destructive: true,
               onTap: () => Navigator.pop(sheetContext, _ProfileAction.report),
