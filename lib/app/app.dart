@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_mode_provider.dart';
+import '../features/app_update/widgets/app_update_gate.dart';
 import '../features/external_record_import/widgets/external_import_share_coordinator.dart';
 import 'router.dart';
 
@@ -38,9 +39,12 @@ class BBBookApp extends ConsumerWidget {
             systemNavigationBarColor: AppColors.of(context).pageBackground,
             systemNavigationBarIconBrightness: iconBrightness,
           ),
-          child: ExternalImportShareCoordinator(
+          child: AppUpdateGate(
             navigatorKey: rootNavigatorKey,
-            child: child ?? const SizedBox.shrink(),
+            child: ExternalImportShareCoordinator(
+              navigatorKey: rootNavigatorKey,
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         );
       },

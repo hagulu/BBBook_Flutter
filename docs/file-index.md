@@ -215,6 +215,13 @@
 - `lib/features/notices/data/important_notice_dismissed_store.dart` — 그만 보기한 중요 공지 id를 기기에만 저장
 - `lib/features/notices/data/notice_seen_store.dart` — 마지막으로 확인한 일반 공지 id를 기기에만 저장(SharedPreferences)
 
+## features/app_update
+
+- `lib/features/app_update/widgets/app_update_gate.dart` — 앱 전체를 감싸 `/api/app-versions` 정책과 빌드 이름을 비교, 권장은 팝업(업데이트/그만 보기), 강제는 앱을 덮는 차단 화면(업데이트만, 복귀 시 재확인)
+- `lib/features/app_update/services/app_update_service.dart` — 점 구분 숫자 버전 비교와 권장/강제/없음 판단 순수 함수(빌드 번호 미사용)
+- `lib/features/app_update/data/app_version_api.dart` — 플랫폼별 앱 버전 정책 조회(인증 불필요)
+- `lib/features/app_update/data/app_update_dismissed_store.dart` — 그만 보기한 최신 버전을 기기에만 저장
+
 ## features/public_bookshelf
 
 - `lib/features/public_bookshelf/screens/public_finished_bookshelf_screen.dart` — 다른 사용자의 공개 완독 책장 화면(그리드, 커서 무한 스크롤), 비공개(403)는 일반 오류와 구분해 안내
@@ -257,3 +264,4 @@
 - `docs/review/20261001-182423-current-sanction-review.md` — 현재 변경분의 징계 상태 갱신·공개 기능 제한·징계 상세 화면 코드 리뷰 결과
 - `docs/review/20261001-183002-sanction-followup-review.md` — 징계 상태 갱신·마감일 제한·마이 팝업 후속 코드 리뷰 결과
 - `docs/review/20261002-134340-current-notices-review.md` — 새 공지 확인 상태·목록 로딩·중요 공지 시트 높이 코드 리뷰 결과
+- `docs/review/20261002-140520-current-app-update-review.md` — 앱 업데이트 정책 재확인·강제 차단 전환·스토어 실패 안내 코드 리뷰 결과
