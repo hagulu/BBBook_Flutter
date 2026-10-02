@@ -23,16 +23,20 @@ class AdConfig {
   static const _iosTestBannerAdUnitId =
       'ca-app-pub-3940256099942544/2934735716';
 
+  /// 실제 광고 단위 ID 발급 전, 내부 테스트용 release 빌드에서만
+  /// `--dart-define=ALLOW_TEST_ADS=true`로 테스트 ID 사용을 허용한다.
+  static const _allowTestAds = bool.fromEnvironment('ALLOW_TEST_ADS');
+
   /// release 빌드가 실제 배너 광고 단위 ID로 교체되기 전에 테스트 ID를 그대로
   /// 배포하는 것을 막는다. `main()`에서 앱 시작 전에 한 번 호출한다
   /// (`ApiConfig`/`KakaoConfig`의 release 검사와 같은 관례).
   static void assertConfiguredForRelease() {
     const testIds = {_androidTestBannerAdUnitId, _iosTestBannerAdUnitId};
-    if (kReleaseMode && testIds.contains(bannerAdUnitId)) {
+    if (kReleaseMode && !_allowTestAds && testIds.contains(bannerAdUnitId)) {
       throw StateError(
         'AdMob 배너 광고 단위 ID가 아직 Google 공식 테스트 값입니다. release 빌드 '
         '전에 lib/core/config/ad_config.dart의 배너 광고 단위 ID를 실제 발급받은 '
-        'ID로 교체하세요.',
+        'ID로 교체하세요. 내부 테스트용이면 --dart-define=ALLOW_TEST_ADS=true를 지정하세요.',
       );
     }
   }
