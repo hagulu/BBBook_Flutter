@@ -4,9 +4,13 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_base_options.dart';
+import '../data/important_notice_dismissed_store.dart';
+import '../data/notice_seen_store.dart';
 import '../data/notices_api.dart';
 import '../models/notice_detail.dart';
 import '../models/notice_summary.dart';
+import '../services/important_notice_service.dart';
+import '../services/notice_badge_service.dart';
 
 /// 공지사항 목록 페이지 크기(`notices-screens.md` §1-2).
 const int _kPageSize = 20;
@@ -58,16 +62,38 @@ class NoticeListState {
 
 class NoticeListController extends AutoDisposeAsyncNotifier<NoticeListState> {
   late NoticesApi _api;
+  bool _disposed = false;
 
   @override
   FutureOr<NoticeListState> build() async {
+    _disposed = false;
+    ref.onDispose(() => _disposed = true);
     _api = ref.watch(noticesApiProvider);
     final page = await _api.fetchNotices(size: _kPageSize);
+    // 확인 처리는 목록 표시를 막지 않도록 별도로 실행한다.
+    unawaited(_markSeen(page.items));
     return NoticeListState(
       items: page.items,
       nextCursor: page.nextCursor,
       hasNext: page.hasNext,
     );
+  }
+
+  /// 표시한 목록에 포함된 최신 일반 공지까지 확인한 것으로 저장한다. 화면이
+  /// 이미 닫혔으면(provider 폐기) 사용자가 보지 못했으므로 저장하지 않는다.
+  Future<void> _markSeen(List<NoticeSummary> shownItems) async {
+    try {
+      final store = ref.read(noticeSeenStoreProvider);
+      final next = NoticeBadgeService.nextLastSeenId(
+        latestId: NoticeBadgeService.latestNormalId(shownItems),
+        lastSeenId: await store.read(),
+      );
+      if (next == null || _disposed) return;
+      await store.write(next);
+      if (!_disposed) ref.invalidate(hasNewNoticeProvider);
+    } catch (_) {
+      // 배지 처리 실패가 목록 표시를 막지 않는다.
+    }
   }
 
   Future<void> loadMore() async {
@@ -127,4 +153,39 @@ final noticeDetailProvider = FutureProvider.autoDispose
     .family<NoticeDetail, int>((ref, id) {
       final api = ref.watch(noticesApiProvider);
       return api.fetchNotice(id);
+    });
+
+final noticeSeenStoreProvider = Provider<NoticeSeenStore>(
+  (ref) => NoticeSeenStore(),
+);
+
+/// 새 일반 공지 배지 여부(설정 아이콘·공지사항 메뉴 공용). 전용 가벼운 API로
+/// 판단하며, 실패하면 배지를 표시하지 않는다.
+final hasNewNoticeProvider = FutureProvider.autoDispose<bool>((ref) async {
+  try {
+    final latest = await ref.watch(noticesApiProvider).fetchLatestNotice();
+    final lastSeenId = await ref.watch(noticeSeenStoreProvider).read();
+    return NoticeBadgeService.hasNewNotice(
+      latestId: latest.id,
+      lastSeenId: lastSeenId,
+    );
+  } catch (_) {
+    return false;
+  }
+});
+
+final importantNoticeDismissedStoreProvider =
+    Provider<ImportantNoticeDismissedStore>(
+      (ref) => ImportantNoticeDismissedStore(),
+    );
+
+/// 팝업으로 띄울 중요 공지 목록(없으면 빈 목록). 일반 공지 목록·배지와 독립적으로
+/// 전용 API만 사용한다.
+final importantNoticesToShowProvider =
+    FutureProvider.autoDispose<List<NoticeDetail>>((ref) async {
+      final items = await ref.watch(noticesApiProvider).fetchImportantNotices();
+      final dismissed = await ref
+          .watch(importantNoticeDismissedStoreProvider)
+          .read();
+      return ImportantNoticeService.pickPopupNotices(items, dismissed);
     });

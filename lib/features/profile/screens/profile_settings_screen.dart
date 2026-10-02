@@ -13,6 +13,7 @@ import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../auth/providers/auth_access_providers.dart';
+import '../../notices/providers/notices_providers.dart';
 import '../../notices/screens/notices_list_screen.dart';
 import '../../record_archive/providers/record_archive_provider.dart';
 import '../../record_archive/screens/record_archive_import_screen.dart';
@@ -220,14 +221,16 @@ class ProfileSettingsScreen extends ConsumerWidget {
   }
 }
 
-class _NoticesMenu extends StatelessWidget {
+class _NoticesMenu extends ConsumerWidget {
   const _NoticesMenu();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasNew = ref.watch(hasNewNoticeProvider).valueOrNull ?? false;
     return _SettingsMenuTile(
       icon: PhosphorIconsRegular.megaphone,
       label: '공지사항',
+      showBadge: hasNew,
       onTap: () => Navigator.of(context).push<void>(
         MaterialPageRoute(builder: (_) => const NoticesListScreen()),
       ),
@@ -291,7 +294,7 @@ class _AppVersion extends StatelessWidget {
         final info = snapshot.data;
         if (info == null) return const SizedBox.shrink();
         return Text(
-          '버전 ${info.version}+${info.buildNumber}',
+          'v ${info.version}',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: AppColors.of(context).controlInactive,
@@ -514,8 +517,10 @@ class _SettingsMenuTile extends StatelessWidget {
     this.statusIsActive = false,
     this.showCaret = true,
     this.compact = false,
+    this.showBadge = false,
   });
 
+  final bool showBadge;
   final IconData icon;
   final String label;
   final String? status;
@@ -544,6 +549,17 @@ class _SettingsMenuTile extends StatelessWidget {
                   style: TextStyle(fontSize: 15, color: colors.textStrong),
                 ),
               ),
+              if (showBadge) ...[
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: colors.error,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                if (showCaret) const SizedBox(width: 8),
+              ],
               if (status != null) ...[
                 _SettingsStatusPill(label: status!, active: statusIsActive),
                 if (showCaret) const SizedBox(width: 6),

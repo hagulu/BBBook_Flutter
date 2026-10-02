@@ -2,12 +2,13 @@ import 'package:dio/dio.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../models/notice_detail.dart';
+import '../models/notice_latest.dart';
 import '../models/notice_summary.dart';
 
 /// 공지사항 목록·상세 API(`notices-screens.md` §3).
 ///
 /// 문서: ../../../../../api-doc/api-notices-get.md,
-/// api-notices-id-get.md
+/// api-notices-id-get.md, api-notices-important-get.md, api-notices-latest-get.md
 ///
 /// 두 요청 모두 인증이 필요 없는 공개 API다(`notices-screens.md` §1-2, §2-3).
 /// Authorization 헤더 자동 첨부·401 refresh 재시도가 붙는 [ApiClient] 대신,
@@ -41,10 +42,44 @@ class NoticesApi {
   /// GET /api/notices/{id}
   Future<NoticeDetail> fetchNotice(int id) async {
     try {
-      final response = await dio.get<Map<String, dynamic>>(
-        '/api/notices/$id',
-      );
+      final response = await dio.get<Map<String, dynamic>>('/api/notices/$id');
       return NoticeDetail.fromJson(_unwrapMap(response));
+    } on DioException catch (error) {
+      throw _mapError(error);
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException('서버 응답 형식이 올바르지 않습니다.', cause: error);
+    }
+  }
+
+  /// GET /api/notices/important — 서버가 7일 이내 중요 공지만 최신순으로 준다.
+  Future<List<NoticeDetail>> fetchImportantNotices() async {
+    try {
+      final response = await dio.get<Map<String, dynamic>>(
+        '/api/notices/important',
+      );
+      final items = _unwrapMap(response)['items'] as List<dynamic>;
+      return items
+          .cast<Map<String, dynamic>>()
+          .map(NoticeDetail.fromJson)
+          .toList();
+    } on DioException catch (error) {
+      throw _mapError(error);
+    } on ApiException {
+      rethrow;
+    } catch (error) {
+      throw ApiException('서버 응답 형식이 올바르지 않습니다.', cause: error);
+    }
+  }
+
+  /// GET /api/notices/latest — 7일 이내 최신 일반 공지 id(배지 판단용).
+  Future<NoticeLatest> fetchLatestNotice() async {
+    try {
+      final response = await dio.get<Map<String, dynamic>>(
+        '/api/notices/latest',
+      );
+      return NoticeLatest.fromJson(_unwrapMap(response));
     } on DioException catch (error) {
       throw _mapError(error);
     } on ApiException {

@@ -208,7 +208,12 @@
 - `lib/features/notices/screens/notices_list_screen.dart` — 공지사항 목록(인증 불필요, 커서 무한 스크롤, 다음 페이지 실패 시 하단 재시도), 프로필 메인 "공지사항" 메뉴로 진입
 - `lib/features/notices/screens/notice_detail_screen.dart` — 공지사항 상세(인증 불필요, 404는 재시도 없이 "찾을 수 없음" 표시)
 - `lib/features/notices/data/notices_api.dart` — 공지사항 목록·상세 API 호출(둘 다 인증 불필요)
-- `lib/features/notices/providers/notices_providers.dart` — 공지사항 목록 커서 무한 스크롤(다음 페이지 전용 에러 상태 포함)·상세 조회 Riverpod provider
+- `lib/features/notices/providers/notices_providers.dart` — 공지사항 목록 커서 무한 스크롤(다음 페이지 전용 에러 상태 포함)·상세 조회·새 공지 배지(`/api/notices/latest`, 메인 셸 설정 아이콘·설정 화면 메뉴 공용)/확인 처리 Riverpod provider
+- `lib/features/notices/services/notice_badge_service.dart` — 서버 최신 일반 공지 id와 앱이 마지막으로 확인한 id를 비교하는 새 공지 배지 판단 순수 함수
+- `lib/features/notices/widgets/important_notice_dialog.dart` — 중요 공지 바텀시트(여러 건은 좌우 스와이프 페이지·점 표시, 그만 보기=현재 보는 공지 건별, 확인=닫기만, 그만 보기=기기에 id 저장), 메인 셸에서 호출
+- `lib/features/notices/services/important_notice_service.dart` — 그만 보기한 공지를 제외한 중요 공지 팝업 대상을 서버 정렬 그대로 고르는 순수 함수
+- `lib/features/notices/data/important_notice_dismissed_store.dart` — 그만 보기한 중요 공지 id를 기기에만 저장
+- `lib/features/notices/data/notice_seen_store.dart` — 마지막으로 확인한 일반 공지 id를 기기에만 저장(SharedPreferences)
 
 ## features/public_bookshelf
 
@@ -251,3 +256,4 @@
 - `docs/review/20261001-165029-current-user-report-review.md` — 현재 변경분의 사용자 신고 진입 경로 코드 리뷰 결과
 - `docs/review/20261001-182423-current-sanction-review.md` — 현재 변경분의 징계 상태 갱신·공개 기능 제한·징계 상세 화면 코드 리뷰 결과
 - `docs/review/20261001-183002-sanction-followup-review.md` — 징계 상태 갱신·마감일 제한·마이 팝업 후속 코드 리뷰 결과
+- `docs/review/20261002-134340-current-notices-review.md` — 새 공지 확인 상태·목록 로딩·중요 공지 시트 높이 코드 리뷰 결과

@@ -13,6 +13,8 @@ import '../features/auth/providers/auth_notifier.dart';
 import '../features/book_search/screens/book_search_screen.dart';
 import '../features/bookshelf/providers/bookshelf_providers.dart';
 import '../features/bookshelf/screens/bookshelf_screen.dart';
+import '../features/notices/providers/notices_providers.dart';
+import '../features/notices/widgets/important_notice_dialog.dart';
 import '../features/profile/screens/profile_screen.dart';
 import '../features/profile/screens/profile_settings_screen.dart';
 import '../features/record_sync/providers/background_record_sync_provider.dart';
@@ -97,11 +99,28 @@ class _MainShellState extends ConsumerState<MainShell>
     with WidgetsBindingObserver {
   static const _tabs = [BookshelfScreen(), ProfileScreen()];
 
+  bool _checkingImportantNotice = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     unawaited(_refreshCategoriesIfStale());
+    // 셸이 처음 뜬 뒤 중요 공지 팝업을 한 번 확인한다.
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _checkImportantNotice(),
+    );
+  }
+
+  /// 중요 공지 팝업 확인. 이미 확인 중이거나 팝업이 떠 있으면 중복으로 띄우지 않는다.
+  Future<void> _checkImportantNotice() async {
+    if (!mounted || _checkingImportantNotice) return;
+    _checkingImportantNotice = true;
+    try {
+      await showImportantNoticeIfNeeded(context, ref);
+    } finally {
+      _checkingImportantNotice = false;
+    }
   }
 
   @override
@@ -114,6 +133,8 @@ class _MainShellState extends ConsumerState<MainShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_refreshCategoriesIfStale());
+      unawaited(_checkImportantNotice());
+      ref.invalidate(hasNewNoticeProvider);
       // 징계 해제는 서버 상태를 다시 읽어야 반영된다. 앱 복귀 때만 확인한다.
       if (ref.read(authNotifierProvider).user?.isSanctioned == true) {
         unawaited(ref.read(authNotifierProvider.notifier).refreshCurrentUser());
@@ -169,6 +190,7 @@ class _MainShellState extends ConsumerState<MainShell>
   Widget build(BuildContext context) {
     ref.watch(backgroundRecordSyncProvider);
     final selectedIndex = ref.watch(mainShellTabIndexProvider);
+    final hasNewNotice = ref.watch(hasNewNoticeProvider).valueOrNull ?? false;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) => _handlePopAttempt(didPop),
@@ -181,7 +203,12 @@ class _MainShellState extends ConsumerState<MainShell>
           actions: selectedIndex == 1
               ? [
                   IconButton(
-                    icon: const Icon(PhosphorIconsRegular.gearSix),
+                    icon: Badge(
+                      isLabelVisible: hasNewNotice,
+                      smallSize: 8,
+                      backgroundColor: AppColors.of(context).error,
+                      child: const Icon(PhosphorIconsRegular.gearSix),
+                    ),
                     tooltip: '설정',
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(

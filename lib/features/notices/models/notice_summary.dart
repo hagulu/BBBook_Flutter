@@ -3,17 +3,20 @@ class NoticeSummary {
   const NoticeSummary({
     required this.id,
     required this.title,
+    required this.isImportant,
     required this.createdAt,
   });
 
   final int id;
   final String title;
+  final bool isImportant;
   final DateTime createdAt;
 
   factory NoticeSummary.fromJson(Map<String, dynamic> json) {
     return NoticeSummary(
       id: json['id'] as int,
       title: json['title'] as String,
+      isImportant: json['isImportant'] as bool? ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }
