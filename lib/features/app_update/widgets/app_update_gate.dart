@@ -151,9 +151,10 @@ class _AppUpdateGateState extends ConsumerState<AppUpdateGate>
     }
   }
 
-  String _messageOf(AppVersionPolicy policy) {
+  String _messageOf(AppVersionPolicy policy, {bool forced = false}) {
     final message = policy.updateMessage?.trim();
     if (message != null && message.isNotEmpty) return message;
+    if (forced) return '원활한 이용을 위해 업데이트가 필요해요. 업데이트 후 계속 이용할 수 있어요.';
     return '새로운 버전(${policy.latestVersion})이 출시되었습니다.';
   }
 
@@ -206,10 +207,10 @@ class _AppUpdateGateState extends ConsumerState<AppUpdateGate>
             child: SafeArea(
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(24),
+                  padding: EdgeInsets.zero,
                   child: AppDialogShell(
-                    title: '업데이트가 필요합니다',
-                    message: _messageOf(forced),
+                    title: '업데이트가 필요해요',
+                    message: _messageOf(forced, forced: true),
                     content: _storeOpenFailed
                         ? Text(
                             _storeErrorMessage,
