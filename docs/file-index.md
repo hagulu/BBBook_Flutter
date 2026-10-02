@@ -36,6 +36,7 @@
 - `lib/features/auth/data/social_auth_service.dart` — Google/Apple/Kakao/Naver 네이티브 로그인, 공급자 토큰 획득·SDK 로그아웃
 - `lib/features/auth/widgets/social_login_section.dart` — 소셜 로그인 버튼 묶음과 로그인 후처리(계정 변경 확인, 계정 없이 남긴 기록 이어가기 선택, 저장 방식 전환 화면 연결) 공용 위젯, 온보딩·MY 화면이 공유
 - `lib/features/auth/widgets/auth_loading_gate.dart` — 인증 확인·라우터 전환 사이 빈 배경 표시, 로그인 사용자의 온보딩 순간 노출 방지
+- `lib/features/auth/widgets/sanction_restricted_alert.dart` — 징계 중 제한 기능을 눌렀을 때 공통 안내 팝업(`AppAlert`)을 띄우는 함수, 모든 제한 진입점이 같은 문구를 사용
 
 ## features/profile
 
@@ -265,3 +266,4 @@
 - `docs/review/20261001-183002-sanction-followup-review.md` — 징계 상태 갱신·마감일 제한·마이 팝업 후속 코드 리뷰 결과
 - `docs/review/20261002-134340-current-notices-review.md` — 새 공지 확인 상태·목록 로딩·중요 공지 시트 높이 코드 리뷰 결과
 - `docs/review/20261002-140520-current-app-update-review.md` — 앱 업데이트 정책 재확인·강제 차단 전환·스토어 실패 안내 코드 리뷰 결과
+- `docs/review/20261002-153041-current-sanction-profile-review.md` — 징계 제한 안내·공개 완독 책장 프로필 헤더 변경분 코드 리뷰 결과

@@ -6,7 +6,6 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/ads/ad_slot_planner.dart';
 import '../../../shared/ads/ads_enabled_provider.dart';
-import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_inline_banner_ad.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../book_detail/screens/book_detail_screen.dart';
@@ -25,12 +24,16 @@ class PublicFinishedBookshelfScreen extends ConsumerStatefulWidget {
     super.key,
     required this.userId,
     this.nickname,
+    this.profileImageUrl,
   });
 
   final int userId;
 
-  /// 앱바 제목에 쓸 대상 사용자 닉네임(있으면 "OO님의 완독 책장").
+  /// 헤더에 표시할 대상 사용자 닉네임.
   final String? nickname;
+
+  /// 헤더에 표시할 대상 사용자 프로필 이미지(없으면 닉네임 이니셜).
+  final String? profileImageUrl;
 
   @override
   ConsumerState<PublicFinishedBookshelfScreen> createState() =>
@@ -59,9 +62,7 @@ class _PublicFinishedBookshelfScreenState
     final position = _scrollController.position;
     if (position.pixels >= position.maxScrollExtent - 240) {
       ref
-          .read(
-            publicFinishedBooksControllerProvider(widget.userId).notifier,
-          )
+          .read(publicFinishedBooksControllerProvider(widget.userId).notifier)
           .loadMore();
     }
   }
@@ -83,9 +84,6 @@ class _PublicFinishedBookshelfScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: AppBarTitle(
-          widget.nickname == null ? '완독 책장' : '${widget.nickname}의 완독 책장',
-        ),
         backgroundColor: AppColors.of(context).pageBackground,
         foregroundColor: AppColors.of(context).textStrong,
         elevation: 0,
@@ -96,7 +94,9 @@ class _PublicFinishedBookshelfScreenState
           ))
             IconButton(
               tooltip: '사용자 신고',
-              icon: const Icon(PhosphorIconsRegular.flag, size: 20),
+              iconSize: 16,
+              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+              icon: const Icon(PhosphorIconsRegular.flag),
               onPressed: () => reportUser(context, widget.userId),
             ),
         ],
@@ -110,6 +110,10 @@ class _PublicFinishedBookshelfScreenState
             isLoadingMore: value.isLoadingMore,
             onTapBook: _openBook,
             adsEnabled: adsEnabled,
+            header: _ProfileHeader(
+              nickname: widget.nickname,
+              profileImageUrl: widget.profileImageUrl,
+            ),
           ),
           AsyncError(:final error) => _ErrorState(
             error: error,
@@ -119,6 +123,103 @@ class _PublicFinishedBookshelfScreenState
           ),
           _ => const CommunityContentLoadingState(),
         },
+      ),
+    );
+  }
+}
+
+/// 마이 프로필처럼 가운데 정렬된 프로필 이미지·닉네임과 "완독 책장" 라벨.
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({required this.nickname, required this.profileImageUrl});
+
+  final String? nickname;
+  final String? profileImageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = nickname?.isNotEmpty == true ? nickname! : '사용자';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Column(
+        children: [
+          _Avatar(imageUrl: profileImageUrl, nickname: name, size: 76),
+          const SizedBox(height: 10),
+          Text(
+            name,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.of(context).textStrong,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.of(context).accentSurface,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  PhosphorIconsFill.books,
+                  size: 16,
+                  color: AppColors.of(context).accentForeground,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '완독 책장',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.of(context).accentForeground,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  const _Avatar({
+    required this.imageUrl,
+    required this.nickname,
+    required this.size,
+  });
+
+  final String? imageUrl;
+  final String nickname;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = CircleAvatar(
+      radius: size / 2,
+      backgroundColor: AppColors.of(context).accentSurface,
+      child: Text(
+        nickname.characters.first.toUpperCase(),
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: AppColors.of(context).accentForeground,
+        ),
+      ),
+    );
+    final url = imageUrl;
+    if (url == null || url.isEmpty) return fallback;
+    return ClipOval(
+      child: Image.network(
+        url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => fallback,
       ),
     );
   }
@@ -182,6 +283,7 @@ class _FinishedGrid extends StatelessWidget {
     required this.isLoadingMore,
     required this.onTapBook,
     required this.adsEnabled,
+    required this.header,
   });
 
   final ScrollController scrollController;
@@ -189,6 +291,7 @@ class _FinishedGrid extends StatelessWidget {
   final bool isLoadingMore;
   final void Function(PublicFinishedBook book) onTapBook;
   final bool adsEnabled;
+  final Widget header;
 
   @override
   Widget build(BuildContext context) {
@@ -197,7 +300,8 @@ class _FinishedGrid extends StatelessWidget {
         controller: scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          const SizedBox(height: 80),
+          header,
+          const SizedBox(height: 56),
           Center(
             child: Text(
               '완독한 책이 없습니다',
@@ -212,6 +316,7 @@ class _FinishedGrid extends StatelessWidget {
       controller: scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
       slivers: [
+        SliverToBoxAdapter(child: header),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
           sliver: _gridSliverWithAds(items, onTapBook: onTapBook),

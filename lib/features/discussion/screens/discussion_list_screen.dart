@@ -9,6 +9,7 @@ import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_inline_banner_ad.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../auth/providers/auth_access_providers.dart';
+import '../../auth/widgets/sanction_restricted_alert.dart';
 import '../models/discussion_topic.dart';
 import '../providers/discussion_providers.dart';
 import 'discussion_detail_screen.dart';
@@ -123,9 +124,11 @@ class _DiscussionListScreenState extends ConsumerState<DiscussionListScreen> {
         },
       ),
       // 토론 목록 조회는 인증이 필요 없지만 작성은 계정이 있어야 한다.
-      floatingActionButton: ref.watch(canPublishCommunityContentProvider)
+      floatingActionButton: ref.watch(canUseAccountFeaturesProvider)
           ? FloatingActionButton(
-              onPressed: _openForm,
+              onPressed: ref.watch(canPublishCommunityContentProvider)
+                  ? _openForm
+                  : () => showSanctionRestrictedAlert(context),
               tooltip: '토론 작성',
               shape: const CircleBorder(),
               backgroundColor: AppColors.of(context).accentFill,

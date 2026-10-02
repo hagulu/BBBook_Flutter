@@ -14,6 +14,7 @@ import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
 import '../../auth/providers/auth_access_providers.dart';
+import '../../auth/widgets/sanction_restricted_alert.dart';
 import '../../book_detail/screens/widgets/report_dialog.dart';
 import '../../public_bookshelf/widgets/author_profile_sheet.dart';
 import '../models/discussion_answer.dart';
@@ -142,6 +143,10 @@ class _DiscussionDetailScreenState
       ref.read(discussionAnswersControllerProvider(widget.topicId).notifier);
 
   void _openPollAnswerSheet(DiscussionTopicDetail topic, int? optionId) {
+    if (!ref.read(canPublishCommunityContentProvider)) {
+      unawaited(showSanctionRestrictedAlert(context));
+      return;
+    }
     final label = optionId == null
         ? '기타'
         : topic.options.firstWhere((o) => o.id == optionId).content;
@@ -157,6 +162,10 @@ class _DiscussionDetailScreenState
   }
 
   void _openFreeAnswerSheet() {
+    if (!ref.read(canPublishCommunityContentProvider)) {
+      unawaited(showSanctionRestrictedAlert(context));
+      return;
+    }
     showDiscussionAnswerSheet(
       context,
       hintText: '내용을 입력하세요',
@@ -289,6 +298,10 @@ class _DiscussionDetailScreenState
   }
 
   Future<void> _editTopic(DiscussionTopicDetail topic) async {
+    if (!ref.read(canPublishCommunityContentProvider)) {
+      await showSanctionRestrictedAlert(context);
+      return;
+    }
     final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => DiscussionFormScreen.edit(topic: topic),
@@ -300,15 +313,14 @@ class _DiscussionDetailScreenState
 
   Future<void> _editDeadline(DiscussionTopicDetail topic) {
     if (!ref.read(canPublishCommunityContentProvider)) {
-      AppSnackBar.error(context, '징계 기간에는 마감일을 수정할 수 없습니다.');
-      return Future<void>.value();
+      return showSanctionRestrictedAlert(context);
     }
     return showDiscussionDeadlineDialog(
       context,
       initialClosesAt: topic.closesAt,
       onSave: (closesAt) async {
         if (!ref.read(canPublishCommunityContentProvider)) {
-          return '징계 기간에는 마감일을 수정할 수 없습니다.';
+          return '현재 징계 중이라 이용할 수 없는 기능입니다.';
         }
         try {
           await _detailController.updateClosesAt(closesAt);
@@ -462,7 +474,6 @@ class _DiscussionDetailScreenState
                 children: [
                   _TopicCard(
                     topic: topic,
-                    canEdit: canPublish,
                     onEdit: () => _editTopic(topic),
                     onEditDeadline: () => _editDeadline(topic),
                     onClose: _closeTopic,
@@ -475,13 +486,13 @@ class _DiscussionDetailScreenState
                     pollSection: topic.hasOptions
                         ? _buildPollSection(
                             topic,
-                            allowAccountActions: canPublish,
+                            allowAccountActions: allowAccountActions,
                           )
                         : null,
                     allowAccountActions: allowAccountActions,
                   ),
                   const AppBannerAd(topSpacing: 20),
-                  if (!topic.hasOptions && canPublish) ...[
+                  if (!topic.hasOptions && allowAccountActions) ...[
                     const SizedBox(height: 32),
                     _FreeAnswerCard(
                       isClosed: topic.isClosed,
@@ -493,7 +504,8 @@ class _DiscussionDetailScreenState
                     AsyncData(:final value) => _AnswerList(
                       state: value,
                       options: topic.options,
-                      canEditAnswers: !topic.isClosed && canPublish,
+                      canEditAnswers: !topic.isClosed,
+                      editRestricted: !canPublish,
                       pendingLikeIds: _pendingAnswerLikeIds,
                       onSubmitEdit: _updateAnswer,
                       onDelete: _deleteAnswer,
@@ -540,7 +552,6 @@ class _DiscussionDetailScreenState
 class _TopicCard extends StatelessWidget {
   const _TopicCard({
     required this.topic,
-    required this.canEdit,
     required this.onEdit,
     required this.onEditDeadline,
     required this.onClose,
@@ -553,7 +564,6 @@ class _TopicCard extends StatelessWidget {
   });
 
   final DiscussionTopicDetail topic;
-  final bool canEdit;
   final VoidCallback onEdit;
   final VoidCallback onEditDeadline;
   final VoidCallback onClose;
@@ -592,6 +602,7 @@ class _TopicCard extends StatelessWidget {
             context,
             userId: topic.user.id,
             nickname: topic.user.nickname,
+            profileImageUrl: topic.user.profileImageUrl,
             isFinishedBooksPublic: topic.user.isFinishedBooksPublic,
           ),
           badges: [
@@ -603,7 +614,6 @@ class _TopicCard extends StatelessWidget {
               : topic.isMine
               ? _TopicMenu(
                   topic: topic,
-                  canEdit: canEdit,
                   onEdit: onEdit,
                   onEditDeadline: onEditDeadline,
                   onClose: onClose,
@@ -680,7 +690,6 @@ class _TopicCard extends StatelessWidget {
 class _TopicMenu extends StatelessWidget {
   const _TopicMenu({
     required this.topic,
-    required this.canEdit,
     required this.onEdit,
     required this.onEditDeadline,
     required this.onClose,
@@ -689,7 +698,6 @@ class _TopicMenu extends StatelessWidget {
   });
 
   final DiscussionTopicDetail topic;
-  final bool canEdit;
   final VoidCallback onEdit;
   final VoidCallback onEditDeadline;
   final VoidCallback onClose;
@@ -706,19 +714,18 @@ class _TopicMenu extends StatelessWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (!topic.isClosed && canEdit)
+            if (!topic.isClosed)
               CommunityMenuTile(
                 icon: PhosphorIconsRegular.pencilSimple,
                 label: '수정',
                 onTap: () => Navigator.pop(sheetContext, _TopicMenuAction.edit),
               ),
-            if (canEdit)
-              CommunityMenuTile(
-                icon: PhosphorIconsRegular.calendarBlank,
-                label: '마감일 설정/수정',
-                onTap: () =>
-                    Navigator.pop(sheetContext, _TopicMenuAction.deadline),
-              ),
+            CommunityMenuTile(
+              icon: PhosphorIconsRegular.calendarBlank,
+              label: '마감일 설정/수정',
+              onTap: () =>
+                  Navigator.pop(sheetContext, _TopicMenuAction.deadline),
+            ),
             if (!topic.isClosed)
               CommunityMenuTile(
                 icon: PhosphorIconsRegular.lock,
@@ -802,6 +809,7 @@ class _AnswerList extends StatelessWidget {
     required this.state,
     required this.options,
     required this.canEditAnswers,
+    required this.editRestricted,
     required this.pendingLikeIds,
     required this.onSubmitEdit,
     required this.onDelete,
@@ -816,6 +824,7 @@ class _AnswerList extends StatelessWidget {
   final DiscussionAnswerPageState state;
   final List<DiscussionOption> options;
   final bool canEditAnswers;
+  final bool editRestricted;
   final Set<int> pendingLikeIds;
   final Future<bool> Function(int answerId, String content) onSubmitEdit;
   final void Function(int answerId) onDelete;
@@ -878,6 +887,7 @@ class _AnswerList extends StatelessWidget {
                         answer: answer,
                         options: options,
                         canEdit: canEditAnswers,
+                        editRestricted: editRestricted,
                         onSubmitEdit: (content) =>
                             onSubmitEdit(answer.id, content),
                         onDelete: () => onDelete(answer.id),

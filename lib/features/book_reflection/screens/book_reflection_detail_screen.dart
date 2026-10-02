@@ -12,6 +12,7 @@ import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../../shared/widgets/record_dialog_shell.dart';
 import '../../auth/providers/auth_access_providers.dart';
+import '../../auth/widgets/sanction_restricted_alert.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../models/book_reflection.dart';
 import '../providers/book_reflection_providers.dart';
@@ -139,71 +140,66 @@ class BookReflectionDetailScreen extends ConsumerWidget {
                       if (canPublish) ...[
                         RecordDialogToggleTile(
                           value: isPublic,
-                          onChanged: isSanctioned && !isPublic
-                              ? null
-                              : (value) async {
-                                  if (!isLocalMode &&
-                                      value &&
-                                      !sheetRef.read(
-                                        canPublishCommunityContentProvider,
-                                      )) {
-                                    AppSnackBar.error(
-                                      context,
-                                      '징계 기간에는 독후감을 공개할 수 없습니다.',
-                                    );
-                                    return;
-                                  }
-                                  if (isUpdatingVisibility) return;
-                                  final previousValue = isPublic;
-                                  // await 뒤에 쓸 provider는 지금(반드시 mounted인
-                                  // 시점) 미리 확보해 둔다 — 시트가 닫힌 뒤 화면
-                                  // 자체가 dispose되면 await 뒤의 `ref.read()`가
-                                  // 예외를 던지기 때문이다. `bookReflectionDetailProvider`는
-                                  // 이 값을 watch하므로 별도 invalidate 없이도
-                                  // 갱신된다.
-                                  final syncVersionNotifier = ref.read(
-                                    bookReflectionSyncVersionProvider.notifier,
-                                  );
-                                  final repository = ref.read(
-                                    bookReflectionRepositoryProvider,
-                                  );
-                                  setSheetState(() {
-                                    isPublic = value;
-                                    isUpdatingVisibility = true;
-                                  });
-                                  try {
-                                    await repository.setPublic(
-                                      ownerUserId: ownerUserId,
-                                      userBookId: userBookId,
-                                      reflectionId: reflection.id,
-                                      isPublic: value,
-                                    );
-                                    // 요청이 성공하면 시트가 이미 닫혔더라도 상세
-                                    // 화면의 캐시된 공개 여부는 항상 최신화한다 —
-                                    // 시트 생명주기와 서버 반영 여부는 별개다.
-                                    syncVersionNotifier.state++;
-                                    if (sheetContext.mounted) {
-                                      setSheetState(
-                                        () => isUpdatingVisibility = false,
-                                      );
-                                    }
-                                  } catch (error) {
-                                    if (sheetContext.mounted) {
-                                      setSheetState(() {
-                                        isPublic = previousValue;
-                                        isUpdatingVisibility = false;
-                                      });
-                                    }
-                                    if (screenContext.mounted) {
-                                      AppSnackBar.error(
-                                        screenContext,
-                                        error is ApiException
-                                            ? error.message
-                                            : '공개 여부를 변경하지 못했습니다.',
-                                      );
-                                    }
-                                  }
-                                },
+                          onChanged: (value) async {
+                            if (!isLocalMode &&
+                                value &&
+                                !sheetRef.read(
+                                  canPublishCommunityContentProvider,
+                                )) {
+                              await showSanctionRestrictedAlert(context);
+                              return;
+                            }
+                            if (isUpdatingVisibility) return;
+                            final previousValue = isPublic;
+                            // await 뒤에 쓸 provider는 지금(반드시 mounted인
+                            // 시점) 미리 확보해 둔다 — 시트가 닫힌 뒤 화면
+                            // 자체가 dispose되면 await 뒤의 `ref.read()`가
+                            // 예외를 던지기 때문이다. `bookReflectionDetailProvider`는
+                            // 이 값을 watch하므로 별도 invalidate 없이도
+                            // 갱신된다.
+                            final syncVersionNotifier = ref.read(
+                              bookReflectionSyncVersionProvider.notifier,
+                            );
+                            final repository = ref.read(
+                              bookReflectionRepositoryProvider,
+                            );
+                            setSheetState(() {
+                              isPublic = value;
+                              isUpdatingVisibility = true;
+                            });
+                            try {
+                              await repository.setPublic(
+                                ownerUserId: ownerUserId,
+                                userBookId: userBookId,
+                                reflectionId: reflection.id,
+                                isPublic: value,
+                              );
+                              // 요청이 성공하면 시트가 이미 닫혔더라도 상세
+                              // 화면의 캐시된 공개 여부는 항상 최신화한다 —
+                              // 시트 생명주기와 서버 반영 여부는 별개다.
+                              syncVersionNotifier.state++;
+                              if (sheetContext.mounted) {
+                                setSheetState(
+                                  () => isUpdatingVisibility = false,
+                                );
+                              }
+                            } catch (error) {
+                              if (sheetContext.mounted) {
+                                setSheetState(() {
+                                  isPublic = previousValue;
+                                  isUpdatingVisibility = false;
+                                });
+                              }
+                              if (screenContext.mounted) {
+                                AppSnackBar.error(
+                                  screenContext,
+                                  error is ApiException
+                                      ? error.message
+                                      : '공개 여부를 변경하지 못했습니다.',
+                                );
+                              }
+                            }
+                          },
                           icon: isPublic
                               ? PhosphorIconsRegular.globe
                               : PhosphorIconsRegular.lock,
@@ -215,13 +211,18 @@ class BookReflectionDetailScreen extends ConsumerWidget {
                       RecordDialogActionTile(
                         icon: PhosphorIconsRegular.pencil,
                         label: '수정',
-                        onTap:
-                            isUpdatingVisibility || (isSanctioned && isPublic)
+                        onTap: isUpdatingVisibility
                             ? null
-                            : () => Navigator.of(sheetContext).pop((
-                                action: _ReflectionAction.edit,
-                                isPublic: isPublic,
-                              )),
+                            : () {
+                                if (isSanctioned && isPublic) {
+                                  showSanctionRestrictedAlert(context);
+                                  return;
+                                }
+                                Navigator.of(sheetContext).pop((
+                                  action: _ReflectionAction.edit,
+                                  isPublic: isPublic,
+                                ));
+                              },
                       ),
                       const SizedBox(height: RecordDialogMetrics.itemSpacing),
                       RecordDialogActionTile(

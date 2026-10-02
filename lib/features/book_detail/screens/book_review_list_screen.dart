@@ -12,6 +12,7 @@ import '../../../shared/widgets/app_inline_banner_ad.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../auth/providers/auth_access_providers.dart';
+import '../../auth/widgets/sanction_restricted_alert.dart';
 import '../models/book_review.dart';
 import '../providers/book_detail_providers.dart';
 import 'widgets/report_dialog.dart';
@@ -196,9 +197,11 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
           _ => const CommunityContentLoadingState(),
         },
       ),
-      floatingActionButton: canPublish
+      floatingActionButton: allowAccountActions
           ? FloatingActionButton(
-              onPressed: _handleCreate,
+              onPressed: canPublish
+                  ? _handleCreate
+                  : () => showSanctionRestrictedAlert(context),
               tooltip: '독자평 쓰기',
               shape: const CircleBorder(),
               backgroundColor: AppColors.of(context).accentFill,

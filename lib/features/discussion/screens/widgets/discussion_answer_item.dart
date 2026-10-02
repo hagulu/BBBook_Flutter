@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/community_content.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
+import '../../../auth/widgets/sanction_restricted_alert.dart';
 import '../../../public_bookshelf/widgets/author_profile_sheet.dart';
 import '../../models/discussion_answer.dart';
 import '../../models/discussion_topic.dart';
@@ -20,6 +23,7 @@ class DiscussionAnswerItem extends StatefulWidget {
     required this.answer,
     required this.options,
     required this.canEdit,
+    this.editRestricted = false,
     required this.onSubmitEdit,
     required this.onDelete,
     required this.onReport,
@@ -38,6 +42,9 @@ class DiscussionAnswerItem extends StatefulWidget {
 
   /// 닫힌 토론에서는 수정 메뉴가 노출되지 않는다(삭제만 가능).
   final bool canEdit;
+
+  /// 징계로 수정이 제한된 상태. 수정 메뉴는 보이되 누르면 안내 팝업을 띄운다.
+  final bool editRestricted;
 
   /// 편집 확정. 성공하면 true를 반환해야 편집 모드가 닫힌다.
   final Future<bool> Function(String content) onSubmitEdit;
@@ -114,6 +121,7 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
                 context,
                 userId: answer.user.id,
                 nickname: answer.user.nickname,
+                profileImageUrl: answer.user.profileImageUrl,
                 isFinishedBooksPublic: answer.user.isFinishedBooksPublic,
               ),
             ),
@@ -211,7 +219,11 @@ class _DiscussionAnswerItemState extends State<DiscussionAnswerItem> {
     if (!mounted || action == null) return;
     switch (action) {
       case _AnswerMenuAction.edit:
-        _startEdit();
+        if (widget.editRestricted) {
+          unawaited(showSanctionRestrictedAlert(this.context));
+        } else {
+          _startEdit();
+        }
       case _AnswerMenuAction.delete:
         widget.onDelete();
     }

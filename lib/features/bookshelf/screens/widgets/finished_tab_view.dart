@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/network/api_exception.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../auth/providers/auth_access_providers.dart';
+import '../../../auth/widgets/sanction_restricted_alert.dart';
 import '../../../../core/utils/author_display.dart';
 import '../../../../shared/ads/ad_slot_planner.dart';
 import '../../../../shared/ads/ads_enabled_provider.dart';
@@ -686,9 +687,7 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
       if (plan.adAfterChunk[i]) {
         final slotKey = 'grid:$groupKey:$i';
         slivers.add(
-          const SliverToBoxAdapter(
-            child: SizedBox(height: mainAxisSpacing),
-          ),
+          const SliverToBoxAdapter(child: SizedBox(height: mainAxisSpacing)),
         );
         slivers.add(
           SliverToBoxAdapter(
@@ -999,9 +998,7 @@ class _FinishedIconBar extends ConsumerWidget {
                     padding: EdgeInsets.zero,
                     tooltip: isPublic
                         ? '완독 책장 공개 중 (탭하면 비공개로 전환)'
-                        : canPublish
-                        ? '완독 책장 비공개 중 (탭하면 공개로 전환)'
-                        : '징계 기간에는 완독 책장을 공개할 수 없습니다',
+                        : '완독 책장 비공개 중 (탭하면 공개로 전환)',
                     icon: Icon(
                       isPublic
                           ? PhosphorIconsRegular.globe
@@ -1009,10 +1006,13 @@ class _FinishedIconBar extends ConsumerWidget {
                       color: AppColors.of(context).accentForeground,
                       size: 20,
                     ),
-                    onPressed:
-                        privacyState.isLoading || (!isPublic && !canPublish)
+                    onPressed: privacyState.isLoading
                         ? null
                         : () async {
+                            if (!isPublic && !canPublish) {
+                              await showSanctionRestrictedAlert(context);
+                              return;
+                            }
                             try {
                               await ref
                                   .read(

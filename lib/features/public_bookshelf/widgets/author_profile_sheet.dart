@@ -17,6 +17,7 @@ VoidCallback? authorProfileSheetHandler(
   BuildContext context, {
   required int userId,
   required String? nickname,
+  String? profileImageUrl,
   required bool isFinishedBooksPublic,
 }) {
   final container = ProviderScope.containerOf(context, listen: false);
@@ -26,6 +27,7 @@ VoidCallback? authorProfileSheetHandler(
     context,
     userId: userId,
     nickname: nickname,
+    profileImageUrl: profileImageUrl,
     isFinishedBooksPublic: isFinishedBooksPublic,
     reportable: reportable,
   );
@@ -35,6 +37,7 @@ Future<void> _openAuthorProfileSheet(
   BuildContext context, {
   required int userId,
   required String? nickname,
+  required String? profileImageUrl,
   required bool isFinishedBooksPublic,
   required bool reportable,
 }) async {
@@ -77,6 +80,7 @@ Future<void> _openAuthorProfileSheet(
       builder: (_) => PublicFinishedBookshelfScreen(
         userId: userId,
         nickname: normalizedNickname,
+        profileImageUrl: profileImageUrl,
       ),
     ),
   );

@@ -259,6 +259,7 @@ class _ReaderBody extends StatelessWidget {
               context,
               userId: detail.user.id,
               nickname: detail.user.nickname,
+              profileImageUrl: detail.user.profileImageUrl,
               isFinishedBooksPublic: detail.user.isFinishedBooksPublic,
             ),
             trailing: onReport == null

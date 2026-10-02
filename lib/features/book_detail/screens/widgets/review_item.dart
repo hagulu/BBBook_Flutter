@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
@@ -5,6 +7,7 @@ import '../../../../shared/widgets/community_content.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../../book_record/screens/widgets/star_rating.dart';
 import '../../../discussion/utils/discussion_date.dart';
+import '../../../auth/widgets/sanction_restricted_alert.dart';
 import '../../../public_bookshelf/widgets/author_profile_sheet.dart';
 import '../../models/book_review.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
@@ -55,13 +58,11 @@ class _ReviewItemState extends State<ReviewItem> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (widget.canEdit)
-              CommunityMenuTile(
-                icon: PhosphorIconsRegular.pencilSimple,
-                label: '수정',
-                onTap: () =>
-                    Navigator.pop(sheetContext, _ReviewMenuAction.edit),
-              ),
+            CommunityMenuTile(
+              icon: PhosphorIconsRegular.pencilSimple,
+              label: '수정',
+              onTap: () => Navigator.pop(sheetContext, _ReviewMenuAction.edit),
+            ),
             CommunityMenuTile(
               icon: PhosphorIconsRegular.trash,
               label: '삭제',
@@ -76,7 +77,11 @@ class _ReviewItemState extends State<ReviewItem> {
     if (!mounted || action == null) return;
     switch (action) {
       case _ReviewMenuAction.edit:
-        widget.onEdit();
+        if (widget.canEdit) {
+          widget.onEdit();
+        } else {
+          unawaited(showSanctionRestrictedAlert(this.context));
+        }
       case _ReviewMenuAction.delete:
         widget.onDelete();
     }
@@ -99,6 +104,7 @@ class _ReviewItemState extends State<ReviewItem> {
               context,
               userId: review.user.id,
               nickname: review.user.nickname,
+              profileImageUrl: review.user.profileImageUrl,
               isFinishedBooksPublic: review.user.isFinishedBooksPublic,
             ),
             trailing: Row(

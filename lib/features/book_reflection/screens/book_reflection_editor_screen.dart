@@ -19,6 +19,7 @@ import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../../shared/widgets/community_content.dart';
 import '../../auth/providers/auth_access_providers.dart';
+import '../../auth/widgets/sanction_restricted_alert.dart';
 import '../../book_note/models/book_note.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../models/book_reflection.dart';
@@ -457,10 +458,7 @@ class _BookReflectionEditorScreenState
         (widget.visibilityOverride ?? widget.reflection?.isPublic ?? false) &&
         !await ref.read(storageModeStoreProvider).isLocal()) {
       if (!mounted) return;
-      AppSnackBar.error(
-        context,
-        '징계 기간에는 공개 독후감을 수정할 수 없습니다. 먼저 비공개로 변경해 주세요.',
-      );
+      await showSanctionRestrictedAlert(context);
       return;
     }
     if (!mounted) return;
