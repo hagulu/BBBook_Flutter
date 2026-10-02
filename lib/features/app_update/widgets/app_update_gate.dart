@@ -194,6 +194,11 @@ class _AppUpdateGateState extends ConsumerState<AppUpdateGate>
       children: [
         ExcludeFocus(excluding: forced != null, child: widget.child),
         if (forced != null) ...[
+          // 뒤로 가기를 여기서 소비해, 아래 화면의 종료 확인 팝업 등이 뜨지 않게 한다.
+          BackButtonListener(
+            onBackButtonPressed: () async => true,
+            child: const SizedBox.shrink(),
+          ),
           const Positioned.fill(
             child: ModalBarrier(dismissible: false, color: Color(0x99000000)),
           ),
