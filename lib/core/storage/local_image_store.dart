@@ -5,6 +5,8 @@ import 'package:dio/dio.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 
+import '../image/image_compressor.dart';
+
 /// 원격 이미지를 바이트로 내려받는 함수. 테스트에서 네트워크 없이 주입한다.
 typedef LocalImageDownloader = Future<List<int>> Function(String url);
 
@@ -140,9 +142,11 @@ class LocalImageStore {
     return File(path.join(directoryPath, name));
   }
 
-  /// 사용자가 촬영/선택한 이미지를 저장소로 복사하고 DB에 넣을 상대 경로를
-  /// 반환한다. 형식/용량 위반은 [FileSystemException]으로 알린다(화면이
-  /// 그대로 사용자 메시지로 보여준다).
+  /// 사용자가 촬영/선택한 이미지를 이미지 정책(긴 변 1600px 이하·JPEG 85%)
+  /// 대로 압축해 저장소에 넣고 DB에 넣을 상대 경로를 반환한다. 이미 정책대로
+  /// 처리된 파일([ImageCompressor.isProcessed])은 재인코딩 없이 복사한다.
+  /// 형식/용량 위반은 [FileSystemException]으로 알린다(화면이 그대로 사용자
+  /// 메시지로 보여준다).
   Future<String> saveSelected(String pickedPath) async {
     final source = File(pickedPath);
     if (!await source.exists()) throw const FileSystemException();
@@ -154,12 +158,19 @@ class LocalImageStore {
     if (sizeBytes == 0) {
       throw FileSystemException('이미지 파일이 손상되었습니다.', pickedPath);
     }
-    if (sizeBytes > maxBytes) {
+    final directory = await ensureDirectory();
+    final fileName = 'local_${DateTime.now().microsecondsSinceEpoch}.jpg';
+    final target = path.join(directory.path, fileName);
+    if (ImageCompressor.isProcessed(pickedPath)) {
+      await source.copy(target);
+    } else {
+      await ImageCompressor.compressToFile(pickedPath, target);
+    }
+    // 압축 후에도 서버 제한을 넘으면(사실상 드묾) 저장하지 않는다.
+    if (await File(target).length() > maxBytes) {
+      await File(target).delete();
       throw FileSystemException('이미지 용량은 5MB 이하만 가능합니다.', pickedPath);
     }
-    final directory = await ensureDirectory();
-    final fileName = 'local_${DateTime.now().microsecondsSinceEpoch}$extension';
-    await source.copy(path.join(directory.path, fileName));
     return relativeOf(fileName);
   }
 

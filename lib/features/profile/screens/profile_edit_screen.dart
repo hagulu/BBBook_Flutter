@@ -130,8 +130,15 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 
   Future<void> _pickImage() async {
-    final path = await pickImageFromGallery();
-    if (path == null || !mounted) return;
+    String? picked;
+    try {
+      picked = await pickImageFromGallery();
+    } catch (_) {
+      if (mounted) AppSnackBar.error(context, '이미지를 선택하지 못했습니다.');
+      return;
+    }
+    if (picked == null || !mounted) return;
+    final path = picked;
     final error = await validateImageFile(path);
     if (!mounted) return;
     if (error != null) {

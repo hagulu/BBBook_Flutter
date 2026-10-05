@@ -6,6 +6,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:pro_image_editor/pro_image_editor.dart';
 
+import '../../../core/image/image_compressor.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../widgets/app_alert.dart';
 import '../../widgets/app_confirm.dart';
@@ -308,9 +309,13 @@ class _SharedImageEditorScreenState extends State<_SharedImageEditorScreen> {
   ImageGenerationConfigs _imageGenerationFor(SharedImageEditorProfile profile) {
     switch (profile) {
       case SharedImageEditorProfile.general:
-        return const ImageGenerationConfigs(
+        return ImageGenerationConfigs(
           outputFormat: OutputFormat.jpg,
-          jpegQuality: 85,
+          jpegQuality: ImagePolicy.jpegQuality,
+          maxOutputSize: Size(
+            ImagePolicy.maxLongSide.toDouble(),
+            ImagePolicy.maxLongSide.toDouble(),
+          ),
           // 편집 없이 바로 완료를 눌러도 결과가 반환되도록 명시한다. false면
           // pro_image_editor가 완료 버튼을 취소와 동일하게 처리해 아무
           // 결과도 돌려주지 않는다.
@@ -351,7 +356,10 @@ class _SharedImageEditorScreenState extends State<_SharedImageEditorScreen> {
       final temporaryDirectory = await getTemporaryDirectory();
       final candidatePath = path.join(
         temporaryDirectory.path,
-        'edited_${DateTime.now().microsecondsSinceEpoch}.jpg',
+        // 일반 프로필 출력은 이미지 정책(JPEG 85·긴 변 1600px 이하)을 이미
+        // 충족하므로 처리 완료 표지를 붙여 저장 단계의 재인코딩을 막는다.
+        '${_isCropOnly ? 'edited_' : ImageCompressor.processedPrefix}'
+        '${DateTime.now().microsecondsSinceEpoch}.jpg',
       );
       await File(candidatePath).writeAsBytes(bytes, flush: true);
       savedPath = candidatePath;

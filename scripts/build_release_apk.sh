@@ -10,4 +10,4 @@ API_BASE_URL="http://192.168.0.51:8081"
 cd "$(dirname "$0")/.."
 
 flutter build apk --release \
-  --dart-define=API_BASE_URL="$API_BASE_URL"
+  --dart-define=API_BASE_URL="$API_BASE_URL" --dart-define=ALLOW_TEST_ADS=true

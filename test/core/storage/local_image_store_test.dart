@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:bbbook/core/storage/local_image_store.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as path;
 
 /// 로컬 이미지 저장소의 서비스 로직 테스트(메모 사진·독후감 이미지가
@@ -37,16 +38,29 @@ void main() {
     return file;
   }
 
+  /// 실제로 디코딩되는 이미지 파일(압축 로직이 해석할 수 있어야 한다).
+  Future<File> createImage(
+    String name, {
+    int width = 40,
+    int height = 20,
+  }) async {
+    final file = File(path.join(root.path, name));
+    await file.writeAsBytes(
+      img.encodePng(img.Image(width: width, height: height)),
+    );
+    return file;
+  }
+
   group('saveSelected', () {
     test('고른 사진을 저장소로 복사하고 상대 경로를 돌려준다', () async {
-      final source = await createSource('picked.jpg');
+      final source = await createImage('picked.jpg');
 
       final stored = await store.saveSelected(source.path);
 
       expect(path.dirname(stored), store.directoryName);
       final saved = await store.resolve(stored);
       expect(await saved!.exists(), isTrue);
-      expect(await saved.length(), await source.length());
+      expect(path.extension(saved.path), '.jpg');
       // 원본(카메라 임시 파일)은 그대로 둔다.
       expect(await source.exists(), isTrue);
     });
@@ -67,6 +81,22 @@ void main() {
         throwsA(isA<FileSystemException>()),
       );
       expect(await store.listFileNames(), isEmpty);
+    });
+
+    test('긴 변이 1600px을 넘으면 비율을 유지해 줄이고 작은 이미지는 키우지 않는다', () async {
+      final wide = await createImage('wide.png', width: 3200, height: 1600);
+      final tall = await createImage('tall.png', width: 800, height: 2400);
+      final small = await createImage('small.png', width: 300, height: 200);
+
+      Future<img.Image> load(String stored) async =>
+          img.decodeJpg((await (await store.resolve(stored))!.readAsBytes()))!;
+
+      final wideImage = await load(await store.saveSelected(wide.path));
+      expect((wideImage.width, wideImage.height), (1600, 800));
+      final tallImage = await load(await store.saveSelected(tall.path));
+      expect((tallImage.width, tallImage.height), (533, 1600));
+      final smallImage = await load(await store.saveSelected(small.path));
+      expect((smallImage.width, smallImage.height), (300, 200));
     });
 
     test('없는 파일을 고르면 예외로 알린다', () async {
@@ -153,7 +183,7 @@ void main() {
   group('경로 해석', () {
     test('마이그레이션 이전 절대 경로·file:// 값도 현재 디렉터리 기준으로 읽는다', () async {
       final stored = await store.saveSelected(
-        (await createSource('a.png')).path,
+        (await createImage('a.png')).path,
       );
       final fileName = store.fileNameOf(stored)!;
 
@@ -175,7 +205,7 @@ void main() {
   group('삭제와 orphan 정리', () {
     test('교체 전후가 같은 파일이면 지우지 않는다', () async {
       final stored = await store.saveSelected(
-        (await createSource('b.jpg')).path,
+        (await createImage('b.jpg')).path,
       );
 
       await store.delete(stored, except: stored);
@@ -187,13 +217,13 @@ void main() {
 
     test('참조되지 않는 오래된 파일만 지운다', () async {
       final referenced = await store.saveSelected(
-        (await createSource('keep.jpg')).path,
+        (await createImage('keep.jpg')).path,
       );
       final orphan = await store.saveSelected(
-        (await createSource('drop.jpg')).path,
+        (await createImage('drop.jpg')).path,
       );
       final justCopied = await store.saveSelected(
-        (await createSource('fresh.jpg')).path,
+        (await createImage('fresh.jpg')).path,
       );
       // 방금 복사돼 아직 DB에 기록되지 않은 파일과 구분하기 위해 유예
       // 시간을 넘긴 것처럼 수정 시각을 되돌린다.
@@ -213,7 +243,7 @@ void main() {
     });
 
     test('clear는 사진 폴더를 통째로 비운다', () async {
-      await store.saveSelected((await createSource('c.jpg')).path);
+      await store.saveSelected((await createImage('c.jpg')).path);
 
       await store.clear();
 

@@ -19,6 +19,7 @@
 - `lib/core/network/patch_field.dart` — PATCH 필드 3-상태(생략=유지 / PatchField.value=수정 / PatchField.clear=명시적 null 삭제) 표현
 - `lib/core/storage/token_storage.dart` — refreshToken 시큐어 스토리지 래퍼
 - `lib/core/storage/client_id_storage.dart` — X-Client-Id 헤더용 설치 단위 클라이언트 식별자(UUID) 저장/재사용
+- `lib/core/image/image_compressor.dart` — 서비스 공통 이미지 정책(긴 변 1600px·JPEG 85%·종횡비 유지·확대 안 함)과 isolate 압축 로직(`ImagePolicy`, `ImageCompressor`)
 - `lib/core/storage/local_image_store.dart` — 기능별 이미지 로컬 파일 저장소(선택 이미지 저장·서버 이미지 내려받기·orphan 정리, DB에는 폴더 기준 상대 경로만 보관)
 - `lib/core/policy/attachment_limit_policy.dart` — 노트/독후감 이미지 첨부 한도 정책(현재 고정값: 노트 3·독후감 0, 추후 서버 등급별 값으로 교체 가능한 단일 지점) 및 서버 제한 에러코드 상수
 - `lib/core/config/ad_config.dart` — AdMob 배너 광고 단위 ID 단일 관리 지점(현재는 Google 공식 테스트 ID, 실제 배포 시 이 값만 교체), release 빌드가 테스트 ID를 그대로 쓰면 막는 `assertConfiguredForRelease()`
@@ -93,7 +94,7 @@
 
 - `lib/features/book_note/screens/book_note_list.dart` — 책 기록 상세의 노트 목록 탭(노트 추가·상세 진입, 당겨서 새로고침)
 - `lib/features/book_note/screens/book_note_detail_screen.dart` — 노트 제목 자동 저장과 타입별 메모 타임라인·로컬 CRUD 화면
-- `lib/features/book_note/screens/memo_photo_camera_screen.dart` — 공용 카메라(`shared/image`)에 메모 사진 촬영 정책을 얹은 진입점(세로 미리보기·갤러리 재인코딩·5MB 촬영 게이트)
+- `lib/features/book_note/screens/memo_photo_camera_screen.dart` — 공용 카메라(`shared/image`)에 메모 사진 촬영 정책을 얹은 진입점(세로 미리보기·갤러리 이미지 정책 압축)
 - `lib/features/book_note/screens/widgets/book_note_ai_memo_composer_screen.dart` — AI 메모 생성 전용 긴 텍스트 입력 화면(메모 추가 시트의 "AI로 메모 만들기" 진입점), 생성 실패 시 입력 내용 보존
 - `lib/features/book_note/data/book_note_api.dart` — 노트 제목 PUT, 메모 생성/수정/삭제, 사진 업로드, AI 메모 생성, 증분 동기화 조회 API 호출
 - `lib/features/book_note/data/book_note_dao.dart` — 로컬 DB 쿼리·dirty push 확정·전체/증분 reconcile(dirty 행 보호, 로컬 PK와 server_id 분리)
@@ -253,9 +254,9 @@
 ## shared/image
 
 - `lib/shared/image/widgets/shared_image_viewer.dart` — 공용 이미지 전체화면 뷰어(핀치 확대/축소, 호출부가 넘긴 이미지 위젯 표시, 선택적 수정/삭제 액션 바)
-- `lib/shared/image/screens/shared_camera_screen.dart` — 공용 카메라 화면(초기화·방향 잠금·생명주기는 공통, 미리보기 모드·가이드·갤러리 압축·촬영 용량 게이트는 `CameraCapturePolicy`로 목적별 주입), 좌하단 아이콘으로 갤러리 전환
+- `lib/shared/image/screens/shared_camera_screen.dart` — 공용 카메라 화면(초기화·방향 잠금·생명주기는 공통, 미리보기 모드·가이드·갤러리 압축 여부·촬영 용량 게이트는 `CameraCapturePolicy`로 목적별 주입), 좌하단 아이콘으로 갤러리 전환
 - `lib/shared/image/screens/shared_image_editor_screen.dart` — 공용 이미지 에디터(`pro_image_editor` 래핑, JPEG 출력), 일반(크롭·회전·텍스트·그리기)/OCR(크롭·회전만) 프로필
-- `lib/shared/image/services/image_gallery_picker.dart` — `image_picker` 갤러리 선택과 `LocalImageStore` 기준(jpg/jpeg/png/webp·5MB) 형식·용량 검증
+- `lib/shared/image/services/image_gallery_picker.dart` — `image_picker` 갤러리 선택(기본 이미지 정책 압축)과 `LocalImageStore` 기준(jpg/jpeg/png/webp·5MB) 형식·용량 검증
 
 ## docs
 
@@ -267,3 +268,4 @@
 - `docs/review/20261002-134340-current-notices-review.md` — 새 공지 확인 상태·목록 로딩·중요 공지 시트 높이 코드 리뷰 결과
 - `docs/review/20261002-140520-current-app-update-review.md` — 앱 업데이트 정책 재확인·강제 차단 전환·스토어 실패 안내 코드 리뷰 결과
 - `docs/review/20261002-153041-current-sanction-profile-review.md` — 징계 제한 안내·공개 완독 책장 프로필 헤더 변경분 코드 리뷰 결과
+- `docs/review/20261005-155112-current-image-compression-review.md` — 공통 이미지 압축 변경분의 Android HEIC 처리·원본 디코딩 메모리·반복 JPEG 인코딩 코드 리뷰 결과

@@ -21,7 +21,7 @@ class ThumbnailPickResult {
 /// (책 정보 수정)와 `custom_book_dialog.dart`(직접 등록)가 공유한다.
 Future<ThumbnailPickResult?> pickBookThumbnail() async {
   try {
-    final picked = await pickImageFromGallery(imageQuality: 90);
+    final picked = await pickImageFromGallery();
     if (picked == null) return null;
 
     final error = await validateImageFile(picked);

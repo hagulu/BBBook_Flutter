@@ -18,6 +18,7 @@ import '../../services/book_note_memo_ocr_service.dart';
 const _memoOcrCapturePolicy = CameraCapturePolicy(
   guideOverlayBuilder: _buildOcrGuideOverlay,
   hintText: '문장이 가이드선과 수평이 되도록 맞춰주세요.',
+  compressGalleryImage: false,
   copyGalleryPickToTemp: true,
   tempFilePrefix: 'memo_ocr_gallery_',
 );

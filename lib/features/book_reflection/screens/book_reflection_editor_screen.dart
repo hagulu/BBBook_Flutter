@@ -500,7 +500,7 @@ class _BookReflectionEditorScreenState
   /// 서버 업로드는 저장 후 push가 맡으므로(오프라인에서도 이미지 첨부가
   /// 가능해야 한다) 여기서는 네트워크를 타지 않는다.
   Future<String?> _pickAndSaveImage(BuildContext context) async {
-    final picked = await pickImageFromGallery(imageQuality: 85, maxWidth: 1600);
+    final picked = await pickImageFromGallery();
     if (picked == null || !context.mounted) return null;
     final edited = await openSharedImageEditor(
       context,

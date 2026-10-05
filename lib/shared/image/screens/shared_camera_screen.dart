@@ -47,8 +47,7 @@ class CameraCapturePolicy {
     this.previewMode = CameraPreviewMode.direct,
     this.guideOverlayBuilder,
     this.hintText,
-    this.galleryImageQuality,
-    this.galleryMaxWidth,
+    this.compressGalleryImage = true,
     this.copyGalleryPickToTemp = false,
     this.tempFilePrefix,
     this.maxCaptureBytes,
@@ -64,10 +63,9 @@ class CameraCapturePolicy {
   /// 가이드 아래 안내 문구.
   final String? hintText;
 
-  /// 갤러리 선택 시 재인코딩 품질/최대 너비. 둘 다 비우면 원본 그대로
+  /// 갤러리 선택 시 이미지 정책대로 압축할지 여부. false면 원본 그대로
   /// 받는다(OCR — 인식률을 위해 압축하지 않는다).
-  final int? galleryImageQuality;
-  final double? galleryMaxWidth;
+  final bool compressGalleryImage;
 
   /// 갤러리에서 고른 파일을 앱 임시 디렉터리로 복사해 안정된 경로로
   /// 만들지 여부(OCR — 분석이 끝날 때까지 원본이 살아 있어야 한다).
@@ -357,8 +355,7 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
     String? partialCopyPath;
     try {
       final picked = await pickImageFromGallery(
-        imageQuality: _policy.galleryImageQuality,
-        maxWidth: _policy.galleryMaxWidth,
+        compress: _policy.compressGalleryImage,
       );
       if (picked == null) return;
       developer.log('[공용 카메라 갤러리 선택] target=image_picker result=SUCCESS');
