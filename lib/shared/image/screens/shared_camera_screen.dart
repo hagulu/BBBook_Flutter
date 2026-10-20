@@ -106,12 +106,23 @@ class SharedCameraScreen extends StatefulWidget {
 
 class _SharedCameraScreenState extends State<SharedCameraScreen>
     with WidgetsBindingObserver {
+  // Android CameraX 플러그인은 앱 전역에 Preview 하나만 들고 있어, 이전
+  // 컨트롤러 해제가 끝나기 전에 다음 컨트롤러를 만들면 서로의 Preview를
+  // 해제해 버린다. 화면 인스턴스와 무관하게 생성/해제를 한 줄로 세운다.
+  static Future<void> _cameraSessionChain = Future<void>.value();
+
+  // 카메라를 쓰는 화면은 하나뿐이어야 한다. Navigator.push 결과는 이전
+  // 화면의 dispose()(pop 애니메이션 종료)보다 먼저 돌아오므로, 닫자마자
+  // 다시 열면 이전 화면의 뒤늦은 해제가 새 카메라를 해제할 수 있다.
+  static _SharedCameraScreenState? _cameraOwner;
+
   CameraController? _controller;
   bool _isLoading = true;
   bool _isTakingPicture = false;
   bool _isPickingImage = false;
   String? _errorMessage;
   int _cameraGeneration = 0;
+  int? _initializingGeneration;
 
   // 회전 잠금 상태에서도 실제 기기 자세를 알아내 촬영 방향을 맞추고
   // (lockCaptureOrientation), 컨트롤 아이콘 방향도 함께 돌리기 위한 값.
@@ -122,6 +133,17 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
   bool _orientationSubscriptionPaused = false;
 
   CameraCapturePolicy get _policy => widget.policy;
+
+  bool get _isInitializingCamera =>
+      _initializingGeneration == _cameraGeneration;
+
+  bool get _ownsCamera => identical(_cameraOwner, this);
+
+  static Future<void> _enqueueCameraSession(Future<void> Function() task) {
+    final run = _cameraSessionChain.then((_) => task());
+    _cameraSessionChain = run.catchError((Object _) {});
+    return run;
+  }
 
   @override
   void initState() {
@@ -137,10 +159,13 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_orientationSubscription?.cancel());
+    if (_ownsCamera) _cameraOwner = null;
     _cameraGeneration++;
     final controller = _controller;
     _controller = null;
-    if (controller != null) unawaited(controller.dispose());
+    if (controller != null) {
+      unawaited(_enqueueCameraSession(() => _disposeCameraQuietly(controller)));
+    }
     super.dispose();
   }
 
@@ -210,9 +235,21 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
     switch (state) {
       case AppLifecycleState.resumed:
         _resumeOrientationSensor();
-        if (!_isPickingImage) _initializeCamera();
+        // 새 화면에 카메라를 넘긴 채 닫히는 중인 화면은 다시 가져오지 않는다.
+        if (_ownsCamera &&
+            !_isPickingImage &&
+            !_isInitializingCamera &&
+            _controller == null) {
+          _initializeCamera();
+        }
         break;
       case AppLifecycleState.inactive:
+        _pauseOrientationSensor();
+        // 최초 권한 다이얼로그도 inactive를 일으킨다. 초기화 중이면 해제하지
+        // 않고 이어가게 둔다 — 여기서 끊으면 resumed에서 시작한 두 번째
+        // 초기화와 겹친다.
+        if (!_isInitializingCamera) _releaseCamera();
+        break;
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
@@ -229,20 +266,45 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
     if (mounted) {
       setState(() => _isLoading = true);
     }
-    if (controller != null) unawaited(controller.dispose());
+    if (controller != null) {
+      unawaited(_enqueueCameraSession(() => _disposeCameraQuietly(controller)));
+    }
   }
 
-  Future<void> _initializeCamera() async {
+  Future<void> _initializeCamera() {
+    // 이전 화면의 해제(진행 중인 초기화 무효화 포함)를 새 초기화보다 먼저
+    // 큐에 넣어, 이전 화면의 dispose()가 할 일이 남지 않게 한다.
+    final previousOwner = _cameraOwner;
+    if (previousOwner != null && !identical(previousOwner, this)) {
+      previousOwner._releaseCamera();
+    }
+    _cameraOwner = this;
     final generation = ++_cameraGeneration;
+    _initializingGeneration = generation;
+    final previousController = _controller;
     setState(() {
+      _controller = null;
       _isLoading = true;
       _errorMessage = null;
     });
+    return _enqueueCameraSession(() async {
+      if (previousController != null) {
+        await _disposeCameraQuietly(previousController);
+      }
+      try {
+        if (!mounted || generation != _cameraGeneration) return;
+        await _openCamera(generation);
+      } finally {
+        if (_initializingGeneration == generation) {
+          _initializingGeneration = null;
+        }
+      }
+    });
+  }
+
+  Future<void> _openCamera(int generation) async {
     CameraController? nextController;
     try {
-      final previousController = _controller;
-      _controller = null;
-      if (previousController != null) await previousController.dispose();
       final cameras = await availableCameras();
       if (cameras.isEmpty) throw StateError('camera_not_found');
       final camera = cameras.firstWhere(
@@ -256,7 +318,7 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
       );
       await nextController.initialize();
       if (!mounted || generation != _cameraGeneration) {
-        await nextController.dispose();
+        await _disposeCameraQuietly(nextController);
         return;
       }
       // 방향 잠금 중 새 센서 값이 들어오면 최신 방향까지 다시 적용한다.
@@ -271,7 +333,7 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
           requirePublishedController: false,
         );
         if (!mounted || generation != _cameraGeneration) {
-          await nextController.dispose();
+          await _disposeCameraQuietly(nextController);
           return;
         }
         if (!locked) throw StateError('capture_orientation_lock_failed');
@@ -283,7 +345,7 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
       });
       developer.log('[공용 카메라] target=camera result=SUCCESS');
     } catch (error, stackTrace) {
-      if (nextController != null) await nextController.dispose();
+      if (nextController != null) await _disposeCameraQuietly(nextController);
       if (!mounted || generation != _cameraGeneration) return;
       developer.log(
         '[공용 카메라] target=camera '
@@ -572,6 +634,21 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
           ),
         );
     }
+  }
+}
+
+/// 해제 실패가 초기화 실패 처리(로딩 해제·안내 표시)를 막지 않도록 삼킨다.
+/// Android CameraX 플러그인은 이미 해제된 Preview를 다시 해제하면
+/// `IllegalStateException`을 던진다.
+Future<void> _disposeCameraQuietly(CameraController controller) async {
+  try {
+    await controller.dispose();
+  } catch (error, stackTrace) {
+    developer.log(
+      '[공용 카메라 해제] target=camera result=FAIL reason=camera_dispose_error',
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 }
 

@@ -697,12 +697,28 @@ class BookNoteDao {
   /// 서버 사진이 "같은 사진"인지 비교한다. 호스트나 쿼리 문자열(서명/만료
   /// 등)이 달라져도 경로가 같으면 같은 사진으로 본다 — 그러지 않으면
   /// 동기화 때마다 교체로 오인해 로컬 사본을 지우고 다시 받는다.
+  ///
+  /// 로컬 → 서버 저장 전환은 Import 첨부 응답의 R2 키(`{prefix}/notes/…`,
+  /// 호스트 없음)를 그대로 저장하지만([applyImportResults]), 이후 조회 API는
+  /// 같은 사진을 전체 공개 URL로 내려준다. 공개 URL 경로는 그 키로 끝나므로
+  /// 한쪽이 키면 끝부분으로 비교한다 — 그러지 않으면 전환 직후 첫 동기화가
+  /// 방금 올린 사진을 모두 교체로 보고 로컬 사본을 끊는다.
   static bool _isSameImage(String? a, String? b) {
     if (a == null || b == null) return a == b;
-    return _imageIdentityOf(a) == _imageIdentityOf(b);
+    final identityA = _imageIdentityOf(a);
+    final identityB = _imageIdentityOf(b);
+    if (identityA == identityB) return true;
+    if (!_hasScheme(a)) return identityB.endsWith('/$identityA');
+    if (!_hasScheme(b)) return identityA.endsWith('/$identityB');
+    return false;
   }
 
-  static String _imageIdentityOf(String url) => Uri.tryParse(url)?.path ?? url;
+  static String _imageIdentityOf(String url) {
+    final path = Uri.tryParse(url)?.path ?? url;
+    return path.startsWith('/') ? path.substring(1) : path;
+  }
+
+  static bool _hasScheme(String url) => Uri.tryParse(url)?.hasScheme ?? false;
 
   /// `/api/me/records` 전체 조회 결과로 노트/메모 테이블을 맞춘다: 서버에
   /// 있는 행은 upsert, 서버에 없는(로컬에만 남은) 비-dirty 행은 삭제. dirty

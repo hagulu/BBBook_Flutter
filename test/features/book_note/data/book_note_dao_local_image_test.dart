@@ -124,6 +124,40 @@ void main() {
     expect(await dao.getAllLocalImagePaths(), isEmpty);
   });
 
+  // 로컬 → 서버 저장 전환은 Import 첨부 응답의 R2 키를 그대로 저장하고,
+  // 이후 동기화는 같은 사진을 전체 공개 URL로 내려준다.
+  test('전환 때 저장한 R2 키가 같은 사진의 공개 URL로 동기화돼도 로컬 사본을 유지한다', () async {
+    const r2Key = 'prod/notes/400/imports/12/photo-a.jpg';
+    await applyServerPhoto(imageUrl: r2Key);
+    await dao.setLocalImagePath(
+      localId: (await readMemo()).id,
+      localImagePath: 'memo_images/local_1.jpg',
+      expectedImageUrl: r2Key,
+    );
+
+    await applyServerPhoto(imageUrl: 'https://cdn.example.com/$r2Key');
+
+    final memo = await readMemo();
+    expect(memo.localImagePath, 'memo_images/local_1.jpg');
+    expect(memo.imageUrl, 'https://cdn.example.com/$r2Key');
+  });
+
+  test('전환 때 저장한 R2 키와 다른 사진이 동기화되면 로컬 사본 참조를 끊는다', () async {
+    const r2Key = 'prod/notes/400/imports/12/photo-a.jpg';
+    await applyServerPhoto(imageUrl: r2Key);
+    await dao.setLocalImagePath(
+      localId: (await readMemo()).id,
+      localImagePath: 'memo_images/local_1.jpg',
+      expectedImageUrl: r2Key,
+    );
+
+    await applyServerPhoto(
+      imageUrl: 'https://cdn.example.com/prod/notes/400/photo-b.jpg',
+    );
+
+    expect((await readMemo()).localImagePath, isNull);
+  });
+
   test('사진 내려받기 대상은 서버 사진만 있고 로컬 사본이 없는 메모다', () async {
     const imageUrl = 'https://cdn.example.com/notes/400/photo-a.jpg';
     await applyServerPhoto(imageUrl: imageUrl);

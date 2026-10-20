@@ -270,3 +270,4 @@
 - `docs/review/20261002-153041-current-sanction-profile-review.md` — 징계 제한 안내·공개 완독 책장 프로필 헤더 변경분 코드 리뷰 결과
 - `docs/review/20261005-155112-current-image-compression-review.md` — 공통 이미지 압축 변경분의 Android HEIC 처리·원본 디코딩 메모리·반복 JPEG 인코딩 코드 리뷰 결과
 - `docs/review/20261020-165155-current-finished-search-review.md` — 완독 메모·독후감 검색 변경분의 기록 변경 후 결과 갱신·강조 메모 검색 누락 코드 리뷰 결과
+- `docs/review/20261020-183411-current-camera-image-review.md` — 공용 카메라 직렬화·노트 사진 동기화 변경분의 화면 재진입 시 카메라 소유권 경합 코드 리뷰 결과
