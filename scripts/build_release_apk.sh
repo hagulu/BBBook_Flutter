@@ -5,7 +5,7 @@ set -euo pipefail
 # API_BASE_URL은 --dart-define으로 지정하고, 카카오/네이버 SDK 키는
 # android/local.properties에서 네이티브 빌드에 주입한다.
 
-API_BASE_URL="http://192.168.0.51:8081"
+API_BASE_URL="https://bbbookspring-production.up.railway.app"
 
 cd "$(dirname "$0")/.."
 

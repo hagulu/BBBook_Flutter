@@ -955,8 +955,10 @@ class BookshelfRepository {
 
   Future<List<BookItem>> getGridTab(BookStatus status) => _dao.getGrid(status);
 
-  Future<List<BookItem>> searchFinished(FinishedFilter filter) =>
-      _dao.searchFinished(filter);
+  Future<List<BookItem>> searchFinished(
+    FinishedFilter filter, {
+    int? recordOwnerId,
+  }) => _dao.searchFinished(filter, recordOwnerId: recordOwnerId);
 
   Future<List<String>> getDistinctCategories() => _dao.getDistinctCategories();
 

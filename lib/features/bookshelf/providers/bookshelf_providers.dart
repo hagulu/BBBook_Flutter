@@ -167,6 +167,9 @@ class FinishedFilterNotifier extends Notifier<FinishedFilter> {
 
   void setKeyword(String keyword) => state = state.copyWith(keyword: keyword);
 
+  void setIncludeRecords(bool value) =>
+      state = state.copyWith(includeRecords: value);
+
   void toggleCategory(String category) {
     final categories = Set<String>.from(state.categories);
     if (!categories.remove(category)) {
@@ -199,9 +202,12 @@ class FinishedFilterNotifier extends Notifier<FinishedFilter> {
   /// 함께 지운다.
   void reset() => state = const FinishedFilter();
 
-  /// 필터 바텀시트의 "초기화" — 검색어는 필터 기준이 아니므로 그대로 두고
-  /// 카테고리·태그·명작·난이도만 지운다.
-  void resetCriteria() => state = FinishedFilter(keyword: state.keyword);
+  /// 필터 바텀시트의 "초기화" — 검색어·검색 범위(메모·독후감 포함)는 필터
+  /// 기준이 아니므로 그대로 두고 카테고리·태그·명작·난이도만 지운다.
+  void resetCriteria() => state = FinishedFilter(
+    keyword: state.keyword,
+    includeRecords: state.includeRecords,
+  );
 }
 
 final finishedFilterProvider =
@@ -212,7 +218,9 @@ final finishedFilterProvider =
 final finishedBooksProvider = FutureProvider<List<BookItem>>((ref) {
   ref.watch(bookshelfSyncVersionProvider);
   final filter = ref.watch(finishedFilterProvider);
-  return ref.watch(bookshelfRepositoryProvider).searchFinished(filter);
+  return ref
+      .watch(bookshelfRepositoryProvider)
+      .searchFinished(filter, recordOwnerId: ref.watch(recordOwnerIdProvider));
 });
 
 /// 완독한 책 중 ISBN(공용 book 연결)이 없는 책. 완독 상단 배너(일괄 연결

@@ -15,7 +15,9 @@ import '../../../../shared/widgets/app_alert.dart';
 import '../../../../shared/widgets/app_inline_banner_ad.dart';
 import '../../../../shared/widgets/app_snackbar.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
+import '../../../book_note/providers/book_note_providers.dart';
 import '../../../book_record/screens/book_record_screen.dart';
+import '../../../book_reflection/providers/book_reflection_providers.dart';
 import '../../models/book_item.dart';
 import '../../models/finished_filter.dart';
 import '../../providers/bookshelf_providers.dart';
@@ -126,10 +128,11 @@ Color _finishedDividerColor(BuildContext context) =>
 ///   없다). 다만 [BookshelfScreen]이 이 CustomScrollView의 세로 스크롤
 ///   방향을 감지해 상단 탭 바(읽는 중/완독/읽고 싶음/중단)는 같은 타이밍에
 ///   접었다 펼친다.
-/// - 검색/필터 바(`_FinishedSearchBar`): 검색창 + 필터 버튼. 스크롤과는
-///   무관하게, 아이콘 바의 검색 버튼을 누를 때만 접혔다 펼쳐진다(토글). 펼칠
-///   때는 목록을 맨 위로 스크롤해 바로 보이게 하고 검색창에 포커스를 준다.
-///   닫으면(X) 검색을 "종료"하는 것으로 보고 검색어/필터도 함께 초기화한다.
+/// - 검색/필터 바(`_FinishedSearchBar`): 검색창 + 메모·독후감 포함 토글 +
+///   필터 버튼. 스크롤과는 무관하게, 아이콘 바의 검색 버튼을 누를 때만
+///   접혔다 펼쳐진다(토글). 펼칠 때는 목록을 맨 위로 스크롤해 바로 보이게
+///   하고 검색창에 포커스를 준다. 닫으면(X) 검색을 "종료"하는 것으로 보고
+///   검색어/검색 범위/필터도 함께 초기화한다.
 ///   검색은 입력할 때마다 짧은 디바운스 후 로컬 DB를 바로 재조회한다(버튼 없음).
 class FinishedTabView extends ConsumerStatefulWidget {
   const FinishedTabView({super.key});
@@ -265,6 +268,38 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     _searchController.clear();
     ref.read(finishedFilterProvider.notifier).setKeyword('');
     _resetScroll();
+  }
+
+  /// 검색 범위에 메모·독후감 본문을 넣었다 뺀다. 검색어가 있으면 결과
+  /// 집합이 달라지므로 검색어 변경과 같이 맨 위로 되돌린다.
+  void _toggleIncludeRecords() {
+    final includeRecords = ref.read(finishedFilterProvider).includeRecords;
+    ref
+        .read(finishedFilterProvider.notifier)
+        .setIncludeRecords(!includeRecords);
+    _resetScroll();
+  }
+
+  /// 메모·독후감까지 찾는 검색 중일 때만 결과를 다시 조회한다. 필터는 그대로라
+  /// build()가 재조회 동안 이전 목록을 유지하다 바뀐 결과로 교체한다.
+  void _refreshRecordSearch() {
+    if (ref.read(finishedFilterProvider).searchesRecords) {
+      ref.invalidate(finishedBooksProvider);
+    }
+  }
+
+  /// 메모 로컬 편집은 동기화 버전을 올리지 않고 노트 상세 상태만 바꾸므로,
+  /// 책 기록 화면에서 돌아온 시점에 메모·독후감 검색 결과를 직접 다시
+  /// 조회한다(`book_note_list.dart`가 노트 상세에서 돌아올 때 목록을
+  /// 무효화하는 것과 같은 방식).
+  Future<void> _openBookRecord(BookItem book) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => BookRecordScreen(userBookId: book.userBookId),
+      ),
+    );
+    if (!mounted) return;
+    _refreshRecordSearch();
   }
 
   /// 그리드/리스트 행 높이 계산 방식이 서로 달라 인덱스 스크러버의 오프셋이
@@ -445,6 +480,14 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
     // watch해 둬야 이 값이 바뀔 때(예: 광고 제거 구매) 화면이 다시
     // 그려져 광고 슬롯이 즉시 사라지거나 나타난다.
     ref.watch(adsEnabledProvider);
+    // 메모·독후감은 책장 동기화 버전과 별개로 바뀐다(기록 동기화, 다른
+    // 화면에서의 독후감 저장·삭제 등). 메모·독후감까지 찾는 검색 중이면
+    // 이 신호에도 결과를 다시 조회한다.
+    ref.listen(bookNoteSyncVersionProvider, (_, _) => _refreshRecordSearch());
+    ref.listen(
+      bookReflectionSyncVersionProvider,
+      (_, _) => _refreshRecordSearch(),
+    );
     final filter = ref.watch(finishedFilterProvider);
     final books = ref.watch(finishedBooksProvider);
     final isDefaultMode = filter.isDefaultMode;
@@ -513,6 +556,8 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
                         searchFocusNode: _searchFocusNode,
                         onSearchChanged: _onSearchChanged,
                         onClearSearch: _clearSearch,
+                        includeRecords: filter.includeRecords,
+                        onToggleIncludeRecords: _toggleIncludeRecords,
                         filterActiveCount: filter.activeCount,
                         onToggleFilterPanel: _openFilterSheet,
                       ),
@@ -679,7 +724,10 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
             childAspectRatio: _kFinishedGridAspectRatio,
           ),
           delegate: SliverChildBuilderDelegate(
-            (context, index) => _FinishedBookCard(book: chunkItems[index]),
+            (context, index) => _FinishedBookCard(
+              book: chunkItems[index],
+              onTap: () => _openBookRecord(chunkItems[index]),
+            ),
             childCount: chunkItems.length,
           ),
         ),
@@ -728,6 +776,7 @@ class _FinishedTabViewState extends ConsumerState<FinishedTabView>
           delegate: SliverChildBuilderDelegate(
             (context, index) => _FinishedBookListRow(
               book: chunkItems[index],
+              onTap: () => _openBookRecord(chunkItems[index]),
               categoryColor: _categoryColors[chunkItems[index].category],
               showDivider: chunkStart + index != items.length - 1,
             ),
@@ -1098,15 +1147,18 @@ class _FilterSheetResetButton extends ConsumerWidget {
   }
 }
 
-/// 완독 탭 검색창 + 필터 버튼 행. 높이는 항상 [_kFinishedSearchBarHeight]에
-/// 맞춰야 한다. 아이콘 바의 검색 버튼을 누를 때만 트리에 들어왔다 빠지는
-/// 방식(스크롤과 무관한 단순 토글)이라 `SliverToBoxAdapter`로 감싸 쓴다.
+/// 완독 탭 검색창 + (메모·독후감 포함 토글 / 필터 버튼) 행. 높이는 항상
+/// [_kFinishedSearchBarHeight]에 맞춰야 한다. 아이콘 바의 검색 버튼을 누를
+/// 때만 트리에 들어왔다 빠지는 방식(스크롤과 무관한 단순 토글)이라
+/// `SliverToBoxAdapter`로 감싸 쓴다.
 class _FinishedSearchBar extends StatelessWidget {
   const _FinishedSearchBar({
     required this.searchController,
     required this.searchFocusNode,
     required this.onSearchChanged,
     required this.onClearSearch,
+    required this.includeRecords,
+    required this.onToggleIncludeRecords,
     required this.filterActiveCount,
     required this.onToggleFilterPanel,
   });
@@ -1115,11 +1167,16 @@ class _FinishedSearchBar extends StatelessWidget {
   final FocusNode searchFocusNode;
   final ValueChanged<String> onSearchChanged;
   final VoidCallback onClearSearch;
+  final bool includeRecords;
+  final VoidCallback onToggleIncludeRecords;
   final int filterActiveCount;
   final VoidCallback onToggleFilterPanel;
 
   @override
   Widget build(BuildContext context) {
+    final recordsToggleColor = includeRecords
+        ? AppColors.of(context).accentForeground
+        : AppColors.of(context).textMuted;
     return SizedBox(
       height: _kFinishedSearchBarHeight,
       child: Column(
@@ -1129,41 +1186,46 @@ class _FinishedSearchBar extends StatelessWidget {
             height: 44,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: searchController,
-                focusNode: searchFocusNode,
-                onChanged: onSearchChanged,
-                decoration: InputDecoration(
-                  isDense: true,
-                  hintText: '책 이름, 작가, 출판사 검색',
-                  filled: true,
-                  fillColor: AppColors.of(context).surfaceSubtle,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  prefixIcon: Icon(
-                    PhosphorIconsRegular.magnifyingGlass,
-                    size: 20,
-                    color: AppColors.of(context).textMuted,
-                  ),
-                  suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: searchController,
-                    builder: (context, value, _) {
-                      if (value.text.isEmpty) return const SizedBox.shrink();
-                      return IconButton(
-                        icon: Icon(
-                          PhosphorIconsRegular.x,
-                          size: 18,
-                          color: AppColors.of(context).textMuted,
-                        ),
-                        onPressed: onClearSearch,
-                      );
-                    },
+              // 지우기 버튼은 입력이 있을 때만 suffixIcon으로 둔다 — 빈
+              // 상태에서도 자리를 잡아 두면 힌트가 그만큼 좁아져 메모·독후감까지
+              // 들어간 힌트가 좁은 화면에서 잘린다(입력이 있으면 힌트는
+              // 보이지 않으므로 그때만 자리를 내줘도 된다).
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: searchController,
+                builder: (context, value, _) => TextField(
+                  controller: searchController,
+                  focusNode: searchFocusNode,
+                  onChanged: onSearchChanged,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: includeRecords
+                        ? '제목, 작가, 출판사, 메모, 독후감'
+                        : '책 이름, 작가, 출판사 검색',
+                    filled: true,
+                    fillColor: AppColors.of(context).surfaceSubtle,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    prefixIcon: Icon(
+                      PhosphorIconsRegular.magnifyingGlass,
+                      size: 20,
+                      color: AppColors.of(context).textMuted,
+                    ),
+                    suffixIcon: value.text.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: Icon(
+                              PhosphorIconsRegular.x,
+                              size: 18,
+                              color: AppColors.of(context).textMuted,
+                            ),
+                            onPressed: onClearSearch,
+                          ),
                   ),
                 ),
               ),
@@ -1175,8 +1237,34 @@ class _FinishedSearchBar extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  Semantics(
+                    toggled: includeRecords,
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(0, 32),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        foregroundColor: recordsToggleColor,
+                      ),
+                      onPressed: onToggleIncludeRecords,
+                      icon: Icon(
+                        includeRecords
+                            ? PhosphorIconsFill.checkSquare
+                            : PhosphorIconsRegular.square,
+                        size: 16,
+                        color: recordsToggleColor,
+                      ),
+                      label: Text(
+                        '메모·독후감 포함',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: recordsToggleColor,
+                        ),
+                      ),
+                    ),
+                  ),
                   TextButton.icon(
                     style: TextButton.styleFrom(
                       minimumSize: const Size(0, 32),
@@ -1243,18 +1331,15 @@ class _ScrubBubble extends StatelessWidget {
 }
 
 class _FinishedBookCard extends StatelessWidget {
-  const _FinishedBookCard({required this.book});
+  const _FinishedBookCard({required this.book, required this.onTap});
 
   final BookItem book;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => BookRecordScreen(userBookId: book.userBookId),
-        ),
-      ),
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1328,11 +1413,13 @@ const _kFinishedListThumbWidth = 44.0;
 class _FinishedBookListRow extends StatelessWidget {
   const _FinishedBookListRow({
     required this.book,
+    required this.onTap,
     this.categoryColor,
     this.showDivider = true,
   });
 
   final BookItem book;
+  final VoidCallback onTap;
 
   /// 카테고리 이름으로 마스터 목록에서 매핑한 실제 카테고리 색(없으면 null).
   final Color? categoryColor;
@@ -1351,11 +1438,7 @@ class _FinishedBookListRow extends StatelessWidget {
     final textScale = MediaQuery.textScalerOf(context).scale(1.0);
 
     final row = InkWell(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => BookRecordScreen(userBookId: book.userBookId),
-        ),
-      ),
+      onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(

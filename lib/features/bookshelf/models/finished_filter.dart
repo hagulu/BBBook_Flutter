@@ -2,6 +2,7 @@
 class FinishedFilter {
   const FinishedFilter({
     this.keyword = '',
+    this.includeRecords = false,
     this.categories = const {},
     this.tagIds = const {},
     this.masterpieceOnly = false,
@@ -9,6 +10,15 @@ class FinishedFilter {
   });
 
   final String keyword;
+
+  /// 검색어를 책 정보(제목·작가·출판사)뿐 아니라 내가 쓴 메모·독후감 본문에서도
+  /// 찾을지 여부. 검색 범위 옵션일 뿐 그 자체로 목록을 거르지는 않으므로
+  /// 검색어가 비어 있으면 결과에 영향이 없다 — [isEmpty]/[activeCount]에 넣지 않는다.
+  final bool includeRecords;
+
+  /// 지금 검색 결과가 메모·독후감 내용에 좌우되는지. 이 값이 true일 때만
+  /// 기록 변경(동기화·편집)에 맞춰 결과를 다시 조회하면 된다.
+  bool get searchesRecords => includeRecords && keyword.isNotEmpty;
 
   /// 책 하나당 카테고리는 하나뿐이지만, 필터에서는 여러 카테고리를 선택해
   /// "그 중 하나라도 해당"(OR)으로 걸러낼 수 있다.
@@ -38,6 +48,7 @@ class FinishedFilter {
 
   FinishedFilter copyWith({
     String? keyword,
+    bool? includeRecords,
     Set<String>? categories,
     Set<int>? tagIds,
     bool? masterpieceOnly,
@@ -46,6 +57,7 @@ class FinishedFilter {
   }) {
     return FinishedFilter(
       keyword: keyword ?? this.keyword,
+      includeRecords: includeRecords ?? this.includeRecords,
       categories: categories ?? this.categories,
       tagIds: tagIds ?? this.tagIds,
       masterpieceOnly: masterpieceOnly ?? this.masterpieceOnly,

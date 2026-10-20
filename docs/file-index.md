@@ -269,3 +269,4 @@
 - `docs/review/20261002-140520-current-app-update-review.md` — 앱 업데이트 정책 재확인·강제 차단 전환·스토어 실패 안내 코드 리뷰 결과
 - `docs/review/20261002-153041-current-sanction-profile-review.md` — 징계 제한 안내·공개 완독 책장 프로필 헤더 변경분 코드 리뷰 결과
 - `docs/review/20261005-155112-current-image-compression-review.md` — 공통 이미지 압축 변경분의 Android HEIC 처리·원본 디코딩 메모리·반복 JPEG 인코딩 코드 리뷰 결과
+- `docs/review/20261020-165155-current-finished-search-review.md` — 완독 메모·독후감 검색 변경분의 기록 변경 후 결과 갱신·강조 메모 검색 누락 코드 리뷰 결과

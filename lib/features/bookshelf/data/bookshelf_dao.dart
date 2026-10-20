@@ -153,15 +153,40 @@ class BookshelfDao {
     );
   }
 
-  Future<List<BookItem>> searchFinished(FinishedFilter filter) async {
+  /// [recordOwnerId]는 [FinishedFilter.includeRecords]로 메모·독후감까지 검색할
+  /// 때 그 소유자의 기록만 보도록 거르는 값이다(노트/독후감 DAO와 같은 계정
+  /// 격리 기준). null이면(기록 소유자를 알 수 없음) 책 정보만 검색한다.
+  Future<List<BookItem>> searchFinished(
+    FinishedFilter filter, {
+    int? recordOwnerId,
+  }) async {
     final db = await BookshelfDatabase.instance();
     final where = <String>['status = ?', 'pending_delete = 0'];
     final args = <Object?>[BookStatus.finished.apiValue];
 
     if (filter.keyword.isNotEmpty) {
-      where.add('(title LIKE ? OR author LIKE ? OR publisher LIKE ?)');
       final kw = '%${filter.keyword}%';
+      final matches = ['title LIKE ?', 'author LIKE ?', 'publisher LIKE ?'];
       args.addAll([kw, kw, kw]);
+      if (filter.includeRecords && recordOwnerId != null) {
+        // 메모 본문은 강조를 `::hl[[...]]` 마크업째 저장하므로(memo_highlight.dart)
+        // 마크업 토큰을 지운 평문으로 비교한다 — 그러지 않으면 화면에 "삶의
+        // 의미"로 보이는 메모도 일부가 강조돼 있으면 같은 검색어에 걸리지 않는다.
+        matches.add(
+          'user_book_id IN (SELECT n.user_book_id FROM book_note n '
+          'JOIN book_note_memo m ON m.note_id = n.id '
+          'WHERE n.owner_user_id = ? AND n.deleted_at IS NULL '
+          'AND m.deleted_at IS NULL '
+          "AND REPLACE(REPLACE(m.content, '::hl[[', ''), ']]', '') LIKE ?)",
+        );
+        matches.add(
+          'user_book_id IN (SELECT user_book_id FROM book_reflection '
+          'WHERE owner_user_id = ? AND deleted_at IS NULL '
+          'AND (title LIKE ? OR content_text LIKE ?))',
+        );
+        args.addAll([recordOwnerId, kw, recordOwnerId, kw, kw]);
+      }
+      where.add('(${matches.join(' OR ')})');
     }
     if (filter.categories.isNotEmpty) {
       final placeholders = List.filled(
