@@ -42,11 +42,26 @@ class BookCover extends StatelessWidget {
         child: url == null || url.isEmpty
             ? _CoverPlaceholder(title: title)
             : localFile != null
-            ? Image.file(
-                localFile,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    _CoverPlaceholder(title: title),
+            ? LayoutBuilder(
+                builder: (context, constraints) {
+                  // 직접 등록한 표지도 표시 크기로 디코딩해 원본 이미지가
+                  // 메모리 캐시를 채우고 화면 전환마다 재로딩되는 것을 줄인다.
+                  final dpr = MediaQuery.devicePixelRatioOf(context);
+                  final cacheWidth = constraints.maxWidth.isFinite
+                      ? (constraints.maxWidth * dpr).ceil()
+                      : null;
+                  final bucketedCacheWidth = cacheWidth == null
+                      ? null
+                      : ((cacheWidth + 7) ~/ 8) * 8;
+                  return Image.file(
+                    localFile,
+                    fit: BoxFit.cover,
+                    cacheWidth: bucketedCacheWidth,
+                    gaplessPlayback: true,
+                    errorBuilder: (context, error, stackTrace) =>
+                        _CoverPlaceholder(title: title),
+                  );
+                },
               )
             : LayoutBuilder(
                 builder: (context, constraints) {
@@ -115,9 +130,7 @@ class _CoverPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.of(context).accentFill,
-      ),
+      decoration: BoxDecoration(color: AppColors.of(context).accentFill),
       alignment: Alignment.center,
       padding: const EdgeInsets.all(8),
       child: Text(

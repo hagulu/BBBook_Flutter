@@ -41,8 +41,8 @@ const _kFinishedIconBarHeight = 48.0;
 /// 아이콘 바의 검색 버튼을 누르면 접혔다 펼쳐지는 방식이라(스크롤 연동 아님)
 /// [_FinishedTabViewState._searchOpen]이 false면 아예 트리에서 빠진다.
 /// `_FinishedSearchBar`의 내부 Column이 항상 같은 값을 참조해야 한다 —
-/// 실제 콘텐츠 합계(88)보다 여유를 둔 값이라 RenderFlex 오버플로우 없이 안전하다.
-const _kFinishedSearchBarHeight = 96.0;
+/// 실제 콘텐츠 합계(100)보다 여유를 둬 검색창과 48dp 터치 영역을 확보한다.
+const _kFinishedSearchBarHeight = 104.0;
 
 /// 완독 탭 월 그룹 헤더 고정 높이(시스템 글자 배율 1.0 기준). `_groupedSlivers`의
 /// 헤더 위젯과 `_FinishedTabViewState._offsetForGroupIndex`의 스크롤 오프셋
@@ -1147,7 +1147,7 @@ class _FilterSheetResetButton extends ConsumerWidget {
   }
 }
 
-/// 완독 탭 검색창 + (메모·독후감 포함 토글 / 필터 버튼) 행. 높이는 항상
+/// 완독 탭 검색창 + (기록 포함 토글 / 필터 버튼) 행. 높이는 항상
 /// [_kFinishedSearchBarHeight]에 맞춰야 한다. 아이콘 바의 검색 버튼을 누를
 /// 때만 트리에 들어왔다 빠지는 방식(스크롤과 무관한 단순 토글)이라
 /// `SliverToBoxAdapter`로 감싸 쓴다.
@@ -1174,9 +1174,10 @@ class _FinishedSearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     final recordsToggleColor = includeRecords
-        ? AppColors.of(context).accentForeground
-        : AppColors.of(context).textMuted;
+        ? colors.textStrong
+        : colors.textMuted.withValues(alpha: 0.65);
     return SizedBox(
       height: _kFinishedSearchBarHeight,
       child: Column(
@@ -1233,37 +1234,35 @@ class _FinishedSearchBar extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           SizedBox(
-            height: 36,
+            height: 48,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Semantics(
-                    toggled: includeRecords,
-                    child: TextButton.icon(
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(0, 32),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        foregroundColor: recordsToggleColor,
-                      ),
-                      onPressed: onToggleIncludeRecords,
-                      icon: Icon(
-                        includeRecords
-                            ? PhosphorIconsFill.checkSquare
-                            : PhosphorIconsRegular.square,
-                        size: 16,
-                        color: recordsToggleColor,
-                      ),
-                      label: Text(
-                        '메모·독후감 포함',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: recordsToggleColor,
-                        ),
-                      ),
+                  FilterChip(
+                    selected: includeRecords,
+                    onSelected: (_) => onToggleIncludeRecords(),
+                    showCheckmark: false,
+                    label: const Text('기록 포함'),
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: recordsToggleColor,
                     ),
+                    backgroundColor: colors.surfaceSubtle.withValues(
+                      alpha: 0.4,
+                    ),
+                    selectedColor: colors.accentFill,
+                    shape: const StadiumBorder(),
+                    side: BorderSide(
+                      color: includeRecords
+                          ? colors.accentForeground.withValues(alpha: 0.4)
+                          : colors.border.withValues(alpha: 0.45),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    visualDensity: VisualDensity.standard,
+                    materialTapTargetSize: MaterialTapTargetSize.padded,
                   ),
                   TextButton.icon(
                     style: TextButton.styleFrom(

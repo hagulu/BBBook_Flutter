@@ -62,6 +62,8 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
   bool _allowPop = false;
   bool _isClosing = false;
   bool _scrolledToInitialPosition = false;
+  final _lastMemoKey = GlobalKey();
+  int _autoScrollGeneration = 0;
   Future<void> _titleSaveChain = Future.value();
 
   @override
@@ -76,10 +78,18 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
     _titleFocusNode = FocusNode()..addListener(_onTitleFocusChanged);
     _scrollController = ScrollController();
     if (widget.noteId == null) _titleInitialized = true;
+    ref.listenManual(bookNoteDetailProvider(_args), (_, next) {
+      if (next case AsyncData(:final value)) {
+        if (widget.noteId == null || value.note != null) {
+          _scheduleInitialScrollToBottom();
+        }
+      }
+    }, fireImmediately: true);
   }
 
   @override
   void dispose() {
+    _autoScrollGeneration++;
     _titleFocusNode.removeListener(_onTitleFocusChanged);
     _titleFocusNode.dispose();
     _titleController.dispose();
@@ -163,8 +173,10 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
                 child: FilterChip(
                   selected: _importantOnly,
                   showCheckmark: false,
-                  onSelected: (selected) =>
-                      setState(() => _importantOnly = selected),
+                  onSelected: (selected) {
+                    _autoScrollGeneration++;
+                    setState(() => _importantOnly = selected);
+                  },
                   avatar: Icon(
                     PhosphorIconsRegular.highlighter,
                     size: 16,
@@ -214,69 +226,80 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
   }
 
   Widget _buildContent(BookNoteDetail detail) {
-    _scheduleInitialScrollToBottom();
     final visibleMemos = _importantOnly
         ? detail.memos.where((memo) => memo.isImportant).toList(growable: false)
         : detail.memos;
     return BookNoteRefreshIndicator(
-      child: CustomScrollView(
-        controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-            sliver: SliverList.list(
-              children: [
-                TextField(
-                  controller: _titleController,
-                  focusNode: _titleFocusNode,
-                  maxLength: 255,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => unawaited(_saveTitle()),
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.of(context).textStrong,
-                  ),
-                  decoration: const InputDecoration(
-                    hintText: '제목을 입력하세요 (선택)',
-                    fillColor: Colors.transparent,
-                    contentPadding: EdgeInsets.symmetric(vertical: 10),
-                    counterText: '',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (visibleMemos.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: _EmptyMemos(importantOnly: _importantOnly),
-            )
-          else
+      child: NotificationListener<ScrollStartNotification>(
+        onNotification: (notification) {
+          if (notification.dragDetails != null) _autoScrollGeneration++;
+          return false;
+        },
+        child: CustomScrollView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
-              sliver: SliverList.builder(
-                itemCount: visibleMemos.length,
-                itemBuilder: (context, index) {
-                  final memo = visibleMemos[index];
-                  return BookNoteMemoTimelineItem(
-                    memo: memo,
-                    showDivider: index < visibleMemos.length - 1,
-                    onTap: memo.type == BookNoteMemoType.photo && memo.hasImage
-                        ? () => _showPhotoMemo(
-                            memo,
-                            totalMemoCount: detail.memos.length,
-                          )
-                        : () => _showMemoActions(
-                            memo,
-                            totalMemoCount: detail.memos.length,
-                          ),
-                  );
-                },
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+              sliver: SliverList.list(
+                children: [
+                  TextField(
+                    controller: _titleController,
+                    focusNode: _titleFocusNode,
+                    maxLength: 255,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => unawaited(_saveTitle()),
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.of(context).textStrong,
+                    ),
+                    decoration: const InputDecoration(
+                      hintText: '제목을 입력하세요 (선택)',
+                      fillColor: Colors.transparent,
+                      contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      counterText: '',
+                    ),
+                  ),
+                ],
               ),
             ),
-        ],
+            if (visibleMemos.isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyMemos(importantOnly: _importantOnly),
+              )
+            else
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+                sliver: SliverList.builder(
+                  itemCount: visibleMemos.length,
+                  itemBuilder: (context, index) {
+                    final memo = visibleMemos[index];
+                    return KeyedSubtree(
+                      key: index == visibleMemos.length - 1
+                          ? _lastMemoKey
+                          : null,
+                      child: BookNoteMemoTimelineItem(
+                        memo: memo,
+                        showDivider: index < visibleMemos.length - 1,
+                        onTap:
+                            memo.type == BookNoteMemoType.photo && memo.hasImage
+                            ? () => _showPhotoMemo(
+                                memo,
+                                totalMemoCount: detail.memos.length,
+                              )
+                            : () => _showMemoActions(
+                                memo,
+                                totalMemoCount: detail.memos.length,
+                              ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -284,23 +307,49 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
   void _scheduleInitialScrollToBottom() {
     if (_scrolledToInitialPosition) return;
     _scrolledToInitialPosition = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
-      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-    });
+    unawaited(_scrollToBottom(animate: false));
   }
 
   /// 새 메모는 목록 맨 아래(최신)에 추가되므로, 추가 직후 자연스럽게
   /// 아래까지 스크롤해 방금 추가한 메모가 바로 보이게 한다.
   void _scrollToNewestMemo() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_scrollController.hasClients) return;
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
-    });
+    unawaited(_scrollToBottom(animate: true));
+  }
+
+  Future<void> _scrollToBottom({required bool animate}) async {
+    final generation = ++_autoScrollGeneration;
+    var shouldAnimate = animate;
+    // 화면 비노출·레이아웃 정체 등의 경우에도 프레임을 무한 예약하지 않는다.
+    for (var attempt = 0; attempt < 32; attempt++) {
+      // 새 메모 반영과 직전 이동으로 새로 보이는 항목의 레이아웃을 기다린다.
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted ||
+          generation != _autoScrollGeneration ||
+          ModalRoute.of(context)?.isCurrent != true ||
+          !_scrollController.hasClients) {
+        return;
+      }
+      final position = _scrollController.position;
+      if (!position.hasContentDimensions) continue;
+      // SliverList의 maxScrollExtent는 마지막 항목이 배치되기 전까지
+      // 추정값이다. 그 값에 도착한 것만으로 이동을 끝내지 않는다.
+      final memos = ref.read(bookNoteDetailProvider(_args)).valueOrNull?.memos;
+      final hasVisibleMemos =
+          memos?.any((memo) => !_importantOnly || memo.isImportant) ?? false;
+      final lastMemoIsBuilt =
+          !hasVisibleMemos || _lastMemoKey.currentContext != null;
+      if (lastMemoIsBuilt && position.extentAfter <= 0.5) return;
+      if (shouldAnimate) {
+        shouldAnimate = false;
+        await _scrollController.animateTo(
+          position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      } else {
+        _scrollController.jumpTo(position.maxScrollExtent);
+      }
+    }
   }
 
   void _onTitleFocusChanged() {
@@ -362,6 +411,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
   }
 
   Future<void> _addMemo() async {
+    var generatedAiMemos = false;
     final aiFeaturesEnabled =
         ref.read(canUseAccountFeaturesProvider) &&
         ref.read(storageModeProvider).valueOrNull == StorageMode.server;
@@ -370,8 +420,16 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
       attachmentLimitPolicy: ref.read(attachmentLimitPolicyProvider),
       currentImageMemoCount: _currentImageMemoCount,
       aiMemoEnabled: aiFeaturesEnabled,
-      onGenerateAiMemos: aiFeaturesEnabled ? _generateAiMemos : null,
+      onGenerateAiMemos: aiFeaturesEnabled
+          ? (text) async {
+              await _generateAiMemos(text);
+              generatedAiMemos = true;
+            }
+          : null,
     );
+    // AI 콜백은 작성 화면이 떠 있는 동안 실행된다. 목록이 다시 보이는
+    // 빠른 작성 시트 종료 후에 이동해야 최신 항목을 레이아웃할 수 있다.
+    if (mounted && generatedAiMemos) _scrollToNewestMemo();
     if (draft == null || !mounted) return;
     if (!await _saveTitle(createWhenEmpty: true)) {
       if (mounted) AppSnackBar.error(context, '노트를 준비하지 못했습니다.');
@@ -392,7 +450,6 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
   /// 입력 내용을 지우지 않고 오류만 보여주게 한다.
   Future<void> _generateAiMemos(String text) async {
     await ref.read(bookNoteDetailProvider(_args).notifier).createAiMemos(text);
-    _scrollToNewestMemo();
   }
 
   Future<void> _createAiReflection() async {

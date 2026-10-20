@@ -32,12 +32,16 @@ Future<String?> openSharedImageEditor(
   BuildContext context, {
   required String imagePath,
   required SharedImageEditorProfile profile,
+  Future<bool> Function(BuildContext context)? confirmClose,
 }) {
   return Navigator.of(context).push<String>(
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (_) =>
-          _SharedImageEditorScreen(imagePath: imagePath, profile: profile),
+      builder: (_) => _SharedImageEditorScreen(
+        imagePath: imagePath,
+        profile: profile,
+        confirmClose: confirmClose,
+      ),
     ),
   );
 }
@@ -46,10 +50,12 @@ class _SharedImageEditorScreen extends StatefulWidget {
   const _SharedImageEditorScreen({
     required this.imagePath,
     required this.profile,
+    this.confirmClose,
   });
 
   final String imagePath;
   final SharedImageEditorProfile profile;
+  final Future<bool> Function(BuildContext context)? confirmClose;
 
   @override
   State<_SharedImageEditorScreen> createState() =>
@@ -62,6 +68,7 @@ class _SharedImageEditorScreenState extends State<_SharedImageEditorScreen> {
   // 한 단계 더 닫히는 사고로 이어지므로, 이 화면이 이미 pop됐는지 여기서
   // 직접 지킨다.
   bool _hasPopped = false;
+  bool _isConfirmingClose = false;
 
   final _editorKey = GlobalKey<ProImageEditorState>();
 
@@ -142,27 +149,26 @@ class _SharedImageEditorScreenState extends State<_SharedImageEditorScreen> {
         onCloseEditor: (mode) => _handleCloseEditor(context, mode),
         mainEditorCallbacks: MainEditorCallbacks(
           // 서브 에디터가 완전히 닫힌(dismiss 애니메이션까지 끝난) 시점의
-          // 신호. OCR 크롭 홈 화면에서 예약해 둔 동작이 있으면 그것을
-          // 실행한다. OCR 프로필은 `enableGesturePop: false`로 뒤로 가기
-          // 제스처 자체를 막아 두었기 때문에 예약 없이 이 콜백이 불리는
-          // 경우는 정상적으로는 생기지 않는다 — 혹시 모를 경로 누락에
-          // 대비한 방어적 처리로, 크롭 화면을 그대로 다시 연다.
+          // 신호. OCR 크롭 홈 화면에서 예약해 둔 동작을 한 번만 실행한다.
+          // 라이브러리의 전환 리스너가 여러 번 등록되면 이 콜백도 반복될
+          // 수 있다. 예약이 없는 호출에서 크롭을 다시 열면 저장 경로를
+          // 반환할 때 새 크롭 라우트(TransformConfigs)에 문자열이 전달된다.
           onEndCloseSubEditor: (editor) {
             final pending = _pendingCropExit;
             _pendingCropExit = null;
             switch (pending) {
               case _CropExitAction.closeWhole:
-                _editorKey.currentState?.closeEditor();
+                if (widget.confirmClose != null) {
+                  _cancel(context);
+                } else {
+                  _editorKey.currentState?.closeEditor();
+                }
                 return;
               case _CropExitAction.finishWhole:
                 _editorKey.currentState?.doneEditing();
                 return;
               case null:
-                // _hasPopped면 이미 편집기 전체를 닫는 중이라는 뜻이라
-                // 중복 호출할 필요가 없다.
-                if (_isCropOnly && !_hasPopped) {
-                  _editorKey.currentState?.openCropRotateEditor();
-                }
+                return;
             }
           },
         ),
@@ -211,10 +217,21 @@ class _SharedImageEditorScreenState extends State<_SharedImageEditorScreen> {
             : CropRotateEditorWidgets(
                 appBar: (state, stream) => ReactiveAppbar(
                   stream: stream,
-                  builder: (context) => _OcrCropAppBar(
-                    state: state,
-                    onDone: () => _finishFromOcrCrop(state),
-                    onClose: () => _cancelFromOcrCrop(state),
+                  builder: (context) => PreferredSize(
+                    preferredSize: const Size.fromHeight(kToolbarHeight),
+                    child: PopScope(
+                      canPop: false,
+                      onPopInvokedWithResult: (didPop, result) {
+                        if (!didPop && widget.confirmClose != null) {
+                          _cancelFromOcrCrop(state);
+                        }
+                      },
+                      child: _OcrCropAppBar(
+                        state: state,
+                        onDone: () => _finishFromOcrCrop(state),
+                        onClose: () => _cancelFromOcrCrop(state),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -422,7 +439,7 @@ class _SharedImageEditorScreenState extends State<_SharedImageEditorScreen> {
   /// dispose되므로, 그보다 넉넉한 시간이 지나도 여전히 살아있으면 실패로
   /// 보고 예약을 풀어 재시도할 수 있게 한다.
   Future<void> _finishFromOcrCrop(CropRotateEditorState state) async {
-    if (_pendingCropExit != null) return;
+    if (_pendingCropExit != null || _isConfirmingClose) return;
     _pendingCropExit = _CropExitAction.finishWhole;
     await state.done();
     await Future.delayed(const Duration(milliseconds: 600));
@@ -433,16 +450,28 @@ class _SharedImageEditorScreenState extends State<_SharedImageEditorScreen> {
     }
   }
 
-  /// OCR 크롭 홈 화면의 닫기(X) — 대기 중인 크롭 변경은 버리고 편집기
-  /// 전체를 취소한다. [ProImageEditorState.closeEditor] 호출은 크롭 서브
+  /// OCR 크롭 홈 화면의 닫기 — 호출부의 종료 확인이 있으면 먼저 확인하고,
+  /// 승인한 경우 크롭 변경을 버리고 편집기 전체를 취소한다.
+  /// [ProImageEditorState.closeEditor] 호출은 크롭 서브
   /// 화면이 실제로 완전히 닫힌 뒤([_pendingCropExit]을 통해
   /// [MainEditorCallbacks.onEndCloseSubEditor]가 실행) 이뤄진다 — pop 직후
   /// 바로 부르면 메인 에디터의 이력 유무 확인이 아직 dismiss 애니메이션이
   /// 끝나지 않은 라우트 상태와 뒤섞일 수 있다. 이력이 있어 확인 다이얼로그가
   /// 뜨고 사용자가 취소하면 [_confirmCloseWhole]이 크롭 화면을 다시 연다.
-  void _cancelFromOcrCrop(CropRotateEditorState state) {
-    if (_pendingCropExit != null) return;
+  Future<void> _cancelFromOcrCrop(CropRotateEditorState state) async {
+    if (_pendingCropExit != null || _isConfirmingClose) return;
+    final confirmClose = widget.confirmClose;
+    if (confirmClose != null) {
+      _isConfirmingClose = true;
+      try {
+        final confirmed = await confirmClose(state.context);
+        if (!confirmed || !mounted || !state.mounted || _hasPopped) return;
+      } finally {
+        _isConfirmingClose = false;
+      }
+    }
     _pendingCropExit = _CropExitAction.closeWhole;
+    if (!state.mounted) return;
     Navigator.of(state.context).pop();
   }
 

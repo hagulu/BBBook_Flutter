@@ -9,6 +9,7 @@ import '../../../../shared/image/screens/shared_camera_screen.dart';
 import '../../../../shared/image/screens/shared_image_editor_screen.dart';
 import '../../../../shared/widgets/app_alert.dart';
 import '../../../../shared/widgets/app_bar_title.dart';
+import '../../../../shared/widgets/app_confirm.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../services/book_note_memo_ocr_service.dart';
 
@@ -16,12 +17,24 @@ import '../../services/book_note_memo_ocr_service.dart';
 /// 갤러리 선택은 인식률을 위해 압축하지 않은 원본을 그대로 받아 분석이
 /// 끝날 때까지 살아있을 임시 경로로 복사해 둔다.
 const _memoOcrCapturePolicy = CameraCapturePolicy(
+  previewMode: CameraPreviewMode.rotatedAspectRatio,
   guideOverlayBuilder: _buildOcrGuideOverlay,
   hintText: '문장이 가이드선과 수평이 되도록 맞춰주세요.',
   compressGalleryImage: false,
   copyGalleryPickToTemp: true,
   tempFilePrefix: 'memo_ocr_gallery_',
+  confirmClose: _confirmCloseOcr,
 );
+
+Future<bool> _confirmCloseOcr(BuildContext context) {
+  return AppConfirm.show(
+    context,
+    title: '발췌를 닫을까요?',
+    message: '진행 중인 발췌 내용이 저장되지 않습니다.',
+    confirmText: '닫기',
+    cancelText: '계속하기',
+  );
+}
 
 Widget _buildOcrGuideOverlay(BuildContext context) {
   return const Padding(
@@ -87,14 +100,16 @@ _captureAndAnalyzeOcr(BuildContext context) async {
   }
 
   // 크롭/회전만 지원한다 — 인식 대상 문장을 텍스트/그리기로 가릴 이유가
-  // 없다. 편집을 건너뛰면(취소) 촬영/선택 원본을 그대로 분석한다.
+  // 없다. 편집을 취소하면 발췌를 종료한다.
   final editedPath = await openSharedImageEditor(
     context,
     imagePath: capturedPath,
     profile: SharedImageEditorProfile.cropRotateOnly,
+    confirmClose: _confirmCloseOcr,
   );
-  final analyzedPath = editedPath ?? capturedPath;
-  if (editedPath != null) await _deleteCapturedFile(capturedPath);
+  await _deleteCapturedFile(capturedPath);
+  if (editedPath == null) return null;
+  final analyzedPath = editedPath;
   if (!context.mounted) {
     await _deleteCapturedFile(analyzedPath);
     return null;
@@ -103,9 +118,7 @@ _captureAndAnalyzeOcr(BuildContext context) async {
   BookNoteMemoOcrAnalysis? analysis;
   AppLoading.show(context);
   try {
-    analysis = await const BookNoteMemoOcrService().analyzeImage(
-      analyzedPath,
-    );
+    analysis = await const BookNoteMemoOcrService().analyzeImage(analyzedPath);
   } catch (_) {
     analysis = null;
   } finally {
@@ -138,8 +151,8 @@ _captureAndAnalyzeOcr(BuildContext context) async {
   return (imagePath: analyzedPath, analysis: analysis);
 }
 
-/// 선택된 단어들을 줄(lineOrder) → 낱말 순서(wordOrder)로 정렬해 원래
-/// 문장/줄 배치를 복원한다([_MemoOcrSelectionScreenState._selectedText]).
+/// 선택한 단어를 줄(lineOrder) → 낱말(wordOrder) 순으로 정렬하고,
+/// 발췌문이 한 문단이 되도록 줄 구분 없이 공백으로 이어 붙인다.
 String _joinWordsAsText(List<BookNoteMemoOcrWord> words) {
   final lines = <int, List<BookNoteMemoOcrWord>>{};
   for (final word in words) {
@@ -154,7 +167,7 @@ String _joinWordsAsText(List<BookNoteMemoOcrWord> words) {
         );
         return entry.value.map((word) => word.text).join(' ');
       })
-      .join('\n');
+      .join(' ');
 }
 
 Future<void> _deleteCapturedFile(String path) async {
@@ -181,96 +194,118 @@ class _MemoOcrSelectionScreen extends StatefulWidget {
 
 class _MemoOcrSelectionScreenState extends State<_MemoOcrSelectionScreen> {
   Set<int> _selectedIndexes = <int>{};
+  bool _isConfirmingClose = false;
+
+  Future<void> _requestClose() async {
+    if (_isConfirmingClose) return;
+    _isConfirmingClose = true;
+    try {
+      final confirmed = await _confirmCloseOcr(context);
+      if (confirmed && mounted) Navigator.of(context).pop();
+    } finally {
+      _isConfirmingClose = false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.mediaBackdrop,
-      appBar: AppBar(
+    return PopScope<String>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _requestClose();
+      },
+      child: Scaffold(
         backgroundColor: AppColors.mediaBackdrop,
-        foregroundColor: AppColors.mediaForeground,
-        leading: IconButton(
-          onPressed: () => Navigator.of(context).pop(),
-          tooltip: '닫기',
-          icon: const Icon(PhosphorIconsRegular.x),
-        ),
-        title: const AppBarTitle('발췌 문장 선택'),
-        actions: [
-          TextButton(
-            onPressed: _selectedIndexes.isEmpty
-                ? null
-                : () => setState(() => _selectedIndexes = <int>{}),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.mediaForeground,
-              disabledForegroundColor: AppColors.mediaForeground.withValues(
-                alpha: 0.4,
-              ),
-            ),
-            child: const Text('선택 취소'),
+        appBar: AppBar(
+          backgroundColor: AppColors.mediaBackdrop,
+          foregroundColor: AppColors.mediaForeground,
+          leading: IconButton(
+            onPressed: _requestClose,
+            tooltip: '닫기',
+            icon: const Icon(PhosphorIconsRegular.x),
           ),
-          TextButton(
-            onPressed: _selectedIndexes.isEmpty
-                ? null
-                : () => Navigator.of(context).pop(_selectedText()),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.mediaForeground,
-              disabledForegroundColor: AppColors.mediaForeground.withValues(
-                alpha: 0.4,
-              ),
-            ),
-            child: const Text(
-              '완료',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: _OcrPhotoCanvas(
-              imagePath: widget.imagePath,
-              analysis: widget.analysis,
-              selectedIndexes: _selectedIndexes,
-              onSelectionChanged: (indexes) {
-                setState(() => _selectedIndexes = indexes);
-              },
-            ),
-          ),
-          Container(
-            width: double.infinity,
-            color: AppColors.mediaBackdrop,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+          title: const AppBarTitle('발췌 문장 선택'),
+          actions: [
+            TextButton(
+              onPressed: _selectedIndexes.isEmpty
+                  ? null
+                  : () => setState(() => _selectedIndexes = <int>{}),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.mediaForeground,
+                disabledForegroundColor: AppColors.mediaForeground.withValues(
+                  alpha: 0.4,
                 ),
-                child: Semantics(
-                  liveRegion: true,
-                  child: Text(
-                    _selectedIndexes.isEmpty
-                        ? '발췌할 단어를 드래그해 주세요.'
-                        : '${_selectedIndexes.length}개 단어가 선택되었습니다.',
-                    style: TextStyle(
-                      color: AppColors.mediaForeground.withValues(alpha: 0.84),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+              ),
+              child: const Text('선택 취소'),
+            ),
+            TextButton(
+              onPressed: _selectedIndexes.isEmpty
+                  ? null
+                  : () => Navigator.of(context).pop(_selectedText()),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.mediaForeground,
+                disabledForegroundColor: AppColors.mediaForeground.withValues(
+                  alpha: 0.4,
+                ),
+              ),
+              child: const Text(
+                '완료',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(width: 4),
+          ],
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: _OcrPhotoCanvas(
+                imagePath: widget.imagePath,
+                analysis: widget.analysis,
+                selectedIndexes: _selectedIndexes,
+                onSelectionChanged: (indexes) {
+                  setState(() => _selectedIndexes = indexes);
+                },
+              ),
+            ),
+            Container(
+              width: double.infinity,
+              color: AppColors.mediaBackdrop,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      _selectedIndexes.isEmpty
+                          ? '발췌할 단어를 드래그해 주세요.'
+                          : '${_selectedIndexes.length}개 단어가 선택되었습니다.',
+                      style: TextStyle(
+                        color: AppColors.mediaForeground.withValues(
+                          alpha: 0.84,
+                        ),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   String _selectedText() {
-    final selected = _selectedIndexes.map((index) => widget.analysis.words[index]);
+    final selected = _selectedIndexes.map(
+      (index) => widget.analysis.words[index],
+    );
     return _joinWordsAsText(selected.toList(growable: false));
   }
 }
