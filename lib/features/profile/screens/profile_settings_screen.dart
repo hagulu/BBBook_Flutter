@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/config/api_config.dart';
+import '../../../core/config/policy_link.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/theme_mode_provider.dart';
 import '../../../shared/widgets/app_bar_title.dart';
@@ -123,13 +122,13 @@ class ProfileSettingsScreen extends ConsumerWidget {
                     _PolicyMenu(
                       icon: PhosphorIconsRegular.fileText,
                       label: '이용약관',
-                      path: '/terms',
+                      link: PolicyLink.terms,
                     ),
                     Divider(),
                     _PolicyMenu(
                       icon: PhosphorIconsRegular.shieldCheck,
                       label: '개인정보 처리방침',
-                      path: '/privacy',
+                      link: PolicyLink.privacy,
                     ),
                   ],
                 ),
@@ -261,23 +260,16 @@ class _PolicyMenu extends StatelessWidget {
   const _PolicyMenu({
     required this.icon,
     required this.label,
-    required this.path,
+    required this.link,
   });
 
   final IconData icon;
   final String label;
-  final String path;
+  final PolicyLink link;
 
   @override
   Widget build(BuildContext context) {
-    return _SettingsMenuTile(
-      icon: icon,
-      label: label,
-      onTap: () => launchUrl(
-        Uri.parse('${ApiConfig.baseUrl}$path'),
-        mode: LaunchMode.externalApplication,
-      ),
-    );
+    return _SettingsMenuTile(icon: icon, label: label, onTap: link.open);
   }
 }
 

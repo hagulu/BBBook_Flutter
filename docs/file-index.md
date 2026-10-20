@@ -23,11 +23,12 @@
 - `lib/core/storage/local_image_store.dart` — 기능별 이미지 로컬 파일 저장소(선택 이미지 저장·서버 이미지 내려받기·orphan 정리, DB에는 폴더 기준 상대 경로만 보관)
 - `lib/core/policy/attachment_limit_policy.dart` — 노트/독후감 이미지 첨부 한도 정책(현재 고정값: 노트 3·독후감 0, 추후 서버 등급별 값으로 교체 가능한 단일 지점) 및 서버 제한 에러코드 상수
 - `lib/core/config/ad_config.dart` — AdMob 배너 광고 단위 ID 단일 관리 지점(현재는 Google 공식 테스트 ID, 실제 배포 시 이 값만 교체), release 빌드가 테스트 ID를 그대로 쓰면 막는 `assertConfiguredForRelease()`
+- `lib/core/config/policy_link.dart` — 이용약관·개인정보 처리방침 정책 페이지 링크(`API_BASE_URL` + `/terms`·`/privacy`)와 외부 브라우저 열기(`PolicyLink`), 온보딩·설정 화면이 공유
 - `lib/core/utils/preview_text.dart` — 목록 본문 미리보기의 줄바꿈·연속 공백을 공백 하나로 합쳐 한 문단처럼 만드는 헬퍼(`flattenPreviewText`)
 
 ## features/auth
 
-- `lib/features/auth/screens/onboarding_screen.dart` — 온보딩(로그인) 화면, 소셜 로그인 아래 "로그인 없이 사용하기" 진입점
+- `lib/features/auth/screens/onboarding_screen.dart` — 온보딩(로그인) 화면, 카드 없는 전체 화면 구성(위쪽 로고·앱 이름·소개 문구 / 하단 소셜 로그인·"로그인 없이 사용하기"(확인 팝업 후 시작)·약관 동의 안내)
 - `lib/features/auth/providers/auth_notifier.dart` — 로컬 계정으로 먼저 진입하고 뒤에서 인증 복구, 인증 무효 시 로컬 기록 보존·재로그인, 다른 계정은 확인 후 로컬 초기화, 계정 없이 시작/로그인 전환(소유자 리키)·저장 방식별 로그아웃 처리
 - `lib/features/auth/providers/auth_access_providers.dart` — 로컬 기록 소유자 id(`recordOwnerIdProvider`)와 계정 필요 기능 노출 여부(`canUseAccountFeaturesProvider`) 단일 기준
 - `lib/features/auth/models/standalone_session.dart` — 계정 없이 쓰는 사용자의 기록 소유자 sentinel과 로그인 시 기록 처리 선택지
@@ -38,6 +39,7 @@
 - `lib/features/auth/widgets/social_login_section.dart` — 소셜 로그인 버튼 묶음과 로그인 후처리(계정 변경 확인, 계정 없이 남긴 기록 이어가기 선택, 저장 방식 전환 화면 연결) 공용 위젯, 온보딩·MY 화면이 공유
 - `lib/features/auth/widgets/auth_loading_gate.dart` — 인증 확인·라우터 전환 사이 빈 배경 표시, 로그인 사용자의 온보딩 순간 노출 방지
 - `lib/features/auth/widgets/sanction_restricted_alert.dart` — 징계 중 제한 기능을 눌렀을 때 공통 안내 팝업(`AppAlert`)을 띄우는 함수, 모든 제한 진입점이 같은 문구를 사용
+- `lib/features/auth/widgets/login_consent_notice.dart` — 온보딩 하단의 이용약관 동의·개인정보처리방침 적용 안내 문구(한 줄, 넘치면 글자를 줄여 맞춤), '이용약관'·'개인정보처리방침'을 누르면 정책 페이지를 외부 브라우저로 연다
 
 ## features/profile
 
@@ -271,3 +273,4 @@
 - `docs/review/20261005-155112-current-image-compression-review.md` — 공통 이미지 압축 변경분의 Android HEIC 처리·원본 디코딩 메모리·반복 JPEG 인코딩 코드 리뷰 결과
 - `docs/review/20261020-165155-current-finished-search-review.md` — 완독 메모·독후감 검색 변경분의 기록 변경 후 결과 갱신·강조 메모 검색 누락 코드 리뷰 결과
 - `docs/review/20261020-183411-current-camera-image-review.md` — 공용 카메라 직렬화·노트 사진 동기화 변경분의 화면 재진입 시 카메라 소유권 경합 코드 리뷰 결과
+- `docs/review/20261020-190838-current-onboarding-policy-review.md` — 온보딩 화면·비로그인 시작 확인·약관 링크·로고 에셋 변경분 코드 리뷰 결과
