@@ -101,6 +101,18 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
   Widget build(BuildContext context) {
     final asyncDetail = ref.watch(bookNoteDetailProvider(_args));
     final detail = asyncDetail.valueOrNull;
+    // 동기화로 provider가 다시 읽히는 동안(이전 값을 가진 AsyncLoading)에도
+    // 기존 내용을 유지한다 — 로딩 표시로 바꾸면 스크롤 뷰가 새로 만들어져
+    // 목록이 맨 위로 돌아간다.
+    final shownDetail = asyncDetail.when(
+      skipLoadingOnReload: true,
+      data: (value) => value,
+      error: (_, _) => null,
+      loading: () => null,
+    );
+    final hasNote = shownDetail?.note != null;
+    final canEditNote =
+        shownDetail != null && (widget.noteId == null || hasNote);
     final aiFeaturesEnabled =
         ref.watch(canUseAccountFeaturesProvider) &&
         ref.watch(storageModeProvider).valueOrNull == StorageMode.server;
@@ -125,12 +137,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
           foregroundColor: AppColors.of(context).textStrong,
           elevation: 0,
           actions: [
-            if (aiFeaturesEnabled &&
-                switch (asyncDetail) {
-                  AsyncData(:final value) =>
-                    value.note != null && value.memos.isNotEmpty,
-                  _ => false,
-                })
+            if (aiFeaturesEnabled && hasNote && shownDetail!.memos.isNotEmpty)
               IconButton(
                 onPressed: _isSavingMemo ? null : _createAiReflection,
                 tooltip: 'AI로 독후감 만들기',
@@ -139,10 +146,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
                   color: AppColors.of(context).accentForeground,
                 ),
               ),
-            if (switch (asyncDetail) {
-              AsyncData(:final value) => value.note != null,
-              _ => false,
-            })
+            if (hasNote)
               IconButton(
                 onPressed: _isSavingMemo ? null : _deleteNote,
                 tooltip: '노트 삭제',
@@ -152,21 +156,15 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
         ),
         body: Stack(
           children: [
-            switch (asyncDetail) {
-              AsyncData(:final value) =>
-                widget.noteId != null && value.note == null
-                    ? const _NoteNotFound()
-                    : _buildContent(value),
-              AsyncError() => _LoadError(
+            if (shownDetail != null)
+              canEditNote ? _buildContent(shownDetail) : const _NoteNotFound()
+            else if (asyncDetail.hasError)
+              _LoadError(
                 onRetry: () => ref.invalidate(bookNoteDetailProvider(_args)),
-              ),
-              _ => const Center(child: CircularProgressIndicator()),
-            },
-            if (switch (asyncDetail) {
-              AsyncData(:final value) =>
-                widget.noteId == null || value.note != null,
-              _ => false,
-            })
+              )
+            else
+              const Center(child: CircularProgressIndicator()),
+            if (canEditNote)
               Positioned(
                 left: 16,
                 bottom: 16 + MediaQuery.paddingOf(context).bottom,
@@ -198,29 +196,26 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
               ),
           ],
         ),
-        floatingActionButton: switch (asyncDetail) {
-          AsyncData(:final value)
-              when widget.noteId == null || value.note != null =>
-            FloatingActionButton(
-              onPressed: _isSavingMemo ? null : _addMemo,
-              tooltip: '메모 빠르게 추가',
-              shape: const CircleBorder(),
-              backgroundColor: _isSavingMemo
-                  ? AppColors.of(context).surfaceSubtle
-                  : AppColors.of(context).accentFill,
-              foregroundColor: AppColors.of(context).textStrong,
-              child: _isSavingMemo
-                  ? SizedBox.square(
-                      dimension: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.of(context).textStrong,
-                      ),
-                    )
-                  : const Icon(PhosphorIconsRegular.plus),
-            ),
-          _ => null,
-        },
+        floatingActionButton: canEditNote
+            ? FloatingActionButton(
+                onPressed: _isSavingMemo ? null : _addMemo,
+                tooltip: '메모 빠르게 추가',
+                shape: const CircleBorder(),
+                backgroundColor: _isSavingMemo
+                    ? AppColors.of(context).surfaceSubtle
+                    : AppColors.of(context).accentFill,
+                foregroundColor: AppColors.of(context).textStrong,
+                child: _isSavingMemo
+                    ? SizedBox.square(
+                        dimension: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.of(context).textStrong,
+                        ),
+                      )
+                    : const Icon(PhosphorIconsRegular.plus),
+              )
+            : null,
       ),
     );
   }
@@ -307,18 +302,17 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
   void _scheduleInitialScrollToBottom() {
     if (_scrolledToInitialPosition) return;
     _scrolledToInitialPosition = true;
-    unawaited(_scrollToBottom(animate: false));
+    unawaited(_scrollToBottom());
   }
 
-  /// 새 메모는 목록 맨 아래(최신)에 추가되므로, 추가 직후 자연스럽게
-  /// 아래까지 스크롤해 방금 추가한 메모가 바로 보이게 한다.
+  /// 새 메모는 목록 맨 아래(최신)에 추가되므로, 추가 직후 애니메이션 없이
+  /// 바로 아래로 이동해 방금 추가한 메모가 보이게 한다.
   void _scrollToNewestMemo() {
-    unawaited(_scrollToBottom(animate: true));
+    unawaited(_scrollToBottom());
   }
 
-  Future<void> _scrollToBottom({required bool animate}) async {
+  Future<void> _scrollToBottom() async {
     final generation = ++_autoScrollGeneration;
-    var shouldAnimate = animate;
     // 화면 비노출·레이아웃 정체 등의 경우에도 프레임을 무한 예약하지 않는다.
     for (var attempt = 0; attempt < 32; attempt++) {
       // 새 메모 반영과 직전 이동으로 새로 보이는 항목의 레이아웃을 기다린다.
@@ -339,16 +333,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
       final lastMemoIsBuilt =
           !hasVisibleMemos || _lastMemoKey.currentContext != null;
       if (lastMemoIsBuilt && position.extentAfter <= 0.5) return;
-      if (shouldAnimate) {
-        shouldAnimate = false;
-        await _scrollController.animateTo(
-          position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      } else {
-        _scrollController.jumpTo(position.maxScrollExtent);
-      }
+      _scrollController.jumpTo(position.maxScrollExtent);
     }
   }
 
