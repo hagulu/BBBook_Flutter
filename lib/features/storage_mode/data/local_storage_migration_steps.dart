@@ -1,6 +1,10 @@
+import 'dart:developer' as developer;
+
+import '../../../core/network/api_exception.dart';
 import '../../../core/storage/local_image_store.dart';
 import '../../book_note/data/book_note_repository.dart';
 import '../../book_reflection/data/book_reflection_repository.dart';
+import '../../bookshelf/data/bookshelf_database.dart';
 import '../../bookshelf/data/bookshelf_repository.dart';
 import '../../record_sync/data/record_sync_api.dart';
 import '../../tag/data/tag_repository.dart';
@@ -49,6 +53,61 @@ class LocalStorageMigrationRepositorySteps
     await reflectionRepository.sync(ownerUserId: ownerUserId);
     await tagRepository.sync();
   }
+
+  @override
+  Future<String?> applyLatestRecords() async {
+    // 저장소별 동기화는 각자 다른 시점의 서버 상태를 받으므로, 서버 정리에
+    // 보낼 exportedAt은 네 테이블에 **같은 한 번의 응답**을 반영해야만
+    // "이 시각까지의 서버 기록이 로컬에 있다"를 뜻한다. 진행 중인 동기화가
+    // 이 응답보다 오래된 결과를 뒤늦게 덮어쓰지 않도록 먼저 기다린다.
+    await _waitForCurrentSyncs();
+    final expectedGeneration = BookshelfDatabase.sessionGeneration;
+    final requestedAt = DateTime.now().toUtc();
+    final payload = await recordSyncApi.getAllRecords();
+    final baseline = payload.exportedAtTime ?? requestedAt;
+    // 책장부터 맞춰야 노트/독후감/태그가 붙을 로컬 책 행이 존재한다.
+    final applied =
+        await bookshelfRepository.applyFullRecords(
+          payload.books,
+          expectedGeneration: expectedGeneration,
+          baseline: baseline,
+        ) &&
+        await noteRepository.applyFullRecords(
+          payload,
+          ownerUserId: ownerUserId,
+          expectedGeneration: expectedGeneration,
+          baseline: baseline,
+        ) &&
+        await reflectionRepository.applyFullRecords(
+          payload,
+          ownerUserId: ownerUserId,
+          expectedGeneration: expectedGeneration,
+          baseline: baseline,
+        ) &&
+        await tagRepository.applyFullRecords(
+          payload,
+          expectedGeneration: expectedGeneration,
+          baseline: baseline,
+        );
+    if (!applied) {
+      // 그 사이 로그아웃 등으로 로컬 DB가 바뀌었다. 반영하지 못한 응답의
+      // exportedAt으로 서버를 정리하면 안 된다.
+      throw StateError('Session changed while applying records');
+    }
+    developer.log(
+      '[로컬 저장 이전 기록 반영] userId=$ownerUserId '
+      'count=${payload.totalItemCount} '
+      'exportedAt=${payload.exportedAt ?? "none"} result=SUCCESS',
+    );
+    return payload.exportedAt;
+  }
+
+  Future<void> _waitForCurrentSyncs() => Future.wait([
+    bookshelfRepository.waitForCurrentSync(),
+    noteRepository.waitForCurrentSync(),
+    reflectionRepository.waitForCurrentSync(),
+    tagRepository.waitForCurrentSync(),
+  ]);
 
   @override
   Future<LocalImageSyncReport> downloadAllImages(
@@ -107,22 +166,40 @@ class LocalStorageMigrationRepositorySteps
   }
 
   @override
-  Future<void> switchToLocalMode() async {
-    await storageMode.switchToLocal(ownerUserId: ownerUserId);
+  Future<void> switchToLocalMode({required String? exportedAt}) async {
+    await storageMode.switchToLocal(
+      ownerUserId: ownerUserId,
+      exportedAt: exportedAt,
+    );
     // 새 동기화는 로컬 모드 게이트에서 차단된다. 이미 시작한 응답 적용이
     // 끝나기 전에는 서버를 삭제하지 않는다.
-    await Future.wait([
-      bookshelfRepository.waitForCurrentSync(),
-      noteRepository.waitForCurrentSync(),
-      reflectionRepository.waitForCurrentSync(),
-      tagRepository.waitForCurrentSync(),
-    ]);
+    await _waitForCurrentSyncs();
     // 동기화가 멈춘 뒤에 바꿔야 서버 응답이 표지를 서버 URL로 되돌리지 않는다.
     await bookshelfRepository.promoteLocalCoverCopies();
   }
 
   @override
-  Future<void> deleteServerRecords() => recordSyncApi.deleteAllRecords();
+  Future<void> updateExportedAt(String? exportedAt) =>
+      storageMode.updateServerDeleteExportedAt(exportedAt);
+
+  @override
+  Future<String?> pendingExportedAt() => storageMode.serverDeleteExportedAt();
+
+  @override
+  Future<void> deleteServerRecords({required String? exportedAt}) async {
+    // 바뀐 기록 때문에 거절된 뒤 [applyLatestRecords]로 다시 반영하면 책
+    // 표지가 서버 URL로 되돌아간다. 서버를 지우면 그 URL도 사라지므로,
+    // 삭제 직전마다 다시 승격한다(이미 승격된 행은 조건에 걸리지 않는다).
+    await bookshelfRepository.promoteLocalCoverCopies();
+    try {
+      await recordSyncApi.deleteAllRecords(exportedAt: exportedAt);
+    } on ApiException catch (error) {
+      if (RecordSyncApi.isRecordsChangedSinceExport(error)) {
+        throw const ServerRecordsChangedException();
+      }
+      rethrow;
+    }
+  }
 
   @override
   Future<void> markServerRecordsDeleted() =>

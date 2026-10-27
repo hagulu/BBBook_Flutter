@@ -7,6 +7,7 @@ import '../../../core/storage/local_image_store.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
 import '../../bookshelf/data/bookshelf_repository.dart';
 import '../../record_sync/data/record_sync_api.dart';
+import '../../record_sync/models/record_sync_payload.dart';
 import '../models/book_reflection.dart';
 import '../services/book_reflection_content_adapter.dart';
 import '../services/reflection_image_mapping.dart';
@@ -344,6 +345,22 @@ class BookReflectionRepository {
   }) async {
     final requestedAt = baseline ?? DateTime.now().toUtc();
     final payload = await _recordSyncApi.getAllRecords();
+    return applyFullRecords(
+      payload,
+      ownerUserId: ownerUserId,
+      expectedGeneration: expectedGeneration,
+      baseline: requestedAt,
+    );
+  }
+
+  /// 이미 받아 둔 `/api/me/records` 응답으로 독후감 테이블을 맞춘다.
+  /// 서버 → 로컬 전환 전용 용도는 `BookNoteRepository.applyFullRecords` 참고.
+  Future<bool> applyFullRecords(
+    RecordSyncPayload payload, {
+    required int ownerUserId,
+    required int expectedGeneration,
+    required DateTime baseline,
+  }) async {
     if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
       return false;
     }
@@ -353,7 +370,7 @@ class BookReflectionRepository {
           .map((b) => b.userBookId)
           .toList(growable: false),
       reflections: payload.reflections,
-      requestedAt: requestedAt,
+      requestedAt: baseline,
     );
     return true;
   }

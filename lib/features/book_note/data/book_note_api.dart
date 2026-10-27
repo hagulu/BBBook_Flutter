@@ -29,9 +29,11 @@ import '../models/book_note_sync_changes_result.dart';
 /// 인증 필요 요청이므로 401 시 1회 재시도 후 실패하면 로그아웃 처리하는
 /// [ApiClient]를 통해서만 호출한다(CLAUDE.md 인증 API 호출 규칙).
 class BookNoteApi {
-  BookNoteApi({required this._apiClient, AttachmentLimitPolicy? attachmentLimitPolicy})
-    : _attachmentLimitPolicy =
-          attachmentLimitPolicy ?? AttachmentLimitPolicy.defaultPolicy;
+  BookNoteApi({
+    required this._apiClient,
+    AttachmentLimitPolicy? attachmentLimitPolicy,
+  }) : _attachmentLimitPolicy =
+           attachmentLimitPolicy ?? AttachmentLimitPolicy.defaultPolicy;
 
   final ApiClient _apiClient;
   final AttachmentLimitPolicy _attachmentLimitPolicy;
@@ -319,6 +321,8 @@ class BookNoteApi {
       'USER_BOOK_NOT_FOUND' => '책장에서 이 책을 찾을 수 없습니다.',
       'BOOK_NOTE_NOT_FOUND' => '노트를 찾을 수 없습니다.',
       'AI_PROVIDER_ERROR' => 'AI 서비스에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+      'AI_REQUEST_IN_PROGRESS' => '진행 중인 AI 요청이 있습니다. 끝난 뒤 다시 시도해 주세요.',
+      'AI_SERVICE_BUSY' => 'AI 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.',
       _ => switch (statusCode) {
         401 => '인증에 실패했습니다.',
         400 => '입력한 내용을 확인해 주세요.',

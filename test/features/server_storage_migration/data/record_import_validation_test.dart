@@ -62,13 +62,14 @@ BookNoteMemo _memo({
   int? startPage,
   int? endPage,
   int sortOrder = 0,
+  BookNoteMemoType type = BookNoteMemoType.quote,
 }) {
   return BookNoteMemo(
     id: id,
     serverId: null,
     clientRequestId: clientRequestId,
     noteId: noteId,
-    type: BookNoteMemoType.quote,
+    type: type,
     startPage: startPage,
     endPage: endPage,
     content: '내용',
@@ -88,6 +89,11 @@ ReflectionForImport _reflection({
   String? clientRequestId = 'reflection-crid',
   String? title = '제목',
   String? contentText = '본문',
+  Map<String, dynamic> contentJson = const {
+    'ops': [
+      {'insert': '\n'},
+    ],
+  },
 }) {
   final reflection = BookReflection(
     id: id,
@@ -96,11 +102,7 @@ ReflectionForImport _reflection({
     userBookId: -1,
     reflectionType: 'USER_WRITTEN',
     title: title,
-    contentJson: const {
-      'ops': [
-        {'insert': '\n'},
-      ],
-    },
+    contentJson: contentJson,
     contentText: contentText,
     isPublic: false,
     isHidden: false,
@@ -168,9 +170,7 @@ void main() {
 
   test('오디오북은 진행 쪽수를 0~100 진행률로 보고 100을 넘으면 거부한다', () {
     expect(
-      _validate(
-        books: [_book(currentPage: 101, sourceType: 'AUDIO_BOOK')],
-      ),
+      _validate(books: [_book(currentPage: 101, sourceType: 'AUDIO_BOOK')]),
       isNotNull,
     );
     expect(
@@ -234,6 +234,39 @@ void main() {
     expect(_validate(reflections: [_reflection(contentText: null)]), isNotNull);
   });
 
+  test('한 노트의 사진 메모가 노트당 이미지 한도를 넘으면 거부한다', () {
+    List<BookNoteMemo> photos(int count) => List.generate(
+      count,
+      (i) => _memo(
+        id: -(i + 1),
+        clientRequestId: 'photo-$i',
+        type: BookNoteMemoType.photo,
+      ),
+    );
+    expect(_validate(memos: photos(3)), isNull);
+    expect(_validate(memos: photos(4)), isNotNull);
+  });
+
+  test('이미지가 들어 있는 독후감은 거부한다(독후감 이미지 한도 0)', () {
+    expect(
+      _validate(
+        reflections: [
+          _reflection(
+            contentJson: const {
+              'ops': [
+                {
+                  'insert': {'image': 'local://reflection/-1/0'},
+                },
+                {'insert': '\n'},
+              ],
+            },
+          ),
+        ],
+      ),
+      isNotNull,
+    );
+  });
+
   test('독후감 clientRequestId가 중복되면 거부한다', () {
     expect(
       _validate(
@@ -253,7 +286,10 @@ void main() {
   test('같은 이름의 태그가 둘 이상이면 거부한다(서버 findOrCreate 1:1 위반)', () {
     expect(
       _validate(
-        tags: [_tag(id: -1, name: '중복'), _tag(id: -2, name: '중복')],
+        tags: [
+          _tag(id: -1, name: '중복'),
+          _tag(id: -2, name: '중복'),
+        ],
       ),
       isNotNull,
     );

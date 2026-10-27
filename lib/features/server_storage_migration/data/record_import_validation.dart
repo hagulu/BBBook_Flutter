@@ -1,4 +1,6 @@
+import '../../../core/policy/attachment_limit_policy.dart';
 import '../../book_note/models/book_note.dart';
+import '../../book_reflection/services/book_reflection_content_adapter.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../tag/models/tag_mapping.dart';
 import 'record_import_snapshot.dart';
@@ -9,7 +11,9 @@ import 'record_import_snapshot.dart';
 /// 간결한 메시지를, 없으면 null을 반환한다.
 ///
 /// 이미지 파일 자체(용량·형식)는 실제 파일을 열어야 하는 검사라 여기 대신
-/// [RecordImportSnapshotBuilder]가 처리한다.
+/// [RecordImportSnapshotBuilder]가 처리한다. 이미지 **개수** 한도는 서버가
+/// 일반 저장과 같은 [AttachmentLimitPolicy]를 Import에도 적용하므로 여기서
+/// 함께 확인한다.
 String? validateRecordImportSnapshot({
   required List<BookItem> books,
   required List<BookNote> notes,
@@ -17,6 +21,7 @@ String? validateRecordImportSnapshot({
   required List<ReflectionForImport> reflections,
   required List<LocalTag> tags,
   required List<TagMapping> tagMaps,
+  AttachmentLimitPolicy attachmentLimits = AttachmentLimitPolicy.defaultPolicy,
 }) {
   for (final book in books) {
     if (book.title.length > 255 ||
@@ -72,12 +77,37 @@ String? validateRecordImportSnapshot({
   if (_hasDuplicate(memos.map((m) => m.clientRequestId))) {
     return '메모 데이터에 중복된 식별자가 있어 가져올 수 없습니다.';
   }
+  // 서버는 PHOTO 메모를 저장할 때마다 그 노트의 활성 PHOTO 메모 수를 세어
+  // 한도에 닿으면 400(NOTE_IMAGE_LIMIT_EXCEEDED)으로 세션 전체를 정리한다.
+  final photoCountByNote = <int, int>{};
+  for (final memo in memos) {
+    if (memo.type != BookNoteMemoType.photo) continue;
+    photoCountByNote[memo.noteId] = (photoCountByNote[memo.noteId] ?? 0) + 1;
+  }
+  final noteImageLimit = attachmentLimits.noteImageLimit;
+  if (photoCountByNote.values.any((count) => count > noteImageLimit)) {
+    return '한 노트에 사진이 $noteImageLimit장을 넘어 가져올 수 없습니다. '
+        '사진을 정리한 뒤 다시 시도해 주세요.';
+  }
 
+  const contentAdapter = BookReflectionContentAdapter();
   for (final reflection in reflections) {
     final r = reflection.reflection;
     final title = r.title?.trim();
     if (title == null || title.isEmpty || r.contentText == null) {
       return '내용 없는 독후감이 있어 가져올 수 없습니다.';
+    }
+    // 서버는 아직 올리지 않은 local:// placeholder도 이미지로 세어, 한도를
+    // 넘으면 400(REFLECTION_IMAGE_NOT_ALLOWED)으로 세션 전체를 정리한다.
+    final imageCount = contentAdapter
+        .imageSources(reflection.contentJsonForImport)
+        .length;
+    if (imageCount > attachmentLimits.reflectionImageLimit) {
+      return attachmentLimits.reflectionImageAllowed
+          ? '독후감 하나에 이미지가 ${attachmentLimits.reflectionImageLimit}장을 넘어 '
+                '가져올 수 없습니다. 이미지를 정리한 뒤 다시 시도해 주세요.'
+          : '이미지가 들어 있는 독후감이 있어 가져올 수 없습니다. '
+                '독후감에서 이미지를 지운 뒤 다시 시도해 주세요.';
     }
   }
   if (_hasDuplicate(reflections.map((r) => r.reflection.clientRequestId))) {

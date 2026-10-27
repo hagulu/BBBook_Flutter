@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:developer' as developer;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -81,33 +80,35 @@ class LocalStorageMigrationController
   }
 
   /// 전환은 끝났는데 서버 기록 정리만 남은 상태를 마저 처리한다(멱등한
-  /// DELETE라 여러 번 호출해도 안전하다).
+  /// DELETE라 여러 번 호출해도 안전하다). 프로필의 다시 시도와 서버 저장
+  /// 복귀 전 정리가 함께 쓴다.
   ///
-  /// 전환 도중 앱이 종료됐다면 표지 사본 승격이 끝나지 않았을 수 있다. 서버
-  /// 기록을 지우면 표지 원본 URL이 사라지므로, 삭제 전에 승격을 먼저 마친다
-  /// (이미 승격된 행은 조건에 걸리지 않아 다시 실행해도 안전하다).
-  Future<bool> retryServerCleanup() async {
-    try {
-      await ref.read(bookshelfRepositoryProvider).promoteLocalCoverCopies();
-      await ref.read(recordSyncApiProvider).deleteAllRecords();
-      await ref.read(storageModeStoreProvider).markServerRecordsDeleted();
+  /// 받지 못한 이미지를 먼저 이어 받고, 전환 때 남긴 `exportedAt`으로 정리한다
+  /// ([LocalStorageMigrationService.retryServerCleanup]). 표지 사본 승격은
+  /// 삭제 직전에 다시 한다 — 전환 도중 앱이 종료됐다면 승격이 끝나지 않았을
+  /// 수 있고, 서버 기록을 지우면 표지 원본 URL이 사라진다.
+  Future<ServerCleanupResult> retryServerCleanup({
+    bool ignoreMissingImages = false,
+    bool ignoreChangedRecords = false,
+  }) async {
+    final steps = _steps();
+    if (steps == null) return ServerCleanupResult.failed;
+    final result = await LocalStorageMigrationService(steps).retryServerCleanup(
+      ignoreMissingImages: ignoreMissingImages,
+      ignoreChangedRecords: ignoreChangedRecords,
+    );
+    if (result == ServerCleanupResult.cleaned) {
       ref.invalidate(serverDeletePendingProvider);
-      return true;
-    } catch (error) {
-      developer.log('[서버 기록 정리] result=FAIL reason=${error.runtimeType}');
-      return false;
     }
+    return result;
   }
 
-  Future<void> _run(
-    Future<bool> Function(String message)? confirmProceed,
-  ) async {
+  LocalStorageMigrationRepositorySteps? _steps() {
     final ownerUserId = ref.read(
       authNotifierProvider.select((auth) => auth.user?.id),
     );
-    if (ownerUserId == null) return;
-
-    final steps = LocalStorageMigrationRepositorySteps(
+    if (ownerUserId == null) return null;
+    return LocalStorageMigrationRepositorySteps(
       ownerUserId: ownerUserId,
       bookshelfRepository: ref.read(bookshelfRepositoryProvider),
       noteRepository: ref.read(bookNoteRepositoryProvider),
@@ -116,6 +117,13 @@ class LocalStorageMigrationController
       recordSyncApi: ref.read(recordSyncApiProvider),
       storageMode: ref.read(storageModeStoreProvider),
     );
+  }
+
+  Future<void> _run(
+    Future<bool> Function(String message)? confirmProceed,
+  ) async {
+    final steps = _steps();
+    if (steps == null) return;
     final result = await LocalStorageMigrationService(steps).run(
       onProgress: (progress) {
         if (_disposed) return;

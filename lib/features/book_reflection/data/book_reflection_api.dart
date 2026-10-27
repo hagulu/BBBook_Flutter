@@ -208,6 +208,8 @@ class BookReflectionApi {
       'USER_BOOK_NOT_FOUND' => '책장에서 이 책을 찾을 수 없습니다.',
       'BOOK_NOTE_NOT_FOUND' => '노트를 찾을 수 없습니다.',
       'AI_PROVIDER_ERROR' => 'AI 서비스에 일시적인 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.',
+      'AI_REQUEST_IN_PROGRESS' => '진행 중인 AI 요청이 있습니다. 끝난 뒤 다시 시도해 주세요.',
+      'AI_SERVICE_BUSY' => 'AI 요청이 많아 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.',
       _ => switch (statusCode) {
         401 => '인증에 실패했습니다.',
         _ => '독후감을 생성하지 못했습니다.',

@@ -118,7 +118,8 @@ class ServerStorageMigrationService {
         return _failed(
           emit,
           state,
-          '이전 전환에서 남은 서버 기록 정리가 끝나지 않았습니다. 잠시 후 다시 시도해 주세요.',
+          '이전 전환에서 남은 서버 기록 정리가 끝나지 않았습니다. '
+          '서버 기록 정리를 먼저 다시 시도해 주세요.',
         );
       }
 
@@ -287,8 +288,8 @@ class ServerStorageMigrationService {
           );
         }
         reflectionUploadedImages[reflectionLocalId] = uploaded;
-        final original = reflectionsById[reflectionLocalId]!
-            .contentJsonForImport;
+        final original =
+            reflectionsById[reflectionLocalId]!.contentJsonForImport;
         reflectionFinalContent[reflectionLocalId] = _contentAdapter
             .replaceImageSources(original, replacements);
       }

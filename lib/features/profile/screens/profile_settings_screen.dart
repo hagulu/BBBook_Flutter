@@ -201,21 +201,63 @@ class ProfileSettingsScreen extends ConsumerWidget {
     ref.read(serverStorageMigrationControllerProvider.notifier).start();
   }
 
-  Future<void> _retryServerCleanup(BuildContext context, WidgetRef ref) async {
+  Future<void> _retryServerCleanup(
+    BuildContext context,
+    WidgetRef ref, {
+    bool ignoreMissingImages = false,
+    bool ignoreChangedRecords = false,
+  }) async {
     AppLoading.show(context);
-    final bool cleaned;
+    final ServerCleanupResult result;
     try {
-      cleaned = await ref
+      result = await ref
           .read(localStorageMigrationControllerProvider.notifier)
-          .retryServerCleanup();
+          .retryServerCleanup(
+            ignoreMissingImages: ignoreMissingImages,
+            ignoreChangedRecords: ignoreChangedRecords,
+          );
     } finally {
       AppLoading.hide();
     }
     if (!context.mounted) return;
-    if (cleaned) {
-      AppSnackBar.success(context, '서버 기록을 정리했습니다.');
-    } else {
-      AppSnackBar.error(context, '서버 기록을 정리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    switch (result) {
+      case ServerCleanupResult.cleaned:
+        AppSnackBar.success(context, '서버 기록을 정리했습니다.');
+      case ServerCleanupResult.failed:
+        AppSnackBar.error(context, '서버 기록을 정리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      case ServerCleanupResult.missingImages:
+        // 서버를 지우면 다시 받을 수 없으므로 사용자가 직접 정한다.
+        final confirmed = await AppConfirm.show(
+          context,
+          title: '서버 기록 정리',
+          message:
+              '이 기기에 아직 내려받지 못한 이미지가 있습니다. 정리하면 그 이미지는 '
+              '다시 받을 수 없습니다.\n\n그래도 정리할까요?',
+          confirmText: '정리',
+          destructive: true,
+        );
+        if (!confirmed || !context.mounted) return;
+        await _retryServerCleanup(context, ref, ignoreMissingImages: true);
+      case ServerCleanupResult.changedSinceExport:
+        // 서버에만 있는 기록을 지우게 되므로 사용자가 직접 정한다.
+        final confirmed = await AppConfirm.show(
+          context,
+          title: '서버 기록 정리',
+          message:
+              '이 기기로 기록을 옮긴 뒤 다른 기기나 웹에서 추가·수정된 기록이 서버에 '
+              '있습니다. 정리하면 이 기기에 없는 그 기록도 함께 삭제됩니다.\n\n'
+              '그래도 정리할까요?',
+          confirmText: '정리',
+          destructive: true,
+        );
+        if (!confirmed || !context.mounted) return;
+        // 이미지 확인은 이번 시도에서 이미 끝났다(통과했거나 사용자가 승인).
+        await _retryServerCleanup(
+          context,
+          ref,
+          ignoreMissingImages: true,
+          ignoreChangedRecords: true,
+        );
     }
   }
 }

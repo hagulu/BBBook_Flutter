@@ -191,6 +191,9 @@ class BookshelfDatabase {
   /// `server_delete_pending`은 "로컬 모드로 전환은 됐지만 서버 기록 정리가
   /// 아직 안 끝남"을 앱 재시작 뒤에도 기억하기 위한 값이다 — 이 값이 없으면
   /// 전환 직후 삭제가 실패했을 때 다시 시도할 방법이 사라진다.
+  /// `server_delete_exported_at`은 그 정리에 함께 보낼 `exportedAt`이다 —
+  /// 다시 시도할 때도 이 기기가 내려받은 시점 이후 다른 기기·웹에서 바뀐
+  /// 기록은 지우지 않게 한다.
   ///
   /// 행이 없으면 기본값인 서버 저장 모드다 — 자발적 로그아웃이 실행하는
   /// [clearAll]이 이 행을 지우므로, 로컬 데이터가 사라지는 순간 모드도 함께
@@ -202,9 +205,19 @@ class BookshelfDatabase {
         mode TEXT NOT NULL,
         owner_user_id INTEGER,
         server_delete_pending INTEGER NOT NULL DEFAULT 0,
+        server_delete_exported_at TEXT,
         updated_at TEXT NOT NULL
       )
     ''');
+    // 이 컬럼이 생기기 전에 만들어진 테이블에도 채운다(`onOpen` 참고).
+    final columns = (await db.rawQuery(
+      'PRAGMA table_info(storage_mode)',
+    )).map((row) => row['name']).toSet();
+    if (!columns.contains('server_delete_exported_at')) {
+      await db.execute(
+        'ALTER TABLE storage_mode ADD COLUMN server_delete_exported_at TEXT',
+      );
+    }
   }
 
   /// 독후감 본문 이미지의 "서버 URL ↔ 로컬 사본" 짝을 담는 로컬 전용 테이블.

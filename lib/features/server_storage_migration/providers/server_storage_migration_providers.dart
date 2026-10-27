@@ -8,8 +8,8 @@ import '../../book_reflection/data/book_reflection_dao.dart';
 import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/data/bookshelf_dao.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
-import '../../record_sync/providers/record_sync_providers.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
+import '../../storage_mode/services/local_storage_migration_service.dart';
 import '../../tag/data/tag_dao.dart';
 import '../../tag/providers/tag_providers.dart';
 import '../data/record_import_api.dart';
@@ -54,7 +54,11 @@ class ServerStorageMigrationController
       reflectionDao: const BookReflectionDao(),
       tagDao: const TagDao(),
       recordImportApi: ref.read(recordImportApiProvider),
-      recordSyncApi: ref.read(recordSyncApiProvider),
+      cleanUpPendingServerRecords: () async =>
+          await ref
+              .read(localStorageMigrationControllerProvider.notifier)
+              .retryServerCleanup() ==
+          ServerCleanupResult.cleaned,
       storageMode: ref.read(storageModeStoreProvider),
     );
     final result = await ServerStorageMigrationService(steps).run(

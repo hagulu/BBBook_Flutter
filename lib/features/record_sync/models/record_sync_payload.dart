@@ -175,6 +175,7 @@ class RecordSyncPayload {
     required this.reflections,
     required this.tags,
     required this.tagMaps,
+    this.exportedAt,
   });
 
   factory RecordSyncPayload.fromJson(Map<String, dynamic> json) {
@@ -203,6 +204,7 @@ class RecordSyncPayload {
       tagMaps: (json['tagMaps'] as List<dynamic>)
           .map((map) => ServerTagMap.fromJson(map as Map<String, dynamic>))
           .toList(growable: false),
+      exportedAt: json['exportedAt'] as String?,
     );
     payload._validateRelationships();
     return payload;
@@ -220,6 +222,19 @@ class RecordSyncPayload {
   /// 된다.
   final List<ServerTag> tags;
   final List<ServerTagMap> tagMaps;
+
+  /// 이 조회를 시작한 서버 시각(ISO-8601 UTC). 서버 → 로컬 전환의 서버 기록
+  /// 정리(`DELETE /api/me/records?exportedAt=`)에 받은 문자열 그대로 넘긴다
+  /// — 그 시각 이후 다른 기기·웹에서 바뀐 기록이 있으면 서버가 삭제를
+  /// 거절(409)해 이 기기에 없는 기록을 지우지 않는다.
+  final String? exportedAt;
+
+  /// [exportedAt]을 로컬 동기화 기준값으로 쓸 때의 시각. 서버 시각이라
+  /// 기기 시계 오차의 영향을 받지 않는다.
+  DateTime? get exportedAtTime {
+    final value = exportedAt;
+    return value == null ? null : DateTime.tryParse(value)?.toUtc();
+  }
 
   int get totalItemCount =>
       books.length +

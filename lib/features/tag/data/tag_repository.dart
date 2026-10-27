@@ -5,6 +5,7 @@ import '../../../core/network/api_exception.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
 import '../../bookshelf/data/bookshelf_repository.dart';
 import '../../record_sync/data/record_sync_api.dart';
+import '../../record_sync/models/record_sync_payload.dart';
 import '../../storage_mode/data/storage_mode_store.dart';
 import '../models/tag_mapping.dart';
 import 'tag_api.dart';
@@ -118,6 +119,20 @@ class TagRepository {
   Future<bool> _fullSync(int expectedGeneration, {DateTime? baseline}) async {
     final requestedAt = baseline ?? DateTime.now().toUtc();
     final payload = await _recordSyncApi.getAllRecords();
+    return applyFullRecords(
+      payload,
+      expectedGeneration: expectedGeneration,
+      baseline: requestedAt,
+    );
+  }
+
+  /// 이미 받아 둔 `/api/me/records` 응답으로 태그/매핑 테이블을 맞춘다.
+  /// 서버 → 로컬 전환 전용 용도는 `BookNoteRepository.applyFullRecords`와 같다.
+  Future<bool> applyFullRecords(
+    RecordSyncPayload payload, {
+    required int expectedGeneration,
+    required DateTime baseline,
+  }) async {
     if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
       return false;
     }
@@ -127,7 +142,7 @@ class TagRepository {
           .toList(growable: false),
       tags: payload.tags,
       tagMaps: payload.tagMaps,
-      requestedAt: requestedAt,
+      requestedAt: baseline,
     );
     return true;
   }

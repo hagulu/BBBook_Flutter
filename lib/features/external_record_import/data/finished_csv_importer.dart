@@ -45,6 +45,10 @@ class FinishedCsvImporter {
   static const _maxTagLength = 15;
   static const _maxTagsPerBook = 10;
 
+  /// 한 파일에서 가져올 수 있는 데이터 행(헤더 제외) 수. 넘으면 서버처럼
+  /// 어떤 행도 가져오지 않는다.
+  static const maxDataRows = 2000;
+
   static final _isbnSeparatorPattern = RegExp(r'[-\s]');
   static final _isbnPattern = RegExp(r'^\d{13}$');
   static final _pagesPattern = RegExp(r'^\d+$');
@@ -95,6 +99,7 @@ class FinishedCsvImporter {
       );
     }
 
+    final headerColumnCount = rows.first.length;
     final books = <ExternalBookImportItem>[];
     final failures = <ExternalImportRowFailure>[];
     var dataRowCount = 0;
@@ -109,8 +114,25 @@ class FinishedCsvImporter {
       // 파일 끝 빈 줄처럼 모든 칸이 빈 행은 데이터 행으로 세지 않는다.
       if (headers.every((header) => value(header).isEmpty)) continue;
       dataRowCount++;
+      if (dataRowCount > maxDataRows) {
+        throw const ExternalImportException(
+          '한 파일에서는 기록을 최대 $maxDataRows행까지 가져올 수 있어요.',
+          reason: 'csv_too_many_rows',
+        );
+      }
 
       final title = value('title');
+      // 서버처럼 헤더보다 칸이 적은 행은 그 행만 실패로 남기고 계속한다.
+      if (row.length < headerColumnCount) {
+        failures.add(
+          ExternalImportRowFailure(
+            row: rowIndex + 1,
+            title: title.isEmpty ? null : title,
+            reason: '헤더보다 칸 수가 적어요. 쉼표 개수를 확인해 주세요.',
+          ),
+        );
+        continue;
+      }
       final parsed = _parseRow(value);
       switch (parsed) {
         case _RowFailure(:final reason):

@@ -232,6 +232,21 @@ class BookshelfRepository {
     return true;
   }
 
+  /// 이미 받아 둔 `/api/me/records` 응답의 `books`(`/api/me/books/sync`와
+  /// 같은 필드)로 책장 테이블을 맞춘다. 서버 → 로컬 전환 전용 용도는
+  /// `BookNoteRepository.applyFullRecords`와 같다.
+  Future<bool> applyFullRecords(
+    List<BookItem> books, {
+    required int expectedGeneration,
+    required DateTime baseline,
+  }) async {
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+      return false;
+    }
+    await _dao.reconcile(books, baseline);
+    return true;
+  }
+
   /// dirty 표시된 책 기록 로컬 수정을 서버로 일괄 재전송한다(오프라인/실패로
   /// 아직 반영되지 못한 것들 — 책 기록 화면에서 편집 직후 시도하는
   /// [pushDirtyRecord]와 같은 책별 큐를 공유한다). 그러지 않고 이 행들을

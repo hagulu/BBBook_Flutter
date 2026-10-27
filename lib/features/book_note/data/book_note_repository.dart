@@ -502,6 +502,26 @@ class BookNoteRepository {
   }) async {
     final requestedAt = baseline ?? DateTime.now().toUtc();
     final payload = await _recordSyncApi.getAllRecords();
+    return applyFullRecords(
+      payload,
+      ownerUserId: ownerUserId,
+      expectedGeneration: expectedGeneration,
+      baseline: requestedAt,
+    );
+  }
+
+  /// 이미 받아 둔 `/api/me/records` 응답으로 노트/메모 테이블을 맞춘다.
+  ///
+  /// 서버 → 로컬 전환이 책장·독후감·태그와 **같은 한 번의 응답**을 반영할 때
+  /// 쓴다 — 그래야 그 응답의 `exportedAt`이 로컬에 실제로 반영된 시점을
+  /// 가리킨다. 저장 모드 게이트를 거치지 않으므로 로컬 저장 모드로 막 전환한
+  /// 뒤에도 쓸 수 있다.
+  Future<bool> applyFullRecords(
+    RecordSyncPayload payload, {
+    required int ownerUserId,
+    required int expectedGeneration,
+    required DateTime baseline,
+  }) async {
     if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
       return false;
     }
@@ -512,7 +532,7 @@ class BookNoteRepository {
           .toList(growable: false),
       notes: payload.notes,
       noteMemos: payload.noteMemos,
-      requestedAt: requestedAt,
+      requestedAt: baseline,
     );
     return true;
   }

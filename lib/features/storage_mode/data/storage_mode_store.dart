@@ -43,6 +43,7 @@ class StorageModeStore {
   StorageMode? _cached;
   int? _cachedOwnerUserId;
   bool _cachedServerDeletePending = false;
+  String? _cachedServerDeleteExportedAt;
 
   /// 현재 저장 모드. 캐시가 없으면 DB에서 읽어 채운다.
   Future<StorageMode> current() async {
@@ -52,6 +53,8 @@ class StorageModeStore {
     _cached = StorageMode.fromDb(row?['mode'] as String?);
     _cachedOwnerUserId = row?['owner_user_id'] as int?;
     _cachedServerDeletePending = (row?['server_delete_pending'] as int?) == 1;
+    _cachedServerDeleteExportedAt =
+        row?['server_delete_exported_at'] as String?;
     return _cached!;
   }
 
@@ -69,6 +72,14 @@ class StorageModeStore {
   Future<bool> isServerDeletePending() async {
     await current();
     return _cached == StorageMode.local && _cachedServerDeletePending;
+  }
+
+  /// 남은 서버 기록 정리에 함께 보낼 `exportedAt`(`DELETE /api/me/records`).
+  /// 정리가 남아 있지 않거나, 최신 기록을 받지 못한 채 전환을 승인했으면
+  /// null이다.
+  Future<String?> serverDeleteExportedAt() async {
+    if (!await isServerDeletePending()) return null;
+    return _cachedServerDeleteExportedAt;
   }
 
   /// 이 로컬 데이터가 계정 없이 쓰는 사용자가 만든 것인지.
@@ -120,6 +131,7 @@ class StorageModeStore {
       StorageMode.local,
       ownerUserId,
       serverDeletePending: _cachedServerDeletePending,
+      serverDeleteExportedAt: _cachedServerDeleteExportedAt,
       alongside: alongside,
     );
     developer.log('[저장 모드 소유자 변경] userId=$ownerUserId result=SUCCESS');
@@ -130,9 +142,34 @@ class StorageModeStore {
   /// 순서가 반대면 삭제 직후 앱이 죽었을 때 다음 동기화가 "서버에서 지워진
   /// 기록"으로 판단해 로컬 원본까지 지운다. 아직 서버 정리 전이라
   /// [isServerDeletePending]은 true로 남는다.
-  Future<void> switchToLocal({required int ownerUserId}) async {
-    await _write(StorageMode.local, ownerUserId, serverDeletePending: true);
+  ///
+  /// [exportedAt]은 로컬에 반영한 `GET /api/me/records` 응답의 값이다. 정리를
+  /// 나중에 다시 시도할 때도 같은 값으로 보낸다([serverDeleteExportedAt]).
+  Future<void> switchToLocal({
+    required int ownerUserId,
+    String? exportedAt,
+  }) async {
+    await _write(
+      StorageMode.local,
+      ownerUserId,
+      serverDeletePending: true,
+      serverDeleteExportedAt: exportedAt,
+    );
     developer.log('[저장 모드 전환] mode=LOCAL userId=$ownerUserId result=SUCCESS');
+  }
+
+  /// 서버 기록을 다시 받아 로컬에 반영한 뒤, 남은 정리에 보낼 `exportedAt`을
+  /// 그 응답의 값으로 바꾼다. 정리가 남아 있지 않으면 아무 것도 하지 않는다.
+  Future<void> updateServerDeleteExportedAt(String? exportedAt) async {
+    if (!await isServerDeletePending()) return;
+    final ownerUserId = _cachedOwnerUserId;
+    if (ownerUserId == null) return;
+    await _write(
+      StorageMode.local,
+      ownerUserId,
+      serverDeletePending: true,
+      serverDeleteExportedAt: exportedAt,
+    );
   }
 
   /// 서버 기록 일괄 소프트 삭제가 성공한 뒤 호출한다.
@@ -165,6 +202,7 @@ class StorageModeStore {
     _cached = StorageMode.server;
     _cachedOwnerUserId = null;
     _cachedServerDeletePending = false;
+    _cachedServerDeleteExportedAt = null;
   }
 
   /// [BookshelfDatabase.clearAll]처럼 DB를 통째로 비운 뒤 호출한다.
@@ -172,6 +210,7 @@ class StorageModeStore {
     _cached = null;
     _cachedOwnerUserId = null;
     _cachedServerDeletePending = false;
+    _cachedServerDeleteExportedAt = null;
   }
 
   Future<Map<String, Object?>?> _readRow() async {
@@ -190,14 +229,18 @@ class StorageModeStore {
     StorageMode mode,
     int ownerUserId, {
     required bool serverDeletePending,
+    String? serverDeleteExportedAt,
     Future<void> Function(Transaction txn)? alongside,
   }) async {
     final db = await BookshelfDatabase.instance();
+    // 정리가 끝났거나 필요 없으면 이전 전환의 값을 남기지 않는다.
+    final exportedAt = serverDeletePending ? serverDeleteExportedAt : null;
     final row = {
       'id': 1,
       'mode': mode.dbValue,
       'owner_user_id': ownerUserId,
       'server_delete_pending': serverDeletePending ? 1 : 0,
+      'server_delete_exported_at': exportedAt,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
     if (alongside == null) {
@@ -219,6 +262,7 @@ class StorageModeStore {
     _cached = mode;
     _cachedOwnerUserId = ownerUserId;
     _cachedServerDeletePending = serverDeletePending;
+    _cachedServerDeleteExportedAt = exportedAt;
   }
 }
 

@@ -4,7 +4,6 @@ import '../../book_note/data/book_note_dao.dart';
 import '../../book_reflection/data/book_reflection_dao.dart';
 import '../../bookshelf/data/bookshelf_dao.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
-import '../../record_sync/data/record_sync_api.dart';
 import '../../storage_mode/data/storage_mode_store.dart';
 import '../../tag/data/tag_dao.dart';
 import 'record_import_api.dart';
@@ -24,7 +23,7 @@ class ServerStorageMigrationRepositorySteps
     required this.reflectionDao,
     required this.tagDao,
     required this.recordImportApi,
-    required this.recordSyncApi,
+    required this.cleanUpPendingServerRecords,
     required this.storageMode,
   });
 
@@ -34,19 +33,19 @@ class ServerStorageMigrationRepositorySteps
   final BookReflectionDao reflectionDao;
   final TagDao tagDao;
   final RecordImportApi recordImportApi;
-  final RecordSyncApi recordSyncApi;
+
+  /// 남은 서버 기록 정리를 프로필의 다시 시도와 같은 규칙으로 실행한다
+  /// (`LocalStorageMigrationController.retryServerCleanup`). 정리가 끝나면 true.
+  final Future<bool> Function() cleanUpPendingServerRecords;
   final StorageModeStore storageMode;
 
   @override
   Future<bool> ensureNoPendingServerCleanup() async {
     if (!await storageMode.isServerDeletePending()) return true;
-    try {
-      await recordSyncApi.deleteAllRecords();
-      await storageMode.markServerRecordsDeleted();
-      return true;
-    } catch (_) {
-      return false;
-    }
+    // 받지 못한 이미지가 남았거나 내려받은 뒤 다른 기기·웹에서 바뀐 기록이
+    // 있으면 여기서 지우기를 강행하지 않는다 — 지울지는 프로필의 서버 기록
+    // 정리에서 사용자가 정한다.
+    return cleanUpPendingServerRecords();
   }
 
   @override
