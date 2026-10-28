@@ -151,6 +151,10 @@ class RecordSyncDao {
       for (final reflection in payload.reflections) {
         await txn.insert('book_reflection', {
           'id': reflection.id,
+          // 노트/메모와 같은 이유로 server_id를 채운다 — 비워두면
+          // BookReflectionRepository가 이 글을 "서버에 없는 로컬 전용 행"으로
+          // 보고 수정은 CREATE로, 삭제·공개 설정은 서버 호출 없이 처리한다.
+          'server_id': reflection.id,
           'owner_user_id': userId,
           'user_book_id': reflection.userBookId,
           'reflection_type': reflection.reflectionType,

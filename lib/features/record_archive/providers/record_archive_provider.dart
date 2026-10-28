@@ -8,6 +8,7 @@ import '../../book_note/providers/book_note_providers.dart';
 import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
+import '../../external_record_import/providers/external_import_providers.dart';
 import '../../tag/providers/tag_providers.dart';
 import '../../server_storage_migration/providers/server_storage_migration_providers.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
@@ -27,6 +28,10 @@ class RecordArchiveController extends Notifier<bool> {
         ref.read(localStorageMigrationControllerProvider).isRunning ||
         ref.read(serverStorageMigrationControllerProvider).isRunning) {
       return null;
+    }
+    // 화면을 닫아도 계속되는 외부 기록 가져오기가 같은 기록을 쓰는 중이다.
+    if (ref.read(externalImportExecutionLockProvider) != null) {
+      return externalImportRunningMessage;
     }
     // ZIP 내보내기/가져오기는 서버를 쓰지 않는 로컬 작업이라 계정 없이 쓰는
     // 사용자도 그대로 쓴다(소유자만 그 사용자의 sentinel이 된다).
@@ -70,17 +75,22 @@ class RecordArchiveController extends Notifier<bool> {
         return '기록을 가져왔습니다.';
       }
       final result = await service.exportRecords(owner);
-      checkSession();
-      final saved = await FilePicker.saveFile(
-        dialogTitle: '내 기록 저장',
-        fileName: result.file.uri.pathSegments.last,
-        bytes: await result.file.readAsBytes(),
-        mimeType: 'application/zip',
-      );
-      final notice = result.missingImages == 0
-          ? ''
-          : '\n확보하지 못한 이미지 ${result.missingImages}개는 제외했습니다.';
-      return saved == null ? null : '선택한 위치에 내보내기 파일을 저장했습니다.$notice';
+      try {
+        checkSession();
+        final saved = await FilePicker.saveFile(
+          dialogTitle: '내 기록 저장',
+          fileName: result.file.uri.pathSegments.last,
+          bytes: await result.file.readAsBytes(),
+          mimeType: 'application/zip',
+        );
+        final notice = result.missingImages == 0
+            ? ''
+            : '\n확보하지 못한 이미지 ${result.missingImages}개는 제외했습니다.';
+        return saved == null ? null : '선택한 위치에 내보내기 파일을 저장했습니다.$notice';
+      } finally {
+        // 저장·취소·실패와 무관하게 개인 기록이 담긴 작업용 ZIP을 남기지 않는다.
+        await result.discard();
+      }
     } on ArchiveException catch (error) {
       developer.log('[내 기록 파일 처리] result=FAIL reason=invalid_archive');
       return error.message;

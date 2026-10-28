@@ -9,6 +9,9 @@ import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../auth/providers/auth_access_providers.dart';
+import '../../storage_mode/data/storage_mode_store.dart';
+import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../models/external_import_models.dart';
 import '../providers/external_import_providers.dart';
 import '../services/external_record_import_service.dart';
@@ -124,16 +127,33 @@ class _ExternalImportScreenState extends ConsumerState<ExternalImportScreen> {
             final alreadySelected = state.selectedBookIndexes.contains(index);
             final conflict = state.conflictingBookIndexes.contains(index);
             if (conflict && !alreadySelected && !_overwriteWarningConfirmed) {
-              final confirmed = await AppConfirm.show(
-                context,
-                title: '기존 기록 덮어쓰기',
-                message:
-                    '같은 ISBN의 책이 이미 있어요. 선택하면 책 정보와 독서 '
-                    '상태, 진행 페이지, 별점, 한줄평이 가져오는 기록으로 '
-                    '바뀝니다. 난이도, 명작, 또 볼래요, 카테고리, 대출 정보 '
-                    '등 북꾸러미에서 설정한 정보와 기존 메모·태그는 유지합니다.',
-                confirmText: '덮어쓰기',
-              );
+              // 동기화가 켜져 있으면 서버 Import가 이미 있는 책을 수정하지
+              // 않고 그대로 재사용한다(§ items 문서 books[n]). 그 경우에는
+              // 덮어쓴다고 안내하지 않고 실제 결과(메모·태그만 추가)를 알린다.
+              final overwrites =
+                  !ref.read(canUseAccountFeaturesProvider) ||
+                  ref.read(storageModeProvider).valueOrNull ==
+                      StorageMode.local;
+              final confirmed = overwrites
+                  ? await AppConfirm.show(
+                      context,
+                      title: '기존 기록 덮어쓰기',
+                      message:
+                          '같은 ISBN의 책이 이미 있어요. 선택하면 책 정보와 독서 '
+                          '상태, 진행 페이지, 별점, 한줄평이 가져오는 기록으로 '
+                          '바뀝니다. 난이도, 명작, 또 볼래요, 카테고리, 대출 정보 '
+                          '등 북꾸러미에서 설정한 정보와 기존 메모·태그는 유지합니다.',
+                      confirmText: '덮어쓰기',
+                    )
+                  : await AppConfirm.show(
+                      context,
+                      title: '기존 책에 메모 추가',
+                      message:
+                          '같은 ISBN의 책이 이미 있어요. 동기화가 켜져 있으면 기존 '
+                          '책 정보와 독서 기록(상태, 진행 페이지, 별점, 한줄평 등)은 '
+                          '그대로 두고, 가져오는 메모·태그만 기존 책에 추가합니다.',
+                      confirmText: '메모 추가',
+                    );
               if (!confirmed || !context.mounted) return;
               _overwriteWarningConfirmed = true;
             }

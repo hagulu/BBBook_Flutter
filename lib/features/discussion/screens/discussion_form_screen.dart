@@ -178,6 +178,13 @@ class _DiscussionFormScreenState extends ConsumerState<DiscussionFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 저장 요청이 서버로 나간 뒤에는 화면을 닫아도 쓰기가 취소되지 않는다.
+    // 결과 안내 없이 닫히면 취소된 줄 알고 다시 작성해 중복 토론이 생길 수
+    // 있으므로 저장 중에만 닫기를 막는다.
+    return PopScope(canPop: !_isSaving, child: _buildScaffold(context));
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: _buildAppBarTitle(),

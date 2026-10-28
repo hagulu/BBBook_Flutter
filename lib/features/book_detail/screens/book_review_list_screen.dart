@@ -77,47 +77,62 @@ class _BookReviewListScreenState extends ConsumerState<BookReviewListScreen> {
     }
   }
 
+  /// 시트는 이 요청의 결과가 나올 때까지 열려 있다 — 실패(false)하면 입력을
+  /// 유지한 채 다시 등록할 수 있다([showReviewCreateDialog]).
   Future<void> _handleCreate() async {
-    final result = await showReviewCreateDialog(context);
-    if (result == null || !mounted) return;
-    try {
-      final success = await ref
-          .read(reviewsControllerProvider(widget.isbn13).notifier)
-          .submitReview(
+    final controller = ref.read(
+      reviewsControllerProvider(widget.isbn13).notifier,
+    );
+    await showReviewCreateDialog(
+      context,
+      onSubmit: (result) async {
+        try {
+          final success = await controller.submitReview(
             rating: result.rating,
             content: result.content,
             isSpoiler: result.isSpoiler,
           );
-      if (!mounted) return;
-      if (success) {
-        AppSnackBar.success(context, '독자평이 등록되었습니다.');
-      } else {
-        // submitReview()는 등록(POST) 자체가 성공한 뒤 첫 페이지 재조회만
-        // 실패했을 때 false를 반환한다 — 여기서 "등록 실패"로 안내하면
-        // 사용자가 같은 내용을 다시 등록해 중복 리뷰가 생길 수 있다.
-        AppSnackBar.info(context, '독자평을 등록했어요. 목록은 잠시 후 새로고침해주세요.');
-      }
-    } on ApiException catch (e) {
-      if (mounted) AppSnackBar.error(context, e.message);
-    }
+          if (!mounted) return true;
+          if (success) {
+            AppSnackBar.success(context, '독자평이 등록되었습니다.');
+          } else {
+            // submitReview()는 등록(POST) 자체가 성공한 뒤 첫 페이지 재조회만
+            // 실패했을 때 false를 반환한다 — 여기서 "등록 실패"로 안내하면
+            // 사용자가 같은 내용을 다시 등록해 중복 리뷰가 생길 수 있다.
+            AppSnackBar.info(context, '독자평을 등록했어요. 목록은 잠시 후 새로고침해주세요.');
+          }
+          return true;
+        } on ApiException catch (e) {
+          if (mounted) AppSnackBar.error(context, e.message);
+          return false;
+        }
+      },
+    );
   }
 
   Future<void> _handleEdit(BookReview review) async {
-    final result = await showReviewEditDialog(context, review: review);
-    if (result == null || !mounted) return;
-    try {
-      await ref
-          .read(reviewsControllerProvider(widget.isbn13).notifier)
-          .updateReview(
+    final controller = ref.read(
+      reviewsControllerProvider(widget.isbn13).notifier,
+    );
+    await showReviewEditDialog(
+      context,
+      review: review,
+      onSubmit: (result) async {
+        try {
+          await controller.updateReview(
             review,
             rating: result.rating,
             clearRating: result.clearRating,
             content: result.content,
             isSpoiler: result.isSpoiler,
           );
-    } on ApiException catch (e) {
-      if (mounted) AppSnackBar.error(context, e.message);
-    }
+          return true;
+        } on ApiException catch (e) {
+          if (mounted) AppSnackBar.error(context, e.message);
+          return false;
+        }
+      },
+    );
   }
 
   Future<void> _handleDelete(BookReview review) async {

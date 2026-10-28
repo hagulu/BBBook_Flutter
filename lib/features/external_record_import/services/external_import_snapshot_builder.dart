@@ -51,9 +51,10 @@ class ExternalImportSnapshotBuilder {
           ? BookItem(
               userBookId: bookLocalId,
               serverId: overwriteExisting ? existing.serverId : null,
-              // 같은 clientRequestId의 활성 책은 서버가 기존 필드를 유지한다.
-              // 사용자가 명시적으로 덮어쓰기를 선택한 경우에는 새 키를 써서
-              // serverId/ISBN 매칭의 교체 정책을 타게 한다.
+              // 사용자가 명시적으로 고른 기존 책은 새 키와 기존 serverId로
+              // 보낸다. 서버 Import는 매칭된 활성 책의 필드를 바꾸지 않으므로
+              // (§ items 문서 books[n] — 화면도 "메모·태그 추가"로 안내한다)
+              // 이 값으로 덮어쓰는 것은 로컬 저장 분기와 soft delete 복구뿐이다.
               clientRequestId: overwriteExisting
                   ? uuid.v4()
                   : _stableId('book|$identity'),

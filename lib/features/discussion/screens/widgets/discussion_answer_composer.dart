@@ -86,6 +86,21 @@ class _DiscussionAnswerSheetState extends State<_DiscussionAnswerSheet> {
   Widget build(BuildContext context) {
     final accent = widget.accentColor ?? AppColors.of(context).accentForeground;
 
+    // 등록 요청 중에는 뒤로 가기·바깥 탭으로 시트를 닫지 못하게 한다. 이미
+    // 나간 요청은 취소되지 않으므로, 닫힌 줄 알고 다시 쓰면 답변이 중복된다.
+    // 아래로 끌어 닫기는 PopScope를 거치지 않고 시트가 직접 닫으므로, 요청
+    // 중에는 세로 드래그를 이 시트가 먼저 가져가 막는다.
+    return PopScope(
+      canPop: !_isSubmitting,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onVerticalDragStart: _isSubmitting ? (_) {} : null,
+        child: _buildShell(context, accent),
+      ),
+    );
+  }
+
+  Widget _buildShell(BuildContext context, Color accent) {
     return RecordDialogShell(
       title: '답변 작성',
       content: Column(
@@ -100,6 +115,9 @@ class _DiscussionAnswerSheetState extends State<_DiscussionAnswerSheet> {
           ],
           TextField(
             controller: _controller,
+            // 보낸 본문은 등록 시작 시점의 것이라, 요청 중 고친 내용은 성공해
+            // 시트가 닫히면 사라진다.
+            readOnly: _isSubmitting,
             autofocus: true,
             minLines: 3,
             maxLines: 8,

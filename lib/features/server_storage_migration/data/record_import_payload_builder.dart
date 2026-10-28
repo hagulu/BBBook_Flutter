@@ -145,12 +145,13 @@ class RecordImportChunk {
 /// 6개 배열을 `maxChunkItemCount`(문서 — `/start` 응답 값, 하드코딩 금지)
 /// 이하로 묶어 청크 목록을 만든다.
 ///
-/// books → tags → notes → noteMemos → reflections → tagMaps 순서를 절대
-/// 흩트리지 않는다(카테고리 내부·경계 모두) — 이 순서를 지키면 어떤 항목이
-/// 자신의 부모(`localUserBookId`/`localNoteId`/`localTagId`)보다 앞서
-/// 등장하는 청크가 생길 수 없다. 문서는 "같은 청크 안에서 완결되지 않아도
-/// 되며 이전 청크에서 이미 매핑된 부모를 참조할 수 있다"고 허용하므로,
-/// 여러 카테고리를 한 청크에 채워 넣는 것도 안전하다.
+/// books → tags → (노트 + 그 노트의 메모) → reflections → tagMaps 순서를
+/// 흩트리지 않는다 — 이 순서를 지키면 어떤 항목이 자신의 부모
+/// (`localUserBookId`/`localNoteId`/`localTagId`)보다 앞서 등장하는 청크가
+/// 생길 수 없다. 문서는 "같은 청크 안에서 완결되지 않아도 되며 이전 청크에서
+/// 이미 매핑된 부모를 참조할 수 있다"고 허용하므로, 여러 카테고리를 한 청크에
+/// 채워 넣는 것도 안전하다. 노트와 메모만은 노트 단위로 묶는다(이유는 함수
+/// 본문 참고).
 List<RecordImportChunk> buildRecordImportChunks({
   required List<Map<String, dynamic>> books,
   required List<Map<String, dynamic>> tags,
@@ -208,8 +209,30 @@ List<RecordImportChunk> buildRecordImportChunks({
   // 다시 읽도록 클로저로 감싼다.
   addAll(books, (item) => currentBooks.add(item));
   addAll(tags, (item) => currentTags.add(item));
-  addAll(notes, (item) => currentNotes.add(item));
-  addAll(noteMemos, (item) => currentMemos.add(item));
+
+  // 노트마다 자기 메모를 바로 뒤에 붙인다. 서버는 `serverId` 없는 노트를 같은
+  // 요청에 실린 하위 메모로 판별·역추적하므로(§ items 문서 notes[n]), 새 노트가
+  // 청크 끝에 걸려 메모 없이 따로 전송되면 "내용 없는 신규 제목 전용 노트"로
+  // 400이 나고 세션 전체가 정리된다. 그런 노트는 첫 메모와 같은 청크에 둔다.
+  // 메모는 여전히 자기 노트와 같은 청크이거나 그 뒤에만 온다.
+  final memosByNote = <Object?, List<Map<String, dynamic>>>{};
+  for (final memo in noteMemos) {
+    (memosByNote[memo['localNoteId']] ??= []).add(memo);
+  }
+  for (final note in notes) {
+    final memos = memosByNote.remove(note['localId']) ?? const [];
+    if (note['serverId'] == null &&
+        memos.isNotEmpty &&
+        currentCount + 2 > maxChunkItemCount) {
+      flush();
+    }
+    addAll([note], (item) => currentNotes.add(item));
+    addAll(memos, (item) => currentMemos.add(item));
+  }
+  // 이론상 없어야 하지만, 목록에 없는 노트를 가리키는 메모도 빠뜨리지 않는다.
+  for (final memos in memosByNote.values) {
+    addAll(memos, (item) => currentMemos.add(item));
+  }
   addAll(reflections, (item) => currentReflections.add(item));
   addAll(tagMaps, (item) => currentTagMaps.add(item));
   flush();

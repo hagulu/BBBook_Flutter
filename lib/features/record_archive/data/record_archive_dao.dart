@@ -331,8 +331,10 @@ class RecordArchiveDao {
           );
         }
         final existing = sameIdentity.isNotEmpty ? sameIdentity : sameIsbn;
+        // 책 ID는 하위 기록이 참조 중인 ID까지 피해 발급한다(이유는
+        // [BookshelfDao.nextLocalUserBookId] 참고).
         final id = existing.isEmpty
-            ? await _nextId(txn, 'user_book', 'user_book_id')
+            ? await BookshelfDao.nextLocalUserBookId(txn)
             : existing.single['user_book_id'] as int;
         bookIds[book.id] = id;
         if (sameIdentity.isNotEmpty) continue;

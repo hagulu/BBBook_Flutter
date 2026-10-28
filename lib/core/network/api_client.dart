@@ -68,6 +68,10 @@ class ApiClient {
     _onUserRetry = onUserRetry;
   }
 
+  /// 일시 오류(연결/타임아웃/5xx) 뒤 새 요청을 보내지 않고 거절하는 시각.
+  /// 결과 확인이 꼭 필요한 요청이 대기가 끝난 뒤 다시 시도할 때만 읽는다.
+  DateTime? get retryAfter => _retryAfter;
+
   /// 사용자가 명시적으로 재시도했을 때만 일시 오류 대기를 해제한다.
   /// 인증 무효나 진행 중인 요청은 변경하지 않는다.
   void requestUserRetry() {

@@ -44,7 +44,16 @@ class LocalAuthStore {
     // 그 기록만 있는 기기가 존재하지 않는 계정으로 복원된다.
     final owners = <int>{};
     final modes = await db.query('storage_mode', columns: ['owner_user_id']);
-    owners.addAll(modes.map((row) => row['owner_user_id']).whereType<int>());
+    final modeOwners = modes
+        .map((row) => row['owner_user_id'])
+        .whereType<int>()
+        .toSet();
+    // 로컬 저장 모드 로그아웃이 기록을 계정에서 떼어 둔 상태다
+    // (`AuthNotifier._detachAccountFromRecords`). 남아 있는 최초 동기화
+    // 완료 키 등으로 이전 계정을 추정해 복원하면, 로그아웃했는데도 그 계정으로
+    // 다시 열리고 노트·독후감은 소유자가 달라 보이지 않는다.
+    if (modeOwners.contains(standaloneOwnerUserId)) return null;
+    owners.addAll(modeOwners);
     final keys = await db.query('sync_meta', columns: ['key']);
     final pattern = RegExp(
       r'^initial_(?:flat_records|records|records_with_books)_synced_user_(\d+)$',

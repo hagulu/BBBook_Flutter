@@ -8,6 +8,7 @@ import '../../../shared/widgets/app_banner_ad.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_inline_banner_ad.dart';
 import '../../../shared/widgets/community_content.dart';
+import '../../auth/providers/auth_providers.dart';
 import '../../book_detail/screens/book_detail_screen.dart';
 import '../../book_record/screens/book_record_screen.dart';
 import '../../external_record_import/screens/external_import_guide_screen.dart';
@@ -77,6 +78,13 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
     ref
         .read(bookSearchControllerProvider.notifier)
         .search(_queryController.text);
+  }
+
+  /// 검색 실패 화면의 "다시 시도". 직전 연결 오류로 걸린 일시 대기를 풀어야
+  /// 통신이 복구된 직후에도 실제로 다시 요청한다.
+  void _retrySearch() {
+    ref.read(apiClientProvider).requestUserRetry();
+    _submit();
   }
 
   void _clear() {
@@ -189,7 +197,7 @@ class _BookSearchScreenState extends ConsumerState<BookSearchScreen> {
                 state: state,
                 scrollController: _scrollController,
                 onOpenDetail: _openDetail,
-                onRetry: _submit,
+                onRetry: _retrySearch,
                 onRetryLoadMore: () => ref
                     .read(bookSearchControllerProvider.notifier)
                     .retryLoadMore(),

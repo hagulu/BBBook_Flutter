@@ -156,15 +156,22 @@ class BookNoteDetailController
       return const BookNoteDetail.empty();
     }
     _repository = ref.watch(bookNoteRepositoryProvider);
-    _noteId = args.noteId;
-    if (_noteId == null) return const BookNoteDetail.empty();
-    final detail =
-        await _repository.findDetail(
-          ownerUserId: args.ownerUserId,
-          userBookId: args.userBookId,
-          noteId: _noteId!,
-        ) ??
-        const BookNoteDetail.empty();
+    // 신규 작성 화면(args.noteId == null)은 동기화 등으로 다시 build돼도 이
+    // 화면에서 이미 만든 노트를 계속 쓴다. args 값으로 되돌리면 빈 화면이 되고
+    // 다음 저장이 노트를 하나 더 만들어 메모가 여러 노트로 나뉜다.
+    final noteId = _noteId = args.noteId ?? _noteId;
+    if (noteId == null) return const BookNoteDetail.empty();
+    final found = await _repository.findDetail(
+      ownerUserId: args.ownerUserId,
+      userBookId: args.userBookId,
+      noteId: noteId,
+    );
+    // 이 화면에서 만든 노트가 그 사이 사라졌으면(다른 기기에서 삭제 등) 다음
+    // 저장은 새 노트로 시작한다.
+    if (found == null && args.noteId == null && _noteId == noteId) {
+      _noteId = null;
+    }
+    final detail = found ?? const BookNoteDetail.empty();
     // 이 노트의 사진만 지금 확보한다(전체 일괄 다운로드는 하지 않는다).
     // 새로 받은 사진이 있으면 로컬 경로가 채워진 최신 상태로 다시 읽는다.
     unawaited(_ensureImages(args));

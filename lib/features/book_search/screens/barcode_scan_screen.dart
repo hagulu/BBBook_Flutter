@@ -10,9 +10,13 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/app_alert.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../auth/providers/auth_access_providers.dart';
+import '../../book_detail/providers/book_detail_providers.dart';
 import '../../book_record/models/record_labels.dart';
+import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/models/book_status.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
+import '../../storage_mode/providers/storage_mode_providers.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 책 뒷면 바코드(ISBN-13/EAN-13)를 카메라로 스캔하는 화면. 검색 화면의
@@ -26,6 +30,9 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 ///   담은 뒤 계속 스캔한다(여러 권을 연달아 등록하는 용도).
 ///
 /// 뒤로가기로 닫으면 null을 반환한다.
+/// 스캔 프레임(가이드) 크기. 빠른 등록에서는 이 영역 주변의 바코드만 인식한다.
+const _scanFrameSize = Size(260, 160);
+
 class BarcodeScanScreen extends ConsumerStatefulWidget {
   const BarcodeScanScreen({super.key});
 
@@ -33,7 +40,8 @@ class BarcodeScanScreen extends ConsumerStatefulWidget {
   ConsumerState<BarcodeScanScreen> createState() => _BarcodeScanScreenState();
 }
 
-class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
+class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen>
+    with WidgetsBindingObserver {
   // ISBN-13은 EAN-13 바코드 값과 그대로 같다(978/979로 시작하는 13자리).
   static final _isbn13Pattern = RegExp(r'^(978|979)\d{10}$');
   static const _quickStatuses = [
@@ -73,15 +81,51 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
   /// 일정 시간 뒤 스스로 지운다.
   Timer? _clearWarningTimer;
 
+  /// 일시적인 실패 뒤 같은 바코드를 다시 처리할 수 있게 [_lastProcessedIsbn]을
+  /// 잠시 뒤에 푼다. 바로 풀면 같은 책을 비추는 동안 매 프레임 실패 요청이
+  /// 반복된다(오프라인에서 책 정보를 조회하는 경우 등).
+  Timer? _retryLastIsbnTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // controller를 직접 넘기면 MobileScanner가 앱 생명주기를 처리하지 않는다
+    // (mobile_scanner `useAppLifecycleState` 문서) — 플러그인 기본 동작과 같은
+    // 정지/재시작을 여기서 맡는다.
+    WidgetsBinding.instance.addObserver(this);
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     _clearWarningTimer?.cancel();
+    _retryLastIsbnTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 권한 요청 창도 생명주기를 바꾼다. 권한이 확인되기 전에는 첫 시작을
+    // 플러그인에 맡긴다.
+    if (!_controller.value.hasCameraPermission) return;
+    switch (state) {
+      case AppLifecycleState.resumed:
+        unawaited(_controller.start().catchError((Object _) {}));
+      case AppLifecycleState.inactive:
+        unawaited(_controller.stop().catchError((Object _) {}));
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+        return;
+    }
   }
 
   void _onDetect(BarcodeCapture capture) {
     if (_handled || _processing || !mounted) return;
+    // 도움말 등 다른 창이 스캐너 위에 떠 있으면 인식 결과를 쓰지 않는다 —
+    // 그대로 pop하면 위에 뜬 창이 닫히고 스캐너는 처리 완료 상태로 남는다.
+    if (ModalRoute.isCurrentOf(context) == false) return;
 
     for (final barcode in capture.barcodes) {
       final value = barcode.rawValue;
@@ -124,14 +168,18 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
     final status = _quickStatus;
     setState(() => _processing = true);
     try {
-      final result = await ref
-          .read(bookshelfRepositoryProvider)
-          .createIsbnBook(
-            isbn13: isbn13,
-            title: 'ISBN $isbn13',
-            status: status,
-          );
-      ref.read(bookshelfSyncVersionProvider.notifier).state++;
+      final bookshelfRepository = ref.read(bookshelfRepositoryProvider);
+      final syncVersion = ref.read(bookshelfSyncVersionProvider.notifier);
+      final result = await _isServerSynced()
+          // 서버 CREATE 응답이 제목·저자·표지를 채워 준다(아래 문구는 그
+          // 응답 전까지만 보이는 임시 제목이다).
+          ? await bookshelfRepository.createIsbnBook(
+              isbn13: isbn13,
+              title: 'ISBN $isbn13',
+              status: status,
+            )
+          : await _createWithBookDetail(isbn13, status);
+      syncVersion.state++;
       // 서버 반영 여부(serverId)와 무관하게 "서재에 담겼다"는 사실은 로컬
       // 저장 시점에 확정된다 — 오프라인이나 로컬 저장 모드에서는 serverId가
       // 계속 null이라, 이 조건을 걸면 연속 스캔 화면에 아무 피드백이 없다.
@@ -144,10 +192,16 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
         );
       }
     } on ApiException catch (e) {
-      // 409(이미 서재에 있음)는 같은 책을 계속 비추고 있는 한 재시도해도
-      // 결과가 같으니 _lastProcessedIsbn을 유지해 중복 요청을 막는다. 그 외
-      // 실패(네트워크 오류 등)는 풀어줘서 같은 책을 바로 재시도할 수 있게 한다.
-      if (e.statusCode != 409) _lastProcessedIsbn = null;
+      // 409(이미 서재에 있음)·404(책 정보 없음)는 같은 책을 계속 비추고 있는
+      // 한 재시도해도 결과가 같으니 _lastProcessedIsbn을 유지해 중복 요청을
+      // 막는다. 그 외 실패(네트워크 오류 등)는 잠시 뒤 풀어줘서 같은 책을
+      // 다시 비추면 재시도할 수 있게 한다.
+      if (e.statusCode != 409 && e.statusCode != 404) {
+        _retryLastIsbnTimer?.cancel();
+        _retryLastIsbnTimer = Timer(const Duration(seconds: 2), () {
+          if (_lastProcessedIsbn == isbn13) _lastProcessedIsbn = null;
+        });
+      }
       if (mounted) {
         AppSnackBar.error(
           context,
@@ -173,6 +227,35 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
     }
   }
 
+  /// 서버로 push·pull하는 상태인지. 로컬 저장 모드·계정 없음에서는 서버
+  /// CREATE 응답으로 책 정보를 보강할 경로가 없다.
+  Future<bool> _isServerSynced() async =>
+      ref.read(canUseAccountFeaturesProvider) &&
+      !await ref.read(storageModeStoreProvider).isLocal();
+
+  /// 서버 동기화를 쓰지 않는 상태의 빠른 등록. 일반 스캔이 여는 책 상세와 같은
+  /// 공개 책 조회로 제목·저자·표지를 먼저 확보한 뒤 저장한다 — 임시 제목으로
+  /// 저장하면 이후 채워 줄 경로가 없다. 조회에 실패하면 저장하지 않고 예외를
+  /// 그대로 던져 안내한다(다시 비추면 재시도).
+  Future<BookItem> _createWithBookDetail(
+    String isbn13,
+    BookStatus status,
+  ) async {
+    final bookshelfRepository = ref.read(bookshelfRepositoryProvider);
+    final detail = await ref.read(bookDetailApiProvider).getBookDetail(isbn13);
+    return bookshelfRepository.createIsbnBook(
+      isbn13: detail.isbn,
+      title: detail.title,
+      author: detail.author,
+      publisher: detail.publisher,
+      statsTotalPages: detail.pageCount == 0 ? null : detail.pageCount,
+      coverImageUrl: detail.coverUrl,
+      categoryId: detail.categoryId,
+      category: detail.category,
+      status: status,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -188,16 +271,29 @@ class _BarcodeScanScreenState extends ConsumerState<BarcodeScanScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          MobileScanner(
-            controller: _controller,
-            onDetect: _onDetect,
-            errorBuilder: (context, error) => Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  '카메라를 사용할 수 없습니다.\n설정에서 카메라 권한을 허용해주세요.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+          LayoutBuilder(
+            builder: (context, constraints) => MobileScanner(
+              controller: _controller,
+              onDetect: _onDetect,
+              // 빠른 등록은 확인 없이 바로 담으므로 가이드 밖(옆 책 등)의
+              // 바코드는 인식하지 않는다. 가이드보다 조금 넓게 잡아 맞추기
+              // 어렵지 않게 한다. 일반 스캔은 책 상세에서 다시 확인하므로
+              // 그대로 화면 전체를 인식한다.
+              scanWindow: _quickRegister
+                  ? Rect.fromCenter(
+                      center: constraints.biggest.center(Offset.zero),
+                      width: _scanFrameSize.width + 40,
+                      height: _scanFrameSize.height + 40,
+                    )
+                  : null,
+              errorBuilder: (context, error) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    '카메라를 사용할 수 없습니다.\n설정에서 카메라 권한을 허용해주세요.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                  ),
                 ),
               ),
             ),
@@ -392,8 +488,8 @@ class _ScanFrame extends StatelessWidget {
     return IgnorePointer(
       child: Center(
         child: Container(
-          width: 260,
-          height: 160,
+          width: _scanFrameSize.width,
+          height: _scanFrameSize.height,
           decoration: BoxDecoration(
             border: Border.all(color: Colors.white, width: 2),
             borderRadius: BorderRadius.circular(16),

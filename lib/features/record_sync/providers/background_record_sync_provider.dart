@@ -11,6 +11,7 @@ import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/data/bookshelf_database.dart';
 import '../../bookshelf/data/bookshelf_dao.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
+import '../../external_record_import/providers/external_import_providers.dart';
 import '../../server_storage_migration/providers/server_storage_migration_providers.dart';
 import '../../record_archive/providers/record_archive_provider.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
@@ -91,10 +92,14 @@ class BackgroundRecordSync with WidgetsBindingObserver {
     await _inFlight;
   }
 
+  /// 외부 기록 가져오기도 포함한다 — 서버 Import가 청크를 올리는 동안의
+  /// 중간 서버 상태를 일반 동기화가 받아 오지 않게 한다(가져오기는 앞뒤로
+  /// 필요한 동기화를 직접 실행한다).
   bool get _migrationRunning =>
       ref.read(localStorageMigrationControllerProvider).isRunning ||
       ref.read(serverStorageMigrationControllerProvider).isRunning ||
-      ref.read(recordArchiveProvider);
+      ref.read(recordArchiveProvider) ||
+      ref.read(externalImportExecutionLockProvider) != null;
 
   Future<void> _run() async {
     final generation = BookshelfDatabase.sessionGeneration;

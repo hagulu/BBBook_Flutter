@@ -78,6 +78,33 @@ class BookRecordApi {
     }
   }
 
+  /// GET /api/me/books/:userBookId — 서버의 현재 `updated_at`만 읽는다
+  /// (api-me-books-userBookId-get.md).
+  ///
+  /// 기록 PATCH가 409(다른 곳에서 이미 수정됨)로 거부됐을 때, 이 기기의 편집과
+  /// 서버의 마지막 수정 중 어느 쪽이 나중인지 판단하는 데만 쓴다
+  /// (`BookshelfRepository`의 충돌 처리).
+  Future<DateTime> getRecordUpdatedAt(int userBookId) async {
+    try {
+      final response = await _apiClient.dio.get<Map<String, dynamic>>(
+        '/api/me/books/$userBookId',
+      );
+      final updatedAt = DateTime.tryParse(
+        _unwrapMap(response)['updatedAt'] as String? ?? '',
+      );
+      if (updatedAt == null) {
+        throw const ApiException('서버 응답을 처리할 수 없습니다.');
+      }
+      return updatedAt.toUtc();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException('서버 응답 형식이 올바르지 않습니다.', cause: e);
+    }
+  }
+
   /// PATCH /api/me/books/:userBookId/book-info — 표시용 제목/저자/출판사/총쪽수/표지 수정.
   ///
   /// [thumbnailFile]이 있으면 새 표지를 업로드하고, [removeThumbnail]이

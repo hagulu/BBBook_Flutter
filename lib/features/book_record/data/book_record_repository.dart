@@ -364,6 +364,15 @@ class BookRecordRepository {
     required String? isbn13,
     BookSearchItem? linkedBook,
   }) async {
+    // 서버 연결(409)과 같은 기준으로, 다른 책이 이미 쓰는 ISBN은 연결하지
+    // 않는다. 같은 ISBN의 활성 책이 둘이 되면 동기화 켜기(Import)가 서버의
+    // ISBN 1:1 규칙에 걸려 전체가 실패한다(§ items 문서 ISBN13 활성 행 단일성).
+    if (isbn13 != null) {
+      final sameIsbn = await _bookshelfRepository.getByIsbn13(isbn13);
+      if (sameIsbn != null && sameIsbn.userBookId != current.userBookId) {
+        throw const ApiException('이미 다른 책에 연결된 ISBN입니다.', statusCode: 409);
+      }
+    }
     final updated = current.copyWithBookInfo(
       title: linkedBook?.title ?? current.title,
       author: linkedBook?.author ?? current.author,

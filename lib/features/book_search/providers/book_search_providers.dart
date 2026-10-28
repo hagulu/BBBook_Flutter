@@ -154,6 +154,8 @@ class BookSearchController extends AutoDisposeNotifier<BookSearchState> {
     if (!state.hasQuery || state.isLoading || state.isLoadingMore) {
       return Future.value();
     }
+    // 직전 연결 오류로 걸린 일시 대기를 풀어야 실제로 다시 요청한다.
+    ref.read(apiClientProvider).requestUserRetry();
     _loadMoreDebounceTimer?.cancel();
     final requestId = ++_requestId;
     return _fetchMore(

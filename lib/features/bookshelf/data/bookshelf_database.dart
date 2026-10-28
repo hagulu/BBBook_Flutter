@@ -117,11 +117,33 @@ class BookshelfDatabase {
         await _createBookCategoryTable(db);
         await _createDismissedIsbnLinkTable(db);
         await _createRecordTables(db);
+        await _backfillDownloadedReflectionServerIds(db);
         await _createReflectionImageLocalTable(db);
         await _createStorageModeTable(db);
         await _createTagTables(db);
       },
     );
+  }
+
+  /// 최초 기록 다운로드(`RecordSyncDao.replaceInitialRecords`)가 예전에
+  /// 독후감의 `server_id`를 비운 채 저장한 행을 보정한다.
+  ///
+  /// 이 앱이 만드는 로컬 독후감 PK는 항상 음수다(`BookReflectionDao._nextLocalId`,
+  /// `RecordArchiveDao._nextId`). 그래서 `server_id`가 없는 양수 PK 행은 서버
+  /// PK를 그대로 `id`로 받은 다운로드 행뿐이고, 그 `id`가 곧 서버 ID다. 같은
+  /// 서버 ID를 이미 다른 행이 쓰고 있으면 고유 인덱스 충돌을 피해 건너뛴다.
+  /// 조건에 맞는 행이 없으면 아무 것도 바꾸지 않으므로 매번 실행해도 안전하다.
+  static Future<void> _backfillDownloadedReflectionServerIds(
+    Database db,
+  ) async {
+    await db.rawUpdate('''
+      UPDATE book_reflection SET server_id = id
+      WHERE server_id IS NULL AND id > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM book_reflection other
+          WHERE other.server_id = book_reflection.id
+        )
+    ''');
   }
 
   static Future<void> _ensureOfflineBookColumns(Database db) async {

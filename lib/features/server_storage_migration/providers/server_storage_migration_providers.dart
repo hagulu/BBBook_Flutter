@@ -8,6 +8,7 @@ import '../../book_reflection/data/book_reflection_dao.dart';
 import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/data/bookshelf_dao.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
+import '../../external_record_import/providers/external_import_providers.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
 import '../../storage_mode/services/local_storage_migration_service.dart';
 import '../../tag/data/tag_dao.dart';
@@ -38,6 +39,16 @@ class ServerStorageMigrationController
 
   /// 겹쳐 눌러도 진행 중인 전환을 공유한다(같은 전환을 두 번 돌리지 않는다).
   Future<void> start() {
+    // 화면을 닫아도 계속되는 외부 기록 가져오기와 Import 세션이 겹치지 않게
+    // 시작하지 않는다(진행 중인 가져오기를 끊지는 않는다).
+    if (_inFlight == null &&
+        ref.read(externalImportExecutionLockProvider) != null) {
+      state = const ServerStorageMigrationState(
+        stage: ServerStorageMigrationStage.failed,
+        failureMessage: externalImportRunningMessage,
+      );
+      return Future<void>.value();
+    }
     return _inFlight ??= _run().whenComplete(() => _inFlight = null);
   }
 

@@ -454,6 +454,7 @@ class BookshelfRepository {
           );
           return;
         }
+        if (await _retryNewerLocalEdit(record, expectedGeneration)) return;
         final reverted = await _dao.resolveConflict(
           item.userBookId,
           capturedUpdatedAt: item.updatedAt,
@@ -479,6 +480,102 @@ class BookshelfRepository {
         '[책 기록 더티 push] userBookId=${item.userBookId} result=FAIL reason=unknown',
       );
     }
+  }
+
+  /// 기록 PATCH의 409는 "이 기기가 마지막으로 본 뒤 서버 행이 바뀌었다"는
+  /// 뜻일 뿐, 어느 쪽 편집이 나중인지는 알려주지 않는다. 그대로 서버 값을
+  /// 따르면 다른 기기보다 나중에 한 이 기기의 편집(예: 오프라인 수정 뒤 재연결)도
+  /// 안내 없이 사라진다. 그래서 서버의 현재 `updated_at`을 다시 읽어 이 기기의
+  /// 편집([BookItem.updatedAt])이 더 나중이면 그 값을 기준으로 한 번 더
+  /// 보낸다 — 이 기기가 바꾼 필드만 담는 부분 PATCH라 다른 곳에서 바뀐 나머지
+  /// 필드는 그대로 남는다. 서버 쪽이 나중이면 false를 돌려 기존처럼 서버 값을
+  /// 따른다([BookshelfDao.resolveConflict]).
+  ///
+  /// 서버 시각을 확인하지 못하면 어느 쪽이 나중인지 모르므로 편집을 버리지
+  /// 않고 dirty로 남긴 채(true) 다음 동기화가 같은 판단을 다시 하게 한다.
+  /// 서버에 책이 없다는 404만 기존 충돌 처리(서버 기준 재조회)로 넘긴다.
+  /// 확인·재전송 요청의 실패는 예외로 던지지 않는다.
+  Future<bool> _retryNewerLocalEdit(
+    DirtyRecord record,
+    int expectedGeneration,
+  ) async {
+    final item = record.item;
+    final DateTime serverUpdatedAt;
+    try {
+      serverUpdatedAt = await _recordApi.getRecordUpdatedAt(item.serverId!);
+    } catch (e) {
+      if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+        return true;
+      }
+      final status = e is ApiException ? e.statusCode : null;
+      if (status == 404) return false;
+      // 일시 오류(응답 없음·429·5xx)는 다음 동기화가 바로 다시 판단하고,
+      // 그 밖의 거부는 재시도 간격만 늘려 같은 요청이 반복되지 않게 한다.
+      if (status != null && status != 429 && status < 500) {
+        await _dao.deferPush(
+          item.userBookId,
+          capturedUpdatedAt: item.updatedAt,
+          reason: 'conflict_check_$status',
+        );
+      }
+      developer.log(
+        '[책 기록 충돌 확인] userBookId=${item.userBookId} '
+        'result=FAIL reason=${status ?? "network"} keep=dirty',
+      );
+      return true;
+    }
+    if (BookshelfDatabase.sessionGeneration != expectedGeneration) return true;
+    if (!item.updatedAt.isAfter(serverUpdatedAt)) return false;
+
+    try {
+      final data = await _recordApi.patchRecord(
+        userBookId: item.serverId!,
+        patch: RecordPatch.fromSnapshot(
+          item,
+          changedFields: record.changedFields,
+        ),
+        updatedAt: serverUpdatedAt,
+      );
+      if (BookshelfDatabase.sessionGeneration != expectedGeneration) {
+        return true;
+      }
+      final serverItem = BookItem.fromDetailJson(
+        data,
+        createdAt: item.createdAt,
+        localUserBookId: item.userBookId,
+        clientRequestId: item.clientRequestId,
+        createThumbnailPath: item.createThumbnailPath,
+      );
+      final applied = await _dao.confirmPush(
+        serverItem,
+        capturedUpdatedAt: item.updatedAt,
+      );
+      developer.log(
+        '[책 기록 더티 push] userBookId=${item.userBookId} result=SUCCESS '
+        'reason=conflict_local_newer applied=$applied',
+      );
+    } on ApiException catch (e) {
+      // 다시 409면(확인하는 사이 또 바뀜) dirty를 남겨 다음 동기화가 같은
+      // 판단을 반복한다.
+      if (BookshelfDatabase.sessionGeneration == expectedGeneration &&
+          (e.statusCode == 400 || e.statusCode == 404)) {
+        await _dao.deferPush(
+          item.userBookId,
+          capturedUpdatedAt: item.updatedAt,
+          reason: 'record_rejected_${e.statusCode}',
+        );
+      }
+      developer.log(
+        '[책 기록 더티 push] userBookId=${item.userBookId} result=FAIL '
+        'reason=conflict_retry_${e.statusCode ?? "network"} keep=dirty',
+      );
+    } catch (_) {
+      developer.log(
+        '[책 기록 더티 push] userBookId=${item.userBookId} result=FAIL '
+        'reason=conflict_retry_unknown keep=dirty',
+      );
+    }
+    return true;
   }
 
   bool _isPermanentCreateFailure(ApiException error) =>

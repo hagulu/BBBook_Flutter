@@ -122,7 +122,8 @@ class TagRepository {
     return applyFullRecords(
       payload,
       expectedGeneration: expectedGeneration,
-      baseline: requestedAt,
+      // 서버 시각을 모를 때는 응답의 exportedAt(서버 시각)을 우선 쓴다.
+      baseline: baseline ?? payload.exportedAtTime ?? requestedAt,
     );
   }
 

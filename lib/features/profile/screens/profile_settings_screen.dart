@@ -12,6 +12,7 @@ import '../../../shared/widgets/app_confirm.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
 import '../../auth/providers/auth_access_providers.dart';
+import '../../external_record_import/providers/external_import_providers.dart';
 import '../../notices/providers/notices_providers.dart';
 import '../../notices/screens/notices_list_screen.dart';
 import '../../record_archive/providers/record_archive_provider.dart';
@@ -41,6 +42,10 @@ class ProfileSettingsScreen extends ConsumerWidget {
         ref.watch(localStorageMigrationControllerProvider).isRunning ||
         ref.watch(serverStorageMigrationControllerProvider).isRunning ||
         ref.watch(recordArchiveProvider);
+    // 화면 밖에서 계속되는 외부 기록 가져오기와 ZIP·저장 방식 전환이 겹치지
+    // 않게 진입만 막는다. 설정 화면 닫기([isSwitching])는 막지 않는다.
+    final recordTaskBusy =
+        isSwitching || ref.watch(externalImportExecutionLockProvider) != null;
 
     return PopScope(
       canPop: !isSwitching,
@@ -94,13 +99,15 @@ class ProfileSettingsScreen extends ConsumerWidget {
                     _SettingsMenuTile(
                       icon: PhosphorIconsRegular.export,
                       label: '내 기록 내보내기',
-                      onTap: isSwitching ? null : () => _export(context, ref),
+                      onTap: recordTaskBusy
+                          ? null
+                          : () => _export(context, ref),
                     ),
                     const Divider(),
                     _SettingsMenuTile(
                       icon: PhosphorIconsRegular.downloadSimple,
                       label: '내 기록 가져오기',
-                      onTap: isSwitching
+                      onTap: recordTaskBusy
                           ? null
                           : () => Navigator.of(context).push<void>(
                               MaterialPageRoute(
@@ -163,7 +170,8 @@ class ProfileSettingsScreen extends ConsumerWidget {
       title: '동기화 끄기',
       message:
           '서버의 최신 기록과 이미지를 받아 이 기기에 남기고 서버 기록은 정리합니다.\n\n'
-          '동기화를 끄면 다른 기기에서 기록을 볼 수 없고, 로그아웃하면 이 기기의 기록이 삭제됩니다.\n\n'
+          '동기화를 끄면 기록은 이 기기에만 보관되어 다른 기기에서 볼 수 없습니다. '
+          '로그아웃해도 이 기기의 기록은 지우지 않습니다.\n\n'
           '계속할까요?',
       confirmText: '동기화 끄기',
     );
@@ -494,7 +502,10 @@ class _StorageModeCard extends ConsumerWidget {
           statusIsActive: !isLocal,
           showCaret: false,
           compact: true,
-          onTap: isSwitching
+          // 화면 밖에서 계속되는 외부 기록 가져오기 중에는 전환을 시작하지 않는다.
+          onTap:
+              isSwitching ||
+                  ref.watch(externalImportExecutionLockProvider) != null
               ? null
               : (isLocal ? onSwitchToServer : onSwitchToLocal),
         ),

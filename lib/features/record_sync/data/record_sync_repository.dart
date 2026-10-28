@@ -32,7 +32,9 @@ class RecordSyncRepository {
       await _dao.replaceInitialRecords(
         userId: userId,
         expectedSessionGeneration: expectedGeneration,
-        requestedAt: requestedAt,
+        // 서버가 이 조회를 시작한 시각을 우선 쓴다 — 기기 시계가 서버보다
+        // 앞서 있으면 그 차이만큼의 다른 기기 변경이 다음 증분에서 빠진다.
+        requestedAt: payload.exportedAtTime ?? requestedAt,
         payload: payload,
         onProgress: onSaveProgress,
       );

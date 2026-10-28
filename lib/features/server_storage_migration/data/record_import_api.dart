@@ -133,6 +133,88 @@ class RecordImportApi {
     }
   }
 
+  /// [complete]의 응답을 받지 못했을 때 같은 세션의 확정 여부를 다시 확인한다.
+  ///
+  /// 응답이 유실돼도 서버는 이미 COMPLETED일 수 있다. 그 상태를 실패로 끝내면
+  /// 다음 재시도는 `/start`부터 새 세션을 열고, 이미 활성인 기존 행을 재사용하는
+  /// 그 세션은 사진 재첨부가 400으로 반복 실패하거나 확정 반영이 그 사이의 로컬
+  /// 편집을 덮을 수 있다. 그래서 매핑을 아직 들고 있는 이 실행 안에서만 같은
+  /// importId로 다시 확인한다(앱이 종료된 뒤의 복구는 하지 않는다).
+  ///
+  /// - 재요청이 성공하면 첫 요청은 서버에 닿지 않았던 것이다.
+  /// - 재요청의 409는 "이미 COMPLETED"와 "이번 재요청의 검증 실패로 롤백"을
+  ///   구분하지 못한다. 취소 API는 COMPLETED 세션에만 409를 돌려주므로 그
+  ///   응답으로 확정 여부를 판정한다(롤백된 세션은 404).
+  /// - 그 밖의 응답이나 재시도 소진은 원래처럼 실패로 던진다.
+  Future<void> completeConfirmingDelivery(
+    int importId,
+    RecordImportCounts counts,
+  ) async {
+    try {
+      await complete(importId, counts);
+      return;
+    } on RecordImportException catch (error) {
+      if (error.kind != RecordImportFailureKind.network) rethrow;
+    }
+    for (var attempt = 1; ; attempt++) {
+      // 연결 오류 직후에는 ApiClient가 잠시 새 요청을 통신 없이 거절한다.
+      await _waitForRetryWindow();
+      try {
+        await complete(importId, counts);
+        return;
+      } on RecordImportException catch (error) {
+        if (error.kind == RecordImportFailureKind.sessionCompleted) {
+          if (await _isSessionCompleted(importId)) {
+            developer.log(
+              '[Import 완료] importId=$importId result=SUCCESS '
+              'reason=confirmed_after_lost_response',
+            );
+            return;
+          }
+          rethrow;
+        }
+        if (error.kind != RecordImportFailureKind.network ||
+            attempt >= _maxCompleteConfirmAttempts) {
+          rethrow;
+        }
+      }
+    }
+  }
+
+  static const _maxCompleteConfirmAttempts = 2;
+
+  Future<void> _waitForRetryWindow() async {
+    final retryAfter = _apiClient.retryAfter;
+    final wait = retryAfter == null
+        ? const Duration(seconds: 1)
+        : retryAfter.difference(DateTime.now()) +
+              const Duration(milliseconds: 500);
+    if (wait > Duration.zero) await Future<void>.delayed(wait);
+  }
+
+  /// 응답 유실 뒤 재요청이 409를 받았을 때만 쓰는 확정 여부 확인. 그 시점의
+  /// 세션은 COMPLETED이거나 이미 롤백돼 사라진 상태라 취소 요청이 기록을
+  /// 건드리지 않는다(정리 실패로 EXPIRED가 남았다면 이 요청이 정리를 마친다).
+  Future<bool> _isSessionCompleted(int importId) async {
+    final api = '/api/me/records/import/$importId/cancel';
+    try {
+      await _apiClient.dio.post<Map<String, dynamic>>(api);
+      return false;
+    } on DioException catch (e) {
+      final statusCode = e.response?.statusCode;
+      if (statusCode == 409) return true;
+      if (statusCode == 404) return false;
+      final error = _mapError(e);
+      _logRequestFailure(
+        operation: 'Import 완료 확인',
+        api: api,
+        importId: importId,
+        error: error,
+      );
+      throw error;
+    }
+  }
+
   /// POST /api/me/records/import/{importId}/cancel
   ///
   /// 세션이 아직 살아 있는 동안 클라이언트가 직접 중단할 때만 호출한다.

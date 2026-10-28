@@ -99,6 +99,10 @@ class FinishedCsvImporter {
       );
     }
 
+    // 행 식별자의 기준. 같은 파일(내용이 같은 파일)을 다시 고르면 같은 행이
+    // 같은 식별자를 받는다 — 완료 응답을 잃은 뒤 같은 파일로 재시도해도 ISBN
+    // 없는 책이 다시 만들어지지 않는다. 내용이 하나라도 다르면 다른 파일로 본다.
+    final fileKey = uuid.v5(Namespace.url.value, 'finished_csv|$contents');
     final headerColumnCount = rows.first.length;
     final books = <ExternalBookImportItem>[];
     final failures = <ExternalImportRowFailure>[];
@@ -133,7 +137,10 @@ class FinishedCsvImporter {
         );
         continue;
       }
-      final parsed = _parseRow(value);
+      final parsed = _parseRow(
+        value,
+        sourceBookId: uuid.v5(Namespace.url.value, '$fileKey|${rowIndex + 1}'),
+      );
       switch (parsed) {
         case _RowFailure(:final reason):
           failures.add(
@@ -164,7 +171,10 @@ class FinishedCsvImporter {
     );
   }
 
-  _RowResult _parseRow(String Function(String header) value) {
+  _RowResult _parseRow(
+    String Function(String header) value, {
+    required String sourceBookId,
+  }) {
     final title = value('title');
     if (title.isEmpty) return const _RowFailure('제목이 비어 있어요.');
     if (title.length > _maxTextLength) {
@@ -303,10 +313,10 @@ class FinishedCsvImporter {
     return _RowBook(
       ExternalBookImportItem(
         source: ExternalImportSource.finishedCsv,
-        // ISBN 없는 행은 서버처럼 중복 검사 없이 모두 등록한다. 같은 제목의
-        // 행이나 다음에 다시 가져온 행이 같은 식별자로 합쳐지지 않도록 행마다
-        // 새 식별자를 준다.
-        sourceBookId: uuid.v4(),
+        // ISBN 없는 행은 서버처럼 내용(제목 등)으로 중복을 검사하지 않는다.
+        // 식별자는 파일 내용과 행 번호로 정해([parseBytes]) 같은 제목의 다른
+        // 행이나 다른 파일의 행과 합쳐지지 않고, 같은 파일의 같은 행만 같다.
+        sourceBookId: sourceBookId,
         title: title,
         author: author.isEmpty ? null : author,
         publisher: publisher.isEmpty ? null : publisher,

@@ -12,6 +12,7 @@ import '../../bookshelf/data/bookshelf_database.dart';
 import '../../bookshelf/models/book_item.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
 import '../../record_archive/data/record_archive_dao.dart';
+import '../../record_archive/providers/record_archive_provider.dart';
 import '../../server_storage_migration/providers/server_storage_migration_providers.dart';
 import '../../storage_mode/data/storage_mode_store.dart';
 import '../../storage_mode/providers/storage_mode_providers.dart';
@@ -61,6 +62,10 @@ final externalImportExecutionLockProvider =
     NotifierProvider<ExternalImportExecutionLock, int?>(
       ExternalImportExecutionLock.new,
     );
+
+/// [externalImportExecutionLockProvider]가 잡혀 있어 저장 방식 전환·ZIP 등
+/// 기록 전체를 다루는 작업을 시작하지 않을 때의 안내.
+const externalImportRunningMessage = '기록을 가져오는 중이에요. 가져오기가 끝난 뒤 다시 시도해 주세요.';
 
 enum ExternalImportPhase { analyzing, ready, importing, completed, failed }
 
@@ -233,6 +238,10 @@ class ExternalImportController
     if (ref.read(localStorageMigrationControllerProvider).isRunning ||
         ref.read(serverStorageMigrationControllerProvider).isRunning) {
       return const ExternalImportFeedback.info('저장 방식 변경이 끝난 뒤 다시 시도해 주세요.');
+    }
+    // ZIP 내보내기/가져오기도 같은 기록 전체를 읽고 쓴다.
+    if (ref.read(recordArchiveProvider)) {
+      return const ExternalImportFeedback.info('내 기록 파일 작업이 끝난 뒤 다시 시도해 주세요.');
     }
     final ownerUserId = ref.read(recordOwnerIdProvider);
     if (ownerUserId == null) {

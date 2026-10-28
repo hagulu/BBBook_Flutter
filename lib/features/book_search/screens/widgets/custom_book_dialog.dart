@@ -15,6 +15,7 @@ import '../../../book_record/screens/widgets/book_thumbnail_field.dart';
 import '../../../book_record/screens/widgets/finish_confirm_dialog.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
 import '../../../book_record/screens/widgets/record_field_tile.dart';
+import '../../../bookshelf/models/book_category.dart';
 import '../../../bookshelf/models/book_status.dart';
 import '../../../bookshelf/models/record_patch.dart';
 import '../../../bookshelf/providers/bookshelf_providers.dart';
@@ -57,6 +58,11 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
   BookStatus _status = BookStatus.reading;
   FinishConfirmResult? _finishOptions;
   String? _errorText;
+
+  /// 저장 중에는 시트를 닫지 못하게 하고 같은 저장을 다시 시작하지 않는다.
+  /// 저장이 시작되면 시트가 닫혀도 생성은 계속되는데, 호출부는 취소(null)로
+  /// 받아 사용자가 같은 책을 다시 등록하게 된다(직접 등록은 합치지 않는다).
+  bool _isSaving = false;
 
   TextStyle get _labelStyle => TextStyle(
     fontSize: 11,
@@ -126,6 +132,7 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
   }
 
   Future<void> _save() async {
+    if (_isSaving) return;
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       setState(() => _errorText = '제목을 입력해주세요.');
@@ -140,45 +147,48 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
       return;
     }
 
-    setState(() => _errorText = null);
+    setState(() {
+      _errorText = null;
+      _isSaving = true;
+    });
+    // await 뒤에 쓸 provider는 지금(반드시 mounted인 시점) 미리 확보해 둔다.
+    final bookshelfRepository = ref.read(bookshelfRepositoryProvider);
+    final bookRecordRepository = ref.read(bookRecordRepositoryProvider);
+    final syncVersion = ref.read(bookshelfSyncVersionProvider.notifier);
     AppLoading.show(context);
     try {
       final options = _finishOptions;
-      final book = await ref
-          .read(bookshelfRepositoryProvider)
-          .createCustomBook(
-            title: title,
-            author: _authorController.text.trim().isEmpty
-                ? null
-                : _authorController.text.trim(),
-            publisher: _publisherController.text.trim().isEmpty
-                ? null
-                : _publisherController.text.trim(),
-            statsTotalPages: totalPages,
-            categoryId: _selectedCategoryId,
-            thumbnailFile: _pickedThumbnail,
-            status: _status,
-            sourceType: options?.sourceType?.apiValue,
-            myRating: options?.myRating,
-            shortReview: options?.shortReview,
-            difficulty: options?.difficulty,
-            wantToReread: options?.wantToReread ?? false,
-            finishedAt: options?.finishedAt == null
-                ? null
-                : _formatDate(options!.finishedAt!),
-          );
+      final book = await bookshelfRepository.createCustomBook(
+        title: title,
+        author: _authorController.text.trim().isEmpty
+            ? null
+            : _authorController.text.trim(),
+        publisher: _publisherController.text.trim().isEmpty
+            ? null
+            : _publisherController.text.trim(),
+        statsTotalPages: totalPages,
+        categoryId: _selectedCategoryId,
+        thumbnailFile: _pickedThumbnail,
+        status: _status,
+        sourceType: options?.sourceType?.apiValue,
+        myRating: options?.myRating,
+        shortReview: options?.shortReview,
+        difficulty: options?.difficulty,
+        wantToReread: options?.wantToReread ?? false,
+        finishedAt: options?.finishedAt == null
+            ? null
+            : _formatDate(options!.finishedAt!),
+      );
       // 명작은 생성 API가 받지 않으므로 생성 직후 로컬 우선 PATCH로 남긴다.
       // CREATE가 오프라인으로 대기 중이어도 dirty 필드가 보존돼, 생성 확정
       // 후 이어지는 PATCH 재시도에서 사용자가 고른 값을 반영한다.
       if (options?.isMasterpiece == true) {
-        await ref
-            .read(bookRecordRepositoryProvider)
-            .updateRecord(
-              book.userBookId,
-              const RecordPatch(isMasterpiece: true),
-            );
+        await bookRecordRepository.updateRecord(
+          book.userBookId,
+          const RecordPatch(isMasterpiece: true),
+        );
       }
-      ref.read(bookshelfSyncVersionProvider.notifier).state++;
+      syncVersion.state++;
       if (mounted) {
         Navigator.of(context).pop((userBookId: book.userBookId, synced: true));
       }
@@ -190,6 +200,7 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
       if (mounted) setState(() => _errorText = '서재에 추가하지 못했습니다.');
     } finally {
       AppLoading.hide();
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -218,6 +229,10 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(bookCategoriesProvider);
+    return PopScope(canPop: !_isSaving, child: _buildShell(categoriesAsync));
+  }
+
+  Widget _buildShell(AsyncValue<List<BookCategory>> categoriesAsync) {
     return RecordDialogShell(
       title: '직접 등록',
       content: Column(

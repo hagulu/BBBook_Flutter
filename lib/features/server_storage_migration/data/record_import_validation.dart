@@ -46,6 +46,15 @@ String? validateRecordImportSnapshot({
   if (_hasDuplicate(books.map((b) => b.clientRequestId))) {
     return '책 기록 데이터에 중복된 식별자가 있어 가져올 수 없습니다.';
   }
+  // 서버는 같은 ISBN13의 활성 책을 사용자당 하나로 보고, 서로 다른 로컬 책이
+  // 같은 서버 책으로 해석되면 청크를 다 올린 뒤에야 세션 전체를 실패시킨다
+  // (§ items 문서 ISBN13 활성 행 단일성 정책). 전송 전에 알린다.
+  if (_hasDuplicate(
+    books.map((b) => b.isbn13).where((isbn) => isbn?.isNotEmpty ?? false),
+  )) {
+    return '같은 ISBN의 책이 둘 이상 있어 가져올 수 없습니다. '
+        '중복된 책 하나의 ISBN 연결을 해제하거나 삭제한 뒤 다시 시도해 주세요.';
+  }
 
   for (final note in notes) {
     if ((note.title?.length ?? 0) > 255) {

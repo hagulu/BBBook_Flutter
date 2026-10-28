@@ -11,6 +11,7 @@ import '../../../shared/widgets/app_banner_ad.dart';
 import '../../../shared/widgets/app_bar_title.dart';
 import '../../../shared/widgets/app_loading.dart';
 import '../../../shared/widgets/app_snackbar.dart';
+import '../../auth/providers/auth_providers.dart';
 import '../../book_community/screens/widgets/book_community_preview_section.dart';
 import '../../book_record/providers/book_record_providers.dart';
 import '../../book_record/screens/book_record_screen.dart';
@@ -184,8 +185,11 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
       );
     } else if (state.hasError) {
       body = _ErrorBody(
-        onRetry: () =>
-            ref.invalidate(bookDetailControllerProvider(widget.isbn)),
+        onRetry: () {
+          // 직전 연결 오류로 걸린 일시 대기를 풀어야 실제로 다시 요청한다.
+          ref.read(apiClientProvider).requestUserRetry();
+          ref.invalidate(bookDetailControllerProvider(widget.isbn));
+        },
       );
     } else {
       body = const Center(child: CircularProgressIndicator());

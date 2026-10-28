@@ -229,17 +229,18 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     if (!confirmed || !mounted) return;
 
     setState(() => _isDeletingAccount = true);
+    // 탈퇴 성공 뒤의 로컬 정리는 이 화면의 생존 여부와 무관하게 반드시
+    // 실행돼야 하므로, await 전에(반드시 mounted인 시점에) 미리 확보해 둔다.
+    final profileApi = ref.read(profileApiProvider);
+    final authNotifier = ref.read(authNotifierProvider.notifier);
     try {
-      await ref.read(profileApiProvider).deleteMe();
-      if (!mounted) return;
+      await profileApi.deleteMe();
       // 서버가 이미 리프레시 토큰을 만료시켰으므로, 로그아웃 API 호출 실패
       // 여부와 무관하게 로컬 인증 상태·서재 캐시를 정리한다(logout()의
       // try/finally가 보장). 라우터가 상태 변화를 감지해 루트로 이동한다.
       // 로컬 저장 모드라도 탈퇴는 "모든 기록이 영구 삭제된다"고 이미
       // 확인받았다 — 일반 로그아웃과 달리 로컬 기록을 보존하지 않는다.
-      await ref
-          .read(authNotifierProvider.notifier)
-          .logout(deletingAccount: true);
+      await authNotifier.logout(deletingAccount: true);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _isDeletingAccount = false);
@@ -252,6 +253,16 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 탈퇴 요청 중에는 화면을 닫지 못하게 한다. 정리 자체는 화면 생존과
+    // 무관하게 이어지지만([_deleteAccount]), 결과 안내 없이 화면이 사라지면
+    // 사용자는 탈퇴가 취소됐다고 오해할 수 있다.
+    return PopScope(
+      canPop: !_isDeletingAccount,
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const AppBarTitle('프로필 수정'),

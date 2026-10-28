@@ -491,7 +491,8 @@ class BookNoteRepository {
   }
 
   /// [baseline]을 넘기지 않으면(최초 동기화 등 서버 시각을 알 수 없을 때)
-  /// 요청 직전 클라이언트 시각(UTC)을 기준값으로 쓴다. `/api/me/records`(최초
+  /// 응답의 `exportedAt`(서버 시각)을, 그것도 없으면 요청 직전 클라이언트
+  /// 시각(UTC)을 기준값으로 쓴다. `/api/me/records`(최초
   /// 기록 전체 조회 — record_sync 기능과 같은 API)를 그대로 재사용한다.
   /// api-doc(`api-me-notes-sync-changes-get.md`)이 `fullSyncRequired`일 때의
   /// 복구 경로로 이 API를 명시하고 있다.
@@ -506,7 +507,8 @@ class BookNoteRepository {
       payload,
       ownerUserId: ownerUserId,
       expectedGeneration: expectedGeneration,
-      baseline: requestedAt,
+      // 서버 시각을 모를 때는 응답의 exportedAt(서버 시각)을 우선 쓴다.
+      baseline: baseline ?? payload.exportedAtTime ?? requestedAt,
     );
   }
 

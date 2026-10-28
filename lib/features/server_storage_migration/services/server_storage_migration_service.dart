@@ -307,9 +307,11 @@ class ServerStorageMigrationService {
       };
 
       // 여기서부터는 서버 Import가 이미 확정(COMPLETED)됐다 — 아래가 실패해도
-      // 서버 데이터는 안전하며, 다음 재시도도 멱등 키 덕분에 중복 생성 없이
-      // 안전하다(이 구현은 그 희귀 케이스를 위해 별도 복구 경로를 두지
-      // 않고, 다른 실패와 동일하게 다시 시도하도록 안내한다).
+      // 서버 데이터는 안전하고 다음 재시도도 멱등 키로 중복 생성되지 않는다.
+      // 다만 확정된 세션의 결과를 이어 받는 복구 경로는 두지 않아(재시도는
+      // 항상 `/start`부터), 그 재시도에서 사진 메모 재첨부가 거부되거나
+      // 그 사이 로컬 편집이 반영되지 않을 수 있다
+      // ([ServerStorageMigrationRepositorySteps.applyResults] 문서 참고).
       await _steps.applyResults(
         RecordImportAppliedResults(
           bookServerIdByLocalId: bookServerIds,

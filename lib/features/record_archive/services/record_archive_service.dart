@@ -24,6 +24,16 @@ class ArchiveExportResult {
   const ArchiveExportResult(this.file, this.missingImages);
   final File file;
   final int missingImages;
+
+  /// 이번 내보내기가 만든 작업 폴더(`bookkureomi_export_*`)를 지운다. 파일
+  /// 저장 창에는 바이트를 넘기므로 사용자가 고른 위치의 파일과는 무관하다.
+  Future<void> discard() async {
+    try {
+      await file.parent.delete(recursive: true);
+    } catch (_) {
+      developer.log('[내 기록 내보내기 정리] result=FAIL reason=local_file_error');
+    }
+  }
 }
 
 class RecordArchiveService {

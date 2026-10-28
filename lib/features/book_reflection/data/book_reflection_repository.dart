@@ -171,6 +171,11 @@ class BookReflectionRepository {
     }
   }
 
+  /// 본문 push([pushReflection])와 같은 독후감별 큐에서 실행한다. 본문
+  /// PATCH/CREATE도 `isPublic`을 함께 보내므로, 큐 밖에서 공개 설정을 바꾸면
+  /// 먼저 나간 본문 요청이 나중에 처리되며 이전 공개 값으로 되돌릴 수 있다
+  /// (비공개로 바꾼 글이 서버에서 다시 공개됨). 큐에 들어간 뒤 행을 다시
+  /// 읽어, 앞선 CREATE가 채운 `server_id`도 그대로 쓴다.
   Future<BookReflection> setPublic({
     required int ownerUserId,
     required int userBookId,
@@ -178,25 +183,27 @@ class BookReflectionRepository {
     required bool isPublic,
   }) async {
     try {
-      final current = await _dao.getByLocalId(reflectionId);
-      if (current == null || current.deletedAt != null) {
-        throw StateError('Reflection not found');
-      }
-      // 로컬 저장 모드에서는 서버에 이 독후감이 남아 있지 않다 — 공개
-      // 설정은 로컬 값만 바꾼다(서버 호출은 404가 될 뿐이고, 기록을 서버로
-      // 올리지 않는다는 정책에도 어긋난다).
-      if (current.serverId != null && !await _storageMode.isLocal()) {
-        await _api.updateVisibility(
-          reflectionId: current.serverId!,
+      final reflection = await _runInReflectionQueue(reflectionId, () async {
+        final current = await _dao.getByLocalId(reflectionId);
+        if (current == null || current.deletedAt != null) {
+          throw StateError('Reflection not found');
+        }
+        // 로컬 저장 모드에서는 서버에 이 독후감이 남아 있지 않다 — 공개
+        // 설정은 로컬 값만 바꾼다(서버 호출은 404가 될 뿐이고, 기록을 서버로
+        // 올리지 않는다는 정책에도 어긋난다).
+        if (current.serverId != null && !await _storageMode.isLocal()) {
+          await _api.updateVisibility(
+            reflectionId: current.serverId!,
+            isPublic: isPublic,
+          );
+        }
+        return _dao.updateVisibilityLocal(
+          ownerUserId: ownerUserId,
+          userBookId: userBookId,
+          reflectionId: reflectionId,
           isPublic: isPublic,
         );
-      }
-      final reflection = await _dao.updateVisibilityLocal(
-        ownerUserId: ownerUserId,
-        userBookId: userBookId,
-        reflectionId: reflectionId,
-        isPublic: isPublic,
-      );
+      });
       developer.log(
         '[독후감 공개 설정] userId=$ownerUserId bookId=$userBookId '
         'reflectionId=$reflectionId result=SUCCESS',
@@ -336,7 +343,8 @@ class BookReflectionRepository {
   }
 
   /// [baseline]을 넘기지 않으면(최초 동기화 등 서버 시각을 알 수 없을 때)
-  /// 요청 직전 클라이언트 시각(UTC)을 기준값으로 쓴다. `/api/me/records`(최초
+  /// 응답의 `exportedAt`(서버 시각)을, 그것도 없으면 요청 직전 클라이언트
+  /// 시각(UTC)을 기준값으로 쓴다. `/api/me/records`(최초
   /// 기록 전체 조회 — record_sync 기능과 같은 API)를 그대로 재사용한다.
   Future<bool> _fullSync(
     int ownerUserId,
@@ -349,7 +357,8 @@ class BookReflectionRepository {
       payload,
       ownerUserId: ownerUserId,
       expectedGeneration: expectedGeneration,
-      baseline: requestedAt,
+      // 서버 시각을 모를 때는 응답의 exportedAt(서버 시각)을 우선 쓴다.
+      baseline: baseline ?? payload.exportedAtTime ?? requestedAt,
     );
   }
 
@@ -396,6 +405,23 @@ class BookReflectionRepository {
         .catchError((_, _) {});
     _dirtyPushChains[localReflectionId] = chained;
     return chained;
+  }
+
+  /// [action]을 [pushReflection]과 같은 독후감별 큐에 넣고 그 결과를
+  /// 돌려준다. push와 달리 실패를 호출부에 그대로 전달하되, 큐 자체는
+  /// 실패와 무관하게 다음 작업으로 이어진다.
+  Future<T> _runInReflectionQueue<T>(
+    int localReflectionId,
+    Future<T> Function() action,
+  ) {
+    final previous =
+        _dirtyPushChains[localReflectionId] ?? Future<void>.value();
+    final result = previous.then((_) => action());
+    _dirtyPushChains[localReflectionId] = result.then<void>(
+      (_) {},
+      onError: (_, _) {},
+    );
+    return result;
   }
 
   Future<void> _pushOne(int localReflectionId) async {

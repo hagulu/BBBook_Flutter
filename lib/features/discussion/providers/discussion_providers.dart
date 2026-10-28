@@ -57,6 +57,11 @@ class DiscussionListController
         > {
   late DiscussionApi _api;
 
+  /// [refresh]가 시작될 때마다 올라가는 세대값. 그 사이 [loadMore]가 보낸
+  /// 이전 커서의 응답이 새로 구성된 목록 뒤에 섞이지 않게 버린다
+  /// (`ReviewsController`와 같은 방식).
+  int _requestGeneration = 0;
+
   @override
   FutureOr<DiscussionListState<DiscussionTopic>> build(
     DiscussionListArgs arg,
@@ -78,6 +83,7 @@ class DiscussionListController
     final current = state.valueOrNull;
     if (current == null || !current.hasNext || current.isLoadingMore) return;
 
+    final generation = _requestGeneration;
     state = AsyncValue.data(current.copyWith(isLoadingMore: true));
     try {
       final page = await _api.getTopics(
@@ -86,6 +92,7 @@ class DiscussionListController
         cursor: current.nextCursor,
         size: _kPageSize,
       );
+      if (generation != _requestGeneration) return;
       final latest = state.valueOrNull;
       if (latest == null) return;
       state = AsyncValue.data(
@@ -97,6 +104,7 @@ class DiscussionListController
         ),
       );
     } catch (_) {
+      if (generation != _requestGeneration) return;
       final latest = state.valueOrNull;
       if (latest != null) {
         state = AsyncValue.data(latest.copyWith(isLoadingMore: false));
@@ -113,7 +121,15 @@ class DiscussionListController
   /// 상태에서도 그만큼은 다시 채워져 스크롤 위치가 크게 흔들리지 않는다.
   /// 실패해도 이미 보고 있던 목록을 지우지 않는다.
   Future<void> refresh() async {
-    final priorCount = state.valueOrNull?.items.length ?? 0;
+    final generation = ++_requestGeneration;
+    final prior = state.valueOrNull;
+    final priorCount = prior?.items.length ?? 0;
+    // 버려질 loadMore()가 남긴 "더 불러오는 중"을 미리 끈다 — 이 재조회가
+    // 실패하면 기존 목록을 그대로 두므로, 그대로 두면 다음 페이지를 다시
+    // 요청할 수 없게 멈춘다.
+    if (prior != null && prior.isLoadingMore) {
+      state = AsyncValue.data(prior.copyWith(isLoadingMore: false));
+    }
     try {
       final items = <DiscussionTopic>[];
       int? cursor;
@@ -130,6 +146,8 @@ class DiscussionListController
         hasNext = page.hasNext;
       } while (items.length < priorCount && hasNext);
 
+      // 겹친 새로고침 중 나중에 시작한 것만 반영한다.
+      if (generation != _requestGeneration) return;
       state = AsyncValue.data(
         DiscussionListState(items: items, nextCursor: cursor, hasNext: hasNext),
       );

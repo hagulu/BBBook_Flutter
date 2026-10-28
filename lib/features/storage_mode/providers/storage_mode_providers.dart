@@ -6,6 +6,7 @@ import '../../auth/providers/auth_notifier.dart';
 import '../../book_note/providers/book_note_providers.dart';
 import '../../book_reflection/providers/book_reflection_providers.dart';
 import '../../bookshelf/providers/bookshelf_providers.dart';
+import '../../external_record_import/providers/external_import_providers.dart';
 import '../../record_sync/providers/record_sync_providers.dart';
 import '../../tag/providers/tag_providers.dart';
 import '../data/local_storage_migration_steps.dart';
@@ -74,6 +75,17 @@ class LocalStorageMigrationController
   /// 최신 기록이나 이미지를 다 받지 못하면 [confirmProceed]로 그래도
   /// 전환할지 묻는다(없으면 전환하지 않는다).
   Future<void> start({Future<bool> Function(String message)? confirmProceed}) {
+    // 화면을 닫아도 계속되는 외부 기록 가져오기가 서버 Import를 진행 중일 수
+    // 있다. 전체 조회·서버 기록 정리가 그 중간 상태와 겹치지 않게 시작하지
+    // 않는다(진행 중인 가져오기를 끊지는 않는다).
+    if (_inFlight == null &&
+        ref.read(externalImportExecutionLockProvider) != null) {
+      state = const LocalStorageMigrationState(
+        stage: LocalStorageMigrationStage.failed,
+        failureMessage: externalImportRunningMessage,
+      );
+      return Future<void>.value();
+    }
     return _inFlight ??= _run(
       confirmProceed,
     ).whenComplete(() => _inFlight = null);

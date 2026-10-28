@@ -114,9 +114,12 @@ class ServerStorageMigrationRepositorySteps
     );
   }
 
+  /// 응답을 받지 못하면 같은 세션의 확정 여부를 다시 확인한다
+  /// ([RecordImportApi.completeConfirmingDelivery]). 그래도 알 수 없으면
+  /// 아래 [applyResults] 문서의 잔여 위험이 남는다.
   @override
   Future<void> complete(int importId, RecordImportCounts counts) {
-    return recordImportApi.complete(importId, counts);
+    return recordImportApi.completeConfirmingDelivery(importId, counts);
   }
 
   /// 네 도메인의 확정 반영을 하나의 로컬 트랜잭션으로 묶는다 — 별도
@@ -138,6 +141,10 @@ class ServerStorageMigrationRepositorySteps
   ///   "Import 이전부터 이미지가 연결된 메모"로 거부된다.
   /// - 책 표지: `/items` 응답의 `coverUploadRequired`가 서버 상태를 그대로
   ///   알려주므로 이 경로에서는 첨부를 시도하지 않는다(위 둘과 달리 안전).
+  /// - 재시도 전 로컬 편집: 새 세션의 `/items`는 이미 활성인 서버 행을
+  ///   수정하지 않고 재사용하는데, 이 메서드는 매핑과 함께 dirty를 지우므로
+  ///   실패 안내 뒤 로컬에서 고친 값은 이후 서버 재조회 때 지난 세션 값으로
+  ///   되돌아갈 수 있다.
   ///
   /// 이 잔여 위험을 닫으려면 청크·완료 결과를 내구성 있게 남겨 세션 간에
   /// 이어 받는 별도의 복구 저장소가 필요한데, 이는 "세션을 이어서 복구하지

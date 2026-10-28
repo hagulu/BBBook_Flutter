@@ -809,7 +809,9 @@ class BookshelfDao {
     });
   }
 
-  /// 서버 push가 409(다른 곳에서 이미 수정됨)로 거부됐을 때 호출한다. 이
+  /// 서버 push가 409(다른 곳에서 이미 수정됨)로 거부됐고, 서버 쪽 수정이 이
+  /// 기기의 편집보다 나중이거나 서버가 그 확인을 거부했을 때 호출한다(이 기기
+  /// 편집이 더 나중이면 `BookshelfRepository`가 다시 보낸다). 이
   /// 행의 로컬 편집을 서버가 거부했으므로 dirty를 해제해 다음 동기화가
   /// 다시 덮어쓸 수 있게 하고, `sync_meta.last_synced_at`도 함께 지워
   /// 다음 [BookshelfRepository.sync] 호출이 증분이 아닌 전체 동기화로
@@ -1383,10 +1385,24 @@ class BookshelfDao {
     }
   }
 
-  Future<int> _nextLocalUserBookId(Transaction txn) async {
-    final rows = await txn.rawQuery(
-      'SELECT MIN(user_book_id) AS min_id FROM user_book',
-    );
+  Future<int> _nextLocalUserBookId(Transaction txn) => nextLocalUserBookId(txn);
+
+  /// 새 로컬 책 ID(음수)를 발급한다. 직접 등록·ZIP/외부 기록 복원이 함께 쓴다.
+  ///
+  /// `user_book`만 보지 않고 하위 기록이 참조 중인 책 ID까지 함께 피한다 —
+  /// 원격 삭제 반영([reconcileInTransaction]/[applyChanges])은 clean 책 행만
+  /// 지우고 노트·독후감은 남기므로(외래 키가 없다, [deleteOne] 문서 참고),
+  /// 지워진 책이 가장 작은 음수였다면 그 ID가 다음 책에 재발급돼 남은
+  /// 노트·독후감이 엉뚱한 책에 붙는다.
+  static Future<int> nextLocalUserBookId(DatabaseExecutor txn) async {
+    final rows = await txn.rawQuery('''
+      SELECT MIN(min_id) AS min_id FROM (
+        SELECT MIN(user_book_id) AS min_id FROM user_book
+        UNION ALL SELECT MIN(user_book_id) FROM book_note
+        UNION ALL SELECT MIN(user_book_id) FROM book_reflection
+        UNION ALL SELECT MIN(user_book_id) FROM user_book_tag_map
+      )
+    ''');
     final current = rows.single['min_id'] as int?;
     return current != null && current <= 0 ? current - 1 : -1;
   }
