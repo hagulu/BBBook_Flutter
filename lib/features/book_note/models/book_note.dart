@@ -99,6 +99,13 @@ class BookNoteMemo {
   /// 로컬 사본이든 서버 URL이든 보여줄 사진이 있는지 여부.
   bool get hasImage => localImagePath != null || imageUrl != null;
 
+  /// 노트당 이미지 한도의 한 자리를 차지하는지 여부. 서버는 이미지가 붙은
+  /// 메모에 더해, 기록 가져오기(Import)로 만들어져 아직 이미지가 연결되지
+  /// 않은 PHOTO 메모까지 센다(`GET .../notes/{noteId}/images/count`) —
+  /// 로컬 판단도 같은 기준을 써야 서버가 거절할 저장을 미리 막는다.
+  bool get countsTowardNoteImageLimit =>
+      type == BookNoteMemoType.photo || hasImage;
+
   String? get pageLabel {
     if (startPage == null && endPage == null) return null;
     if (startPage == null) return 'p.$endPage';

@@ -276,3 +276,4 @@
 - `docs/review/20261020-190838-current-onboarding-policy-review.md` — 온보딩 화면·비로그인 시작 확인·약관 링크·로고 에셋 변경분 코드 리뷰 결과
 - `docs/review/20261021-134757-current-note-scroll-review.md` — 노트 재조회 중 화면 유지·새 메모 즉시 스크롤 변경분 코드 리뷰 결과
 - `docs/review/20261027-184712-current-storage-migration-review.md` — 저장 방식 전환 변경분의 이미지 미확보 상태에서 서버 정리 재시도 시 이미지 손실 가능성 코드 리뷰 결과
+- `docs/review/20261028-110846-current-note-image-limit-review.md` — 노트 이미지 한도 집계·교체 허용 변경분과 iOS 앱·테스트 타깃 서명 팀 불일치 코드 리뷰 결과

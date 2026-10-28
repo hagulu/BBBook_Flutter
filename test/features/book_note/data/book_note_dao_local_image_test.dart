@@ -441,5 +441,121 @@ void main() {
 
       expect(cleared.localImagePath, isNull);
     });
+
+    /// 서버 노트 400에 PHOTO 메모들을 동기화로 반영한다. 동기화는 한도를
+    /// 검사하지 않으므로 한도를 넘긴 상태도 만들 수 있다.
+    Future<List<BookNoteMemo>> applyServerPhotos(
+      List<String?> imageUrls,
+    ) async {
+      await dao.applyNoteChanges(
+        ownerUserId: 7,
+        upsertedNotes: [
+          ServerBookNote(
+            id: 400,
+            userBookId: 20,
+            title: '노트',
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ],
+        deletedNoteIds: const [],
+        upsertedNoteMemos: [
+          for (var i = 0; i < imageUrls.length; i++)
+            ServerBookNoteMemo(
+              id: 500 + i,
+              noteId: 400,
+              memoType: 'PHOTO',
+              startPage: null,
+              endPage: null,
+              content: null,
+              imageUrl: imageUrls[i],
+              isImportant: false,
+              sortOrder: i,
+              createdAt: now,
+              updatedAt: now,
+            ),
+        ],
+        deletedNoteMemoIds: const [],
+        syncedAt: now,
+      );
+      return dao.getAllMemosForNote(400);
+    }
+
+    // 서버 `images/count`는 Import로 만들어져 아직 이미지가 연결되지 않은
+    // PHOTO 메모도 센다 — 로컬이 이미지 유무만 세면 서버가 거절할 저장을
+    // 통과시킨다.
+    test('이미지가 아직 연결되지 않은 PHOTO 메모도 한도에 포함된다', () async {
+      final memos = await applyServerPhotos([
+        null,
+        'https://cdn.example.com/notes/400/photo-a.jpg',
+      ]);
+      final pending = memos.firstWhere((memo) => memo.imageUrl == null);
+      expect(pending.hasImage, isFalse);
+      expect(pending.countsTowardNoteImageLimit, isTrue);
+
+      expect(
+        () => dao.createNoteMemo(
+          ownerUserId: 7,
+          userBookId: 20,
+          noteId: 400,
+          draft: const BookNoteMemoDraft(
+            type: BookNoteMemoType.photo,
+            imageChange: MemoImageChange.replaced,
+          ),
+          localImagePath: 'memo_images/new.jpg',
+          noteImageLimit: limit,
+        ),
+        throwsA(isA<NoteImageLimitExceededException>()),
+      );
+    });
+
+    test('삭제된 PHOTO 메모는 한도에서 제외된다', () async {
+      final note = await createNoteWithPhotoMemos(limit);
+      final target = (await dao.getAllMemosForNote(note.id)).first;
+      await dao.deleteNoteMemo(
+        ownerUserId: 7,
+        userBookId: 20,
+        noteId: note.id,
+        noteMemoId: target.id,
+      );
+
+      final created = await dao.createNoteMemo(
+        ownerUserId: 7,
+        userBookId: 20,
+        noteId: note.id,
+        draft: const BookNoteMemoDraft(
+          type: BookNoteMemoType.photo,
+          imageChange: MemoImageChange.replaced,
+        ),
+        localImagePath: 'memo_images/after_delete.jpg',
+        noteImageLimit: limit,
+      );
+
+      expect(created.localImagePath, 'memo_images/after_delete.jpg');
+    });
+
+    test('한도를 넘긴 상태에서도 이미 자리를 차지한 PHOTO 메모에는 사진을 붙일 수 있다', () async {
+      final memos = await applyServerPhotos([
+        'https://cdn.example.com/notes/400/photo-a.jpg',
+        'https://cdn.example.com/notes/400/photo-b.jpg',
+        null,
+      ]);
+      final pending = memos.firstWhere((memo) => memo.imageUrl == null);
+
+      final updated = await dao.updateNoteMemo(
+        ownerUserId: 7,
+        userBookId: 20,
+        noteId: 400,
+        noteMemoId: pending.id,
+        draft: const BookNoteMemoDraft(
+          type: BookNoteMemoType.photo,
+          imageChange: MemoImageChange.replaced,
+        ),
+        localImagePath: 'memo_images/attached.jpg',
+        noteImageLimit: limit,
+      );
+
+      expect(updated.localImagePath, 'memo_images/attached.jpg');
+    });
   });
 }

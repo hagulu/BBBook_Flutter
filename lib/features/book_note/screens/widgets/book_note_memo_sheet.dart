@@ -296,7 +296,7 @@ class _BookNoteMemoQuickComposerState
   Future<void> _startPhotoPick() async {
     if (!widget.attachmentLimitPolicy.canAttachNoteImage(
       currentImageMemoCount: widget.currentImageMemoCount,
-      memoAlreadyHasImage: false,
+      memoAlreadyCounted: false,
     )) {
       AppSnackBar.error(
         context,
@@ -389,9 +389,10 @@ class _BookNoteMemoEditorScreen extends StatefulWidget {
   final BookNoteMemoDraft? initialDraft;
   final AttachmentLimitPolicy attachmentLimitPolicy;
 
-  /// 이 노트 안에서 이미지가 첨부된(삭제되지 않은) 메모의 현재 개수. 지금
-  /// 편집 중인 메모 자체가 이미 이미지가 있었다면([_memoAlreadyHasImage])
-  /// 이 개수에 포함돼 있으므로, 교체는 한도와 무관하게 항상 허용한다.
+  /// 이 노트 안에서 이미지 한도에 들어가는(삭제되지 않은) 메모의 현재 개수
+  /// ([BookNoteMemo.countsTowardNoteImageLimit] 기준). 지금 편집 중인 메모
+  /// 자체가 이미 한 자리를 차지하고 있었다면([_memoAlreadyCounted]) 이 개수에
+  /// 포함돼 있으므로, 교체는 한도와 무관하게 항상 허용한다.
   final int currentImageMemoCount;
 
   /// 카메라·OCR을 거쳐 이미 내용이 채워진 채로 들어올 때는 화면 전환 직후
@@ -432,14 +433,16 @@ class _BookNoteMemoEditorScreenState extends State<_BookNoteMemoEditorScreen> {
   bool _imageRemoved = false;
   String? _errorText;
 
-  /// 편집을 시작한 시점에 이 메모가 이미 이미지를 갖고 있었는지(로컬 DB
-  /// 기준). 편집 중 제거/재선택 여부와 무관하게 고정된 값이다 — 한도 계산은
-  /// "지금 이 메모가 이미 한 자리를 차지하고 있었는가"만 보면 된다.
-  bool get _memoAlreadyHasImage => widget.initialMemo?.hasImage ?? false;
+  /// 편집을 시작한 시점에 이 메모가 이미 이미지 한도 한 자리를 차지하고
+  /// 있었는지(로컬 DB 기준 — PHOTO이거나 이미지가 있던 메모). 편집 중
+  /// 제거/재선택 여부와 무관하게 고정된 값이다 — 한도 계산은 "지금 이 메모가
+  /// 이미 한 자리를 차지하고 있었는가"만 보면 된다.
+  bool get _memoAlreadyCounted =>
+      widget.initialMemo?.countsTowardNoteImageLimit ?? false;
 
   bool get _canAttachImage => widget.attachmentLimitPolicy.canAttachNoteImage(
     currentImageMemoCount: widget.currentImageMemoCount,
-    memoAlreadyHasImage: _memoAlreadyHasImage,
+    memoAlreadyCounted: _memoAlreadyCounted,
   );
 
   @override
@@ -1307,7 +1310,9 @@ class _PhotoPicker extends StatelessWidget {
     return Semantics(
       container: true,
       label: '선택한 사진',
-      hint: allowDelete ? '탭하면 사진을 크게 보고 변경·삭제할 수 있습니다.' : '탭하면 사진을 크게 보고 변경할 수 있습니다.',
+      hint: allowDelete
+          ? '탭하면 사진을 크게 보고 변경·삭제할 수 있습니다.'
+          : '탭하면 사진을 크게 보고 변경할 수 있습니다.',
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: AspectRatio(

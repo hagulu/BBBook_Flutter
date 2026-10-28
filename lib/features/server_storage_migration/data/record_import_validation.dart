@@ -77,8 +77,9 @@ String? validateRecordImportSnapshot({
   if (_hasDuplicate(memos.map((m) => m.clientRequestId))) {
     return '메모 데이터에 중복된 식별자가 있어 가져올 수 없습니다.';
   }
-  // 서버는 PHOTO 메모를 저장할 때마다 그 노트의 활성 PHOTO 메모 수를 세어
-  // 한도에 닿으면 400(NOTE_IMAGE_LIMIT_EXCEEDED)으로 세션 전체를 정리한다.
+  // 서버는 일반 저장과 같은 개수 기준(`images/count`)으로, 아직 이미지가
+  // 연결되지 않은 Import PHOTO 메모까지 세어 한도에 닿으면
+  // 400(NOTE_IMAGE_LIMIT_EXCEEDED)으로 세션 전체를 정리한다.
   final photoCountByNote = <int, int>{};
   for (final memo in memos) {
     if (memo.type != BookNoteMemoType.photo) continue;

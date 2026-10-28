@@ -392,7 +392,7 @@ class _BookNoteDetailScreenState extends ConsumerState<BookNoteDetailScreen> {
 
   int get _currentImageMemoCount {
     final memos = ref.read(bookNoteDetailProvider(_args)).valueOrNull?.memos;
-    return memos?.where((memo) => memo.hasImage).length ?? 0;
+    return memos?.where((memo) => memo.countsTowardNoteImageLimit).length ?? 0;
   }
 
   Future<void> _addMemo() async {

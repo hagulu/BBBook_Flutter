@@ -12,7 +12,7 @@ void main() {
       expect(
         policy.canAttachNoteImage(
           currentImageMemoCount: 2,
-          memoAlreadyHasImage: false,
+          memoAlreadyCounted: false,
         ),
         isTrue,
       );
@@ -22,17 +22,17 @@ void main() {
       expect(
         policy.canAttachNoteImage(
           currentImageMemoCount: 3,
-          memoAlreadyHasImage: false,
+          memoAlreadyCounted: false,
         ),
         isFalse,
       );
     });
 
-    test('한도를 넘겨도 이미 이미지가 있던 메모의 교체는 항상 허용한다', () {
+    test('한도를 넘겨도 이미 한 자리를 차지하던 메모의 교체는 항상 허용한다', () {
       expect(
         policy.canAttachNoteImage(
           currentImageMemoCount: 3,
-          memoAlreadyHasImage: true,
+          memoAlreadyCounted: true,
         ),
         isTrue,
       );
@@ -41,7 +41,10 @@ void main() {
 
   group('AttachmentLimitPolicy.reflectionImageAllowed', () {
     test('한도가 0이면 독후감 이미지 첨부가 허용되지 않는다', () {
-      expect(AttachmentLimitPolicy.defaultPolicy.reflectionImageAllowed, isFalse);
+      expect(
+        AttachmentLimitPolicy.defaultPolicy.reflectionImageAllowed,
+        isFalse,
+      );
     });
 
     test('한도가 0보다 크면 독후감 이미지 첨부가 허용된다', () {

@@ -251,12 +251,13 @@ class BookNoteDao {
         userBookId: userBookId,
         noteId: noteId,
       );
-      // `cleared`가 아니면 저장 후 이미지가 남는다 — `unchanged`는 이미
-      // 이미지가 있던 메모에서만 나오므로(편집 화면이 제출 전 강제한다),
-      // 자기 자신을 개수에서 뺀 채 확인하면 교체·유지는 항상 통과하고
-      // 새로 이미지가 생기는 경우만 한도에 걸린다.
+      // `cleared`가 아니면 저장 후 이미지가 남는다. 이미 한도 한 자리를
+      // 차지하던 메모(PHOTO이거나 이미지가 있던 메모)의 교체·유지는 개수가
+      // 늘지 않으므로 서버처럼 한도와 무관하게 허용하고, 새로 자리를
+      // 차지하게 되는 경우만 자기 자신을 뺀 개수로 확인한다.
       if (draft.imageChange != MemoImageChange.cleared &&
-          noteImageLimit != null) {
+          noteImageLimit != null &&
+          !await _isCountedImageMemo(txn, noteId, noteMemoId)) {
         final count = await _countImageMemos(
           txn,
           noteId,
@@ -1234,9 +1235,15 @@ class BookNoteDao {
     if (rows.isEmpty) throw StateError('Note not found');
   }
 
-  /// 노트 안에서 이미지가 첨부된(삭제되지 않은) 메모 개수. [excludeMemoId]를
-  /// 주면 그 메모 자신은 제외한다 — 수정 중인 메모가 이미 이미지를 갖고
-  /// 있었다면 자기 자신 때문에 한도에 걸리지 않게 하기 위함이다.
+  /// 노트 이미지 한도에 들어가는 메모의 조건([BookNoteMemo.countsTowardNoteImageLimit]과
+  /// 같은 기준). 서버 개수(`images/count`)는 Import로 만들어져 아직 이미지가
+  /// 연결되지 않은 PHOTO 메모도 포함하므로 이미지 유무만으로 세지 않는다.
+  static const _countedImageMemoCondition =
+      '(memo_type = ? OR image_url IS NOT NULL OR local_image_path IS NOT NULL)';
+
+  /// 노트 안에서 이미지 한도에 들어가는(삭제되지 않은) 메모 개수.
+  /// [excludeMemoId]를 주면 그 메모 자신은 제외한다 — 수정 중인 메모가
+  /// 새로 자리를 차지하게 될 때 자기 자신을 이중으로 세지 않기 위함이다.
   Future<int> _countImageMemos(
     Transaction txn,
     int noteId, {
@@ -1245,9 +1252,9 @@ class BookNoteDao {
     final where = <String>[
       'note_id = ?',
       'deleted_at IS NULL',
-      '(image_url IS NOT NULL OR local_image_path IS NOT NULL)',
+      _countedImageMemoCondition,
     ];
-    final args = <Object?>[noteId];
+    final args = <Object?>[noteId, BookNoteMemoType.photo.dbValue];
     if (excludeMemoId != null) {
       where.add('id != ?');
       args.add(excludeMemoId);
@@ -1257,6 +1264,21 @@ class BookNoteDao {
       args,
     );
     return (rows.single['c'] as int?) ?? 0;
+  }
+
+  /// 수정 전의 이 메모가 이미 이미지 한도 한 자리를 차지하고 있었는지.
+  Future<bool> _isCountedImageMemo(
+    Transaction txn,
+    int noteId,
+    int noteMemoId,
+  ) async {
+    final rows = await txn.rawQuery(
+      'SELECT 1 FROM book_note_memo '
+      'WHERE id = ? AND note_id = ? AND deleted_at IS NULL '
+      'AND $_countedImageMemoCondition LIMIT 1',
+      [noteMemoId, noteId, BookNoteMemoType.photo.dbValue],
+    );
+    return rows.isNotEmpty;
   }
 
   static BookNote _noteFromRow(Map<String, Object?> row) {

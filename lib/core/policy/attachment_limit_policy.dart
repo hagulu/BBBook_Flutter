@@ -12,7 +12,8 @@ class AttachmentLimitPolicy {
     required this.reflectionImageLimit,
   });
 
-  /// 노트 1개당 이미지가 첨부된 메모의 최대 개수.
+  /// 노트 1개당 이미지 한도에 들어가는 메모의 최대 개수(이미지가 첨부된
+  /// 메모 + 아직 이미지가 연결되지 않은 PHOTO 메모 — 서버 `images/count` 기준).
   final int noteImageLimit;
 
   /// 독후감에 첨부 가능한 이미지 개수(0이면 첨부 자체가 불가능하다는 뜻).
@@ -32,15 +33,16 @@ class AttachmentLimitPolicy {
 
   bool get reflectionImageAllowed => reflectionImageLimit > 0;
 
-  /// [currentImageMemoCount]는 노트 안에서 이미지가 첨부된(삭제되지 않은)
-  /// 메모의 개수, [memoAlreadyHasImage]는 지금 편집 중인 메모가 이미 그
-  /// 개수에 포함돼 있는지 여부다. 기존 이미지를 교체하는 동작은 새로
-  /// 개수를 늘리지 않으므로 한도와 무관하게 항상 허용한다.
+  /// [currentImageMemoCount]는 노트 안에서 한도에 들어가는(삭제되지 않은)
+  /// 메모의 개수(`BookNoteMemo.countsTowardNoteImageLimit` 기준),
+  /// [memoAlreadyCounted]는 지금 편집 중인 메모가 이미 그 개수에 포함돼
+  /// 있는지 여부다. 기존 PHOTO 메모의 이미지를 교체하는 동작은 새로 개수를
+  /// 늘리지 않으므로 한도와 무관하게 항상 허용한다.
   bool canAttachNoteImage({
     required int currentImageMemoCount,
-    required bool memoAlreadyHasImage,
+    required bool memoAlreadyCounted,
   }) {
-    if (memoAlreadyHasImage) return true;
+    if (memoAlreadyCounted) return true;
     return currentImageMemoCount < noteImageLimit;
   }
 
