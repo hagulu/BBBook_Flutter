@@ -29,11 +29,14 @@
 			<array>
 				<string>kakao$(KAKAO_NATIVE_APP_KEY)</string>
 				<string>$(NAVER_URL_SCHEME)</string>
+				<string>com.googleusercontent.apps.585070787661-r81a5da5htlmonm3e6o9a57cqm3437ri</string>
 			</array>
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>GIDClientID</key>
+	<string>585070787661-r81a5da5htlmonm3e6o9a57cqm3437ri.apps.googleusercontent.com</string>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-3940256099942544~1458002511</string>
 	<key>KakaoNativeAppKey</key>

@@ -22,7 +22,7 @@ class SocialAuthService {
   );
   // 백엔드가 id_token의 audience를 검증하므로 값이 백엔드 설정과 일치해야 한다.
   static const _googleClientId =
-      '585070787661-73kr7939i6slm4c1r53egdn2mi9c48si.apps.googleusercontent.com';
+      '585070787661-r81a5da5htlmonm3e6o9a57cqm3437ri.apps.googleusercontent.com';
   static const _googleServerClientId =
       '585070787661-nm9rlng3ab2pccff926ot80and5pgolt.apps.googleusercontent.com';
 
