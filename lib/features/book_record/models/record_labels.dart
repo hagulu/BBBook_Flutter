@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../bookshelf/models/book_status.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
@@ -99,5 +100,12 @@ enum DifficultyLevel {
     DifficultyLevel.easy => PhosphorIconsRegular.smiley,
     DifficultyLevel.moderate => PhosphorIconsRegular.smileyMeh,
     DifficultyLevel.hard => PhosphorIconsRegular.smileyMelting,
+  };
+
+  /// 선택된 난이도 아이콘에 입히는 색(쉬움=초록, 보통=주황, 어려움=빨강).
+  Color get color => switch (this) {
+    DifficultyLevel.easy => AppColors.pollGreen,
+    DifficultyLevel.moderate => AppColors.pollAmber,
+    DifficultyLevel.hard => AppColors.error,
   };
 }

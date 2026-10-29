@@ -11,6 +11,7 @@ import 'icon_option_selector.dart';
 import 'pill_option.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
+import '../../../../shared/widgets/keyboard_done_bar.dart';
 
 /// 독서 상태 선택 팝업. 책 검색 상세의 서재 담기 시트와 같은 아이콘 카드
 /// 디자인을 쓰되, 책 기록 상세에서 관리하는 5개 상태를 모두 노출한다.
@@ -242,8 +243,7 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
           : widget.initialStatsTotalPages;
       final willReset =
           involvesAudioBook ||
-          (newTotalPages != null &&
-              widget.initialCurrentPage > newTotalPages);
+          (newTotalPages != null && widget.initialCurrentPage > newTotalPages);
       if (willReset) {
         final confirmed = await AppConfirm.show(
           context,
@@ -369,14 +369,16 @@ class _SourcePlatformDialogState extends State<_SourcePlatformDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            TextField(
-              controller: _ebookPagesController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(
-                isDense: true,
-                hintText: '입력하지 않으면 종이책 페이지 사용',
-                counterText: '',
+            KeyboardDoneBar(
+              child: TextField(
+                controller: _ebookPagesController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(
+                  isDense: true,
+                  hintText: '입력하지 않으면 종이책 페이지 사용',
+                  counterText: '',
+                ),
               ),
             ),
             const SizedBox(height: 6),

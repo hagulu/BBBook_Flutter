@@ -7,6 +7,7 @@ import '../../../bookshelf/models/book_item.dart';
 import '../../../bookshelf/models/record_patch.dart';
 import '../../providers/book_record_providers.dart';
 import 'record_section_card.dart';
+import '../../../../shared/widgets/keyboard_done_bar.dart';
 
 /// 전체 페이지(또는 오디오북 진행률 상한)를 아는 책에서만 노출되는 진행률
 /// 카드 — 노출 여부 자체는 호출부(`book_record_screen.dart`)가 결정한다.
@@ -180,30 +181,34 @@ class _ProgressCardState extends ConsumerState<ProgressCard>
               const Spacer(),
               SizedBox(
                 width: 56,
-                child: TextField(
-                  controller: _pageController,
-                  focusNode: _pageFocus,
-                  textAlign: TextAlign.end,
-                  keyboardType: TextInputType.number,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.of(context).textStrong,
-                  ),
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  onSubmitted: (_) => _commitPage(),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                    hintText: _pageHint,
-                    // 옅은 플레이스홀더 — 실제 입력값(textStrong)과 뚜렷이
-                    // 구분되도록 textMuted보다 더 옅게 낮춘다.
-                    hintStyle: TextStyle(
+                child: KeyboardDoneBar(
+                  // 포커스 해제만으로는 제출되지 않아 값이 되돌려지므로 먼저 적용한다.
+                  onDone: _commitPage,
+                  child: TextField(
+                    controller: _pageController,
+                    focusNode: _pageFocus,
+                    textAlign: TextAlign.end,
+                    keyboardType: TextInputType.number,
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.of(
-                        context,
-                      ).textMuted.withValues(alpha: 0.5),
+                      color: AppColors.of(context).textStrong,
+                    ),
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    onSubmitted: (_) => _commitPage(),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                      hintText: _pageHint,
+                      // 옅은 플레이스홀더 — 실제 입력값(textStrong)과 뚜렷이
+                      // 구분되도록 textMuted보다 더 옅게 낮춘다.
+                      hintStyle: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.of(
+                          context,
+                        ).textMuted.withValues(alpha: 0.5),
+                      ),
                     ),
                   ),
                 ),

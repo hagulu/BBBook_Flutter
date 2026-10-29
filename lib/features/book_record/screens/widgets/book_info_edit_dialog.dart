@@ -19,6 +19,7 @@ import 'bulk_link_progress_bar.dart';
 import 'isbn_link_dialog.dart';
 import 'isbn_link_search_sheet.dart';
 import '../../../../shared/widgets/record_dialog_shell.dart';
+import '../../../../shared/widgets/keyboard_done_bar.dart';
 
 /// "책 정보 수정" 모달(제목/저자/출판사/총쪽수/표지/카테고리/ISBN 연결).
 ///
@@ -390,10 +391,12 @@ class _BookInfoEditDialogState extends ConsumerState<BookInfoEditDialog> {
               const SizedBox(width: 10),
               SizedBox(
                 width: 120,
-                child: _labeledField(
-                  label: '총 쪽수',
-                  controller: _totalPagesController,
-                  keyboardType: TextInputType.number,
+                child: KeyboardDoneBar(
+                  child: _labeledField(
+                    label: '총 쪽수',
+                    controller: _totalPagesController,
+                    keyboardType: TextInputType.number,
+                  ),
                 ),
               ),
             ],

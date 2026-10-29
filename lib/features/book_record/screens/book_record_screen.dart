@@ -207,6 +207,7 @@ class _BookRecordBody extends ConsumerWidget {
                         Expanded(
                           child: RecordFieldTile(
                             label: '책 유형',
+                            singleLine: true,
                             value: _sourceSummary(book),
                             hasValue:
                                 BookSourceType.fromApiValue(book.sourceType) !=
@@ -321,10 +322,10 @@ class _BookRecordBody extends ConsumerWidget {
                                 )?.icon ??
                                 PhosphorIconsRegular.smileyMeh,
                             color:
-                                DifficultyLevel.fromApiValue(book.difficulty) !=
-                                    null
-                                ? AppColors.of(context).accentForeground
-                                : AppColors.of(context).textMuted,
+                                DifficultyLevel.fromApiValue(
+                                  book.difficulty,
+                                )?.color ??
+                                AppColors.of(context).textMuted,
                             placeholder:
                                 DifficultyLevel.fromApiValue(book.difficulty) ==
                                     null
@@ -832,15 +833,17 @@ class _IconField extends StatelessWidget {
             if (placeholder == null)
               Icon(icon, size: 24, color: color)
             else
-              Text(
-                placeholder!,
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.of(context).textMuted,
+              // 좁은 화면에서도 한 줄을 유지하도록 폭에 맞춰 글자를 줄인다.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  placeholder!,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.of(context).textMuted,
+                  ),
                 ),
               ),
           ],

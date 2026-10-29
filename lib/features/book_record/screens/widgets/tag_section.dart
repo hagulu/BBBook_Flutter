@@ -12,6 +12,9 @@ import 'package:phosphor_icons/phosphor_icons.dart';
 
 /// 책 상세에는 태그명만 간결히 보여주고, 선택/삭제/검색은 태그 관리 시트에서
 /// 한 번에 처리한다.
+/// 한 줄 가로 스크롤로 보여주는 추천 태그 최대 개수.
+const _kMaxSuggestions = 10;
+
 class TagSection extends ConsumerWidget {
   const TagSection({super.key, required this.userBookId, required this.tags});
 
@@ -302,7 +305,9 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
                 ),
             textInputAction: TextInputAction.done,
             onChanged: (_) => setState(() => _errorText = null),
-            onSubmitted: (name) => _submit(name, existingTags),
+            // onEditingComplete를 지정하면 완료 액션의 기본 동작(포커스 해제 →
+            // 키보드 내려감)이 사라져, 추가 후에도 키보드를 유지한 채 연속 입력된다.
+            onEditingComplete: () => _submit(_controller.text, existingTags),
             decoration: InputDecoration(
               isDense: true,
               hintText: atLimit ? '태그는 최대 10개까지 추가할 수 있습니다.' : '태그 입력',
@@ -322,9 +327,6 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
             ),
           Builder(
             builder: (context) {
-              if (!_suggestionsLoaded || _allSuggestions.isEmpty) {
-                return const SizedBox.shrink();
-              }
               final existingNames = existingTags.map((t) => t.name).toSet();
               final queryLower = query.toLowerCase();
               final filtered = _allSuggestions
@@ -336,9 +338,7 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
                   .toList();
               final visible = atLimit
                   ? <BookTag>[]
-                  : query.isEmpty
-                  ? filtered.take(5).toList()
-                  : filtered;
+                  : filtered.take(_kMaxSuggestions).toList();
               return Padding(
                 padding: const EdgeInsets.only(top: 12),
                 child: Column(
@@ -353,24 +353,44 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxHeight: 160),
-                      child: SingleChildScrollView(
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final tag in visible)
-                              PillOption(
-                                key: ValueKey('suggestion-${tag.id}'),
-                                label: tag.name,
-                                icon: PhosphorIconsRegular.plus,
-                                selected: false,
-                                onTap: () => _submit(tag.name, existingTags),
+                    // 입력/추가에 따라 목록이 바뀌어도 시트 높이가 오르락내리락
+                    // 하지 않도록 한 줄 높이를 고정하고, 넘치면 가로로 스크롤한다.
+                    SizedBox(
+                      height: 40,
+                      child: visible.isEmpty
+                          ? Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                !_suggestionsLoaded
+                                    ? '추천 태그를 불러오는 중...'
+                                    : '추천할 태그가 없습니다.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.of(context).textMuted,
+                                ),
                               ),
-                          ],
-                        ),
-                      ),
+                            )
+                          : _EdgeFade(
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: visible.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(width: 8),
+                                itemBuilder: (context, index) {
+                                  final tag = visible[index];
+                                  return Center(
+                                    child: PillOption(
+                                      key: ValueKey('suggestion-${tag.id}'),
+                                      label: tag.name,
+                                      icon: PhosphorIconsRegular.plus,
+                                      selected: false,
+                                      onTap: () =>
+                                          _submit(tag.name, existingTags),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -378,6 +398,70 @@ class _TagInputSheetState extends ConsumerState<_TagInputSheet> {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 가로 스크롤 자식의 양끝을 부드럽게 흐려, 목록이 더 있음을 알리고 끝이
+/// 뚝 잘려 보이지 않게 한다. 실제로 넘치는 쪽에만 페이드를 적용한다.
+class _EdgeFade extends StatefulWidget {
+  const _EdgeFade({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_EdgeFade> createState() => _EdgeFadeState();
+}
+
+class _EdgeFadeState extends State<_EdgeFade> {
+  static const _fadeWidth = 24.0;
+
+  bool _fadeStart = false;
+  bool _fadeEnd = false;
+
+  bool _onMetrics(ScrollMetrics m) {
+    final start = m.pixels > m.minScrollExtent + 1;
+    final end = m.pixels < m.maxScrollExtent - 1;
+    if (start != _fadeStart || end != _fadeEnd) {
+      // 레이아웃 중에 알림이 올 수 있어 다음 프레임에 반영한다.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _fadeStart = start;
+          _fadeEnd = end;
+        });
+      });
+    }
+    return false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (n) => _onMetrics(n.metrics),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (n) => _onMetrics(n.metrics),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final fraction = constraints.maxWidth > 0
+                ? (_fadeWidth / constraints.maxWidth).clamp(0.0, 0.5)
+                : 0.0;
+            return ShaderMask(
+              blendMode: BlendMode.dstIn,
+              shaderCallback: (rect) => LinearGradient(
+                colors: [
+                  _fadeStart ? Colors.transparent : Colors.black,
+                  Colors.black,
+                  Colors.black,
+                  _fadeEnd ? Colors.transparent : Colors.black,
+                ],
+                stops: [0, fraction, 1 - fraction, 1],
+              ).createShader(rect),
+              child: widget.child,
+            );
+          },
+        ),
       ),
     );
   }

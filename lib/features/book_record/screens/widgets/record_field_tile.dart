@@ -27,6 +27,7 @@ class RecordFieldTile extends StatelessWidget {
     this.labelStyle,
     this.valueStyle,
     this.placeholderStyle,
+    this.singleLine = false,
   });
 
   final String label;
@@ -42,6 +43,9 @@ class RecordFieldTile extends StatelessWidget {
   final TextStyle? labelStyle;
   final TextStyle? valueStyle;
   final TextStyle? placeholderStyle;
+
+  /// 값을 항상 한 줄로 두고, 폭이 모자라면 글자를 비율대로 줄인다.
+  final bool singleLine;
 
   @override
   Widget build(BuildContext context) {
@@ -78,36 +82,41 @@ class RecordFieldTile extends StatelessWidget {
                 const SizedBox(width: 4),
               ],
               Flexible(
-                child: Text.rich(
-                  TextSpan(
-                    style: hasValue && valueStyle != null
-                        ? valueStyle
-                        : !hasValue && placeholderStyle != null
-                        ? placeholderStyle
-                        : TextStyle(
-                            fontSize: hasValue ? 15 : 13,
-                            fontWeight: hasValue
-                                ? FontWeight.w600
-                                : FontWeight.w500,
-                            color: hasValue
-                                ? AppColors.of(context).textStrong
-                                : AppColors.of(context).textMuted,
+                child: _fitIfSingleLine(
+                  Text.rich(
+                    TextSpan(
+                      style: hasValue && valueStyle != null
+                          ? valueStyle
+                          : !hasValue && placeholderStyle != null
+                          ? placeholderStyle
+                          : TextStyle(
+                              fontSize: hasValue ? 15 : 13,
+                              fontWeight: hasValue
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                              color: hasValue
+                                  ? AppColors.of(context).textStrong
+                                  : AppColors.of(context).textMuted,
+                            ),
+                      children: [
+                        TextSpan(text: value),
+                        if (hasValue && valueSecondary != null)
+                          TextSpan(
+                            text: ' · $valueSecondary',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.of(context).textMuted,
+                            ),
                           ),
-                    children: [
-                      TextSpan(text: value),
-                      if (hasValue && valueSecondary != null)
-                        TextSpan(
-                          text: ' · $valueSecondary',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.of(context).textMuted,
-                          ),
-                        ),
-                    ],
+                      ],
+                    ),
+                    maxLines: singleLine ? 1 : 2,
+                    overflow: singleLine
+                        ? TextOverflow.visible
+                        : TextOverflow.ellipsis,
+                    softWrap: !singleLine,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -116,4 +125,12 @@ class RecordFieldTile extends StatelessWidget {
       ),
     );
   }
+
+  Widget _fitIfSingleLine(Widget child) => singleLine
+      ? FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: child,
+        )
+      : child;
 }

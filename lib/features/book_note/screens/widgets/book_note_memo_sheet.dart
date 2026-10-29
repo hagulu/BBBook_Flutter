@@ -19,6 +19,7 @@ import '../memo_photo_camera_screen.dart';
 import 'book_note_ai_memo_composer_screen.dart';
 import 'highlight_text_field.dart';
 import 'memo_ocr_capture.dart';
+import '../../../../shared/widgets/keyboard_done_bar.dart';
 
 Future<BookNoteMemoDraft?> showBookNoteMemoEditor(
   BuildContext context, {
@@ -894,107 +895,118 @@ class _EditorToolbar extends StatelessWidget {
               top: BorderSide(color: AppColors.of(context).border),
             ),
           ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final actionWidth = onExtract == null ? 108.0 : 200.0;
-              final pageWidth = (constraints.maxWidth - actionWidth).clamp(
-                92.0,
-                148.0,
-              );
-              return Row(
-                children: [
-                  SizedBox(
-                    width: pageWidth,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _PageInput(
-                            controller: startPageController,
-                            hintText: '시작',
-                            textInputAction: TextInputAction.next,
-                            onChanged: onPageChanged,
-                          ),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 4),
-                          child: Text(
-                            '–',
-                            style: TextStyle(
-                              color: AppColors.of(context).textMuted,
+          // 숫자 입력 중 키보드 위에 뜨는 완료 바가 툴바를 덮지 않도록,
+          // 떠 있는 동안 그 높이만큼 툴바를 위로 올린다.
+          child: ValueListenableBuilder<bool>(
+            valueListenable: KeyboardDoneBar.isShown,
+            builder: (context, doneBarShown, child) => Padding(
+              padding: EdgeInsets.only(
+                bottom: doneBarShown ? KeyboardDoneBar.height : 0,
+              ),
+              child: child,
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final actionWidth = onExtract == null ? 108.0 : 200.0;
+                final pageWidth = (constraints.maxWidth - actionWidth).clamp(
+                  92.0,
+                  148.0,
+                );
+                return Row(
+                  children: [
+                    SizedBox(
+                      width: pageWidth,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _PageInput(
+                              controller: startPageController,
+                              hintText: '시작',
+                              textInputAction: TextInputAction.next,
+                              onChanged: onPageChanged,
                             ),
                           ),
-                        ),
-                        Expanded(
-                          child: _PageInput(
-                            controller: endPageController,
-                            hintText: '끝',
-                            textInputAction: TextInputAction.done,
-                            onChanged: onPageChanged,
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 4),
+                            child: Text(
+                              '–',
+                              style: TextStyle(
+                                color: AppColors.of(context).textMuted,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Spacer(),
-                  const SizedBox(width: 8),
-                  if (onExtract != null) ...[
-                    SizedBox(
-                      width: 78,
-                      child: _EditorToolButton(
-                        icon: PhosphorIconsRegular.camera,
-                        label: '추출',
-                        foreground: AppColors.of(context).memoQuoteForeground,
-                        background: AppColors.of(context).memoQuoteSurface,
-                        onTap: onExtract,
+                          Expanded(
+                            child: _PageInput(
+                              controller: endPageController,
+                              hintText: '끝',
+                              textInputAction: TextInputAction.done,
+                              onChanged: onPageChanged,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 14),
-                  ],
-                  SizedBox(
-                    width: 100,
-                    height: 48,
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 78,
-                          child: _EditorToolButton(
-                            icon: PhosphorIconsRegular.highlighter,
-                            label: '강조',
-                            foreground: isActive
-                                ? AppColors.highlightGold
-                                : AppColors.of(context).textMuted,
-                            background: isActive
-                                ? AppColors.of(context).highlightGoldSurface
-                                : AppColors.of(context).surfaceSubtle,
-                            selected: isActive,
-                            enabled: toggleEnabled,
-                            onTap: onToggleHighlight,
-                          ),
+                    const Spacer(),
+                    const SizedBox(width: 8),
+                    if (onExtract != null) ...[
+                      SizedBox(
+                        width: 78,
+                        child: _EditorToolButton(
+                          icon: PhosphorIconsRegular.camera,
+                          label: '추출',
+                          foreground: AppColors.of(context).memoQuoteForeground,
+                          background: AppColors.of(context).memoQuoteSurface,
+                          onTap: onExtract,
                         ),
-                        const SizedBox(width: 2),
-                        SizedBox(
-                          width: 20,
-                          child: IconButton(
-                            onPressed: onShowHelp,
-                            tooltip: '강조 사용법',
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints.tightFor(
-                              width: 20,
-                              height: 48,
-                            ),
-                            icon: Icon(
-                              PhosphorIconsRegular.info,
-                              size: 18,
-                              color: AppColors.of(context).textMuted,
+                      ),
+                      const SizedBox(width: 14),
+                    ],
+                    SizedBox(
+                      width: 100,
+                      height: 48,
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 78,
+                            child: _EditorToolButton(
+                              icon: PhosphorIconsRegular.highlighter,
+                              label: '강조',
+                              foreground: isActive
+                                  ? AppColors.highlightGold
+                                  : AppColors.of(context).textMuted,
+                              background: isActive
+                                  ? AppColors.of(context).highlightGoldSurface
+                                  : AppColors.of(context).surfaceSubtle,
+                              selected: isActive,
+                              enabled: toggleEnabled,
+                              onTap: onToggleHighlight,
                             ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 2),
+                          SizedBox(
+                            width: 20,
+                            child: IconButton(
+                              onPressed: onShowHelp,
+                              tooltip: '강조 사용법',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints.tightFor(
+                                width: 20,
+                                height: 48,
+                              ),
+                              icon: Icon(
+                                PhosphorIconsRegular.info,
+                                size: 18,
+                                color: AppColors.of(context).textMuted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              );
-            },
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -1017,59 +1029,69 @@ class _PageInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      textInputAction: textInputAction,
-      textAlign: TextAlign.center,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      style: TextStyle(
-        color: AppColors.of(context).textBody,
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-      decoration: InputDecoration(
-        hintText: hintText,
-        prefixIcon: Align(
-          alignment: Alignment.centerRight,
-          widthFactor: 1,
-          heightFactor: 1,
-          child: Padding(
-            padding: EdgeInsets.only(left: 3),
-            child: Text(
-              'p.',
-              style: TextStyle(
-                color: AppColors.of(context).textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+    return KeyboardDoneBar(
+      child: TextField(
+        controller: controller,
+        keyboardType: TextInputType.number,
+        textInputAction: textInputAction,
+        textAlign: TextAlign.center,
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        style: TextStyle(
+          color: AppColors.of(context).textBody,
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+        ),
+        decoration: InputDecoration(
+          hintText: hintText,
+          prefixIcon: Align(
+            alignment: Alignment.centerRight,
+            widthFactor: 1,
+            heightFactor: 1,
+            child: Padding(
+              padding: EdgeInsets.only(left: 3),
+              child: Text(
+                'p.',
+                style: TextStyle(
+                  color: AppColors.of(context).textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 18,
+            minHeight: 0,
+          ),
+          hintStyle: TextStyle(
+            color: AppColors.of(context).textMuted,
+            fontSize: 12,
+            fontWeight: FontWeight.normal,
+          ),
+          filled: true,
+          fillColor: AppColors.of(context).surfaceSubtle,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 2,
+            vertical: 8,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: AppColors.of(context).border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: AppColors.of(context).border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(
+              color: AppColors.of(context).accentForeground,
+            ),
+          ),
         ),
-        prefixIconConstraints: const BoxConstraints(minWidth: 18, minHeight: 0),
-        hintStyle: TextStyle(
-          color: AppColors.of(context).textMuted,
-          fontSize: 12,
-          fontWeight: FontWeight.normal,
-        ),
-        filled: true,
-        fillColor: AppColors.of(context).surfaceSubtle,
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: AppColors.of(context).border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: AppColors.of(context).border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: AppColors.of(context).accentForeground),
-        ),
+        onChanged: (_) => onChanged(),
       ),
-      onChanged: (_) => onChanged(),
     );
   }
 }
@@ -1094,48 +1116,59 @@ class _TypeSelector extends StatelessWidget {
         color: AppColors.of(context).surface,
         border: Border(bottom: BorderSide(color: AppColors.of(context).border)),
       ),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final type in BookNoteMemoType.values)
-            Builder(
-              builder: (context) {
-                final style = _NoteMemoTypeChoiceStyle.of(context, type);
-                final selected = selectedType == type;
-                final enabled = !lockToSelectedType || selected;
-                return Opacity(
-                  opacity: enabled ? 1 : 0.38,
-                  child: ChoiceChip(
-                    avatar: Icon(style.icon, size: 16, color: style.foreground),
-                    label: Text(type.label),
-                    selected: selected,
-                    showCheckmark: false,
-                    selectedColor: style.background,
-                    backgroundColor: style.background.withValues(alpha: 0.48),
-                    disabledColor: style.background.withValues(alpha: 0.32),
-                    side: BorderSide(
-                      color: selected
-                          ? style.foreground
-                          : AppColors.of(context).border,
-                      width: selected ? 1.5 : 1,
+      // 좁은 화면(iPhone SE 등)에서도 한 줄을 유지하도록 폭에 맞춰 비율대로 축소한다.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final type in BookNoteMemoType.values) ...[
+              if (type != BookNoteMemoType.values.first)
+                const SizedBox(width: 8),
+              Builder(
+                builder: (context) {
+                  final style = _NoteMemoTypeChoiceStyle.of(context, type);
+                  final selected = selectedType == type;
+                  final enabled = !lockToSelectedType || selected;
+                  return Opacity(
+                    opacity: enabled ? 1 : 0.38,
+                    child: ChoiceChip(
+                      avatar: Icon(
+                        style.icon,
+                        size: 16,
+                        color: style.foreground,
+                      ),
+                      label: Text(type.label),
+                      selected: selected,
+                      showCheckmark: false,
+                      selectedColor: style.background,
+                      backgroundColor: style.background.withValues(alpha: 0.48),
+                      disabledColor: style.background.withValues(alpha: 0.32),
+                      side: BorderSide(
+                        color: selected
+                            ? style.foreground
+                            : AppColors.of(context).border,
+                        width: selected ? 1.5 : 1,
+                      ),
+                      shape: const StadiumBorder(),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 11,
+                        vertical: 7,
+                      ),
+                      labelStyle: TextStyle(
+                        color: style.foreground,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      onSelected: enabled ? (_) => onSelected(type) : null,
                     ),
-                    shape: const StadiumBorder(),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: 7,
-                    ),
-                    labelStyle: TextStyle(
-                      color: style.foreground,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    onSelected: enabled ? (_) => onSelected(type) : null,
-                  ),
-                );
-              },
-            ),
-        ],
+                  );
+                },
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

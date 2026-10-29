@@ -19,6 +19,7 @@ import '../../../bookshelf/models/book_category.dart';
 import '../../../bookshelf/models/book_status.dart';
 import '../../../bookshelf/models/record_patch.dart';
 import '../../../bookshelf/providers/bookshelf_providers.dart';
+import '../../../../shared/widgets/keyboard_done_bar.dart';
 
 /// "직접 등록" 모달(book-search.md, `CustomBookModal` add 모드 대응). 항목은
 /// 책 기록 상세의 "책 정보 수정" 팝업(표지/제목/저자/출판사/카테고리/총쪽수)과
@@ -280,10 +281,12 @@ class _CustomBookDialogState extends ConsumerState<_CustomBookDialog> {
               const SizedBox(width: 10),
               SizedBox(
                 width: 120,
-                child: _labeledField(
-                  label: '총 쪽수',
-                  controller: _totalPagesController,
-                  keyboardType: TextInputType.number,
+                child: KeyboardDoneBar(
+                  child: _labeledField(
+                    label: '총 쪽수',
+                    controller: _totalPagesController,
+                    keyboardType: TextInputType.number,
+                  ),
                 ),
               ),
             ],

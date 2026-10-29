@@ -241,6 +241,7 @@
 - `lib/shared/widgets/app_bar_title.dart` — 공통 앱바 타이틀(전역 축소 글씨 크기, `subtitle` 지정 시 제목 아래 작게 배치)
 - `lib/shared/widgets/app_confirm.dart` — 공통 Confirm 팝업(확인/취소, Future<bool> 반환 — `choose()`는 취소 버튼과 닫힘을 구분해 Future<bool?> 반환)
 - `lib/shared/widgets/app_loading.dart` — 공통 Loading(전체 화면 `AppLoading`, 영역 단위 `AppLoadingOverlay`)
+- `lib/shared/widgets/keyboard_done_bar.dart` — iOS 숫자 키패드용 키보드 상단 "완료" 바(포커스 시 표시, iOS 외에는 무동작)
 - `lib/shared/widgets/ai_generating_view.dart` — AI 생성 전용 대기 표시(반짝이는 아이콘 애니메이션 + 직관적 상태 문구 + 순차 점 3개, `AiGeneratingView`), 전체 화면 오버레이 버전 `AppAiLoading` — AI 메모/독후감 생성 두 진입점만 공유
 - `lib/shared/widgets/app_snackbar.dart` — 공통 SnackBar(pill 형태, 성공/정보는 아이덴티티 컬러·에러는 에러 컬러 반투명 배경 + 상태 아이콘)
 - `lib/shared/widgets/app_pagination.dart` — 공통 숫자 페이지네이션(항상 첫/마지막 페이지 노출, 현재 페이지 주변만 펼치고 나머지는 `···` 생략, `buildPaginationRange` 순수 함수 + `AppPagination` 위젯)
@@ -278,3 +279,4 @@
 - `docs/review/20261027-184712-current-storage-migration-review.md` — 저장 방식 전환 변경분의 이미지 미확보 상태에서 서버 정리 재시도 시 이미지 손실 가능성 코드 리뷰 결과
 - `docs/review/20261028-110846-current-note-image-limit-review.md` — 노트 이미지 한도 집계·교체 허용 변경분과 iOS 앱·테스트 타깃 서명 팀 불일치 코드 리뷰 결과
 - `docs/review/20261029-141548-current-camera-orientation-review.md` — 공용 카메라 iOS 방향 보정 변경분의 회전본 저장 실패 시 원본 손상 가능성 코드 리뷰 결과
+- `docs/review/20261029-143117-current-keyboard-input-review.md` — iOS 숫자 키패드 완료 바 변경분의 진행률 입력 취소·메모 쪽수 입력란 가림 코드 리뷰 결과
