@@ -3,8 +3,10 @@ import 'dart:developer' as developer;
 import 'dart:io';
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image/image.dart' as img;
 import 'package:native_device_orientation/native_device_orientation.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -140,6 +142,8 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
 
   CameraCapturePolicy get _policy => widget.policy;
 
+  static bool get _isIos => defaultTargetPlatform == TargetPlatform.iOS;
+
   bool get _isInitializingCamera =>
       _initializingGeneration == _cameraGeneration;
 
@@ -206,8 +210,12 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
         return;
       }
       try {
+        // iOS는 잠근 방향대로 미리보기 텍스처까지 돌아가 화면이 찌그러지므로
+        // 항상 세로로 고정하고, 기기 자세는 촬영 결과에 회전값으로만 반영한다.
         await controller.lockCaptureOrientation(
-          orientation.deviceOrientation ?? DeviceOrientation.portraitUp,
+          _isIos
+              ? DeviceOrientation.portraitUp
+              : orientation.deviceOrientation ?? DeviceOrientation.portraitUp,
         );
         result.complete(true);
       } catch (error, stackTrace) {
@@ -374,8 +382,12 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
       return;
     }
     setState(() => _isTakingPicture = true);
+    final captureOrientation = _deviceOrientation;
     try {
       final file = await controller.takePicture();
+      if (_isIos) {
+        await _rotateCaptureToDeviceOrientation(file.path, captureOrientation);
+      }
       final maxBytes = _policy.maxCaptureBytes;
       if (maxBytes != null) {
         final sizeBytes = await File(file.path).length();
@@ -522,7 +534,14 @@ class _SharedCameraScreenState extends State<SharedCameraScreen>
                     ),
                   ),
                 if (_policy.guideOverlayBuilder case final builder?)
-                  Positioned.fill(child: builder(context)),
+                  Positioned.fill(
+                    child: AnimatedRotation(
+                      turns: controlIconTurnsFor(_deviceOrientation),
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      child: builder(context),
+                    ),
+                  ),
                 if (_policy.hintText case final hint?)
                   Positioned(
                     left: 24,
@@ -677,6 +696,51 @@ Future<void> _disposeCameraQuietly(CameraController controller) async {
       error: error,
       stackTrace: stackTrace,
     );
+  }
+}
+
+/// 세로로 고정해 찍힌 사진을 촬영 당시 기기 자세에 맞게 픽셀 단위로 돌려
+/// 교체한다. 실패하면 원본을 그대로 둔다.
+Future<void> _rotateCaptureToDeviceOrientation(
+  String filePath,
+  NativeDeviceOrientation orientation,
+) async {
+  final degrees = switch (orientation) {
+    NativeDeviceOrientation.landscapeLeft => 270,
+    NativeDeviceOrientation.landscapeRight => 90,
+    NativeDeviceOrientation.portraitDown => 180,
+    _ => 0,
+  };
+  if (degrees == 0) return;
+  try {
+    await compute(_rotateJpegFile, (filePath, degrees));
+  } catch (error, stackTrace) {
+    developer.log(
+      '[공용 카메라 촬영] target=camera '
+      'result=FAIL reason=capture_rotate_error',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  }
+}
+
+Future<void> _rotateJpegFile((String, int) args) async {
+  final (filePath, degrees) = args;
+  final file = File(filePath);
+  final decoded = img.decodeImage(await file.readAsBytes());
+  if (decoded == null) return;
+  final rotated = img.copyRotate(img.bakeOrientation(decoded), angle: degrees);
+  // 원본을 바로 덮어쓰면 쓰기 도중 실패 시 촬영 파일이 손상되므로, 같은
+  // 디렉터리의 임시 파일에 다 쓴 뒤 교체한다.
+  final temp = File('$filePath.rotating');
+  try {
+    await temp.writeAsBytes(img.encodeJpg(rotated, quality: 95), flush: true);
+    await temp.rename(filePath);
+  } catch (_) {
+    try {
+      await temp.delete();
+    } catch (_) {}
+    rethrow;
   }
 }
 
